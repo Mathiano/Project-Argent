@@ -1,4 +1,4 @@
-# PROJECT ARGENT — Combat 2.0 Spec v0.2 (sim-validated)
+# PROJECT ARGENT — Combat 2.0 Spec v0.3.1 (sim-validated)
 
 **Format contract:** 160×144 screen, sprites + text box, D-pad/A/B/SELECT/START. No new buttons, no twitch inputs.
 **Budget rule:** every new system costs ≤1 bar or ≤1 glyph on screen. If it can't fit, it's cut.
@@ -56,7 +56,7 @@ The stance layer IS the show's vocabulary: *"Dodge it!" / "Brace!" / "Press the 
 
 | Matchup | Result |
 |---|---|
-| Guard vs Aggressive | **Counter** — attacker eats 0.5× reflected, staggered (timeline push) |
+| Guard vs Aggressive | **Counter** — attacker eats 0.5× of pre-mitigation damage (post-attacker-stance multiplier, pre-defender mitigation), staggered (timeline push) |
 | Fluid vs Guard | **Opening** — act first, their counter whiffs, your hit lands at 1.15× through a degraded guard (0.85× instead of 0.6×) |
 | Aggressive vs Fluid | **Speed contest** — dodge succeeds only with a real Speed edge; slow mons cannot dodge the big hit, fast ones can. The anime rule, made mechanical |
 | Mirror | No bonus exchange, base effects only |
@@ -67,14 +67,14 @@ The stance layer IS the show's vocabulary: *"Dodge it!" / "Brace!" / "Press the 
 
 Pool: 100 base, species-modified ±20. One bar under HP, both sides.
 
-| Action | Cost |
-|---|---|
-| Status move | 8 |
-| Light (≤60 BP) | 12 |
-| Mid (61–90) | 22 |
-| Heavy (91–120) | 35 |
-| Nuke (>120) | 55 + next action delayed |
-| Regen | +8 per action · Guard +6 · full rest +25 |
+| Action | Cost | Weight |
+|---|---|---|
+| Status move | 8 | — |
+| Light (≤60 BP) | 12 | 0.85 |
+| Mid (61–90) | 22 | 1.00 |
+| Heavy (91–120) | 35 | 1.15 |
+| Nuke (>120) | 55 + next action delayed | 1.30 |
+| Regen | +8 per action · Guard +6 · full rest +25 | — |
 
 > Sim note v0.2: regen cut from 12 — at +12, light moves were stamina-free and Guard was an infinite engine (turtle won every matchup). At +8/+6 even light spam slowly drains, exhaustion appears ~1 in 2 battles, and stall dies to the Opening.
 
@@ -110,7 +110,7 @@ Momentum fills from read-wins, dodges, super-effective hits, clash wins → ★ 
 |---|---|
 | "Hang on!" | Survive this action at 1 HP |
 | "Now — full power!" | Next move +50%, ignores stance modifiers |
-| "Catch your breath!" | Skip move, +40 stamina |
+| "Catch your breath!" | Skip move, +35 stamina |
 | "Get back!" | Free pivot switch that evades the incoming move |
 
 Leaders have Calls too — with bark-line tells (*"Miltank, wear them down..."*) that double as readable boss telegraphs.
