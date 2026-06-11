@@ -1,7 +1,7 @@
 # Project Argent
 
 GBC-style monster battler: Pokémon Silver reimagined with Combat 2.0 (stances, stamina, reads).
-160×144 logical resolution, integer-scaled. TypeScript + Vite + Canvas. No game framework — the engine must run headless.
+320×180 logical resolution, integer-scaled (per docs/pilot-exit-decisions.md §1). TypeScript + Vite + Canvas. No game framework — the engine must run headless.
 
 ## Source of truth
 
@@ -24,12 +24,13 @@ When code and docs conflict: **docs win**. Flag conflicts; never silently change
 - Fluid vs Guard: opening = ×1.15 through ×0.85 guard, Fluid side acts first, no counter
 - Aggressive vs Fluid: defender dodge p = clamp((spdDef/spdAtk − 1) × 2, 0, 0.9)
 - Aggressive vs Aggressive: clash — p(win) ∝ stamina × speed; loser whiffs and is staggered
-- Initiative: speed / move weight (0.85 / 1.0 / 1.15); stagger halves it
+- Tier weights (move): light 0.85 / mid 1.00 / heavy 1.15 / nuke 1.30
+- Initiative: speed / move weight; stagger halves it
 - ★ Momentum: +1 on read-wins (counter landed, opening landed, dodge succeeded, clash won), cap 2. Calls spend ★ (Catch Breath = rest action, +35 ST)
 
 ## Architecture rules
 
-- `src/engine/` — pure TS. Zero DOM/browser imports. Deterministic given an injected RNG (seedable; never `Math.random` here). Everything must run headless in Node.
+- `src/engine/` — pure TS. Zero DOM/browser imports — its tsconfig excludes DOM libs, so the headless rule is compiler-enforced. Deterministic given an injected RNG (seedable; never `Math.random` here). Everything must run headless in Node.
 - `src/game/` — rendering, input, scenes, audio. Consumes the engine only through its public API. Battles render by replaying engine events.
 - `src/sim/` — bot archetypes + ladder runner. Archetypes: static-guard, naive-triangle, stamina-reader, human-ish (30% error rate).
 - Boss AIs are data-driven boss cards in the engine (Whitney card = the format).
