@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": ".",
+    "outDir": "../../node_modules/.tmp/tsbuild-engine",
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["**/*.ts"]
+}

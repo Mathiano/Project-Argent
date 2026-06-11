@@ -1,0 +1,9 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./src/engine" },
+    { "path": "./src/game" },
+    { "path": "./src/sim" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}
