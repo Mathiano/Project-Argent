@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  brute,
   humanIsh,
   naiveTriangle,
   rivalAI,
@@ -13,27 +14,30 @@ const RIVAL_SCALE = { atk: 0.85, dfn: 0.85 } as const;
 const N = 2000;
 const SEED = 1;
 
-// Locked n=2000 seed=1 baselines, captured 2026-06-11 against engine v0.3.
+// Locked n=2000 seed=1 baselines, captured 2026-06-12 against engine v0.3.
+// Archetypes match docs/sim-archetypes.md (canonical v1, telegraph-aware).
 // Each cell is exact (deterministic) — any drift means engine/AI/data changed.
-// Per KICKOFF: POC table at n=40 is superseded; these are the new sim gate.
 const BASELINE: ReadonlyArray<{
   player: string;
   foe: string;
   archetype: BotArchetype;
   wins: number;
 }> = [
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: staticGuard, wins: 1775 },
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: naiveTriangle, wins: 733 },
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: staminaReader, wins: 738 },
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: humanIsh, wins: 639 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: staticGuard, wins: 1141 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: naiveTriangle, wins: 1079 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: staminaReader, wins: 1018 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: humanIsh, wins: 948 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: staticGuard, wins: 1895 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: naiveTriangle, wins: 857 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: staminaReader, wins: 789 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: humanIsh, wins: 721 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: staticGuard, wins: 1631 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: brute, wins: 304 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: naiveTriangle, wins: 1496 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: staminaReader, wins: 1511 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: humanIsh, wins: 1141 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: staticGuard, wins: 930 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: brute, wins: 320 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: naiveTriangle, wins: 730 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: staminaReader, wins: 1059 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: humanIsh, wins: 889 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: staticGuard, wins: 1767 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: brute, wins: 319 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: naiveTriangle, wins: 1604 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: staminaReader, wins: 1516 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: humanIsh, wins: 1131 },
 ];
 
 describe('rival ladder regressions (n=2000, seed=1)', () => {
