@@ -1,6 +1,6 @@
-# PROJECT ARGENT — Combat 2.0 Spec v0.3.1 (sim-validated)
+# PROJECT ARGENT — Combat 2.0 Spec v0.3.2 (sim-validated)
 
-**Format contract:** 160×144 screen, sprites + text box, D-pad/A/B/SELECT/START. No new buttons, no twitch inputs.
+**Format contract:** 320×180 screen, sprites + text box, D-pad/A/B/SELECT/START. No new buttons, no twitch inputs.
 **Budget rule:** every new system costs ≤1 bar or ≤1 glyph on screen. If it can't fit, it's cut.
 **Untouched:** type chart, 4 move slots, 6v6, full-turn commit. The soul stays.
 
