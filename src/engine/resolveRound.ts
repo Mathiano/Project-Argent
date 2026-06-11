@@ -1,0 +1,294 @@
+import { COMBAT, TIERS } from './config';
+import { typeMult } from './data';
+import type { BattleEvent, CommitDescriptor } from './events';
+import type { RNG } from './rng';
+import { lookupMove, validateAction } from './state';
+import type { Action, BattleState, Side, SideState, Stance } from './types';
+
+export interface RoundResult {
+  readonly state: BattleState;
+  readonly events: BattleEvent[];
+}
+
+function opposite(side: Side): Side {
+  return side === 'player' ? 'foe' : 'player';
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+function stanceOutMult(stance: Stance): number {
+  if (stance === 'A') return COMBAT.aggrDmg;
+  if (stance === 'G') return COMBAT.guardDmg;
+  return 1;
+}
+
+function actionStance(action: Action): Stance {
+  return action.kind === 'move' ? action.stance : 'G';
+}
+
+function actionMove(action: Action): string | null {
+  return action.kind === 'move' ? action.move : null;
+}
+
+function describeAction(action: Action, side: SideState): CommitDescriptor {
+  if (action.kind === 'move') return { kind: 'move', move: action.move, stance: action.stance };
+  if (action.kind === 'catchBreath') return { kind: 'catchBreath' };
+  return { kind: 'rest', reason: side.exhausted ? 'exhaustion' : 'softlock' };
+}
+
+function initiative(side: SideState, moveName: string | null): number {
+  if (moveName === null) return COMBAT.restInitiative;
+  const tier = TIERS[lookupMove(moveName).tier];
+  const base = side.species.spd / tier.weight;
+  return side.staggered ? base * COMBAT.staggerInitMult : base;
+}
+
+function gainMomentum(side: SideState, sideKey: Side, events: BattleEvent[]): SideState {
+  if (side.momentum >= COMBAT.momentumCap) return side;
+  const total = side.momentum + 1;
+  events.push({ kind: 'momentum', side: sideKey, total });
+  return { ...side, momentum: total };
+}
+
+interface StrikeResult {
+  readonly attacker: SideState;
+  readonly defender: SideState;
+}
+
+function resolveStrike(
+  attacker: SideState,
+  defender: SideState,
+  moveName: string,
+  attStance: Stance,
+  defStance: Stance,
+  attSide: Side,
+  rng: RNG,
+  events: BattleEvent[],
+): StrikeResult {
+  const move = lookupMove(moveName);
+  const tier = TIERS[move.tier];
+  const defSide = opposite(attSide);
+  const eff = typeMult(move.type, defender.species.type);
+
+  const variance = COMBAT.damageVarianceMin + rng.next() * COMBAT.damageVarianceSpan;
+  let d =
+    (tier.power * attacker.species.atk) / defender.species.dfn * COMBAT.dmgScale * variance;
+  d *= eff;
+  d *= stanceOutMult(attStance);
+
+  // A vs F — dodge check
+  if (attStance === 'A' && defStance === 'F') {
+    const p = clamp(
+      (defender.species.spd / attacker.species.spd - 1) * COMBAT.dodgeSlope,
+      0,
+      COMBAT.dodgeCap,
+    );
+    if (rng.next() < p) {
+      events.push({ kind: 'dodge', side: defSide });
+      const dodged = gainMomentum(defender, defSide, events);
+      return { attacker, defender: dodged };
+    }
+  }
+
+  // F vs G — opening (no counter possible)
+  if (attStance === 'F' && defStance === 'G') {
+    const mit = defender.exhausted ? COMBAT.openTaken * COMBAT.exhTaken : COMBAT.openTaken;
+    const dd = d * COMBAT.openDmg * mit;
+    const newDef: SideState = { ...defender, hp: Math.max(0, defender.hp - dd) };
+    events.push({ kind: 'opening', side: attSide, damage: dd, effectiveness: eff });
+    const newAtt = gainMomentum(attacker, attSide, events);
+    if (newDef.hp <= 0) events.push({ kind: 'ko', side: defSide });
+    return { attacker: newAtt, defender: newDef };
+  }
+
+  // Normal hit (with defender mitigation)
+  const preMit = d;
+  if (defStance === 'A') d *= COMBAT.aggrTaken;
+  if (defStance === 'G') d *= COMBAT.guardTaken;
+  if (defender.exhausted) d *= COMBAT.exhTaken;
+
+  let newDef: SideState = { ...defender, hp: Math.max(0, defender.hp - d) };
+  let newAtt: SideState = attacker;
+  events.push({ kind: 'strike', side: attSide, move: moveName, damage: d, effectiveness: eff });
+
+  if (newDef.hp <= 0) {
+    events.push({ kind: 'ko', side: defSide });
+    return { attacker: newAtt, defender: newDef };
+  }
+
+  // G vs A — counter, only because defender survived
+  if (defStance === 'G' && attStance === 'A') {
+    const reflect = preMit * COMBAT.reflect;
+    newAtt = {
+      ...newAtt,
+      hp: Math.max(0, newAtt.hp - reflect),
+      staggered: true,
+    };
+    events.push({ kind: 'counter', side: defSide, damage: reflect });
+    events.push({ kind: 'staggered', side: attSide });
+    newDef = gainMomentum(newDef, defSide, events);
+    if (newAtt.hp <= 0) events.push({ kind: 'ko', side: attSide });
+  }
+
+  return { attacker: newAtt, defender: newDef };
+}
+
+function paySide(side: SideState, action: Action): SideState {
+  if (action.kind === 'rest') {
+    return {
+      ...side,
+      st: Math.min(100, side.st + COMBAT.restRegen),
+      exhausted: false,
+    };
+  }
+  if (action.kind === 'catchBreath') {
+    return { ...side, st: Math.min(100, side.st + COMBAT.catchBreathRestore) };
+  }
+  const move = lookupMove(action.move);
+  let cost = TIERS[move.tier].cost;
+  if (action.stance === 'A') cost *= COMBAT.aggrCostMult;
+  if (action.stance === 'F') cost += COMBAT.fluidCost;
+  let st = side.st - cost + COMBAT.regen + (action.stance === 'G' ? COMBAT.guardRegen : 0);
+  const exhausted = st <= 0;
+  st = exhausted ? 0 : Math.min(100, st);
+  return { ...side, st, exhausted };
+}
+
+function emitFatigueTransitions(
+  before: SideState,
+  after: SideState,
+  sideKey: Side,
+  events: BattleEvent[],
+): void {
+  if (!before.exhausted && after.exhausted) {
+    events.push({ kind: 'exhausted', side: sideKey });
+    return;
+  }
+  const wasWinded = before.st <= COMBAT.winded;
+  const isWinded = after.st <= COMBAT.winded;
+  if (!wasWinded && isWinded && !after.exhausted) {
+    events.push({ kind: 'winded', side: sideKey });
+  }
+}
+
+export function resolveRound(
+  state: BattleState,
+  playerAction: Action,
+  foeAction: Action,
+  rng: RNG,
+): RoundResult {
+  validateAction(state.player, playerAction);
+  validateAction(state.foe, foeAction);
+
+  const events: BattleEvent[] = [];
+  events.push({ kind: 'roundStart', round: state.round });
+  events.push({ kind: 'commit', side: 'player', action: describeAction(playerAction, state.player) });
+  events.push({ kind: 'commit', side: 'foe', action: describeAction(foeAction, state.foe) });
+
+  let pl = state.player;
+  let foe = state.foe;
+
+  if (playerAction.kind === 'catchBreath') {
+    events.push({ kind: 'catchBreath', side: 'player', restored: COMBAT.catchBreathRestore });
+    pl = { ...pl, momentum: pl.momentum - 1 };
+  }
+  if (foeAction.kind === 'catchBreath') {
+    events.push({ kind: 'catchBreath', side: 'foe', restored: COMBAT.catchBreathRestore });
+    foe = { ...foe, momentum: foe.momentum - 1 };
+  }
+
+  const plStance = actionStance(playerAction);
+  const foeStance = actionStance(foeAction);
+  const plMove = actionMove(playerAction);
+  const foeMove = actionMove(foeAction);
+
+  const plInit = initiative(pl, plMove);
+  const foeInit = initiative(foe, foeMove);
+
+  let order: Side[];
+  if (plInit < 0 && foeInit < 0) order = [];
+  else if (plInit < 0) order = ['foe'];
+  else if (foeInit < 0) order = ['player'];
+  else if (plStance === 'F' && foeStance === 'G') order = ['player', 'foe'];
+  else if (foeStance === 'F' && plStance === 'G') order = ['foe', 'player'];
+  else if (plInit > foeInit) order = ['player', 'foe'];
+  else if (foeInit > plInit) order = ['foe', 'player'];
+  else order = rng.next() < 0.5 ? ['player', 'foe'] : ['foe', 'player'];
+
+  // Stagger is consumed for initiative this round, then cleared.
+  pl = { ...pl, staggered: false };
+  foe = { ...foe, staggered: false };
+
+  const isClash = plMove !== null && foeMove !== null && plStance === 'A' && foeStance === 'A';
+
+  if (isClash) {
+    const psc = pl.st * pl.species.spd;
+    const fsc = foe.st * foe.species.spd;
+    const total = psc + fsc;
+    const plWins = total > 0 ? rng.next() < psc / total : rng.next() < 0.5;
+    if (plWins) {
+      events.push({ kind: 'clash', winner: 'player' });
+      pl = gainMomentum(pl, 'player', events);
+      const r = resolveStrike(pl, foe, plMove!, 'A', 'A', 'player', rng, events);
+      pl = r.attacker;
+      foe = r.defender;
+      if (foe.hp > 0) {
+        foe = { ...foe, staggered: true };
+        events.push({ kind: 'staggered', side: 'foe' });
+      }
+    } else {
+      events.push({ kind: 'clash', winner: 'foe' });
+      foe = gainMomentum(foe, 'foe', events);
+      const r = resolveStrike(foe, pl, foeMove!, 'A', 'A', 'foe', rng, events);
+      foe = r.attacker;
+      pl = r.defender;
+      if (pl.hp > 0) {
+        pl = { ...pl, staggered: true };
+        events.push({ kind: 'staggered', side: 'player' });
+      }
+    }
+  } else {
+    for (const sideKey of order) {
+      if (pl.hp <= 0 || foe.hp <= 0) break;
+      if (sideKey === 'player' && plMove !== null) {
+        const r = resolveStrike(pl, foe, plMove, plStance, foeStance, 'player', rng, events);
+        pl = r.attacker;
+        foe = r.defender;
+      } else if (sideKey === 'foe' && foeMove !== null) {
+        const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, 'foe', rng, events);
+        foe = r.attacker;
+        pl = r.defender;
+      }
+    }
+  }
+
+  const koed = pl.hp <= 0 || foe.hp <= 0;
+
+  // Matches demo: stamina settle is skipped on KO mid-round (battle is over).
+  if (!koed) {
+    const plBefore = pl;
+    pl = paySide(pl, playerAction);
+    emitFatigueTransitions(plBefore, pl, 'player', events);
+    const foeBefore = foe;
+    foe = paySide(foe, foeAction);
+    emitFatigueTransitions(foeBefore, foe, 'foe', events);
+  }
+
+  return {
+    state: {
+      player: pl,
+      foe,
+      round: state.round + 1,
+      history: [
+        ...state.history,
+        {
+          player: playerAction.kind === 'move' ? playerAction.stance : null,
+          foe: foeAction.kind === 'move' ? foeAction.stance : null,
+        },
+      ],
+    },
+    events,
+  };
+}
