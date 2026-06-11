@@ -20,4 +20,8 @@ The foe AI commits first each round; the player archetype sees the foe's committ
 
 ## Reference rival (KAMON)
 
-For the rival-fight ladder regression test, the foe runs the demo's KAMON AI: 10% triangle-read of the player's modal stance after 3+ rounds of history, otherwise 55A / 35G / 10F weighted-random. Move: heavy if `st > 70`, else mid, else lightest.
+For the rival-fight ladder regression test, the foe runs the demo's KAMON AI: 10% triangle-read of the player's modal stance after 3+ rounds of history (ties broken in key order A, G, F), otherwise 55A / 35G / 10F weighted-random. Move: heavy if `st > 70` and affordable, else first affordable mid, else first affordable light. Hesitation scale ×0.85 applies to atk/dfn only (spd/hp unscaled). Foe commits before the player chooses; player history records only real move stances (rests and Calls are not pushed). ★ cap 2.
+
+## Design debt
+
+**EMBERCUB into its counter** (player EMBERCUB vs rival AQUAFIN) is the hardest cell in the rival ladder — ~53% for the optimal `stamina-reader+Call` archetype at n=2000. The matchup combines a type-disadvantage with a speed-advantage in a way that the canonical reader policy can't fully exploit. To be re-tuned when the real game's rival fight gets its own boss card.
