@@ -8,8 +8,8 @@ import {
 } from '../engine';
 import type { Action, BattleState, RNG, Stance } from '../engine';
 import { mountCanvas } from './canvas';
+import { createInputDispatcher } from './input';
 import { SceneStack } from './scene';
-import type { InputKey } from './scene';
 import { createBattleScene } from './scenes/battle';
 
 const host = document.getElementById('app');
@@ -55,20 +55,4 @@ function frame(now: number): void {
 }
 requestAnimationFrame(frame);
 
-const KEYS: Record<string, InputKey> = {
-  ArrowUp: 'up',
-  ArrowDown: 'down',
-  ArrowLeft: 'left',
-  ArrowRight: 'right',
-  z: 'a', Z: 'a',
-  x: 'b', X: 'b',
-  c: 'select', C: 'select',
-  Enter: 'start',
-};
-
-window.addEventListener('keydown', (e) => {
-  const key = KEYS[e.key];
-  if (!key) return;
-  e.preventDefault();
-  scenes.input(key);
-});
+createInputDispatcher((key) => scenes.input(key));
