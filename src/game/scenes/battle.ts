@@ -181,15 +181,36 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     state = result.state;
     pendingEvents = [...result.events];
     eventTimer = 0;
-    display = { player: snapshot(opts.state.player), foe: snapshot(opts.state.foe) };
-    // Reset display HP/ST/momentum to PRE-round values so events animate.
-    display.player.hp = display.player.hp; // (already pre-round)
+    // Display state is reseated by the first roundStart event's snapshot.
     phase = 'resolve';
   }
 
   function applyEvent(ev: BattleEvent): void {
     if (ev.kind === 'roundStart') {
+      display.player = {
+        hp: ev.player.hp,
+        st: ev.player.st,
+        momentum: ev.player.momentum,
+        exhausted: ev.player.exhausted,
+        staggered: ev.player.staggered,
+      };
+      display.foe = {
+        hp: ev.foe.hp,
+        st: ev.foe.st,
+        momentum: ev.foe.momentum,
+        exhausted: ev.foe.exhausted,
+        staggered: ev.foe.staggered,
+      };
       pushLog(`— round ${ev.round} —`);
+      return;
+    }
+    if (ev.kind === 'initiative') {
+      // Reserved for the action-timeline strip (Combat 2.0 spec).
+      // No log/animation here yet — order is implicit in the strike sequence.
+      return;
+    }
+    if (ev.kind === 'stamina') {
+      display[ev.side].st = ev.after;
       return;
     }
     if (ev.kind === 'commit') {
