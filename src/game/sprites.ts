@@ -94,10 +94,25 @@ export function getSprite(name: string): Sprite | null {
   return REGISTRY[name] ?? null;
 }
 
-const TYPE_COLOR: { readonly [k in NonNullable<ElementType>]: string } = {
+// Type-tinted placeholder fills. Covers legacy mixed-case (fixture trio)
+// and CH1+ uppercase types. Unknown types fall back to neutral.
+const TYPE_COLOR: { readonly [k: string]: string } = {
   Flame: '#c2491a',
   Sprout: '#246b38',
   Splash: '#27579c',
+  FLAME: '#c2491a',
+  SPROUT: '#246b38',
+  SPLASH: '#27579c',
+  FIELD: '#a98e5a',
+  GALE: '#9aaecf',
+  VENOM: '#7e3f9c',
+  TERRA: '#7a4e2d',
+  VOLT: '#f0c33a',
+  FROST: '#8fc8e8',
+  SPIRIT: '#9d7fcf',
+  BRAWN: '#c25a36',
+  FORGE: '#6a6a72',
+  DRAKE: '#3d6b50',
 };
 
 const PLACEHOLDER_NEUTRAL = '#6e6e7a';
@@ -114,7 +129,7 @@ export function drawPlaceholder(
   options: { slotSize?: number } = {},
 ): void {
   const slotSize = options.slotSize ?? 56;
-  const fill = type ? TYPE_COLOR[type] : PLACEHOLDER_NEUTRAL;
+  const fill = (type !== null && TYPE_COLOR[type]) ? TYPE_COLOR[type]! : PLACEHOLDER_NEUTRAL;
 
   // Rounded body anchored to the bottom of the slot.
   const bodyTop = slotY + Math.floor(slotSize * 0.25);

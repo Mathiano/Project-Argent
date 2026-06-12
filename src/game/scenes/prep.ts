@@ -43,7 +43,7 @@ export function createPrepScene(opts: PrepSceneOpts): Scene {
       ctx.fill();
       drawSpeciesInSlot(
         ctx,
-        { name: opts.foeSpecies.name, type: opts.foeSpecies.type },
+        { name: opts.foeSpecies.name, type: opts.foeSpecies.types[0] ?? null },
         slotX,
         slotY,
       );

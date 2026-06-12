@@ -3,7 +3,7 @@ import { typeMult } from './data';
 import type { BattleEvent, CommitDescriptor, SideSnapshot } from './events';
 import type { RNG } from './rng';
 import { lookupMove, validateAction } from './state';
-import type { Action, BattleState, Side, SideState, Stance } from './types';
+import type { Action, BattleState, Side, SideState, Stance, TypeChart } from './types';
 
 export interface RoundResult {
   readonly state: BattleState;
@@ -77,11 +77,12 @@ function resolveStrike(
   attSide: Side,
   rng: RNG,
   events: BattleEvent[],
+  typeChart: TypeChart,
 ): StrikeResult {
   const move = lookupMove(moveName);
   const tier = TIERS[move.tier];
   const defSide = opposite(attSide);
-  const eff = typeMult(move.type, defender.species.type);
+  const eff = typeMult(typeChart, move.type, defender.species.types);
 
   const variance = COMBAT.damageVarianceMin + rng.next() * COMBAT.damageVarianceSpan;
   let d =
@@ -254,7 +255,7 @@ export function resolveRound(
     if (plWins) {
       events.push({ kind: 'clash', winner: 'player' });
       pl = gainMomentum(pl, 'player', events);
-      const r = resolveStrike(pl, foe, plMove!, 'A', 'A', 'player', rng, events);
+      const r = resolveStrike(pl, foe, plMove!, 'A', 'A', 'player', rng, events, state.typeChart);
       pl = r.attacker;
       foe = r.defender;
       if (foe.hp > 0) {
@@ -264,7 +265,7 @@ export function resolveRound(
     } else {
       events.push({ kind: 'clash', winner: 'foe' });
       foe = gainMomentum(foe, 'foe', events);
-      const r = resolveStrike(foe, pl, foeMove!, 'A', 'A', 'foe', rng, events);
+      const r = resolveStrike(foe, pl, foeMove!, 'A', 'A', 'foe', rng, events, state.typeChart);
       foe = r.attacker;
       pl = r.defender;
       if (pl.hp > 0) {
@@ -276,11 +277,11 @@ export function resolveRound(
     for (const sideKey of order) {
       if (pl.hp <= 0 || foe.hp <= 0) break;
       if (sideKey === 'player' && plMove !== null) {
-        const r = resolveStrike(pl, foe, plMove, plStance, foeStance, 'player', rng, events);
+        const r = resolveStrike(pl, foe, plMove, plStance, foeStance, 'player', rng, events, state.typeChart);
         pl = r.attacker;
         foe = r.defender;
       } else if (sideKey === 'foe' && foeMove !== null) {
-        const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, 'foe', rng, events);
+        const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, 'foe', rng, events, state.typeChart);
         foe = r.attacker;
         pl = r.defender;
       }
@@ -322,6 +323,7 @@ export function resolveRound(
       player: pl,
       foe,
       round: state.round + 1,
+      typeChart: state.typeChart,
       history: [
         ...state.history,
         {

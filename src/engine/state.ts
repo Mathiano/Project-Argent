@@ -1,6 +1,15 @@
 import { COMBAT, TIERS } from './config';
-import { MOVES } from './data';
-import type { Action, BattleState, Move, SideState, Species, Stance, StatScale } from './types';
+import { LEGACY_TYPE_CHART, MOVES } from './data';
+import type {
+  Action,
+  BattleState,
+  Move,
+  SideState,
+  Species,
+  Stance,
+  StatScale,
+  TypeChart,
+} from './types';
 
 export function createSide(species: Species, scale?: StatScale): SideState {
   const sp: Species = scale
@@ -23,8 +32,22 @@ export function createSide(species: Species, scale?: StatScale): SideState {
   };
 }
 
-export function createBattleState(player: SideState, foe: SideState): BattleState {
-  return { player, foe, round: 1, history: [] };
+export interface BattleSetup {
+  readonly typeChart?: TypeChart;
+}
+
+export function createBattleState(
+  player: SideState,
+  foe: SideState,
+  setup: BattleSetup = {},
+): BattleState {
+  return {
+    player,
+    foe,
+    round: 1,
+    history: [],
+    typeChart: setup.typeChart ?? LEGACY_TYPE_CHART,
+  };
 }
 
 export function lookupMove(name: string): Move {

@@ -294,6 +294,45 @@ describe('Catch Breath call', () => {
   });
 });
 
+describe('injected type chart (A1)', () => {
+  test('a custom chart applied at battle setup changes effectiveness', () => {
+    // Both EMBERCUB (Flame) so the foe's EMBER SNAP fires Flame-into-Flame.
+    const mirror = createBattleState(createSide(SPECIES.EMBERCUB!), createSide(SPECIES.EMBERCUB!));
+    const baseline = resolveRound(
+      mirror,
+      { kind: 'move', move: 'TACKLE', stance: 'A' },
+      { kind: 'move', move: 'EMBER SNAP', stance: 'G' },
+      fixedRng([0.5, 0.5]),
+    );
+    // Foe EMBER SNAP is type 'Flame'; defender (player EMBERCUB) is also 'Flame'.
+    // Legacy chart has no Flame->Flame entry so effectiveness should be 1.
+    const baselineStrike = baseline.events.find(
+      (e): e is Extract<typeof e, { kind: 'strike' }> => e.kind === 'strike' && e.side === 'foe',
+    );
+    expect(baselineStrike?.effectiveness).toBe(1);
+
+    // Now inject a chart that makes Flame super-effective vs Flame.
+    const flameAmplifier = {
+      Flame: { Flame: 2 },
+    };
+    const stateWithChart = createBattleState(
+      createSide(SPECIES.EMBERCUB!),
+      createSide(SPECIES.EMBERCUB!),
+      { typeChart: flameAmplifier },
+    );
+    const result = resolveRound(
+      stateWithChart,
+      { kind: 'move', move: 'TACKLE', stance: 'A' },
+      { kind: 'move', move: 'EMBER SNAP', stance: 'G' },
+      fixedRng([0.5, 0.5]),
+    );
+    const struck = result.events.find(
+      (e): e is Extract<typeof e, { kind: 'strike' }> => e.kind === 'strike' && e.side === 'foe',
+    );
+    expect(struck?.effectiveness).toBe(2);
+  });
+});
+
 describe('determinism', () => {
   test('two runs with the same seed produce identical results', () => {
     const a = resolveRound(

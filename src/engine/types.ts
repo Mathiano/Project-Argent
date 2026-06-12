@@ -4,7 +4,15 @@ export type Stance = 'A' | 'G' | 'F';
 
 export type TierName = 'light' | 'mid' | 'heavy' | 'nuke';
 
-export type ElementType = 'Flame' | 'Sprout' | 'Splash';
+// Type identifiers are arbitrary strings now (data-driven).
+// Legacy fixture content uses 'Flame'|'Sprout'|'Splash' (mixed case);
+// CH1+ content from docs/typechart.json uses 'FLAME'|'SPROUT'|... (upper).
+// Charts and species data within a single battle must use the same casing.
+export type ElementType = string;
+
+export type TypeChart = {
+  readonly [attacker: string]: { readonly [defender: string]: number };
+};
 
 export interface Tier {
   readonly name: TierName;
@@ -22,7 +30,7 @@ export interface Move {
 
 export interface Species {
   readonly name: string;
-  readonly type: ElementType | null;
+  readonly types: readonly ElementType[];
   readonly hp: number;
   readonly atk: number;
   readonly dfn: number;
@@ -51,6 +59,7 @@ export interface BattleState {
   readonly foe: SideState;
   readonly round: number;
   readonly history: readonly TurnHistoryEntry[];
+  readonly typeChart: TypeChart;
 }
 
 export type Action =

@@ -54,12 +54,12 @@ export function createStarterPickScene(opts: StarterPickSceneOpts): Scene {
         ctx.ellipse(sx + SLOT / 2, slotY + SLOT - 2, 26, 4, 0, 0, Math.PI * 2);
         ctx.fill();
         const sp = SPECIES[name]!;
-        drawSpeciesInSlot(ctx, { name: sp.name, type: sp.type }, sx, slotY);
+        drawSpeciesInSlot(ctx, { name: sp.name, type: sp.types[0] ?? null }, sx, slotY);
       });
 
       const sp = species(cursor);
       drawPanel(ctx, 24, 102, LOGICAL_W - 48, 60);
-      drawText(ctx, `${sp.name}  [${sp.type ?? 'Neutral'}]`, 32, 110);
+      drawText(ctx, `${sp.name}  [${sp.types[0] ?? 'Neutral'}]`, 32, 110);
       drawText(ctx, `SPD ${sp.spd}   ATK ${sp.atk}`, 32, 124);
       drawText(ctx, `DEF ${sp.dfn}   HP  ${sp.hp}`, 32, 136);
 

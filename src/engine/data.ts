@@ -1,4 +1,4 @@
-import type { ElementType, Move, Species } from './types';
+import type { ElementType, Move, Species, TypeChart } from './types';
 
 export const MOVES: { readonly [name: string]: Move } = {
   TACKLE: { name: 'TACKLE', tier: 'light', type: null },
@@ -14,7 +14,7 @@ export const MOVES: { readonly [name: string]: Move } = {
 export const SPECIES: { readonly [name: string]: Species } = {
   EMBERCUB: {
     name: 'EMBERCUB',
-    type: 'Flame',
+    types: ['Flame'],
     hp: 58,
     atk: 100,
     dfn: 86,
@@ -24,7 +24,7 @@ export const SPECIES: { readonly [name: string]: Species } = {
   },
   SPROUTLE: {
     name: 'SPROUTLE',
-    type: 'Sprout',
+    types: ['Sprout'],
     hp: 60,
     atk: 96,
     dfn: 100,
@@ -34,7 +34,7 @@ export const SPECIES: { readonly [name: string]: Species } = {
   },
   AQUAFIN: {
     name: 'AQUAFIN',
-    type: 'Splash',
+    types: ['Splash'],
     hp: 64,
     atk: 92,
     dfn: 108,
@@ -44,7 +44,7 @@ export const SPECIES: { readonly [name: string]: Species } = {
   },
   FUZZLET: {
     name: 'FUZZLET',
-    type: null,
+    types: [],
     hp: 46,
     atk: 78,
     dfn: 78,
@@ -60,13 +60,26 @@ export const COUNTER_MAP: { readonly [name: string]: string } = {
   AQUAFIN: 'SPROUTLE',
 };
 
-const TYPE_CHART: { readonly [att in ElementType]?: { readonly [def in ElementType]?: number } } = {
+// LEGACY chart: pinned 1.5/0.67 multipliers for the fixture trio. The
+// rival-fight regression ladder depends on this being bit-identical
+// forever. All new content (CH1+) uses docs/typechart.json (1.3/0.7).
+export const LEGACY_TYPE_CHART: TypeChart = {
   Flame: { Sprout: 1.5, Splash: 0.67 },
   Sprout: { Splash: 1.5, Flame: 0.67 },
   Splash: { Flame: 1.5, Sprout: 0.67 },
 };
 
-export function typeMult(att: ElementType | null, def: ElementType | null): number {
-  if (!att || !def) return 1;
-  return TYPE_CHART[att]?.[def] ?? 1;
+// Defender dual-type multipliers compose multiplicatively per type-chart.md
+// rule 8 (1.3 × 0.7 = 0.91). Empty defTypes / null attType = neutral.
+export function typeMult(
+  chart: TypeChart,
+  attType: ElementType | null,
+  defTypes: readonly ElementType[],
+): number {
+  if (!attType || defTypes.length === 0) return 1;
+  let m = 1;
+  for (const dt of defTypes) {
+    m *= chart[attType]?.[dt] ?? 1;
+  }
+  return m;
 }

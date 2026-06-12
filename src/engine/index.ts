@@ -1,7 +1,7 @@
 export * from './types';
 export * from './events';
 export { COMBAT, TIERS } from './config';
-export { MOVES, SPECIES, COUNTER_MAP, typeMult } from './data';
+export { LEGACY_TYPE_CHART, MOVES, SPECIES, COUNTER_MAP, typeMult } from './data';
 export {
   mulberry32,
   rngPick,
