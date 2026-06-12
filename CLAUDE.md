@@ -54,3 +54,5 @@ Every battle is a puzzle. Preparation is gameplay (prep phase before every boss)
 ## Conventions
 
 TypeScript strict. Small modules, no cyclic deps. Conventional commits, one task per commit.
+
+Push to `origin` after every committed task batch; never end a session with unpushed green commits. The repo is **private** and stays private until the naming-debt rename pass (see README open threads).
