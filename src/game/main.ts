@@ -25,6 +25,14 @@ if (!host) throw new Error('Argent: #app element missing in index.html');
 const { ctx } = mountCanvas(host);
 const dispatcher = createInputDispatcher((key) => scenes.input(key));
 
+const sessionFlags = new Set<string>();
+const flagStore = {
+  has: (flag: string): boolean => sessionFlags.has(flag),
+  set: (flag: string): void => {
+    sessionFlags.add(flag);
+  },
+};
+
 const STARTERS = ['EMBERCUB', 'SPROUTLE', 'AQUAFIN'] as const;
 const RNG_SEED = 0xa9c0;
 
@@ -163,6 +171,7 @@ function showOverworld(map: string, spawn: string, faded: boolean): void {
     map,
     spawn,
     inputState: dispatcher.state,
+    flags: flagStore,
     onWarp(target: string) {
       const colon = target.indexOf(':');
       const nextMap = colon >= 0 ? target.slice(0, colon) : target;

@@ -1,7 +1,7 @@
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import type { InputState } from '../input';
 import { getMap } from '../overworld/maps';
-import type { Facing, MapData, MapObject } from '../overworld/types';
+import type { Facing, MapData, MapObject, ScriptCommand } from '../overworld/types';
 import { findObjectAt, isWalkable } from '../overworld/types';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
@@ -10,10 +10,16 @@ import { drawPanel, drawText } from '../ui';
 const MOVE_DURATION = 0.18;
 const FADE_DURATION = 0.25;
 
+export interface FlagStore {
+  has(flag: string): boolean;
+  set(flag: string): void;
+}
+
 export interface OverworldSceneOpts {
   readonly map: string;
   readonly spawn: string;
   readonly inputState: InputState;
+  readonly flags: FlagStore;
   readonly startFaded?: boolean;
   readonly onWarp: (target: string) => void;
   readonly onEncounter: (foeSpecies: string) => void;
@@ -42,6 +48,9 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
   let dialogPage = 0;
   const DIALOG_LINES_PER_PAGE = 3;
 
+  let scriptQueue: ScriptCommand[] = [];
+  let autoTriggersFired = false;
+
   function openDialog(lines: readonly string[]): void {
     dialogLines = [...lines];
     dialogPage = 0;
@@ -53,7 +62,51 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
     if (dialogPage >= totalPages) {
       dialogLines = null;
       dialogPage = 0;
+      runNextCommand();
     }
+  }
+
+  function runNextCommand(): void {
+    while (scriptQueue.length > 0) {
+      const cmd = scriptQueue.shift()!;
+      if (cmd.kind === 'dialog') {
+        openDialog(cmd.lines);
+        return;
+      }
+      if (cmd.kind === 'set-flag') {
+        opts.flags.set(cmd.flag);
+        continue;
+      }
+      if (cmd.kind === 'move-player') {
+        const nx = tx + cmd.dx;
+        const ny = ty + cmd.dy;
+        if (isWalkable(map, nx, ny)) {
+          prevTx = tx;
+          prevTy = ty;
+          tx = nx;
+          ty = ny;
+          moveT = 1;
+        }
+        continue;
+      }
+      if (cmd.kind === 'warp') {
+        pendingWarp = cmd.target;
+        fadePhase = 'fadeOut';
+        fadeT = 1;
+        return;
+      }
+      if (cmd.kind === 'start-battle') {
+        opts.onEncounter(cmd.species);
+        return;
+      }
+    }
+  }
+
+  function fireScript(script: Extract<MapObject, { type: 'script' }>): void {
+    if (script.once && script.flag && opts.flags.has(script.flag)) return;
+    if (script.once && script.flag) opts.flags.set(script.flag);
+    scriptQueue = [...script.commands];
+    runNextCommand();
   }
   function facingDelta(f: Facing): { dx: number; dy: number } {
     if (f === 'up') return { dx: 0, dy: -1 };
@@ -99,6 +152,12 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
       return;
     }
 
+    const script = stepOnScriptAt(tx, ty);
+    if (script) {
+      fireScript(script);
+      return;
+    }
+
     const zone = findObjectAt(map, tx, ty, 'encounter_zone') as
       | Extract<MapObject, { type: 'encounter_zone' }>
       | null;
@@ -106,6 +165,15 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
       const foe = zone.species[Math.floor(Math.random() * zone.species.length)]!;
       opts.onEncounter(foe);
     }
+  }
+
+  function stepOnScriptAt(x: number, y: number): Extract<MapObject, { type: 'script' }> | null {
+    for (const obj of map.objects) {
+      if (obj.type !== 'script') continue;
+      if (obj.trigger !== 'step-on') continue;
+      if (obj.x === x && obj.y === y) return obj;
+    }
+    return null;
   }
 
   function playerPixel(): { px: number; py: number } {
@@ -140,6 +208,15 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
             opts.onWarp(target);
             return;
           }
+        }
+      }
+
+      if (fadePhase === 'normal' && !autoTriggersFired) {
+        autoTriggersFired = true;
+        for (const obj of map.objects) {
+          if (obj.type !== 'script' || obj.trigger !== 'auto') continue;
+          fireScript(obj);
+          break;
         }
       }
 
