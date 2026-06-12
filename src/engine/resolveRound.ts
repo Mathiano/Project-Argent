@@ -1,6 +1,6 @@
 import { COMBAT, TIERS } from './config';
 import { typeMult } from './data';
-import type { BattleEvent, CommitDescriptor } from './events';
+import type { BattleEvent, CommitDescriptor, SideSnapshot } from './events';
 import type { RNG } from './rng';
 import { lookupMove, validateAction } from './state';
 import type { Action, BattleState, Side, SideState, Stance } from './types';
@@ -12,6 +12,17 @@ export interface RoundResult {
 
 function opposite(side: Side): Side {
   return side === 'player' ? 'foe' : 'player';
+}
+
+function snapshot(side: SideState): SideSnapshot {
+  return {
+    hp: side.hp,
+    maxHp: side.maxHp,
+    st: side.st,
+    momentum: side.momentum,
+    exhausted: side.exhausted,
+    staggered: side.staggered,
+  };
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -183,7 +194,12 @@ export function resolveRound(
   validateAction(state.foe, foeAction);
 
   const events: BattleEvent[] = [];
-  events.push({ kind: 'roundStart', round: state.round });
+  events.push({
+    kind: 'roundStart',
+    round: state.round,
+    player: snapshot(state.player),
+    foe: snapshot(state.foe),
+  });
   events.push({ kind: 'commit', side: 'player', action: describeAction(playerAction, state.player) });
   events.push({ kind: 'commit', side: 'foe', action: describeAction(foeAction, state.foe) });
 
@@ -216,6 +232,13 @@ export function resolveRound(
   else if (plInit > foeInit) order = ['player', 'foe'];
   else if (foeInit > plInit) order = ['foe', 'player'];
   else order = rng.next() < 0.5 ? ['player', 'foe'] : ['foe', 'player'];
+
+  events.push({
+    kind: 'initiative',
+    playerInit: plInit,
+    foeInit: foeInit,
+    first: order.length > 0 ? order[0]! : null,
+  });
 
   // Stagger is consumed for initiative this round, then cleared.
   pl = { ...pl, staggered: false };
@@ -270,9 +293,27 @@ export function resolveRound(
   if (!koed) {
     const plBefore = pl;
     pl = paySide(pl, playerAction);
+    if (pl.st !== plBefore.st) {
+      events.push({
+        kind: 'stamina',
+        side: 'player',
+        before: plBefore.st,
+        after: pl.st,
+        netDelta: pl.st - plBefore.st,
+      });
+    }
     emitFatigueTransitions(plBefore, pl, 'player', events);
     const foeBefore = foe;
     foe = paySide(foe, foeAction);
+    if (foe.st !== foeBefore.st) {
+      events.push({
+        kind: 'stamina',
+        side: 'foe',
+        before: foeBefore.st,
+        after: foe.st,
+        netDelta: foe.st - foeBefore.st,
+      });
+    }
     emitFatigueTransitions(foeBefore, foe, 'foe', events);
   }
 

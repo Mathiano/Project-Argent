@@ -1,4 +1,4 @@
-# PROJECT ARGENT — Combat 2.0 Spec v0.3.2 (sim-validated)
+# PROJECT ARGENT — Combat 2.0 Spec v0.3.3 (sim-validated)
 
 **Format contract:** 320×180 screen, sprites + text box, D-pad/A/B/SELECT/START. No new buttons, no twitch inputs.
 **Budget rule:** every new system costs ≤1 bar or ≤1 glyph on screen. If it can't fit, it's cut.
@@ -204,6 +204,16 @@ Foe intent: ⚔ physical (Rollout building). You: Quilava, 62 ST, behind a pilla
 
 - **Range lanes** (close/far per side; push/pull moves; melee cheap close, ranged cheap far) — prototype in the vertical slice, cut if it muddies
 - Doubles ladder inherits all systems unchanged
+
+## Renderer event stream (v0.3.3)
+
+`resolveRound` returns a typed `BattleEvent[]` the renderer replays. No combat rule changes from v0.3.2; the event surface gained three entries so the renderer no longer needs to remember pre-round state or re-derive initiative:
+
+- `roundStart` now carries a `SideSnapshot` for each side (`hp`, `maxHp`, `st`, `momentum`, `exhausted`, `staggered`). Seeds display state at the head of the round.
+- `initiative` fires after the order resolves, carrying `playerInit`, `foeInit`, and `first` (the side that acts, or `null` if neither side has a move). Unblocks the action-timeline strip.
+- `stamina` fires once per side during settle (unless skipped on KO mid-round) with `before`, `after`, and `netDelta` — lets the renderer animate the ST bar instead of snapping.
+
+These are purely informational: no extra RNG calls, no rule shifts, ladder regressions unchanged.
 
 ## Deliberately not doing
 
