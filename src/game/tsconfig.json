@@ -8,5 +8,5 @@
     "types": []
   },
   "include": ["**/*.ts"],
-  "references": [{ "path": "../engine" }]
+  "references": [{ "path": "../engine" }, { "path": "../sim" }]
 }
