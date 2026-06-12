@@ -3,6 +3,7 @@ import { LEGACY_TYPE_CHART, MOVES } from './data';
 import type {
   Action,
   BattleState,
+  BossCard,
   Move,
   SideState,
   Species,
@@ -34,6 +35,7 @@ export function createSide(species: Species, scale?: StatScale): SideState {
 
 export interface BattleSetup {
   readonly typeChart?: TypeChart;
+  readonly bossCard?: BossCard;
 }
 
 export function createBattleState(
@@ -47,6 +49,7 @@ export function createBattleState(
     round: 1,
     history: [],
     typeChart: setup.typeChart ?? LEGACY_TYPE_CHART,
+    ...(setup.bossCard !== undefined ? { bossCard: setup.bossCard } : {}),
   };
 }
 

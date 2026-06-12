@@ -1,4 +1,5 @@
 export * from './types';
+export { isRhythmRound, traitMods, TRAITS } from './types';
 export * from './events';
 export { COMBAT, TIERS } from './config';
 export { LEGACY_TYPE_CHART, MOVES, SPECIES, COUNTER_MAP, typeMult } from './data';

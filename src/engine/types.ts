@@ -37,6 +37,9 @@ export interface Species {
   readonly spd: number;
   readonly moves: readonly string[];
   readonly spr?: string;
+  // Optional trait id (e.g., 'GUSTBORNE'). Trait effects fire on conditions
+  // declared by the BossCard's ArenaSchedule.
+  readonly trait?: string;
 }
 
 export interface SideState {
@@ -60,6 +63,9 @@ export interface BattleState {
   readonly round: number;
   readonly history: readonly TurnHistoryEntry[];
   readonly typeChart: TypeChart;
+  // Boss-side card driving arena rhythm + future hooks. Null/absent for
+  // wild and rival fights — neutral state, no modifiers.
+  readonly bossCard?: BossCard;
 }
 
 export type Action =
@@ -74,8 +80,41 @@ export interface StatScale {
   readonly spd?: number;
 }
 
+// Per-round arena modifier table. Each Nth round is a "rhythm round"
+// (e.g., gust round on Falkner's rooftop). Heavies cost more and weigh
+// more on initiative for BOTH sides on rhythm rounds; trait-bearing
+// species get their conditional boost.
+export interface ArenaSchedule {
+  readonly rhythmEveryN: number;
+  readonly heavyExtraCost: number;
+  readonly heavyExtraInitWeight: number;
+  readonly telegraphAheadBy: number;
+}
+
 export interface BossCard {
   readonly species: Species;
   readonly statScale?: StatScale;
   readonly breakBar?: number;
+  readonly arenaSchedule?: ArenaSchedule;
+}
+
+export function isRhythmRound(schedule: ArenaSchedule | undefined, round: number): boolean {
+  if (!schedule) return false;
+  if (schedule.rhythmEveryN <= 0) return false;
+  return round % schedule.rhythmEveryN === 0;
+}
+
+// GUSTBORNE: trait modifiers active only on rhythm rounds.
+export const TRAITS: { readonly [id: string]: { readonly dmgMult: number; readonly initMult: number } } = {
+  GUSTBORNE: { dmgMult: 1.3, initMult: 1.25 },
+};
+
+export function traitMods(
+  side: SideState,
+  rhythmRound: boolean,
+): { readonly dmgMult: number; readonly initMult: number } {
+  if (!rhythmRound) return { dmgMult: 1, initMult: 1 };
+  const traitId = side.species.trait;
+  if (!traitId) return { dmgMult: 1, initMult: 1 };
+  return TRAITS[traitId] ?? { dmgMult: 1, initMult: 1 };
 }

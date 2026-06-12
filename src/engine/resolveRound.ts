@@ -3,7 +3,16 @@ import { typeMult } from './data';
 import type { BattleEvent, CommitDescriptor, SideSnapshot } from './events';
 import type { RNG } from './rng';
 import { lookupMove, validateAction } from './state';
-import type { Action, BattleState, Side, SideState, Stance, TypeChart } from './types';
+import type {
+  Action,
+  ArenaSchedule,
+  BattleState,
+  Side,
+  SideState,
+  Stance,
+  TypeChart,
+} from './types';
+import { isRhythmRound, traitMods } from './types';
 
 export interface RoundResult {
   readonly state: BattleState;
@@ -49,10 +58,21 @@ function describeAction(action: Action, side: SideState): CommitDescriptor {
   return { kind: 'rest', reason: side.exhausted ? 'exhaustion' : 'softlock' };
 }
 
-function initiative(side: SideState, moveName: string | null): number {
+function initiative(
+  side: SideState,
+  moveName: string | null,
+  rhythm: boolean,
+  arena: ArenaSchedule | undefined,
+): number {
   if (moveName === null) return COMBAT.restInitiative;
   const tier = TIERS[lookupMove(moveName).tier];
-  const base = side.species.spd / tier.weight;
+  let weight = tier.weight;
+  if (rhythm && arena && tier.name === 'heavy') {
+    weight *= arena.heavyExtraInitWeight;
+  }
+  let base = side.species.spd / weight;
+  const trait = traitMods(side, rhythm);
+  base *= trait.initMult;
   return side.staggered ? base * COMBAT.staggerInitMult : base;
 }
 
@@ -78,6 +98,7 @@ function resolveStrike(
   rng: RNG,
   events: BattleEvent[],
   typeChart: TypeChart,
+  rhythm: boolean,
 ): StrikeResult {
   const move = lookupMove(moveName);
   const tier = TIERS[move.tier];
@@ -89,6 +110,8 @@ function resolveStrike(
     (tier.power * attacker.species.atk) / defender.species.dfn * COMBAT.dmgScale * variance;
   d *= eff;
   d *= stanceOutMult(attStance);
+  // Trait damage modifier (e.g., GUSTBORNE x1.3 on rhythm rounds).
+  d *= traitMods(attacker, rhythm).dmgMult;
 
   // A vs F — dodge check
   if (attStance === 'A' && defStance === 'F') {
@@ -147,7 +170,12 @@ function resolveStrike(
   return { attacker: newAtt, defender: newDef };
 }
 
-function paySide(side: SideState, action: Action): SideState {
+function paySide(
+  side: SideState,
+  action: Action,
+  rhythm: boolean,
+  arena: ArenaSchedule | undefined,
+): SideState {
   if (action.kind === 'rest') {
     return {
       ...side,
@@ -159,9 +187,11 @@ function paySide(side: SideState, action: Action): SideState {
     return { ...side, st: Math.min(100, side.st + COMBAT.catchBreathRestore) };
   }
   const move = lookupMove(action.move);
-  let cost = TIERS[move.tier].cost;
+  const tier = TIERS[move.tier];
+  let cost = tier.cost;
   if (action.stance === 'A') cost *= COMBAT.aggrCostMult;
   if (action.stance === 'F') cost += COMBAT.fluidCost;
+  if (rhythm && arena && tier.name === 'heavy') cost += arena.heavyExtraCost;
   let st = side.st - cost + COMBAT.regen + (action.stance === 'G' ? COMBAT.guardRegen : 0);
   const exhausted = st <= 0;
   st = exhausted ? 0 : Math.min(100, st);
@@ -221,8 +251,11 @@ export function resolveRound(
   const plMove = actionMove(playerAction);
   const foeMove = actionMove(foeAction);
 
-  const plInit = initiative(pl, plMove);
-  const foeInit = initiative(foe, foeMove);
+  const arena = state.bossCard?.arenaSchedule;
+  const rhythm = isRhythmRound(arena, state.round);
+
+  const plInit = initiative(pl, plMove, rhythm, arena);
+  const foeInit = initiative(foe, foeMove, rhythm, arena);
 
   let order: Side[];
   if (plInit < 0 && foeInit < 0) order = [];
@@ -255,7 +288,7 @@ export function resolveRound(
     if (plWins) {
       events.push({ kind: 'clash', winner: 'player' });
       pl = gainMomentum(pl, 'player', events);
-      const r = resolveStrike(pl, foe, plMove!, 'A', 'A', 'player', rng, events, state.typeChart);
+      const r = resolveStrike(pl, foe, plMove!, "A", "A", "player", rng, events, state.typeChart, rhythm);
       pl = r.attacker;
       foe = r.defender;
       if (foe.hp > 0) {
@@ -265,7 +298,7 @@ export function resolveRound(
     } else {
       events.push({ kind: 'clash', winner: 'foe' });
       foe = gainMomentum(foe, 'foe', events);
-      const r = resolveStrike(foe, pl, foeMove!, 'A', 'A', 'foe', rng, events, state.typeChart);
+      const r = resolveStrike(foe, pl, foeMove!, "A", "A", "foe", rng, events, state.typeChart, rhythm);
       foe = r.attacker;
       pl = r.defender;
       if (pl.hp > 0) {
@@ -277,11 +310,11 @@ export function resolveRound(
     for (const sideKey of order) {
       if (pl.hp <= 0 || foe.hp <= 0) break;
       if (sideKey === 'player' && plMove !== null) {
-        const r = resolveStrike(pl, foe, plMove, plStance, foeStance, 'player', rng, events, state.typeChart);
+        const r = resolveStrike(pl, foe, plMove, plStance, foeStance, "player", rng, events, state.typeChart, rhythm);
         pl = r.attacker;
         foe = r.defender;
       } else if (sideKey === 'foe' && foeMove !== null) {
-        const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, 'foe', rng, events, state.typeChart);
+        const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, "foe", rng, events, state.typeChart, rhythm);
         foe = r.attacker;
         pl = r.defender;
       }
@@ -293,7 +326,7 @@ export function resolveRound(
   // Matches demo: stamina settle is skipped on KO mid-round (battle is over).
   if (!koed) {
     const plBefore = pl;
-    pl = paySide(pl, playerAction);
+    pl = paySide(pl, playerAction, rhythm, arena);
     if (pl.st !== plBefore.st) {
       events.push({
         kind: 'stamina',
@@ -305,7 +338,7 @@ export function resolveRound(
     }
     emitFatigueTransitions(plBefore, pl, 'player', events);
     const foeBefore = foe;
-    foe = paySide(foe, foeAction);
+    foe = paySide(foe, foeAction, rhythm, arena);
     if (foe.st !== foeBefore.st) {
       events.push({
         kind: 'stamina',
@@ -324,6 +357,7 @@ export function resolveRound(
       foe,
       round: state.round + 1,
       typeChart: state.typeChart,
+      ...(state.bossCard !== undefined ? { bossCard: state.bossCard } : {}),
       history: [
         ...state.history,
         {
