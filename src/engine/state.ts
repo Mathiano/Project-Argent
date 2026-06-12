@@ -75,7 +75,7 @@ export function isWinded(side: SideState): boolean {
 
 export function moveLegal(side: SideState, moveName: string): boolean {
   if (!side.species.moves.includes(moveName)) return false;
-  const move = MOVES[moveName];
+  const move = MOVES[moveName] ?? REGISTERED_MOVES[moveName];
   if (!move) return false;
   if (isWinded(side) && (move.tier === 'heavy' || move.tier === 'nuke')) return false;
   return canAfford(side, move);

@@ -28,5 +28,7 @@ export {
   loadMoves,
 } from './dexLoader';
 export type { DexEntryJson, MoveJson } from './dexLoader';
+export { falknerBossAI } from './bossAI';
+export type { BossPolicy } from './bossAI';
 export { resolveRound } from './resolveRound';
 export type { RoundResult } from './resolveRound';
