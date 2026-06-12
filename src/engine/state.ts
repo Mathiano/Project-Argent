@@ -50,8 +50,14 @@ export function createBattleState(
   };
 }
 
+const REGISTERED_MOVES: { [name: string]: Move } = {};
+
+export function registerMoves(extras: { readonly [name: string]: Move }): void {
+  Object.assign(REGISTERED_MOVES, extras);
+}
+
 export function lookupMove(name: string): Move {
-  const m = MOVES[name];
+  const m = MOVES[name] ?? REGISTERED_MOVES[name];
   if (!m) throw new Error(`Unknown move: ${name}`);
   return m;
 }

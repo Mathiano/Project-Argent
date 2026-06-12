@@ -13,6 +13,7 @@ export {
   createSide,
   createBattleState,
   lookupMove,
+  registerMoves,
   canAfford,
   isWinded,
   moveLegal,
@@ -20,5 +21,11 @@ export {
   forcedAction,
   validateAction,
 } from './state';
+export {
+  loadSpeciesAt,
+  loadDex,
+  loadMoves,
+} from './dexLoader';
+export type { DexEntryJson, MoveJson } from './dexLoader';
 export { resolveRound } from './resolveRound';
 export type { RoundResult } from './resolveRound';
