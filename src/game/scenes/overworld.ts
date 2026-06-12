@@ -5,7 +5,7 @@ import type { Facing, MapData, MapObject } from '../overworld/types';
 import { findObjectAt, isWalkable } from '../overworld/types';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
-import { drawText } from '../ui';
+import { drawPanel, drawText } from '../ui';
 
 const MOVE_DURATION = 0.18;
 const FADE_DURATION = 0.25;
@@ -35,6 +35,31 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
   let fadePhase: FadePhase = opts.startFaded ? 'fadeIn' : 'normal';
   let fadeT = opts.startFaded ? 0 : 1;
   let pendingWarp: string | null = null;
+  let tick = 0;
+
+  let dialogLines: string[] | null = null;
+  let dialogPage = 0;
+  const DIALOG_LINES_PER_PAGE = 3;
+
+  function openDialog(lines: readonly string[]): void {
+    dialogLines = [...lines];
+    dialogPage = 0;
+  }
+  function advanceDialog(): void {
+    if (!dialogLines) return;
+    const totalPages = Math.max(1, Math.ceil(dialogLines.length / DIALOG_LINES_PER_PAGE));
+    dialogPage += 1;
+    if (dialogPage >= totalPages) {
+      dialogLines = null;
+      dialogPage = 0;
+    }
+  }
+  function facingDelta(f: Facing): { dx: number; dy: number } {
+    if (f === 'up') return { dx: 0, dy: -1 };
+    if (f === 'down') return { dx: 0, dy: 1 };
+    if (f === 'left') return { dx: -1, dy: 0 };
+    return { dx: 1, dy: 0 };
+  }
 
   function tryStartMove(dir: Facing): void {
     facing = dir;
@@ -56,7 +81,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
   }
 
   function pollMovement(): void {
-    if (moving || fadePhase !== 'normal') return;
+    if (moving || fadePhase !== 'normal' || dialogLines !== null) return;
     const s = opts.inputState;
     if (s.pressed('up')) tryStartMove('up');
     else if (s.pressed('down')) tryStartMove('down');
@@ -91,6 +116,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
 
   return {
     update(dt) {
+      tick += dt;
       if (fadePhase === 'fadeIn') {
         fadeT += dt / FADE_DURATION;
         if (fadeT >= 1) { fadeT = 1; fadePhase = 'normal'; }
@@ -118,9 +144,24 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
       pollMovement();
     },
 
-    input(_key: InputKey) {
-      // Task-2 stub: A/B/SELECT/START handled in later tasks. Movement is
-      // polled from the dispatcher's held-key state above.
+    input(key: InputKey) {
+      if (dialogLines !== null) {
+        if (key === 'a' || key === 'b' || key === 'start') advanceDialog();
+        return;
+      }
+      if (fadePhase !== 'normal') return;
+      if (key === 'a') {
+        const { dx, dy } = facingDelta(facing);
+        const fx = tx + dx;
+        const fy = ty + dy;
+        const sign = findObjectAt(map, fx, fy, 'sign') as
+          | Extract<MapObject, { type: 'sign' }>
+          | null;
+        if (sign) {
+          openDialog(sign.lines);
+          return;
+        }
+      }
     },
 
     draw(ctx) {
@@ -142,12 +183,36 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
         ctx.fillStyle = `rgba(0,0,0,${1 - fadeT})`;
         ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
       }
+
+      if (dialogLines !== null) {
+        const startIdx = dialogPage * DIALOG_LINES_PER_PAGE;
+        const slice = dialogLines.slice(startIdx, startIdx + DIALOG_LINES_PER_PAGE);
+        drawDialog(ctx, slice, tick);
+      }
     },
   };
 }
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
+}
+
+function drawDialog(
+  ctx: CanvasRenderingContext2D,
+  lines: readonly string[],
+  tick: number,
+): void {
+  const x = 2;
+  const y = LOGICAL_H - 50;
+  const w = LOGICAL_W - 4;
+  const h = 48;
+  drawPanel(ctx, x, y, w, h);
+  for (let i = 0; i < lines.length; i += 1) {
+    drawText(ctx, lines[i]!, x + 8, y + 8 + i * 12);
+  }
+  if (Math.floor(tick * 2) % 2 === 0) {
+    drawText(ctx, '▼', x + w - 14, y + h - 12, PALETTE.ink);
+  }
 }
 
 function drawTiles(
