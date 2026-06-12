@@ -16,6 +16,7 @@ export interface OverworldSceneOpts {
   readonly inputState: InputState;
   readonly startFaded?: boolean;
   readonly onWarp: (target: string) => void;
+  readonly onEncounter: (foeSpecies: string) => void;
 }
 
 export function createOverworldScene(opts: OverworldSceneOpts): Scene {
@@ -95,6 +96,15 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
       pendingWarp = warp.target;
       fadePhase = 'fadeOut';
       fadeT = 1;
+      return;
+    }
+
+    const zone = findObjectAt(map, tx, ty, 'encounter_zone') as
+      | Extract<MapObject, { type: 'encounter_zone' }>
+      | null;
+    if (zone && Math.random() < zone.rate) {
+      const foe = zone.species[Math.floor(Math.random() * zone.species.length)]!;
+      opts.onEncounter(foe);
     }
   }
 

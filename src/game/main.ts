@@ -169,9 +169,35 @@ function showOverworld(map: string, spawn: string, faded: boolean): void {
       const nextSpawn = colon >= 0 ? target.slice(colon + 1) : 'default';
       showOverworld(nextMap, nextSpawn, true);
     },
+    onEncounter(foeSpecies: string) {
+      pushWildEncounter(foeSpecies);
+    },
   };
   const sceneOpts = faded ? { ...opts, startFaded: true as const } : opts;
   scenes.replace(createOverworldScene(sceneOpts));
+}
+
+function pushWildEncounter(foeSpeciesName: string): void {
+  const player = run.playerSpecies ?? SPECIES.EMBERCUB!;
+  const foe = SPECIES[foeSpeciesName];
+  if (!foe) {
+    console.warn(`Argent: encounter species not found: ${foeSpeciesName}`);
+    return;
+  }
+  const state = createBattleState(createSide(player), createSide(foe));
+  scenes.push(
+    createBattleScene({
+      state,
+      rng: run.rng,
+      chooseFoeAction: (s, r) => wildFoeAI(s, r),
+      intro: [`A wild ${foe.name}`, 'appeared!'],
+      catchBreathUnlocked: run.catchBreathUnlocked,
+      canRun: true,
+      onResolve: () => {
+        scenes.pop();
+      },
+    }),
+  );
 }
 
 let lastTime = performance.now();
