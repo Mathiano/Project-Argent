@@ -39,6 +39,8 @@ When code and docs conflict: **docs win**. Flag conflicts; never silently change
 
 Any change to combat numbers, AI behavior, or a boss kit must re-run the relevant ladder before merging. Ladders are vitest regression tests with seeded RNG and tolerance bands (n ≥ 2000). A boss ships only when its archetype win rates land on its boss card's targets. Never commit failing ladders.
 
+The original starter trio (EMBERCUB / SPROUTLE / AQUAFIN) and their movesets are **permanent sim fixtures** in `src/engine/data.ts` — not shipping content. The rival-ladder regressions in `src/sim/ladder.test.ts` keep them forever; shipping species arrive through `docs/mon-manifest.csv` + the commission pipeline and live in their own data files.
+
 ## Commands
 
 - `npm run dev` — game in browser
