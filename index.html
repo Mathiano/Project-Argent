@@ -10,20 +10,21 @@
         padding: 0;
         background: #000;
         height: 100%;
+        width: 100%;
         overflow: hidden;
-        font-family: monospace;
       }
       #app {
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        width: 100%;
         height: 100%;
-        color: #ccc;
+      }
+      canvas {
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
       }
     </style>
   </head>
   <body>
-    <div id="app">engine-only sprint &mdash; no rendering yet</div>
+    <div id="app"></div>
     <script type="module" src="/src/game/main.ts"></script>
   </body>
 </html>
