@@ -62,7 +62,8 @@ function showStarterPick(): void {
         run.playerSpecies = species;
         run.catchBreathUnlocked = false;
         run.rng = mulberry32(RNG_SEED + species.name.length);
-        showWildBattle();
+        sessionFlags.clear();
+        showOverworld('LAB', 'default', false);
       },
     }),
   );
