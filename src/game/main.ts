@@ -1,5 +1,4 @@
 import {
-  MOVES,
   SPECIES,
   affordableMoves,
   createBattleState,
@@ -19,8 +18,6 @@ if (!host) throw new Error('Argent: #app element missing in index.html');
 const { ctx, getScale } = mountCanvas(host);
 void getScale;
 
-// Temporary task-4 driver: launch a battle straight into the scene with a
-// deterministic RNG and a simple random-stance foe AI. Real flow lands in task 7.
 function randomFoeAI(state: BattleState, rng: RNG): Action {
   const me = state.foe;
   const forced = forcedAction(me);
@@ -29,7 +26,6 @@ function randomFoeAI(state: BattleState, rng: RNG): Action {
   const move = aff[Math.floor(rng.next() * aff.length)]!;
   const r = rng.next();
   const stance: Stance = r < 0.55 ? 'A' : r < 0.9 ? 'G' : 'F';
-  void MOVES; // silence the import lint; we use MOVES elsewhere in the scene
   return { kind: 'move', move, stance };
 }
 
@@ -45,9 +41,7 @@ scenes.push(
     intro: ['Foe AQUAFIN appeared!', 'TIP: SELECT cycles', 'your STANCE.'],
     catchBreathUnlocked: true,
     canRun: false,
-    onResolve: (winner) => {
-      console.log('battle resolved:', winner);
-    },
+    onResolve: (winner) => console.log('battle resolved:', winner),
   }),
 );
 
