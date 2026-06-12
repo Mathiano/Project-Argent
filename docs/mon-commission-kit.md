@@ -7,8 +7,13 @@ Companion to `mon-manifest.csv` (200 slots, 105 lines, pre-assigned chapter/habi
 1. Filter the manifest to one bucket (start: CH1 — the new starters live there)
 2. Run the **design prompt** below in Gemini with those rows pasted in → returns JSON
 3. Send the JSON here → I run validation, derive stats from archetype templates, flag problems, produce the approved batch sheet
-4. Run the **sprite prompts** (one per approved mon, style-ref image attached) → upload results here → ingest via `tools/sprite_ingest.py`
-5. Batch sim run → batch enters the repo as data
+4. Sprites are **one generation at a time, never bulk** (bulk = quality collapse). Per approved mon: run the sprite prompt with the style-ref image attached → Mathias eyeballs (silhouette / single creature / bold forms / white bg) → accept or regenerate with one corrective clause (never inpaint/edit) → upload accepted PNGs here in groups of 3–5
+5. I ingest via `tools/sprite_ingest.py` → contact sheet + in-context 320×180 battle mock → **final approval happens at game scale (56px)**, not at generation scale
+6. Batch sim run → batch enters the repo as data
+
+Style anchor rule: the approved EMBERCUB image seeds the style until the fortress-drake stage 1 is approved; from then on, shipping art anchors shipping art. Back sprites are a second pass (starters first); fronts are the quality bar.
+
+Generation priority: starter fronts (9) → Falkner birds (2) → remaining CH1 (~5) → starter backs (3).
 
 ## The design prompt (paste into Gemini, then paste the manifest rows for the batch)
 

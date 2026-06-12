@@ -1,0 +1,834 @@
+[
+ {
+  "id": 1,
+  "line_id": "L001",
+  "stage": 1,
+  "name": "KINDRAKE",
+  "types": [
+   "FLAME"
+  ],
+  "stats": {
+   "hp": 64,
+   "atk": 86,
+   "dfn": 119,
+   "spd": 57
+  },
+  "archetype": "Wall",
+  "rarity": "starter",
+  "statFlavor": "sturdy",
+  "learnset": [
+   {
+    "move": "TACKLE",
+    "level": 1
+   },
+   {
+    "move": "CINDER FLICK",
+    "level": 1
+   },
+   {
+    "move": "EMBER SNAP",
+    "level": 7
+   },
+   {
+    "move": "HEADBUTT",
+    "level": 13
+   }
+  ],
+  "evoLine": {
+   "evolvesTo": "KILNDRAKE",
+   "at": 16
+  },
+  "dexEntry": "It constantly absorbs ambient heat to thicken the dense, rock-like plates covering its small back. Instead of fleeing danger, it anchors its heavy claws into the earth and lets incoming attacks shatter harmlessly against its shell.",
+  "spriteBrief": "A small, stout quadrupedal drake hatchling crouching defensively, featuring thick, dark grey stone-like plates on its back and glowing orange seams.",
+  "habitatTags": [
+   "lab gift"
+  ],
+  "temperament": null,
+  "marked": false,
+  "spriteRef": "kindrake.sprite.json",
+  "facing": "right"
+ },
+ {
+  "id": 2,
+  "line_id": "L001",
+  "stage": 2,
+  "name": "KILNDRAKE",
+  "types": [
+   "FLAME"
+  ],
+  "stats": {
+   "hp": 76,
+   "atk": 100,
+   "dfn": 140,
+   "spd": 66
+  },
+  "archetype": "Wall",
+  "rarity": "starter",
+  "statFlavor": "ironhided",
+  "learnset": [
+   {
+    "move": "TACKLE",
+    "level": 1
+   },
+   {
+    "move": "CINDER FLICK",
+    "level": 1
+   },
+   {
+    "move": "EMBER SNAP",
+    "level": 7
+   },
+   {
+    "move": "HEADBUTT",
+    "level": 13
+   },
+   {
+    "move": "FLAME RUSH",
+    "level": 19
+   },
+   {
+    "move": "SCRATCH",
+    "level": 24
+   }
+  ],
+  "evoLine": {
+   "evolvesTo": "FORTDRAKE",
+   "at": 34
+  },
+  "dexEntry": "It hunkers down under an onslaught, letting its thick stone plates absorb the punishment. Once the attacker tires from striking its unyielding shell, it pushes forward with a slow, crushing advance.",
+  "spriteBrief": "A bulky, wingless quadrupedal drake in a grounded stance, featuring thick interlocking stone plates and a glowing furnace-like grill on its chest.",
+  "habitatTags": [
+   "lab gift"
+  ],
+  "temperament": null,
+  "marked": false,
+  "spriteRef": null,
+  "facing": null
+ },
+ {
+  "id": 3,
+  "line_id": "L001",
+  "stage": 3,
+  "name": "FORTDRAKE",
+  "types": [
+   "FLAME",
+   "DRAKE"
+  ],
+  "stats": {
+   "hp": 90,
+   "atk": 116,
+   "dfn": 164,
+   "spd": 74
+  },
+  "archetype": "Wall",
+  "rarity": "starter",
+  "statFlavor": "immovable",
+  "learnset": [
+   {
+    "move": "TACKLE",
+    "level": 1
+   },
+   {
+    "move": "CINDER FLICK",
+    "level": 1
+   },
+   {
+    "move": "EMBER SNAP",
+    "level": 7
+   },
+   {
+    "move": "HEADBUTT",
+    "level": 13
+   },
+   {
+    "move": "FLAME RUSH",
+    "level": 19
+   },
+   {
+    "move": "DRAKE CLAW",
+    "level": 24
+   },
+   {
+    "move": "__SIGNATURE_RESERVED__",
+    "level": 34
+   },
+   {
+    "move": "WYRM FURY",
+    "level": 40
+   }
+  ],
+  "evoLine": {
+   "evolvesTo": null,
+   "at": null
+  },
+  "dexEntry": "It anchors its massive, pillar-like legs into the earth to become an impenetrable living fortress against any siege. After enemies break their weapons on its castle-like ridges, it retaliates with unstoppable, earth-shaking force.",
+  "spriteBrief": "A colossal, wingless quadrupedal dragon resembling a walking stone castle, boasting jagged battlement-like back ridges and a heavily armored chest radiating intense magma heat.",
+  "habitatTags": [
+   "lab gift"
+  ],
+  "temperament": null,
+  "marked": false,
+  "spriteRef": null,
+  "facing": null
+ },
+ {
+  "id": 4,
+  "line_id": "L002",
+  "stage": 1,
+  "name": "GRUBLEAF",
+  "types": [
+   "SPROUT"
+  ],
+  "stats": {
+   "hp": 54,
+   "atk": 94,
+   "dfn": 69,
+   "spd": 125
+  },
+  "archetype": "Dodger",
+  "rarity": "starter",
+  "statFlavor": "nimble",
+  "learnset": [
+   {
+    "move": "TACKLE",
+    "level": 1
+   },
+   {
+    "move": "THORN FLICK",
+    "level": 1
+   },
+   {
+    "move": "LEAF LASH",
+    "level": 7
+   },
+   {
+    "move": "HEADBUTT",
+    "level": 13
+   }
+  ],
+  "evoLine": {
+   "evolvesTo": "VINESNAP",
+   "at": 16
+  },
+  "dexEntry": "It scatters false leaves in the wind before darting into the underbrush to strike from unseen angles. Foes are left swatting at shadows while it effortlessly evades their clumsy attacks.",
+  "spriteBrief": "Crouched low on four legs with a gecko-like body, featuring oversized leafy ridges on its head and a curled leaf tail.",
+  "habitatTags": [
+   "lab gift"
+  ],
+  "temperament": null,
+  "marked": false,
+  "spriteRef": "grubleaf.sprite.json",
+  "facing": "right"
+ },
+ {
+  "id": 5,
+  "line_id": "L002",
+  "stage": 2,
+  "name": "VINESNAP",
+  "types": [
+   "SPROUT"
+  ],
+  "stats": {
+   "hp": 63,
+   "atk": 110,
+   "dfn": 81,
+   "spd": 147
+  },
+  "archetype": "Dodger",
+  "rarity": "starter",
+  "statFlavor": "elusive",
+  "learnset": [
+   {
+    "move": "TACKLE",
+    "level": 1
+   },
+   {
+    "move": "THORN FLICK",
+    "level": 1
+   },
+   {
+    "move": "LEAF LASH",
+    "level": 7
+   },
+   {
+    "move": "HEADBUTT",
+    "level": 13
+   },
+   {
+    "move": "VINE SLAM",
+    "level": 16
+   },
+   {
+    "move": "SCRATCH",
+    "level": 24
+   }
+  ],
+  "evoLine": {
+   "evolvesTo": "WYRMFERN",
+   "at": 34
+  },
+  "dexEntry": "It uses its whip-like limbs to swing rapidly through the branches, becoming impossible to pin down. Frustrated enemies lash out wildly at empty space while this agile creature safely dances around every blow.",
+  "spriteBrief": "Standing in a low crouch on two legs with a sleek green body, long whip-like arms, and bright yellow reptilian eyes.",
+  "habitatTags": [
+   "lab gift"
+  ],
+  "temperament": null,
+  "marked": false,
+  "spriteRef": null,
+  "facing": null
+ },
+ {
+  "id": 6,
+  "line_id": "L002",
+  "stage": 3,
+  "name": "WYRMFERN",
+  "types": [
+   "SPROUT"
+  ],
+  "stats": {
+   "hp": 74,
+   "atk": 128,
+   "dfn": 93,
+   "spd": 171
+  },
+  "archetype": "Dodger",
+  "rarity": "starter",
+  "statFlavor": "evasive",
+  "learnset": [
+   {
+    "move": "TACKLE",
+    "level": 1
+   },
+   {
+    "move": "THORN FLICK",
+    "level": 1
+   },
+   {
+    "move": "LEAF LASH",
+    "level": 7
+   },
+   {
+    "move": "HEADBUTT",
+    "level": 13
+   },
+   {
+    "move": "VINE SLAM",
+    "level": 16
+   },
+   {
+    "move": "SCRATCH",
+    "level": 24
+   },
+   {
+    "move": "__SIGNATURE_RESERVED__",
+    "level": 34
+   }
+  ],
+  "evoLine": {
+   "evolvesTo": null,
+   "at": null
+  },
+  "dexEntry": "It dances through the canopy as a blur of emerald, leaving only falling leaves where it stood a fraction of a second prior. Foes exhaust themselves swinging at its afterimages while it gracefully dodges every single strike.",
+  "spriteBrief": "Tall and imposing bipedal dragon with sleek bark armor, large fern-frond wings spread wide, and a glowing green throat.",
+  "habitatTags": [
+   "lab gift"
+  ],
+  "temperament": null,
+  "marked": false,
+  "spriteRef": null,
+  "facing": null
+ },
+ {
+  "id": 7,
+  "line_id": "L003",
+  "stage": 1,
+  "name": "SILTSKIP",
+  "types": [
+   "SPLASH"
+  ],
+  "stats": {
+   "hp": 67,
+   "atk": 90,
+   "dfn": 106,
+   "spd": 67
+  },
+  "archetype": "Counter-tank",
+  "rarity": "starter",
+  "statFlavor": "rubbery",
+  "learnset": [
+   {
+    "move": "TACKLE",
+    "level": 1
+   },
+   {
+    "move": "RIPPLE CUT",
+    "level": 1
+   },
+   {
+    "move": "BUBBLE JET",
+    "level": 7
+   },
+   {
+    "move": "HEADBUTT",
+    "level": 13
+   }
+  ],
+  "evoLine": {
+   "evolvesTo": "BRACKSLAP",
+   "at": 16
+  },
+  "dexEntry": "It deliberately rests in shallow puddles to bait predators into lunging at its exposed, rubbery body. When the strike lands, it absorbs the kinetic energy and violently snaps its tail to repel the attacker back into the muck.",
+  "spriteBrief": "A small, wide-eyed mudskipper resting on slippery fins, turning its spongy flank outward with a challenging, open-mouthed grin.",
+  "habitatTags": [
+   "lab gift"
+  ],
+  "temperament": null,
+  "marked": false,
+  "spriteRef": null,
+  "facing": null
+ },
+ {
+  "id": 8,
+  "line_id": "L003",
+  "stage": 2,
+  "name": "BRACKSLAP",
+  "types": [
+   "SPLASH"
+  ],
+  "stats": {
+   "hp": 73,
+   "atk": 106,
+   "dfn": 134,
+   "spd": 74
+  },
+  "archetype": "Counter-tank",
+  "rarity": "starter",
+  "statFlavor": "calloused",
+  "learnset": [
+   {
+    "move": "TACKLE",
+    "level": 1
+   },
+   {
+    "move": "RIPPLE CUT",
+    "level": 1
+   },
+   {
+    "move": "BUBBLE JET",
+    "level": 7
+   },
+   {
+    "move": "HEADBUTT",
+    "level": 13
+   },
+   {
+    "move": "TIDE CRASH",
+    "level": 16
+   },
+   {
+    "move": "SCRATCH",
+    "level": 24
+   }
+  ],
+  "evoLine": {
+   "evolvesTo": "CRASHMAW",
+   "at": 34
+  },
+  "dexEntry": "Hauling its hefty mass onto muddy banks, it takes heavy blows directly on its calloused fins to tire out its foes. Once the enemy overextends, it channels the absorbed impact into a devastating, full-body retaliation.",
+  "spriteBrief": "A hefty amphibian brawler hauling itself forward on oversized, scarred muscular pectoral fins, looking battered but fiercely alert.",
+  "habitatTags": [
+   "lab gift"
+  ],
+  "temperament": null,
+  "marked": false,
+  "spriteRef": null,
+  "facing": null
+ },
+ {
+  "id": 9,
+  "line_id": "L003",
+  "stage": 3,
+  "name": "CRASHMAW",
+  "types": [
+   "SPLASH"
+  ],
+  "stats": {
+   "hp": 86,
+   "atk": 134,
+   "dfn": 144,
+   "spd": 86
+  },
+  "archetype": "Counter-tank",
+  "rarity": "starter",
+  "statFlavor": "pressurized",
+  "learnset": [
+   {
+    "move": "TACKLE",
+    "level": 1
+   },
+   {
+    "move": "RIPPLE CUT",
+    "level": 1
+   },
+   {
+    "move": "BUBBLE JET",
+    "level": 7
+   },
+   {
+    "move": "HEADBUTT",
+    "level": 13
+   },
+   {
+    "move": "TIDE CRASH",
+    "level": 16
+   },
+   {
+    "move": "SCRATCH",
+    "level": 24
+   },
+   {
+    "move": "__SIGNATURE_RESERVED__",
+    "level": 34
+   }
+  ],
+  "evoLine": {
+   "evolvesTo": null,
+   "at": null
+  },
+  "dexEntry": "This titanic sea beast intentionally exposes its soft underbelly to invite massive strikes that compress its internal hydrostatic bladders. Releasing that trapped pressure, it violently erupts with enough mirrored force to capsize entire galleons.",
+  "spriteBrief": "A colossal, wingless leviathan rising from the water, displaying a bloated, heavily scarred underbelly and massive, anchor-like front fins.",
+  "habitatTags": [
+   "lab gift"
+  ],
+  "temperament": null,
+  "marked": false,
+  "spriteRef": null,
+  "facing": null
+ },
+ {
+  "id": 10,
+  "line_id": "L008",
+  "stage": 1,
+  "name": "FLITPECK",
+  "types": [
+   "GALE"
+  ],
+  "stats": {
+   "hp": 46,
+   "atk": 84,
+   "dfn": 50,
+   "spd": 106
+  },
+  "archetype": "Glass nuke",
+  "rarity": "uncommon",
+  "statFlavor": "windborne",
+  "learnset": [
+   {
+    "move": "TACKLE",
+    "level": 1
+   },
+   {
+    "move": "GUST RAKE",
+    "level": 1
+   },
+   {
+    "move": "WING CUT",
+    "level": 7
+   },
+   {
+    "move": "HEADBUTT",
+    "level": 13
+   }
+  ],
+  "evoLine": {
+   "evolvesTo": "GALEHAWK",
+   "at": 16
+  },
+  "dexEntry": "It catches sudden updrafts to launch itself forward in rapid, unpredictable bursts of speed that catch predators entirely off guard. Between these powerful gusts, it glides limply and avoids engaging until the wind picks back up.",
+  "spriteBrief": "A tiny, sharply angled blue bird plunging downwards like an arrow, with its feathers swept back severely by a strong gale.",
+  "habitatTags": [
+   "route grass"
+  ],
+  "temperament": null,
+  "marked": false,
+  "spriteRef": null,
+  "facing": null
+ },
+ {
+  "id": 11,
+  "line_id": "L008",
+  "stage": 2,
+  "name": "GALEHAWK",
+  "types": [
+   "GALE"
+  ],
+  "stats": {
+   "hp": 56,
+   "atk": 117,
+   "dfn": 59,
+   "spd": 122
+  },
+  "archetype": "Glass nuke",
+  "rarity": "uncommon",
+  "statFlavor": "surging",
+  "learnset": [
+   {
+    "move": "TACKLE",
+    "level": 1
+   },
+   {
+    "move": "GUST RAKE",
+    "level": 1
+   },
+   {
+    "move": "WING CUT",
+    "level": 7
+   },
+   {
+    "move": "HEADBUTT",
+    "level": 13
+   },
+   {
+    "move": "DIVE BOMB",
+    "level": 13
+   },
+   {
+    "move": "SCRATCH",
+    "level": 24
+   }
+  ],
+  "evoLine": {
+   "evolvesTo": null,
+   "at": null
+  },
+  "dexEntry": "Riding the crest of furious storms, it channels the gale's momentum into surging, high-speed talon strikes that cannot be matched. When the squall momentarily dies down, it coasts defensively on residual air currents, conserving energy for the next massive gust.",
+  "spriteBrief": "A fierce, aerodynamic hawk banking sharply on invisible air currents, its razor-sharp wing feathers angled to catch the breeze.",
+  "habitatTags": [
+   "route grass"
+  ],
+  "temperament": null,
+  "marked": false,
+  "spriteRef": null,
+  "facing": null
+ },
+ {
+  "id": 12,
+  "line_id": "L023",
+  "stage": 1,
+  "name": "GRITHOAX",
+  "types": [
+   "TERRA"
+  ],
+  "stats": {
+   "hp": 50,
+   "atk": 66,
+   "dfn": 70,
+   "spd": 78
+  },
+  "archetype": "Trickster",
+  "rarity": "common",
+  "statFlavor": "cunning",
+  "learnset": [
+   {
+    "move": "TACKLE",
+    "level": 1
+   },
+   {
+    "move": "PEBBLE SHOT",
+    "level": 1
+   },
+   {
+    "move": "ROCK MAUL",
+    "level": 7
+   },
+   {
+    "move": "HEADBUTT",
+    "level": 13
+   }
+  ],
+  "evoLine": {
+   "evolvesTo": "CAVELURE",
+   "at": 16
+  },
+  "dexEntry": "It shifts loose gravel at the cave mouth to create false paths that lure unwary predators into deep pitfalls. While the confused enemy struggles to climb out, it safely drops small rocks on their heads from the shadows.",
+  "spriteBrief": "A small, wide-eyed rock creature half-buried in dirt, holding a shiny decoy pebble in its tiny claws.",
+  "habitatTags": [
+   "dark cave mouth"
+  ],
+  "temperament": null,
+  "marked": false,
+  "spriteRef": null,
+  "facing": null
+ },
+ {
+  "id": 13,
+  "line_id": "L023",
+  "stage": 2,
+  "name": "CAVELURE",
+  "types": [
+   "TERRA"
+  ],
+  "stats": {
+   "hp": 62,
+   "atk": 79,
+   "dfn": 84,
+   "spd": 95
+  },
+  "archetype": "Trickster",
+  "rarity": "common",
+  "statFlavor": "deceptive",
+  "learnset": [
+   {
+    "move": "TACKLE",
+    "level": 1
+   },
+   {
+    "move": "PEBBLE SHOT",
+    "level": 1
+   },
+   {
+    "move": "ROCK MAUL",
+    "level": 7
+   },
+   {
+    "move": "HEADBUTT",
+    "level": 13
+   },
+   {
+    "move": "QUAKE STOMP",
+    "level": 16
+   },
+   {
+    "move": "SCRATCH",
+    "level": 24
+   }
+  ],
+  "evoLine": {
+   "evolvesTo": "CHASMTRAP",
+   "at": 34
+  },
+  "dexEntry": "By rearranging stalagmites, it builds disorienting mazes at the cave mouth that trap intruders in endless circles. It controls the battlefield entirely, striking from blind corners and immediately retreating behind stone illusions.",
+  "spriteBrief": "A jagged, hunched cavern dweller hiding behind a fake stalagmite shield, peeking around the side with a mischievous glint.",
+  "habitatTags": [
+   "dark cave mouth"
+  ],
+  "temperament": null,
+  "marked": false,
+  "spriteRef": null,
+  "facing": null
+ },
+ {
+  "id": 14,
+  "line_id": "L023",
+  "stage": 3,
+  "name": "CHASMTRAP",
+  "types": [
+   "TERRA"
+  ],
+  "stats": {
+   "hp": 76,
+   "atk": 102,
+   "dfn": 92,
+   "spd": 112
+  },
+  "archetype": "Trickster",
+  "rarity": "common",
+  "statFlavor": "elusive",
+  "learnset": [
+   {
+    "move": "TACKLE",
+    "level": 1
+   },
+   {
+    "move": "PEBBLE SHOT",
+    "level": 1
+   },
+   {
+    "move": "ROCK MAUL",
+    "level": 7
+   },
+   {
+    "move": "HEADBUTT",
+    "level": 13
+   },
+   {
+    "move": "QUAKE STOMP",
+    "level": 16
+   },
+   {
+    "move": "SCRATCH",
+    "level": 24
+   },
+   {
+    "move": "__SIGNATURE_RESERVED__",
+    "level": 34
+   }
+  ],
+  "evoLine": {
+   "evolvesTo": null,
+   "at": null
+  },
+  "dexEntry": "It constantly shifts the cavern floor beneath its opponent's feet, ensuring they can never find solid footing to launch a proper attack. Opponents waste all their energy swinging at phantom echoes while it attacks safely from the shifting walls.",
+  "spriteBrief": "A large, multi-legged rock monster blending seamlessly into a stone archway, with multiple glowing eyes peering from the dark crevices.",
+  "habitatTags": [
+   "dark cave mouth"
+  ],
+  "temperament": null,
+  "marked": false,
+  "spriteRef": null,
+  "facing": null
+ },
+ {
+  "id": 15,
+  "line_id": "L027",
+  "stage": 1,
+  "name": "MARSHMASH",
+  "types": [
+   "SPLASH"
+  ],
+  "stats": {
+   "hp": 58,
+   "atk": 104,
+   "dfn": 74,
+   "spd": 64
+  },
+  "archetype": "Brawler",
+  "rarity": "common",
+  "statFlavor": "brawny",
+  "learnset": [
+   {
+    "move": "TACKLE",
+    "level": 1
+   },
+   {
+    "move": "RIPPLE CUT",
+    "level": 1
+   },
+   {
+    "move": "BUBBLE JET",
+    "level": 7
+   },
+   {
+    "move": "HEADBUTT",
+    "level": 13
+   },
+   {
+    "move": "TIDE CRASH",
+    "level": 13
+   }
+  ],
+  "evoLine": {
+   "evolvesTo": null,
+   "at": null
+  },
+  "dexEntry": "Never backing down from a territorial dispute, this aggressive amphibian charges headlong into any incoming aquatic strike. It clashes directly with its opponent's attacks, relying on sheer physical power and brute force to claim the pond.",
+  "spriteBrief": "A squat, muscular green frog wearing lily-pad boxing gloves, standing in a wide, aggressive brawler's stance.",
+  "habitatTags": [
+   "route grass"
+  ],
+  "temperament": null,
+  "marked": false,
+  "spriteRef": null,
+  "facing": null
+ }
+]

@@ -626,13 +626,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         { name: state.foe.species.name, type: state.foe.species.type },
         FOE_SLOT.x + spriteOffset('foe'),
         FOE_SLOT.y,
+        { facing: 'left' },
       );
       drawSpeciesInSlot(
         ctx,
         { name: state.player.species.name, type: state.player.species.type },
         PL_SLOT.x + spriteOffset('player'),
         PL_SLOT.y,
-        { flip: true },
+        { facing: 'right' },
       );
 
       drawFoePanel(ctx);

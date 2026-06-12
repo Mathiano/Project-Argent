@@ -2,11 +2,15 @@
 // assets (56x56 text-grid JSON). Unknown species render through the placeholder.
 
 import embercubData from '../../assets/sprites/embercub.sprite.json';
+import grubleafData from '../../assets/sprites/GRUBLEAF.sprite.json';
+import kindrakeData from '../../assets/sprites/KINDRAKE.sprite.json';
 import type { ElementType } from '../engine';
-import type { Sprite } from './sprite';
+import type { Facing, Sprite } from './sprite';
 import { drawSprite, drawSpriteInSlot, validateSprite } from './sprite';
 
 const EMBERCUB_56: Sprite = embercubData as Sprite;
+const GRUBLEAF_56: Sprite = grubleafData as Sprite;
+const KINDRAKE_56: Sprite = kindrakeData as Sprite;
 
 const SPROUTLE_14: Sprite = {
   name: 'SPROUTLE',
@@ -75,10 +79,12 @@ const FUZZLET_14: Sprite = {
 };
 
 // Validate at module load so bad data fails fast.
-[EMBERCUB_56, SPROUTLE_14, AQUAFIN_14, FUZZLET_14].forEach(validateSprite);
+[EMBERCUB_56, GRUBLEAF_56, KINDRAKE_56, SPROUTLE_14, AQUAFIN_14, FUZZLET_14].forEach(validateSprite);
 
 const REGISTRY: { readonly [name: string]: Sprite } = {
   EMBERCUB: EMBERCUB_56,
+  GRUBLEAF: GRUBLEAF_56,
+  KINDRAKE: KINDRAKE_56,
   SPROUTLE: SPROUTLE_14,
   AQUAFIN: AQUAFIN_14,
   FUZZLET: FUZZLET_14,
@@ -169,15 +175,30 @@ export function drawSpeciesInSlot(
   species: SpeciesRef,
   slotX: number,
   slotY: number,
-  options: { slotSize?: number; flip?: boolean } = {},
+  options: { slotSize?: number; flip?: boolean; facing?: Facing } = {},
 ): void {
   const sprite = getSprite(species.name);
   if (sprite) {
-    drawSpriteInSlot(ctx, sprite, slotX, slotY, options);
+    const flip = resolveFlip(sprite, options);
+    const drawOpts: { slotSize?: number; flip: boolean } =
+      options.slotSize !== undefined
+        ? { slotSize: options.slotSize, flip }
+        : { flip };
+    drawSpriteInSlot(ctx, sprite, slotX, slotY, drawOpts);
     return;
   }
   const placeholderOpts = options.slotSize !== undefined ? { slotSize: options.slotSize } : {};
   drawPlaceholder(ctx, species.type, slotX, slotY, placeholderOpts);
+}
+
+// 'facing' wins when both are given: caller declared which way the slot
+// should face, so we flip whenever the source art disagrees.
+function resolveFlip(sprite: Sprite, options: { facing?: Facing; flip?: boolean }): boolean {
+  if (options.facing !== undefined) {
+    const source: Facing = sprite.facing ?? 'left';
+    return source !== options.facing;
+  }
+  return options.flip ?? false;
 }
 
 export { drawSprite, drawSpriteInSlot };

@@ -1,11 +1,16 @@
 // Text-grid sprite format. Each row is a string of palette keys
 // ('.' = transparent). Rendered at 1px per cell, native size — no scaling.
 
+export type Facing = 'left' | 'right';
+
 export interface Sprite {
   readonly name: string;
   readonly size: number;
   readonly palette: { readonly [key: string]: string };
   readonly rows: readonly string[];
+  // Source-art direction. Defaults to 'left' (the demo's convention).
+  // Renderer flips if the slot wants the opposite direction.
+  readonly facing?: Facing;
 }
 
 export function validateSprite(sprite: Sprite): void {

@@ -52,5 +52,5 @@ Dex content is commissioned from Gemini against `docs/mon-manifest.csv` (200 pre
 | `docs/chapter-1-dex.md` | Schema, types, catching params, style bible (species sections superseded) |
 | `docs/mon-manifest.csv` + `docs/mon-commission-kit.md` | The 200-slot commission system |
 | `docs/sim-archetypes.md` | Canonical bots + rival AI + design debt |
-| `docs/falkner-boss-card.md` | STALE — v2 pending CH1 batch |
+| `docs/falkner-boss-card.md` | v2 — Falkner gym kit on the new ace + starters |
 | `docs/argent-demo.html`, `docs/*-sim.py` | POC + methodology reference |

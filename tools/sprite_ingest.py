@@ -34,6 +34,9 @@ MASTER_PAL = {
     'r': (226, 58, 30),    # flame red
     'y': (247, 179, 43),   # flame yellow
     'w': (255, 255, 255),  # shine/teeth
+    's': (168, 162, 150),  # stone light
+    'S': (110, 104, 96),   # stone
+    'D': (70, 66, 62),     # stone dark
 }
 SOFT_EDGE = {'r', 'y'}  # fire keeps soft edges, no forced outline
 

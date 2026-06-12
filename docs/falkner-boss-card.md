@@ -1,55 +1,58 @@
-# Boss Card — FALKNER (Gym 1, Violet City)
+# Falkner Boss Card v2 (CANON — supersedes v0.1 entirely)
 
-Template: Whitney card (combat-2-0-spec.md). Status: v0.1, sim targets unvalidated — tune via ladder before shipping.
+Gym 1 · Violet rooftop · Reads 0% / 15% · Break bar 2 · Badge gift: first Trainer Call slot
 
-**Teaches:** the action timeline (his signature breaks the heavy-is-slow rule), Guard-counter as the answer to faster foes, Break bar debut, first arena rhythm.
-**Core lesson in one line:** *your dodge fails against faster foes — read the timeline, counter instead.*
+The lesson: **the timeline has a rhythm, and you can read it.** Falkner is the metronome boss — every threat he poses is telegraphed by the arena itself.
 
-## Team (fought sequentially, no heal between)
+## Arena — rooftop gusts (both sides)
 
-| Mon | HP | ATK | DFN | SPD | Stance mix | Notes |
-|---|---|---|---|---|---|---|
-| GUSTLING | 44 | 80 | 76 | 95 | 50A/30G/20F | Warm-up: honest, readable |
-| SKYLANCE (ace) | 60 | 96 | 80 | **118** | 40A/20G/40F | Faster than every starter; Break bar 2 |
+- Every 3rd round is a **gust round**, telegraphed one round ahead ("The wind is rising…")
+- During gusts: heavy moves cost +8 ST and weigh ×1.3 on initiative (for BOTH sides — diving into a gale is expensive for you too)
 
-SPD 118 means: no starter can Fluid-dodge him (player spd < his ⇒ dodge p = 0), while his Fluid stuffs slow attackers (vs Aquafin's Aggressive: p = 0.9). The matchup *is* the lesson.
+## The trait — GUSTBORNE (first species trait; engine hook at the Falkner sprint)
 
-## Signature — DIVE BOMB (SKYLANCE)
+GALEHAWK and FLITPECK carry it: **on arena-rhythm rounds, damage ×1.3 and initiative ×1.25; no penalty off-rhythm.** Data-driven round-modifier hook — the same mechanism later powers Pryce's ice pulses and the moon-dragon's phase fight. Wild-caught birds keep the trait (it answers to any future arena/weather rhythm).
 
-Heavy tier (power 110, cost 35) with **weight 0.85 instead of 1.15** — a heavy that acts *first*. Intent shows HV as normal; the order preview shows him jumping the queue. First use is the timeline tutorial moment.
+## Roster
 
-## Arena — Rooftop Gusts
+| Mon | Level band | Stats | Kit | Notes |
+|---|---|---|---|---|
+| FLITPECK (lead) | route band | base | GUST RAKE, WING CUT | honest, 0 reads, pure tutorial |
+| **GALEHAWK (ace)** | ace band | base × HP 1.15 | GUST RAKE, WING CUT, **DIVE BOMB** | boss-privilege heavy (players unlock it at L13 on capture) |
 
-Every 3rd round is a **gust round**, telegraphed one round ahead ("The wind is rising…"). During a gust: heavy moves cost +8 stamina and their weight is ×1.3 (Dive Bomb included — gusts are when you can outpace him). Teaches planning around a rhythm; Pryce later weaponizes the same idea.
+## Behavior script
 
-## Reads, Calls, Break
+- **Phase 1 (Break 0–1, reads 0%):** the metronome. DIVE BOMB *only* on gust rounds — gust telegraph + heavy intent = a fully readable kill window. Off-gust: lights/mids, Fluid-leaning stances. The player learns: Guard the gust, counter the dive, or Fluid only if faster.
+- **Phase 2 (after first Break, reads 15%):** the metronome syncopates. He may WING CUT on a gust (bait) and holds his one Call — *"Now — full power!"* — for a gust-round DIVE BOMB when the player's ST is low.
+- **Break bar 2:** two read-wins → GALEHAWK is blown from the sky: loses a round, gust cycle resets, phase up.
 
-| Difficulty | Read rate | Leader Calls | Intent info |
-|---|---|---|---|
-| Normal | 0% | 0 | Full (stance + tier) |
-| Hard | 15% | 1 ("Full power!") | Full |
+## Scout report (prep phase, earned from the gym trainers)
 
-Break bar: 2 on SKYLANCE only (debut size). Fills on player read-wins (counter/opening/dodge/clash-win). On Break: staggered + Fluid locked for 2 rounds ("wings tire") — his dodge game shuts off, the burst window is obvious.
+SPD edge vs all three starters off-gust is his; *on* gusts he outspeeds everything. Habit line: "He strikes with the wind — count the rounds." ★ note: Catch Breath on the round before a gust is the safe tempo play.
 
-## Player assumptions
+## Matchup texture (typechart canon)
 
-Solo starter (lv-curve natural), prep phase shown before the fight (scout card: SPD 118 — FASTER, habit FLUID-heavy, plan: Guard-counter + strike on gusts), 1 potion (30% heal) on Normal, 0 on Hard. ★ Calls available (Catch Breath unlocked pre-gym).
+GALE hits SPROUT ×1.3 — the GRUBLEAF picker gets the classic hard first gym. TERRA (GRITHOAX, the cave line) hits back ×1.3 — the prep-loop catch. KINDRAKE walls him; SILTSKIP counters the dive.
 
-## Sim targets (N / H), n ≥ 2000 seeded
+## Sim targets (CC tunes levers to land these, n≥2000 per cell, vs each starter at band)
 
-| Archetype | Target win % |
+| Player archetype | Target win % |
 |---|---|
-| Static-guard | 55 / 45 |
-| Brute (aggro-spam) | 25 / 18 |
-| Naive triangle | 50 / 40 |
-| Human-ish (30% err) | 80 / 70 |
-| Stamina-reader + Call | 92 / 88 |
+| button-masher | 25–35 |
+| brute (heavy spam) | 10–20 |
+| naive-triangle | 55–70 |
+| stamina-reader | 85–92 |
+| human-ish (30% err) | 65–75 |
 
-Gym 1 shape: the teacher, not the wall. Everyone who engages with the systems clears in ≤2 attempts; pure stat-checking (brute) is the only hard fail. Expected fight length 10–14 rounds vs ace.
+Tuning levers, in order of preference: GUSTBORNE damage mult (1.3 ±0.1) → DIVE BOMB usage rule strictness → ace HP mult (1.15 ±0.1) → Break bar threshold feel (2 fixed — do not change without design review).
 
-## Tuning levers (in priority order)
+## Engine hooks required (sanctioned additions at the Falkner sprint, sim-gated)
 
-1. SKYLANCE Fluid rate (40% ±10) — controls how punishing slow-aggression is
-2. Dive Bomb weight (0.85 ±0.1) — controls timeline-lesson sharpness
-3. Gust cadence (every 3rd ↔ 4th round) — controls burst-window frequency
-4. GUSTLING chip damage — controls how much HP/stamina the warm-up taxes before the ace
+1. Arena rhythm schedule (round-modifier table on BossCard)
+2. Species trait slot + GUSTBORNE implementation (conditional modifiers)
+3. Break bar (fills on player read-wins; Break = lost round + phase flag)
+4. Boss card loader driving stance/move policy + Call usage
+
+## Gym room (P0 rule: the room teaches the leader)
+
+Wind-current routing puzzle: timed gusts push the player on the rooftop walkways; crossing requires moving between pulses — counting the same rhythm the fight will demand.

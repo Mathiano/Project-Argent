@@ -1,0 +1,217 @@
+[
+ {
+  "name": "TACKLE",
+  "type": null,
+  "tier": "light"
+ },
+ {
+  "name": "SCRATCH",
+  "type": null,
+  "tier": "light"
+ },
+ {
+  "name": "HEADBUTT",
+  "type": null,
+  "tier": "mid"
+ },
+ {
+  "name": "HEAVY SLAM",
+  "type": null,
+  "tier": "heavy"
+ },
+ {
+  "name": "CINDER FLICK",
+  "type": "FLAME",
+  "tier": "light"
+ },
+ {
+  "name": "EMBER SNAP",
+  "type": "FLAME",
+  "tier": "mid"
+ },
+ {
+  "name": "FLAME RUSH",
+  "type": "FLAME",
+  "tier": "heavy"
+ },
+ {
+  "name": "THORN FLICK",
+  "type": "SPROUT",
+  "tier": "light"
+ },
+ {
+  "name": "LEAF LASH",
+  "type": "SPROUT",
+  "tier": "mid"
+ },
+ {
+  "name": "VINE SLAM",
+  "type": "SPROUT",
+  "tier": "heavy"
+ },
+ {
+  "name": "RIPPLE CUT",
+  "type": "SPLASH",
+  "tier": "light"
+ },
+ {
+  "name": "BUBBLE JET",
+  "type": "SPLASH",
+  "tier": "mid"
+ },
+ {
+  "name": "TIDE CRASH",
+  "type": "SPLASH",
+  "tier": "heavy"
+ },
+ {
+  "name": "PAW JAB",
+  "type": "FIELD",
+  "tier": "light"
+ },
+ {
+  "name": "BODY SLAM",
+  "type": "FIELD",
+  "tier": "mid"
+ },
+ {
+  "name": "STAMPEDE",
+  "type": "FIELD",
+  "tier": "heavy"
+ },
+ {
+  "name": "GUST RAKE",
+  "type": "GALE",
+  "tier": "light"
+ },
+ {
+  "name": "WING CUT",
+  "type": "GALE",
+  "tier": "mid"
+ },
+ {
+  "name": "DIVE BOMB",
+  "type": "GALE",
+  "tier": "heavy"
+ },
+ {
+  "name": "VENOM BARB",
+  "type": "VENOM",
+  "tier": "light"
+ },
+ {
+  "name": "TOXIN FANG",
+  "type": "VENOM",
+  "tier": "mid"
+ },
+ {
+  "name": "SLUDGE BURST",
+  "type": "VENOM",
+  "tier": "heavy"
+ },
+ {
+  "name": "PEBBLE SHOT",
+  "type": "TERRA",
+  "tier": "light"
+ },
+ {
+  "name": "ROCK MAUL",
+  "type": "TERRA",
+  "tier": "mid"
+ },
+ {
+  "name": "QUAKE STOMP",
+  "type": "TERRA",
+  "tier": "heavy"
+ },
+ {
+  "name": "SPARK JAB",
+  "type": "VOLT",
+  "tier": "light"
+ },
+ {
+  "name": "VOLT LASH",
+  "type": "VOLT",
+  "tier": "mid"
+ },
+ {
+  "name": "STORM CRASH",
+  "type": "VOLT",
+  "tier": "heavy"
+ },
+ {
+  "name": "FROST NIP",
+  "type": "FROST",
+  "tier": "light"
+ },
+ {
+  "name": "ICE LANCE",
+  "type": "FROST",
+  "tier": "mid"
+ },
+ {
+  "name": "GLACIER RAM",
+  "type": "FROST",
+  "tier": "heavy"
+ },
+ {
+  "name": "WISP TAP",
+  "type": "SPIRIT",
+  "tier": "light"
+ },
+ {
+  "name": "HAUNT CLAW",
+  "type": "SPIRIT",
+  "tier": "mid"
+ },
+ {
+  "name": "SOUL REND",
+  "type": "SPIRIT",
+  "tier": "heavy"
+ },
+ {
+  "name": "QUICK JAB",
+  "type": "BRAWN",
+  "tier": "light"
+ },
+ {
+  "name": "ROUNDHOUSE",
+  "type": "BRAWN",
+  "tier": "mid"
+ },
+ {
+  "name": "MOUNTAIN FIST",
+  "type": "BRAWN",
+  "tier": "heavy"
+ },
+ {
+  "name": "IRON FLICK",
+  "type": "FORGE",
+  "tier": "light"
+ },
+ {
+  "name": "STEEL BASH",
+  "type": "FORGE",
+  "tier": "mid"
+ },
+ {
+  "name": "ANVIL DROP",
+  "type": "FORGE",
+  "tier": "heavy"
+ },
+ {
+  "name": "FANG RAKE",
+  "type": "DRAKE",
+  "tier": "light"
+ },
+ {
+  "name": "DRAKE CLAW",
+  "type": "DRAKE",
+  "tier": "mid"
+ },
+ {
+  "name": "WYRM FURY",
+  "type": "DRAKE",
+  "tier": "heavy"
+ }
+]
