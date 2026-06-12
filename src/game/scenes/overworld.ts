@@ -1,18 +1,21 @@
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import type { InputState } from '../input';
 import { getMap } from '../overworld/maps';
-import type { Facing, MapData } from '../overworld/types';
-import { isWalkable } from '../overworld/types';
+import type { Facing, MapData, MapObject } from '../overworld/types';
+import { findObjectAt, isWalkable } from '../overworld/types';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
 import { drawText } from '../ui';
 
 const MOVE_DURATION = 0.18;
+const FADE_DURATION = 0.25;
 
 export interface OverworldSceneOpts {
   readonly map: string;
   readonly spawn: string;
   readonly inputState: InputState;
+  readonly startFaded?: boolean;
+  readonly onWarp: (target: string) => void;
 }
 
 export function createOverworldScene(opts: OverworldSceneOpts): Scene {
@@ -27,6 +30,11 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
   let facing: Facing = spawn.facing;
   let moveT = 1;
   let moving = false;
+
+  type FadePhase = 'normal' | 'fadeIn' | 'fadeOut';
+  let fadePhase: FadePhase = opts.startFaded ? 'fadeIn' : 'normal';
+  let fadeT = opts.startFaded ? 0 : 1;
+  let pendingWarp: string | null = null;
 
   function tryStartMove(dir: Facing): void {
     facing = dir;
@@ -48,12 +56,21 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
   }
 
   function pollMovement(): void {
-    if (moving) return;
+    if (moving || fadePhase !== 'normal') return;
     const s = opts.inputState;
     if (s.pressed('up')) tryStartMove('up');
     else if (s.pressed('down')) tryStartMove('down');
     else if (s.pressed('left')) tryStartMove('left');
     else if (s.pressed('right')) tryStartMove('right');
+  }
+
+  function onStepFinish(): void {
+    const warp = findObjectAt(map, tx, ty, 'warp') as Extract<MapObject, { type: 'warp' }> | null;
+    if (warp) {
+      pendingWarp = warp.target;
+      fadePhase = 'fadeOut';
+      fadeT = 1;
+    }
   }
 
   function playerPixel(): { px: number; py: number } {
@@ -74,11 +91,28 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
 
   return {
     update(dt) {
+      if (fadePhase === 'fadeIn') {
+        fadeT += dt / FADE_DURATION;
+        if (fadeT >= 1) { fadeT = 1; fadePhase = 'normal'; }
+      } else if (fadePhase === 'fadeOut') {
+        fadeT -= dt / FADE_DURATION;
+        if (fadeT <= 0) {
+          fadeT = 0;
+          if (pendingWarp !== null) {
+            const target = pendingWarp;
+            pendingWarp = null;
+            opts.onWarp(target);
+            return;
+          }
+        }
+      }
+
       if (moving) {
         moveT += dt / MOVE_DURATION;
         if (moveT >= 1) {
           moveT = 1;
           moving = false;
+          onStepFinish();
         }
       }
       pollMovement();
@@ -103,6 +137,11 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
       ctx.fillStyle = 'rgba(32, 32, 44, 0.85)';
       ctx.fillRect(0, 0, LOGICAL_W, 10);
       drawText(ctx, `${map.name}  (${tx},${ty}) facing ${facing}`, 3, 1, PALETTE.paper);
+
+      if (fadeT < 1) {
+        ctx.fillStyle = `rgba(0,0,0,${1 - fadeT})`;
+        ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+      }
     },
   };
 }

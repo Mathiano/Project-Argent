@@ -153,13 +153,26 @@ else if (skip === 'wild') {
   run.catchBreathUnlocked = true;
   showRivalBattle();
 } else if (skip === 'end') showEnd(true);
-else if (skip === 'overworld') {
-  scenes.push(createOverworldScene({ map: 'ROUTE31', spawn: 'default', inputState: dispatcher.state }));
-} else if (skip === 'lab') {
-  scenes.push(createOverworldScene({ map: 'LAB', spawn: 'default', inputState: dispatcher.state }));
-} else if (skip === 'house') {
-  scenes.push(createOverworldScene({ map: 'HOUSE', spawn: 'fromRoute', inputState: dispatcher.state }));
-} else showTitle();
+else if (skip === 'overworld') showOverworld('ROUTE31', 'default', false);
+else if (skip === 'lab') showOverworld('LAB', 'default', false);
+else if (skip === 'house') showOverworld('HOUSE', 'fromRoute', false);
+else showTitle();
+
+function showOverworld(map: string, spawn: string, faded: boolean): void {
+  const opts = {
+    map,
+    spawn,
+    inputState: dispatcher.state,
+    onWarp(target: string) {
+      const colon = target.indexOf(':');
+      const nextMap = colon >= 0 ? target.slice(0, colon) : target;
+      const nextSpawn = colon >= 0 ? target.slice(colon + 1) : 'default';
+      showOverworld(nextMap, nextSpawn, true);
+    },
+  };
+  const sceneOpts = faded ? { ...opts, startFaded: true as const } : opts;
+  scenes.replace(createOverworldScene(sceneOpts));
+}
 
 let lastTime = performance.now();
 function frame(now: number): void {
