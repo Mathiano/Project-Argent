@@ -23,6 +23,7 @@ const host = document.getElementById('app');
 if (!host) throw new Error('Argent: #app element missing in index.html');
 
 const { ctx } = mountCanvas(host);
+const dispatcher = createInputDispatcher((key) => scenes.input(key));
 
 const STARTERS = ['EMBERCUB', 'SPROUTLE', 'AQUAFIN'] as const;
 const RNG_SEED = 0xa9c0;
@@ -153,11 +154,11 @@ else if (skip === 'wild') {
   showRivalBattle();
 } else if (skip === 'end') showEnd(true);
 else if (skip === 'overworld') {
-  scenes.push(createOverworldScene({ map: 'ROUTE31', spawn: 'default' }));
+  scenes.push(createOverworldScene({ map: 'ROUTE31', spawn: 'default', inputState: dispatcher.state }));
 } else if (skip === 'lab') {
-  scenes.push(createOverworldScene({ map: 'LAB', spawn: 'default' }));
+  scenes.push(createOverworldScene({ map: 'LAB', spawn: 'default', inputState: dispatcher.state }));
 } else if (skip === 'house') {
-  scenes.push(createOverworldScene({ map: 'HOUSE', spawn: 'fromRoute' }));
+  scenes.push(createOverworldScene({ map: 'HOUSE', spawn: 'fromRoute', inputState: dispatcher.state }));
 } else showTitle();
 
 let lastTime = performance.now();
@@ -169,5 +170,3 @@ function frame(now: number): void {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-
-createInputDispatcher((key) => scenes.input(key));

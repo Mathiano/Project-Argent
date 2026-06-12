@@ -14,38 +14,61 @@ const KEY_MAP: { readonly [code: string]: InputKey } = {
   Enter: 'start',
 };
 
+export interface InputState {
+  pressed(key: InputKey): boolean;
+}
+
 export interface InputDispatcher {
+  readonly state: InputState;
   dispose(): void;
 }
 
 export function createInputDispatcher(
   onKey: (key: InputKey) => void,
 ): InputDispatcher {
-  const keyHandler = (e: KeyboardEvent): void => {
+  const held = new Set<InputKey>();
+
+  const keyDown = (e: KeyboardEvent): void => {
     const key = KEY_MAP[e.key];
     if (!key) return;
     e.preventDefault();
-    onKey(key);
+    if (!e.repeat) {
+      held.add(key);
+      onKey(key);
+    }
   };
-  window.addEventListener('keydown', keyHandler);
+  const keyUp = (e: KeyboardEvent): void => {
+    const key = KEY_MAP[e.key];
+    if (!key) return;
+    held.delete(key);
+  };
+  const blur = (): void => {
+    held.clear();
+  };
 
-  const overlay = buildOverlay(onKey);
+  window.addEventListener('keydown', keyDown);
+  window.addEventListener('keyup', keyUp);
+  window.addEventListener('blur', blur);
+
+  const overlay = buildOverlay(onKey, held);
   document.body.appendChild(overlay);
 
-  // Only show the touch overlay when the device is touch-first.
   const isCoarse =
     typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
   if (!isCoarse && !window.location.search.includes('touch=1')) overlay.style.display = 'none';
 
   return {
+    state: { pressed: (k) => held.has(k) },
     dispose() {
-      window.removeEventListener('keydown', keyHandler);
+      window.removeEventListener('keydown', keyDown);
+      window.removeEventListener('keyup', keyUp);
+      window.removeEventListener('blur', blur);
       overlay.remove();
     },
   };
 }
 
-function buildOverlay(onKey: (key: InputKey) => void): HTMLDivElement {
+function buildOverlay(onKey: (key: InputKey) => void, held: Set<InputKey>): HTMLDivElement {
   const overlay = document.createElement('div');
   overlay.className = 'argent-touch';
   overlay.style.cssText = [
@@ -79,25 +102,27 @@ function buildOverlay(onKey: (key: InputKey) => void): HTMLDivElement {
       base,
       pos,
     ].join(';');
-    const press = (e: Event): void => {
+    el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
+      held.add(key);
       onKey(key);
+    });
+    const release = (e: Event): void => {
+      e.preventDefault();
+      held.delete(key);
     };
-    el.addEventListener('pointerdown', press);
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointercancel', release);
+    el.addEventListener('pointerleave', release);
     overlay.appendChild(el);
   };
 
-  // D-pad — bottom-left cluster
   button('up', '▲', 'left:74px;bottom:148px', 'dpad');
   button('down', '▼', 'left:74px;bottom:40px', 'dpad');
   button('left', '◀', 'left:14px;bottom:94px', 'dpad');
   button('right', '▶', 'left:134px;bottom:94px', 'dpad');
-
-  // A/B — bottom-right cluster
   button('b', 'B', 'right:96px;bottom:54px', 'ab');
   button('a', 'A', 'right:18px;bottom:108px', 'ab');
-
-  // SELECT / START — top-right meta
   button('select', 'SELECT', 'right:18px;top:14px', 'meta');
   button('start', 'START', 'right:96px;top:14px', 'meta');
 
