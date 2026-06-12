@@ -1,0 +1,31 @@
+{
+  "name": "HOUSE",
+  "width": 10,
+  "height": 8,
+  "tilesize": 16,
+  "tiles": "WWWWWWWWWW\nW..b.....W\nW........W\nW..S.....W\nW........W\nW........W\nW........W\nWWWDWWWWWW",
+  "tileset": {
+    "W": { "color": "#5a4a2a", "solid": true, "label": "wall" },
+    ".": { "color": "#cec3a0", "solid": false, "label": "floor" },
+    "b": { "color": "#4a3c1f", "solid": true, "label": "table" },
+    "S": { "color": "#7a3e0c", "solid": true, "label": "sign" },
+    "D": { "color": "#daa520", "solid": false, "label": "door" }
+  },
+  "objects": [
+    {
+      "type": "warp",
+      "x": 3,
+      "y": 7,
+      "target": "ROUTE31:fromHouse"
+    },
+    {
+      "type": "sign",
+      "x": 3,
+      "y": 3,
+      "lines": ["Just an empty house.", "Cozy, though."]
+    }
+  ],
+  "spawns": {
+    "fromRoute": { "x": 3, "y": 6, "facing": "up" }
+  }
+}

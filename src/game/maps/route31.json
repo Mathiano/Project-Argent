@@ -1,0 +1,64 @@
+{
+  "name": "ROUTE31",
+  "width": 20,
+  "height": 15,
+  "tilesize": 16,
+  "tiles": "TTTTTTTTTTTTTTTTTTTT\nT..................T\nT..BBBB.....BBBB...T\nT..BBBB.....BBBB...T\nT..BDBB.....BDBB...T\nT..................T\nT..................T\nT.....pppppppppp...T\nT..S..pppppppppp...T\nT.....ppGGGGGGpp...T\nT.....ppGGGGGGpp...T\nT.....ppGGGGGGpp...T\nT.....pppppppppp...T\nT..................T\nTTTTTTTTTTTTTTTTTTTT",
+  "tileset": {
+    "T": { "color": "#1d4a26", "solid": true, "label": "tree" },
+    ".": { "color": "#86c06c", "solid": false, "label": "grass" },
+    "B": { "color": "#7a4e2d", "solid": true, "label": "building" },
+    "D": { "color": "#daa520", "solid": false, "label": "door" },
+    "p": { "color": "#d8c08a", "solid": false, "label": "path" },
+    "G": { "color": "#4f9050", "solid": false, "label": "tall_grass" },
+    "S": { "color": "#7a3e0c", "solid": true, "label": "sign" }
+  },
+  "objects": [
+    {
+      "type": "warp",
+      "x": 4,
+      "y": 4,
+      "target": "LAB:fromRoute"
+    },
+    {
+      "type": "warp",
+      "x": 13,
+      "y": 4,
+      "target": "HOUSE:fromRoute"
+    },
+    {
+      "type": "sign",
+      "x": 3,
+      "y": 8,
+      "lines": ["ROUTE 31", "Wild mons in the", "tall grass ahead."]
+    },
+    {
+      "type": "encounter_zone",
+      "x": 7,
+      "y": 9,
+      "width": 6,
+      "height": 3,
+      "species": ["FUZZLET"],
+      "rate": 0.3
+    },
+    {
+      "type": "script",
+      "x": 9,
+      "y": 8,
+      "trigger": "step-on",
+      "flag": "route31_warning",
+      "once": true,
+      "commands": [
+        {
+          "kind": "dialog",
+          "lines": ["A rustle in the grass!", "Something is moving."]
+        }
+      ]
+    }
+  ],
+  "spawns": {
+    "default": { "x": 9, "y": 7, "facing": "down" },
+    "fromLab": { "x": 4, "y": 5, "facing": "down" },
+    "fromHouse": { "x": 13, "y": 5, "facing": "down" }
+  }
+}

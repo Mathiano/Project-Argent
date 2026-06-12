@@ -1,0 +1,32 @@
+{
+  "name": "LAB",
+  "width": 12,
+  "height": 9,
+  "tilesize": 16,
+  "tiles": "WWWWWWWWWWWW\nW..b.......W\nW..b.......W\nW....S.....W\nW..........W\nW..........W\nW..........W\nW..........W\nWWWWDWWWWWWW",
+  "tileset": {
+    "W": { "color": "#5a4a2a", "solid": true, "label": "wall" },
+    ".": { "color": "#b9bcc9", "solid": false, "label": "floor" },
+    "b": { "color": "#4a3c1f", "solid": true, "label": "bookshelf" },
+    "S": { "color": "#7a3e0c", "solid": true, "label": "sign" },
+    "D": { "color": "#daa520", "solid": false, "label": "door" }
+  },
+  "objects": [
+    {
+      "type": "warp",
+      "x": 4,
+      "y": 8,
+      "target": "ROUTE31:fromLab"
+    },
+    {
+      "type": "sign",
+      "x": 5,
+      "y": 3,
+      "lines": ["PROF LARCH:", "Head south to", "the tall grass."]
+    }
+  ],
+  "spawns": {
+    "default": { "x": 6, "y": 7, "facing": "down" },
+    "fromRoute": { "x": 4, "y": 7, "facing": "up" }
+  }
+}

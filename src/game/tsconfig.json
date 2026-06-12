@@ -7,6 +7,6 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": []
   },
-  "include": ["**/*.ts"],
+  "include": ["**/*.ts", "**/*.json"],
   "references": [{ "path": "../engine" }, { "path": "../sim" }]
 }

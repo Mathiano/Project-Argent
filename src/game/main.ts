@@ -14,6 +14,7 @@ import { createInputDispatcher } from './input';
 import { SceneStack } from './scene';
 import { createBattleScene } from './scenes/battle';
 import { createEndScene } from './scenes/end';
+import { createOverworldScene } from './scenes/overworld';
 import { createPrepScene } from './scenes/prep';
 import { createStarterPickScene } from './scenes/starterPick';
 import { createTitleScene } from './scenes/title';
@@ -151,7 +152,13 @@ else if (skip === 'wild') {
   run.catchBreathUnlocked = true;
   showRivalBattle();
 } else if (skip === 'end') showEnd(true);
-else showTitle();
+else if (skip === 'overworld') {
+  scenes.push(createOverworldScene({ map: 'ROUTE31', spawn: 'default' }));
+} else if (skip === 'lab') {
+  scenes.push(createOverworldScene({ map: 'LAB', spawn: 'default' }));
+} else if (skip === 'house') {
+  scenes.push(createOverworldScene({ map: 'HOUSE', spawn: 'fromRoute' }));
+} else showTitle();
 
 let lastTime = performance.now();
 function frame(now: number): void {
