@@ -4,6 +4,7 @@ import {
   createBattleState,
   createSide,
   fixedRng,
+  mulberry32,
   resolveRound,
   TRAITS,
   isRhythmRound,
@@ -100,6 +101,51 @@ describe('arena rhythm + GUSTBORNE trait (A3 + A4)', () => {
     const offSt = off.state.player.st;
     const onSt = on.state.player.st;
     expect(offSt - onSt).toBe(8);
+  });
+
+  test('Break fires when player read-wins reach the threshold (A5)', () => {
+    const card: BossCard = {
+      species: SPECIES.AQUAFIN!,
+      arenaSchedule: ARENA,
+      breakBar: 2,
+    };
+    let state = createBattleState(
+      createSide(SPECIES.EMBERCUB!),
+      createSide(SPECIES.AQUAFIN!),
+      { bossCard: card },
+    );
+
+    // Round 1: player Guards, foe Aggressive — counter fires = +1 break.
+    const r1 = resolveRound(
+      state,
+      { kind: 'move', move: 'TACKLE', stance: 'G' },
+      { kind: 'move', move: 'TACKLE', stance: 'A' },
+      mulberry32(7),
+    );
+    expect(r1.events.some((e) => e.kind === 'counter' && e.side === 'player')).toBe(true);
+    expect(r1.events.some((e) => e.kind === 'break')).toBe(false);
+    expect(r1.state.breakProgress).toBe(1);
+    expect(r1.state.phase).toBe(1);
+
+    state = r1.state;
+
+    // Round 2: same matchup — second counter triggers Break.
+    const r2 = resolveRound(
+      state,
+      { kind: 'move', move: 'TACKLE', stance: 'G' },
+      { kind: 'move', move: 'TACKLE', stance: 'A' },
+      mulberry32(8),
+    );
+    expect(r2.events.some((e) => e.kind === 'counter' && e.side === 'player')).toBe(true);
+    const breakEv = r2.events.find(
+      (e): e is Extract<typeof e, { kind: 'break' }> => e.kind === 'break',
+    );
+    expect(breakEv).toBeDefined();
+    expect(breakEv!.newPhase).toBe(2);
+    expect(r2.state.breakProgress).toBe(0);
+    expect(r2.state.phase).toBe(2);
+    // Rhythm cycle anchors to the round when Break fired.
+    expect(r2.state.rhythmAnchor).toBe(2);
   });
 
   test('bossCard absent = no rhythm = no modifiers, ladder behaviour preserved', () => {

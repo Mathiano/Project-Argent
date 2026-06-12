@@ -66,6 +66,13 @@ export interface BattleState {
   // Boss-side card driving arena rhythm + future hooks. Null/absent for
   // wild and rival fights — neutral state, no modifiers.
   readonly bossCard?: BossCard;
+  // Player's progress toward Breaking the boss; resets to 0 on Break.
+  readonly breakProgress?: number;
+  // Current phase (starts at 1, increments each Break).
+  readonly phase?: number;
+  // Round number at which the arena rhythm cycle was last anchored
+  // (resets to current round on Break so the gust cycle restarts).
+  readonly rhythmAnchor?: number;
 }
 
 export type Action =
@@ -98,10 +105,14 @@ export interface BossCard {
   readonly arenaSchedule?: ArenaSchedule;
 }
 
-export function isRhythmRound(schedule: ArenaSchedule | undefined, round: number): boolean {
+export function isRhythmRound(
+  schedule: ArenaSchedule | undefined,
+  round: number,
+  anchor = 0,
+): boolean {
   if (!schedule) return false;
   if (schedule.rhythmEveryN <= 0) return false;
-  return round % schedule.rhythmEveryN === 0;
+  return (round - anchor) % schedule.rhythmEveryN === 0;
 }
 
 // GUSTBORNE: trait modifiers active only on rhythm rounds.

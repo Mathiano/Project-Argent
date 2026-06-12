@@ -45,4 +45,13 @@ export type BattleEvent =
     }
   | { readonly kind: 'winded'; readonly side: Side }
   | { readonly kind: 'exhausted'; readonly side: Side }
-  | { readonly kind: 'ko'; readonly side: Side };
+  | { readonly kind: 'ko'; readonly side: Side }
+  | {
+      readonly kind: 'breakProgress';
+      readonly progress: number;
+      readonly threshold: number;
+    }
+  | {
+      readonly kind: 'break';
+      readonly newPhase: number;
+    };

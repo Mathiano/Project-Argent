@@ -252,7 +252,7 @@ export function resolveRound(
   const foeMove = actionMove(foeAction);
 
   const arena = state.bossCard?.arenaSchedule;
-  const rhythm = isRhythmRound(arena, state.round);
+  const rhythm = isRhythmRound(arena, state.round, state.rhythmAnchor ?? 0);
 
   const plInit = initiative(pl, plMove, rhythm, arena);
   const foeInit = initiative(foe, foeMove, rhythm, arena);
@@ -351,6 +351,36 @@ export function resolveRound(
     emitFatigueTransitions(foeBefore, foe, 'foe', events);
   }
 
+  // Break bar: count player read-wins from this round's events.
+  // Read-wins per CLAUDE.md = counter landed, opening landed, dodge succeeded, clash won.
+  let breakProgress = state.breakProgress ?? 0;
+  let phase = state.phase ?? 1;
+  let rhythmAnchor = state.rhythmAnchor ?? 0;
+  const breakThreshold = state.bossCard?.breakBar ?? 0;
+  if (breakThreshold > 0) {
+    let gained = 0;
+    for (const ev of events) {
+      if (ev.kind === 'counter' && ev.side === 'player') gained += 1;
+      else if (ev.kind === 'opening' && ev.side === 'player') gained += 1;
+      else if (ev.kind === 'dodge' && ev.side === 'player') gained += 1;
+      else if (ev.kind === 'clash' && ev.winner === 'player') gained += 1;
+    }
+    if (gained > 0) {
+      breakProgress += gained;
+      events.push({
+        kind: 'breakProgress',
+        progress: Math.min(breakProgress, breakThreshold),
+        threshold: breakThreshold,
+      });
+    }
+    if (breakProgress >= breakThreshold) {
+      phase += 1;
+      rhythmAnchor = state.round;
+      events.push({ kind: 'break', newPhase: phase });
+      breakProgress = 0;
+    }
+  }
+
   return {
     state: {
       player: pl,
@@ -358,6 +388,7 @@ export function resolveRound(
       round: state.round + 1,
       typeChart: state.typeChart,
       ...(state.bossCard !== undefined ? { bossCard: state.bossCard } : {}),
+      ...(breakThreshold > 0 ? { breakProgress, phase, rhythmAnchor } : {}),
       history: [
         ...state.history,
         {
