@@ -2,7 +2,7 @@
 
 A from-scratch monster-battler in the body of Pokémon Silver and the soul of a fighting game: every battle is a read, every boss is a puzzle, and preparation is gameplay. 320×180 pixel art, TypeScript + Vite + Canvas, headless-simulable combat engine, ~42-hour content plan, 200 original species.
 
-**Status capsule — overworld kernel sprint open (2026-06-12).**
+**Status capsule — overworld kernel sprint close (2026-06-12).**
 
 ## How this project runs
 
@@ -19,7 +19,8 @@ Dex content is commissioned from Gemini against `docs/mon-manifest.csv` (200 pre
 - `src/engine` — Combat 2.0 v0.3 ported, pure TS, no DOM (compiler-enforced), seeded RNG. 21 edge-case tests.
 - `src/sim` — 4 canonical bot archetypes + rival AI, 15-cell n=2000 regression baseline locked.
 - `src/game` — Sprint 1 closed: 320×180 renderer replaying engine events; playable title → starter pick → wild → prep → rival → end loop.
-- Overworld kernel sprint open (`KICKOFF-overworld.md`): map data pipeline + grid movement + warps + interactables + encounter zones + script triggers + scene flow against a graybox Violet City / Route 31.
+- Overworld kernel sprint closed (`KICKOFF-overworld.md`): JSON map pipeline, tile-locked grid movement with held-key dispatch, camera follow, warps with fade, interactables (A on faced sign → dialog), encounter zones pushing wild battles that pop back, step-on + auto script triggers with a session flag store. Title → starter → LAB → ROUTE31 → grass → battle → pop loop reachable from cold start.
+- Next sprint: Falkner vertical slice (consume `docs/ch1-batch.json` + `docs/typechart.json` in `src/engine`, gust arena, Break bar, boss card AI).
 - Next sprint: overworld kernel (`KICKOFF-overworld.md`). Then: Falkner vertical slice.
 
 ## Locked decisions (the short list)
