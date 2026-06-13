@@ -4,6 +4,7 @@ import {
   TIERS,
   activeMon,
   forcedAction,
+  isTeamWiped,
   resolveRound,
 } from '../../engine';
 import type {
@@ -317,9 +318,36 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       return;
     }
     if (ev.kind === 'ko') {
+      // Hide the active sprite (hp=0) but do not end the battle here —
+      // 'faint' handles the narrative, and team-wipe is detected in
+      // finishResolve via isTeamWiped.
       display[ev.side].hp = 0;
-      pushLog(`${ev.side === 'player' ? activeMon(state.player).species.name : 'Foe ' + activeMon(state.foe).species.name} fainted!`);
-      endingWinner = opposite(ev.side);
+      return;
+    }
+    if (ev.kind === 'switchOut') {
+      const who = ev.side === 'player' ? ev.species : `Foe ${ev.species}`;
+      pushLog(`${who} withdrew.`);
+      return;
+    }
+    if (ev.kind === 'switchIn') {
+      const who = ev.side === 'player' ? ev.species : `Foe ${ev.species}`;
+      pushLog(`${who} took the field!`);
+      // The active mon swapped on the state side. Reseat display so HP/ST
+      // bars reflect the new active's values immediately.
+      const fresh = activeMon(state[ev.side]);
+      display[ev.side] = snapshot(fresh);
+      return;
+    }
+    if (ev.kind === 'faint') {
+      const who = ev.side === 'player' ? ev.species : `Foe ${ev.species}`;
+      pushLog(`${who} fainted!`);
+      return;
+    }
+    if (ev.kind === 'forcedSwitch') {
+      const who = ev.side === 'player' ? ev.species : `Foe sent out ${ev.species}`;
+      pushLog(`${who}!`);
+      const fresh = activeMon(state[ev.side]);
+      display[ev.side] = snapshot(fresh);
       return;
     }
   }
@@ -331,12 +359,16 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       player: snapshot(activeMon(state.player)),
       foe: snapshot(activeMon(state.foe)),
     };
+    // Team-wipe is the only end-of-battle condition now. Individual KOs
+    // are handled by the engine via forced-switch unless the team is out.
+    if (isTeamWiped(state.player)) endingWinner = 'foe';
+    else if (isTeamWiped(state.foe)) endingWinner = 'player';
     if (endingWinner !== null) {
       phase = 'end';
       const msg =
         endingWinner === 'player'
-          ? [`${activeMon(state.player).species.name} wins!`, 'Press A to continue.']
-          : [`${activeMon(state.player).species.name} fell.`, 'Press A to continue.'];
+          ? ['You won the battle!', 'Press A to continue.']
+          : ['Your team fell.', 'Press A to continue.'];
       setText(msg, () => {
         opts.onResolve(endingWinner!);
       });

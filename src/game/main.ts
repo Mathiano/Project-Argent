@@ -5,6 +5,7 @@ import {
   affordableMoves,
   createBattleState,
   createSide,
+  createTeam,
   falknerBossAI,
   forcedAction,
   loadDex,
@@ -60,8 +61,10 @@ const flagStore = {
 // Load CH1 dex + moves at startup.
 registerMoves(loadMoves(movesData as MoveJson[]));
 const CH1_LEVEL = 13;
+const FALKNER_LEAD_LEVEL = 13;
 const FALKNER_ACE_LEVEL = 15;
 const CH1_DEX = loadDex(ch1BatchData as DexEntryJson[], CH1_LEVEL);
+const FALKNER_LEAD_DEX = loadDex(ch1BatchData as DexEntryJson[], FALKNER_LEAD_LEVEL);
 const FALKNER_ACE_DEX = loadDex(ch1BatchData as DexEntryJson[], FALKNER_ACE_LEVEL);
 const TYPECHART_CH1 = typechartData as TypeChart;
 
@@ -206,18 +209,33 @@ function showRivalBattle(): void {
   );
 }
 
-function showFalknerFight(): void {
-  const player = run.playerSpecies ?? STARTERS[0]!;
+function buildFalknerTeam(): { team: ReturnType<typeof createTeam>; card: BossCard } {
+  const flitpeck: Species = FALKNER_LEAD_DEX.FLITPECK!;
   const galehawk: Species = { ...FALKNER_ACE_DEX.GALEHAWK!, trait: 'GUSTBORNE' };
+  // The arena schedule + ace-only HP scale ride on the card; the engine
+  // applies statScale to whatever mon's data the card carries (its species
+  // pointer), but the player-facing team data is what's in the Team.
+  // Falkner's 2-mon team uses the ace mult on the GALEHAWK member only.
   const card: BossCard = {
     species: galehawk,
     statScale: { hp: 1.15 },
     arenaSchedule: FALKNER_ARENA,
     breakBar: 2,
+    teamSize: 2,
   };
-  const state = createBattleState(
-    createSide(player),
+  const team = createTeam([
+    createSide(flitpeck),
     createSide(galehawk, card.statScale),
+  ]);
+  return { team, card };
+}
+
+function showFalknerFight(): void {
+  const player = run.playerSpecies ?? STARTERS[0]!;
+  const { team, card } = buildFalknerTeam();
+  const state = createBattleState(
+    createTeam([createSide(player)]),
+    team,
     {
       typeChart: TYPECHART_CH1,
       traits: FALKNER_TRAITS,
@@ -232,7 +250,7 @@ function showFalknerFight(): void {
       intro: [
         'FALKNER: Welcome to my',
         'rooftop. Read the wind!',
-        '— sent out GALEHAWK!',
+        '— sent out FLITPECK!',
       ],
       catchBreathUnlocked: true,
       canRun: false,
@@ -389,16 +407,10 @@ function showFalknerFightFromOverworld(): void {
 
 function pushFalknerBattle(): void {
   const player = run.playerSpecies ?? STARTERS[0]!;
-  const galehawk: Species = { ...FALKNER_ACE_DEX.GALEHAWK!, trait: 'GUSTBORNE' };
-  const card: BossCard = {
-    species: galehawk,
-    statScale: { hp: 1.15 },
-    arenaSchedule: FALKNER_ARENA,
-    breakBar: 2,
-  };
+  const { team, card } = buildFalknerTeam();
   const state = createBattleState(
-    createSide(player),
-    createSide(galehawk, card.statScale),
+    createTeam([createSide(player)]),
+    team,
     {
       typeChart: TYPECHART_CH1,
       traits: FALKNER_TRAITS,
@@ -413,7 +425,7 @@ function pushFalknerBattle(): void {
       intro: [
         'FALKNER: Welcome to my',
         'rooftop. Read the wind!',
-        '— sent out GALEHAWK!',
+        '— sent out FLITPECK!',
       ],
       catchBreathUnlocked: true,
       canRun: false,
