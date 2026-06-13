@@ -3,9 +3,10 @@
 // Falkner's policy implements the v2 card verbatim (phase 1 metronome,
 // phase 2 syncopation with 15% reads).
 
+import { typeMult } from './data';
 import type { RNG } from './rng';
 import { affordableMoves, forcedAction, lookupMove } from './state';
-import type { Action, BattleState, Side, Stance } from './types';
+import type { Action, BattleState, Side, SideState, Stance, Team } from './types';
 import { activeMon, isRhythmRound } from './types';
 
 export type BossPolicy = (state: BattleState, side: Side, rng: RNG) => Action;
@@ -55,10 +56,63 @@ function modalPlayerStance(state: BattleState): Stance | null {
   return modal;
 }
 
+// Minimal "type-disadvantage" switch policy: if the boss's active mon is
+// taking ≥1.5× from the player's species types and a bench mon would take
+// <1×, switch to the best bench mon. Falkner's 2-mon FLITPECK/GALEHAWK
+// team rarely triggers this (both GALE); the policy is infrastructure
+// for later gyms with type-spread rosters.
+const SWITCH_DISADVANTAGE_THRESHOLD = 1.5;
+
+function bestSwitchTarget(
+  team: Team,
+  attackerTypes: readonly string[],
+  chart: BattleState['typeChart'],
+): number | null {
+  const currentMult = worstIncoming(activeMon(team), attackerTypes, chart);
+  if (currentMult < SWITCH_DISADVANTAGE_THRESHOLD) return null;
+  let bestIdx: number | null = null;
+  let bestMult = currentMult;
+  for (let i = 0; i < team.members.length; i += 1) {
+    if (i === team.active) continue;
+    const m = team.members[i]!;
+    if (m.hp <= 0) continue;
+    const mult = worstIncoming(m, attackerTypes, chart);
+    if (mult < bestMult) {
+      bestIdx = i;
+      bestMult = mult;
+    }
+  }
+  if (bestIdx === null) return null;
+  // Only switch if the bench mon is meaningfully better — not just <1.5x
+  // but strictly resistant (<1x) so we don't churn switches mid-tempo.
+  return bestMult < 1 ? bestIdx : null;
+}
+
+function worstIncoming(
+  side: SideState,
+  attackerTypes: readonly string[],
+  chart: BattleState['typeChart'],
+): number {
+  let worst = 0;
+  for (const at of attackerTypes) {
+    const mult = typeMult(chart, at, side.species.types);
+    if (mult > worst) worst = mult;
+  }
+  return worst;
+}
+
 export const falknerBossAI: BossPolicy = (state, side, rng) => {
-  const me = activeMon(state[side]);
+  const myTeam = state[side];
+  const me = activeMon(myTeam);
   const forced = forcedAction(me);
   if (forced) return forced;
+
+  // Switch on hard type disadvantage. Skips when team is single-mon
+  // (bestSwitchTarget returns null) so 1-mon bosses are unaffected.
+  const enemySide: Side = side === 'player' ? 'foe' : 'player';
+  const enemyActive = activeMon(state[enemySide]);
+  const switchTo = bestSwitchTarget(myTeam, enemyActive.species.types, state.typeChart);
+  if (switchTo !== null) return { kind: 'switch', toIndex: switchTo };
 
   // Catch-breath if low ST and have momentum (the gym spec's tempo play).
   // Leader Calls deferred to Bugsy slice per design ruling; Falkner AI

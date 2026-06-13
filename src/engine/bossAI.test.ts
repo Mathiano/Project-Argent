@@ -86,4 +86,27 @@ describe('Falkner boss AI (A6)', () => {
     const action = falknerBossAI(s, 'foe', mulberry32(1));
     expect(action.kind).toBe('catchBreath');
   });
+
+  test('boss switches when active is at ≥1.5x type disadvantage and a resistant bench mon exists', () => {
+    // Player AQUAFIN (Splash) vs boss EMBERCUB active (Flame, takes 1.5x
+    // from Splash) with SPROUTLE bench (Sprout, takes 0.67x from Splash).
+    // LEGACY_TYPE_CHART: Splash→Flame=1.5, Splash→Sprout=0.67.
+    const playerSide = createSide(SPECIES.AQUAFIN!);
+    const fooSide = createSide(SPECIES.EMBERCUB!);
+    const benchSide = createSide(SPECIES.SPROUTLE!);
+    const team = { active: 0, members: [fooSide, benchSide], maxSize: 2 } as const;
+    const s: BattleState = {
+      ...createBattleState(playerSide, fooSide),
+      foe: team,
+    };
+    const action = falknerBossAI(s, 'foe', mulberry32(1));
+    expect(action.kind).toBe('switch');
+    if (action.kind === 'switch') expect(action.toIndex).toBe(1);
+  });
+
+  test('boss does not switch on single-mon teams (no bench survivor)', () => {
+    const s = makeState();
+    const action = falknerBossAI(s, 'foe', mulberry32(1));
+    expect(action.kind).not.toBe('switch');
+  });
 });
