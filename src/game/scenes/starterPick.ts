@@ -1,4 +1,3 @@
-import { SPECIES } from '../../engine';
 import type { Species } from '../../engine';
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
@@ -7,7 +6,7 @@ import { drawSpeciesInSlot } from '../sprites';
 import { drawPanel, drawText } from '../ui';
 
 export interface StarterPickSceneOpts {
-  readonly starters: readonly string[];
+  readonly starters: readonly Species[];
   readonly onPick: (species: Species) => void;
 }
 
@@ -16,7 +15,7 @@ export function createStarterPickScene(opts: StarterPickSceneOpts): Scene {
   let tick = 0;
 
   function species(i: number): Species {
-    return SPECIES[opts.starters[i]!]!;
+    return opts.starters[i]!;
   }
 
   return {
@@ -42,7 +41,7 @@ export function createStarterPickScene(opts: StarterPickSceneOpts): Scene {
       const startX = (LOGICAL_W - totalW) / 2;
       const slotY = 26;
 
-      opts.starters.forEach((name, i) => {
+      opts.starters.forEach((sp, i) => {
         const sx = startX + i * (SLOT + GAP);
         if (i === cursor) {
           ctx.strokeStyle = PALETTE.paper;
@@ -53,7 +52,6 @@ export function createStarterPickScene(opts: StarterPickSceneOpts): Scene {
         ctx.beginPath();
         ctx.ellipse(sx + SLOT / 2, slotY + SLOT - 2, 26, 4, 0, 0, Math.PI * 2);
         ctx.fill();
-        const sp = SPECIES[name]!;
         drawSpeciesInSlot(ctx, { name: sp.name, type: sp.types[0] ?? null }, sx, slotY);
       });
 

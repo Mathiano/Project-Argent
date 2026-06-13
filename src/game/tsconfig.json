@@ -2,11 +2,16 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
-    "rootDir": ".",
     "outDir": "../../node_modules/.tmp/tsbuild-game",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": []
   },
-  "include": ["**/*.ts", "**/*.json"],
+  "include": [
+    "**/*.ts",
+    "**/*.json",
+    "../../docs/ch1-batch.json",
+    "../../docs/moves.json",
+    "../../docs/typechart.json"
+  ],
   "references": [{ "path": "../engine" }, { "path": "../sim" }]
 }

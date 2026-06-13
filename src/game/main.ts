@@ -5,9 +5,14 @@ import {
   createBattleState,
   createSide,
   forcedAction,
+  loadDex,
+  loadMoves,
   mulberry32,
+  registerMoves,
 } from '../engine';
-import type { Action, BattleState, RNG, Species, Stance } from '../engine';
+import type { Action, BattleState, DexEntryJson, MoveJson, RNG, Species, Stance } from '../engine';
+import ch1BatchData from '../../docs/ch1-batch.json';
+import movesData from '../../docs/moves.json';
 import { rivalAI } from '../sim/archetypes';
 import { mountCanvas } from './canvas';
 import { createInputDispatcher } from './input';
@@ -33,7 +38,17 @@ const flagStore = {
   },
 };
 
-const STARTERS = ['EMBERCUB', 'SPROUTLE', 'AQUAFIN'] as const;
+// Load CH1 dex + moves at startup.
+registerMoves(loadMoves(movesData as MoveJson[]));
+const CH1_LEVEL = 13;
+const CH1_DEX = loadDex(ch1BatchData as DexEntryJson[], CH1_LEVEL);
+
+const STARTERS: readonly Species[] = ['KINDRAKE', 'GRUBLEAF', 'SILTSKIP'].map(
+  (n) => CH1_DEX[n]!,
+);
+
+void SPECIES;
+void COUNTER_MAP;
 const RNG_SEED = 0xa9c0;
 
 const scenes = new SceneStack();
