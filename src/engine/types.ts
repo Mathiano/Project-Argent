@@ -52,14 +52,48 @@ export interface SideState {
   readonly momentum: number;
 }
 
+// A side's roster. The active mon is members[active]; the rest are bench.
+// maxSize caps how big the team may legally grow (boss cards declare this);
+// the runtime never has more members than maxSize.
+export interface Team {
+  readonly active: number;
+  readonly members: readonly SideState[];
+  readonly maxSize: number;
+}
+
+// Pure helpers (no RNG, no allocation in the 1v1 case).
+export function activeMon(team: Team): SideState {
+  return team.members[team.active]!;
+}
+
+export function isTeamWiped(team: Team): boolean {
+  for (const m of team.members) if (m.hp > 0) return false;
+  return true;
+}
+
+export function hasBenchSurvivor(team: Team): boolean {
+  for (let i = 0; i < team.members.length; i += 1) {
+    if (i === team.active) continue;
+    if (team.members[i]!.hp > 0) return true;
+  }
+  return false;
+}
+
+export function firstSurvivor(team: Team): number | null {
+  for (let i = 0; i < team.members.length; i += 1) {
+    if (team.members[i]!.hp > 0) return i;
+  }
+  return null;
+}
+
 export interface TurnHistoryEntry {
   readonly player: Stance | null;
   readonly foe: Stance | null;
 }
 
 export interface BattleState {
-  readonly player: SideState;
-  readonly foe: SideState;
+  readonly player: Team;
+  readonly foe: Team;
   readonly round: number;
   readonly history: readonly TurnHistoryEntry[];
   readonly typeChart: TypeChart;
@@ -81,7 +115,8 @@ export interface BattleState {
 export type Action =
   | { readonly kind: 'move'; readonly move: string; readonly stance: Stance }
   | { readonly kind: 'rest' }
-  | { readonly kind: 'catchBreath' };
+  | { readonly kind: 'catchBreath' }
+  | { readonly kind: 'switch'; readonly toIndex: number };
 
 export interface StatScale {
   readonly hp?: number;
@@ -106,6 +141,9 @@ export interface BossCard {
   readonly statScale?: StatScale;
   readonly breakBar?: number;
   readonly arenaSchedule?: ArenaSchedule;
+  // Variable team size — boss cards declare how big the lineup is.
+  // Defaults to 1 when omitted (single-mon boss). Falkner ships at 2.
+  readonly teamSize?: number;
 }
 
 export function isRhythmRound(

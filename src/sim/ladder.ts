@@ -1,4 +1,12 @@
-import { SPECIES, createBattleState, createSide, mulberry32, resolveRound } from '../engine';
+import {
+  SPECIES,
+  activeMon,
+  createBattleState,
+  createSide,
+  isTeamWiped,
+  mulberry32,
+  resolveRound,
+} from '../engine';
 import type { BattleState, RNG, StatScale } from '../engine';
 import type { BotArchetype } from './archetypes';
 
@@ -49,9 +57,9 @@ export function runMatch(spec: MatchSpec, rng: RNG): MatchResult {
       else if (ev.kind === 'clash') clashes += 1;
     }
     state = r.state;
-    if (state.player.exhausted) pExh = true;
-    if (state.foe.exhausted) fExh = true;
-    if (state.player.hp <= 0) {
+    if (activeMon(state.player).exhausted) pExh = true;
+    if (activeMon(state.foe).exhausted) fExh = true;
+    if (isTeamWiped(state.player)) {
       return {
         winner: 'foe',
         rounds: i + 1,
@@ -63,7 +71,7 @@ export function runMatch(spec: MatchSpec, rng: RNG): MatchResult {
         clashes,
       };
     }
-    if (state.foe.hp <= 0) {
+    if (isTeamWiped(state.foe)) {
       return {
         winner: 'player',
         rounds: i + 1,

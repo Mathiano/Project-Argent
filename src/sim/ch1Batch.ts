@@ -7,9 +7,11 @@ import ch1BatchData from '../../docs/ch1-batch.json';
 import movesData from '../../docs/moves.json';
 import typeChartData from '../../docs/typechart.json';
 import {
+  activeMon,
   createBattleState,
   createSide,
   forcedAction,
+  isTeamWiped,
   loadDex,
   loadMoves,
   mulberry32,
@@ -56,7 +58,7 @@ const ARCHETYPES: readonly BotArchetype[] = [
 
 // Wild-style random-stance reference foe. Same shape as the in-game wild AI.
 function refFoeAI(state: BattleState, rng: RNG): Action {
-  const me = state.foe;
+  const me = activeMon(state.foe);
   const forced = forcedAction(me);
   if (forced) return forced;
   const aff = affordableMoves(me);
@@ -112,11 +114,11 @@ function runMatch(
       return { winner: 'foe', exhausted: playerExhaustedSeen, rounds: i + 1 };
     }
     state = result.state;
-    if (state.player.exhausted) playerExhaustedSeen = true;
-    if (state.player.hp <= 0) {
+    if (activeMon(state.player).exhausted) playerExhaustedSeen = true;
+    if (isTeamWiped(state.player)) {
       return { winner: 'foe', exhausted: playerExhaustedSeen, rounds: i + 1 };
     }
-    if (state.foe.hp <= 0) {
+    if (isTeamWiped(state.foe)) {
       return { winner: 'player', exhausted: playerExhaustedSeen, rounds: i + 1 };
     }
   }

@@ -9,6 +9,7 @@ import {
   createBattleState,
   createSide,
   falknerBossAI,
+  isTeamWiped,
   LEGACY_TRAIT_TABLE,
   loadDex,
   loadMoves,
@@ -115,8 +116,8 @@ function runMatch(
       return { winner: 'foe', rounds: i + 1 };
     }
     state = result.state;
-    if (state.player.hp <= 0) return { winner: 'foe', rounds: i + 1 };
-    if (state.foe.hp <= 0) return { winner: 'player', rounds: i + 1 };
+    if (isTeamWiped(state.player)) return { winner: 'foe', rounds: i + 1 };
+    if (isTeamWiped(state.foe)) return { winner: 'player', rounds: i + 1 };
   }
   return { winner: 'draw', rounds: maxRounds };
 }

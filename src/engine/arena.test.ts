@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   LEGACY_TRAIT_TABLE,
   SPECIES,
+  activeMon,
   createBattleState,
   createSide,
   fixedRng,
@@ -141,8 +142,8 @@ describe('arena rhythm + GUSTBORNE trait (A3 + A4)', () => {
       fixedRng([0.5]),
     );
 
-    const offSt = off.state.player.st;
-    const onSt = on.state.player.st;
+    const offSt = activeMon(off.state.player).st;
+    const onSt = activeMon(on.state.player).st;
     expect(offSt - onSt).toBe(8);
   });
 

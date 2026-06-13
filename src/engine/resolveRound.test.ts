@@ -2,12 +2,14 @@ import { describe, expect, test } from 'vitest';
 import {
   COMBAT,
   SPECIES,
+  activeMon,
   createBattleState,
   createSide,
   fixedRng,
   forcedAction,
   mulberry32,
   resolveRound,
+  setActiveMember,
   validateAction,
 } from './index';
 import type { BattleState, SideState } from './index';
@@ -16,13 +18,23 @@ function makeState(playerKey = 'EMBERCUB', foeKey = 'AQUAFIN'): BattleState {
   return createBattleState(createSide(SPECIES[playerKey]!), createSide(SPECIES[foeKey]!));
 }
 
+// Patch the active mon of either side. With Team-based BattleState the team
+// wraps a SideState; tests want to tweak HP/ST on the active mon to set up
+// edge cases. setActiveMember rebuilds the team with the patched member.
 function patchPlayer(state: BattleState, patch: Partial<SideState>): BattleState {
-  return { ...state, player: { ...state.player, ...patch } };
+  const patched: SideState = { ...activeMon(state.player), ...patch };
+  return { ...state, player: setActiveMember(state.player, patched) };
 }
 
 function patchFoe(state: BattleState, patch: Partial<SideState>): BattleState {
-  return { ...state, foe: { ...state.foe, ...patch } };
+  const patched: SideState = { ...activeMon(state.foe), ...patch };
+  return { ...state, foe: setActiveMember(state.foe, patched) };
 }
+
+// Convenience: read the active mon. Existing tests read state.player.hp etc.;
+// at teamSize 1 the active mon IS the side, so this is the legacy view.
+const pl = (s: BattleState): SideState => activeMon(s.player);
+const fo = (s: BattleState): SideState => activeMon(s.foe);
 
 describe('counter survival rule', () => {
   test('counter fires when the defender survives the hit', () => {
@@ -81,8 +93,8 @@ describe('exhaustion', () => {
       { kind: 'move', move: 'TACKLE', stance: 'G' },
       mulberry32(42),
     );
-    expect(result.state.player.exhausted).toBe(false);
-    expect(result.state.player.st).toBe(COMBAT.restRegen);
+    expect(pl(result.state).exhausted).toBe(false);
+    expect(pl(result.state).st).toBe(COMBAT.restRegen);
   });
 
   test('exhausted defender takes 1.25× damage that round', () => {
@@ -107,8 +119,8 @@ describe('exhaustion', () => {
       exhRng,
     );
 
-    const baseDmg = softlocked.player.hp - baseResult.state.player.hp;
-    const exhDmg = exhausted.player.hp - exhResult.state.player.hp;
+    const baseDmg = pl(softlocked).hp - pl(baseResult.state).hp;
+    const exhDmg = pl(exhausted).hp - pl(exhResult.state).hp;
     expect(baseDmg).toBeGreaterThan(0);
     expect(exhDmg / baseDmg).toBeCloseTo(COMBAT.exhTaken, 4);
   });
@@ -128,8 +140,8 @@ describe('stamina softlock', () => {
       { kind: 'move', move: 'TACKLE', stance: 'G' },
       mulberry32(42),
     );
-    expect(result.state.player.exhausted).toBe(false);
-    expect(result.state.player.st).toBe(5 + COMBAT.restRegen);
+    expect(pl(result.state).exhausted).toBe(false);
+    expect(pl(result.state).st).toBe(5 + COMBAT.restRegen);
   });
 });
 
@@ -137,14 +149,14 @@ describe('winded lock', () => {
   test('heavy moves are blocked while winded', () => {
     const state = patchPlayer(makeState(), { st: COMBAT.winded });
     expect(() =>
-      validateAction(state.player, { kind: 'move', move: 'FLAME RUSH', stance: 'A' }),
+      validateAction(pl(state), { kind: 'move', move: 'FLAME RUSH', stance: 'A' }),
     ).toThrow();
   });
 
   test('mid moves are still allowed while winded', () => {
     const state = patchPlayer(makeState(), { st: COMBAT.winded });
     expect(() =>
-      validateAction(state.player, { kind: 'move', move: 'EMBER SNAP', stance: 'A' }),
+      validateAction(pl(state), { kind: 'move', move: 'EMBER SNAP', stance: 'A' }),
     ).not.toThrow();
   });
 });
@@ -158,7 +170,7 @@ describe('stagger initiative', () => {
       { kind: 'move', move: 'TACKLE', stance: 'G' },
       mulberry32(42),
     );
-    expect(r1.state.player.staggered).toBe(true);
+    expect(pl(r1.state).staggered).toBe(true);
 
     // Round 2: with EMBERCUB staggered, AQUAFIN should act first.
     const r2 = resolveRound(
@@ -186,9 +198,9 @@ describe('clash', () => {
     const strikes = result.events.filter((e) => e.kind === 'strike');
     expect(strikes.length).toBe(1);
     expect(strikes[0]?.side).toBe('player');
-    expect(result.state.player.momentum).toBe(1);
-    expect(result.state.foe.momentum).toBe(0);
-    expect(result.state.foe.staggered).toBe(true);
+    expect(pl(result.state).momentum).toBe(1);
+    expect(fo(result.state).momentum).toBe(0);
+    expect(fo(result.state).staggered).toBe(true);
   });
 
   test('foe wins clash with a high roll', () => {
@@ -202,8 +214,8 @@ describe('clash', () => {
       rng,
     );
     expect(result.events.some((e) => e.kind === 'clash' && e.winner === 'foe')).toBe(true);
-    expect(result.state.foe.momentum).toBe(1);
-    expect(result.state.player.staggered).toBe(true);
+    expect(fo(result.state).momentum).toBe(1);
+    expect(pl(result.state).staggered).toBe(true);
   });
 });
 
@@ -233,8 +245,8 @@ describe('momentum charging on each read-win', () => {
       { kind: 'move', move: 'TACKLE', stance: 'A' },
       mulberry32(42),
     );
-    expect(result.state.player.momentum).toBe(1);
-    expect(result.state.foe.momentum).toBe(0);
+    expect(pl(result.state).momentum).toBe(1);
+    expect(fo(result.state).momentum).toBe(0);
   });
 
   test('opening grants momentum to the attacker', () => {
@@ -244,8 +256,8 @@ describe('momentum charging on each read-win', () => {
       { kind: 'move', move: 'TACKLE', stance: 'G' },
       mulberry32(42),
     );
-    expect(result.state.player.momentum).toBe(1);
-    expect(result.state.foe.momentum).toBe(0);
+    expect(pl(result.state).momentum).toBe(1);
+    expect(fo(result.state).momentum).toBe(0);
   });
 
   test('dodge grants momentum to the defender', () => {
@@ -259,7 +271,7 @@ describe('momentum charging on each read-win', () => {
       rng,
     );
     expect(result.events.some((e) => e.kind === 'dodge' && e.side === 'foe')).toBe(true);
-    expect(result.state.foe.momentum).toBe(1);
+    expect(fo(result.state).momentum).toBe(1);
   });
 
   test('momentum caps at 2', () => {
@@ -270,7 +282,7 @@ describe('momentum charging on each read-win', () => {
       { kind: 'move', move: 'TACKLE', stance: 'G' },
       mulberry32(7),
     );
-    expect(result.state.player.momentum).toBe(COMBAT.momentumCap);
+    expect(pl(result.state).momentum).toBe(COMBAT.momentumCap);
     expect(result.events.some((e) => e.kind === 'momentum' && e.side === 'player')).toBe(false);
   });
 });
@@ -284,13 +296,13 @@ describe('Catch Breath call', () => {
       { kind: 'move', move: 'TACKLE', stance: 'G' },
       mulberry32(42),
     );
-    expect(result.state.player.momentum).toBe(1);
-    expect(result.state.player.st).toBe(30 + COMBAT.catchBreathRestore);
+    expect(pl(result.state).momentum).toBe(1);
+    expect(pl(result.state).st).toBe(30 + COMBAT.catchBreathRestore);
   });
 
   test('Catch Breath is illegal with 0 momentum', () => {
     const state = makeState();
-    expect(() => validateAction(state.player, { kind: 'catchBreath' })).toThrow();
+    expect(() => validateAction(pl(state), { kind: 'catchBreath' })).toThrow();
   });
 });
 
@@ -347,8 +359,8 @@ describe('determinism', () => {
       { kind: 'move', move: 'TACKLE', stance: 'G' },
       mulberry32(123),
     );
-    expect(a.state.foe.hp).toBe(b.state.foe.hp);
-    expect(a.state.player.hp).toBe(b.state.player.hp);
+    expect(fo(a.state).hp).toBe(fo(b.state).hp);
+    expect(pl(a.state).hp).toBe(pl(b.state).hp);
     expect(a.events).toEqual(b.events);
   });
 });

@@ -6,12 +6,12 @@
 import type { RNG } from './rng';
 import { affordableMoves, forcedAction, lookupMove } from './state';
 import type { Action, BattleState, Side, Stance } from './types';
-import { isRhythmRound } from './types';
+import { activeMon, isRhythmRound } from './types';
 
 export type BossPolicy = (state: BattleState, side: Side, rng: RNG) => Action;
 
 function pickFalknerMove(state: BattleState, side: Side, rhythm: boolean, rng: RNG): string {
-  const me = state[side];
+  const me = activeMon(state[side]);
   const aff = affordableMoves(me);
   if (aff.length === 0) return me.species.moves[0]!;
   const phase = state.phase ?? 1;
@@ -56,7 +56,7 @@ function modalPlayerStance(state: BattleState): Stance | null {
 }
 
 export const falknerBossAI: BossPolicy = (state, side, rng) => {
-  const me = state[side];
+  const me = activeMon(state[side]);
   const forced = forcedAction(me);
   if (forced) return forced;
 

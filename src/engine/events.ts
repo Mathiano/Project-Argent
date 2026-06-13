@@ -54,4 +54,27 @@ export type BattleEvent =
   | {
       readonly kind: 'break';
       readonly newPhase: number;
+    }
+  | {
+      readonly kind: 'switchOut';
+      readonly side: Side;
+      readonly fromIndex: number;
+      readonly species: string;
+    }
+  | {
+      readonly kind: 'switchIn';
+      readonly side: Side;
+      readonly toIndex: number;
+      readonly species: string;
+    }
+  | {
+      readonly kind: 'faint';
+      readonly side: Side;
+      readonly species: string;
+    }
+  | {
+      readonly kind: 'forcedSwitch';
+      readonly side: Side;
+      readonly toIndex: number;
+      readonly species: string;
     };

@@ -13,6 +13,8 @@ export type { RNG } from './rng';
 export {
   createSide,
   createBattleState,
+  createTeam,
+  setActiveMember,
   lookupMove,
   registerMoves,
   canAfford,
@@ -21,6 +23,8 @@ export {
   affordableMoves,
   forcedAction,
   validateAction,
+  validateActionTeam,
+  activeMon,
 } from './state';
 export {
   loadSpeciesAt,

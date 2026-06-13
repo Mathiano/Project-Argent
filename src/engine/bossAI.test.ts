@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'vitest';
 import { falknerBossAI } from './bossAI';
-import { registerMoves } from './state';
+import { registerMoves, setActiveMember } from './state';
 import { mulberry32 } from './rng';
 import { createBattleState, createSide } from './state';
 import { SPECIES } from './data';
 import type { BattleState, BossCard, Species, ArenaSchedule } from './types';
+import { activeMon } from './types';
 
 const ARENA: ArenaSchedule = {
   rhythmEveryN: 3,
@@ -80,7 +81,8 @@ describe('Falkner boss AI (A6)', () => {
   test('low ST + momentum + phase 1 triggers Catch Breath', () => {
     let s = makeState();
     s = atRound(s, 2, 1);
-    s = { ...s, foe: { ...s.foe, momentum: 1, st: 20 } };
+    const patched = { ...activeMon(s.foe), momentum: 1, st: 20 };
+    s = { ...s, foe: setActiveMember(s.foe, patched) };
     const action = falknerBossAI(s, 'foe', mulberry32(1));
     expect(action.kind).toBe('catchBreath');
   });

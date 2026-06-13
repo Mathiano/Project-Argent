@@ -1,6 +1,7 @@
 import {
   COUNTER_MAP,
   SPECIES,
+  activeMon,
   affordableMoves,
   createBattleState,
   createSide,
@@ -133,7 +134,7 @@ function showStarterPick(): void {
 
 // Simple wild AI: uniform-random affordable move + 40A/30G/30F stance mix.
 function wildFoeAI(state: BattleState, rng: RNG): Action {
-  const me = state.foe;
+  const me = activeMon(state.foe);
   const forced = forcedAction(me);
   if (forced) return forced;
   const aff = affordableMoves(me);

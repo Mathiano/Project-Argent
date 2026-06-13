@@ -1,7 +1,7 @@
 // Canonical sim archetypes — see docs/sim-archetypes.md.
 // These are measurement instruments; do not "improve" without a design ruling.
 
-import { affordableMoves, forcedAction, lookupMove } from '../engine';
+import { activeMon, affordableMoves, forcedAction, lookupMove } from '../engine';
 import type { Action, BattleState, RNG, Side, SideState, Stance } from '../engine';
 
 export interface BotArchetype {
@@ -52,7 +52,7 @@ function pickRandomStance(rng: RNG): Stance {
 export const buttonMasher: BotArchetype = {
   name: 'button-masher',
   chooseAction(state, side, rng) {
-    const me = state[side];
+    const me = activeMon(state[side]);
     const forced = forcedAction(me);
     if (forced) return forced;
     const aff = affordableMoves(me);
@@ -64,7 +64,7 @@ export const buttonMasher: BotArchetype = {
 export const staticGuard: BotArchetype = {
   name: 'static-guard',
   chooseAction(state, side) {
-    const me = state[side];
+    const me = activeMon(state[side]);
     const forced = forcedAction(me);
     if (forced) return forced;
     return { kind: 'move', move: pickMidOrLight(me), stance: 'G' };
@@ -74,7 +74,7 @@ export const staticGuard: BotArchetype = {
 export const brute: BotArchetype = {
   name: 'brute',
   chooseAction(state, side) {
-    const me = state[side];
+    const me = activeMon(state[side]);
     const forced = forcedAction(me);
     if (forced) return forced;
     return { kind: 'move', move: pickHeaviest(me), stance: 'A' };
@@ -84,7 +84,7 @@ export const brute: BotArchetype = {
 export const naiveTriangle: BotArchetype = {
   name: 'naive-triangle',
   chooseAction(state, side, _rng, telegraph) {
-    const me = state[side];
+    const me = activeMon(state[side]);
     const forced = forcedAction(me);
     if (forced) return forced;
     const foeStance = telegraphStance(telegraph);
@@ -98,9 +98,9 @@ function staminaReaderPolicy(
   side: Side,
   telegraph?: Action,
 ): Action {
-  const me = state[side];
+  const me = activeMon(state[side]);
   const foeKey: Side = side === 'player' ? 'foe' : 'player';
-  const foe = state[foeKey];
+  const foe = activeMon(state[foeKey]);
 
   const forced = forcedAction(me);
   if (forced) return forced;
@@ -130,7 +130,7 @@ export const staminaReader: BotArchetype = {
 export const humanIsh: BotArchetype = {
   name: 'human-ish',
   chooseAction(state, side, rng, telegraph) {
-    const me = state[side];
+    const me = activeMon(state[side]);
     const forced = forcedAction(me);
     if (forced) return forced;
     if (rng.next() < 0.3) {
@@ -178,7 +178,7 @@ function rivalMovePick(side: SideState): string {
 export const rivalAI: BotArchetype = {
   name: 'rival',
   chooseAction(state, side, rng) {
-    const me = state[side];
+    const me = activeMon(state[side]);
     const forced = forcedAction(me);
     if (forced) return forced;
     const enemy = enemyStancesFromHistory(state, side);

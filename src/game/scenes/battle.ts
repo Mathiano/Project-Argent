@@ -2,6 +2,7 @@ import {
   COMBAT,
   MOVES,
   TIERS,
+  activeMon,
   forcedAction,
   resolveRound,
 } from '../../engine';
@@ -127,13 +128,17 @@ function actionMove(action: Action): string | null {
 function describeFoeIntent(action: Action): { stance: Stance | null; tag: string } {
   if (action.kind === 'rest') return { stance: null, tag: 'RESTING' };
   if (action.kind === 'catchBreath') return { stance: null, tag: 'RECOVERING' };
+  if (action.kind === 'switch') return { stance: null, tag: 'SWITCHING' };
   return { stance: action.stance, tag: `${TIER_TAG[MOVES[action.move]!.tier]} ATTACK` };
 }
 
 export function createBattleScene(opts: BattleSceneOpts): Scene {
   let state: BattleState = opts.state;
   let foeAction: Action = { kind: 'rest' };
-  let display: Display = { player: snapshot(state.player), foe: snapshot(state.foe) };
+  let display: Display = {
+    player: snapshot(activeMon(state.player)),
+    foe: snapshot(activeMon(state.foe)),
+  };
   const breakThreshold = state.bossCard?.breakBar ?? 0;
   let displayBreakProgress = state.breakProgress ?? 0;
   let breakFlashT = 0;
@@ -167,7 +172,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   }
 
   function beginTurn(): void {
-    const forced = forcedAction(state.player);
+    const forced = forcedAction(activeMon(state.player));
     if (forced) {
       foeAction = opts.chooseFoeAction(state, opts.rng);
       commit(forced);
@@ -218,14 +223,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
     if (ev.kind === 'commit') {
       if (ev.action.kind === 'rest') {
-        const who = ev.side === 'player' ? state.player.species.name : state.foe.species.name;
+        const who = ev.side === 'player' ? activeMon(state.player).species.name : activeMon(state.foe).species.name;
         const note = ev.action.reason === 'exhaustion' ? 'is spent — resting.' : 'has no moves — resting.';
         pushLog(`${who} ${note}`);
       } else if (ev.action.kind === 'catchBreath') {
-        const who = ev.side === 'player' ? state.player.species.name : state.foe.species.name;
+        const who = ev.side === 'player' ? activeMon(state.player).species.name : activeMon(state.foe).species.name;
         pushLog(`${who}: catch your breath!`);
       } else {
-        const who = ev.side === 'player' ? state.player.species.name : `Foe ${state.foe.species.name}`;
+        const who = ev.side === 'player' ? activeMon(state.player).species.name : `Foe ${activeMon(state.foe).species.name}`;
         pushLog(`${who} used ${ev.action.move}.`);
       }
       return;
@@ -240,7 +245,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       animKind = 'clash';
       animSide = ev.winner;
       animT = 0.3;
-      pushLog(`CLASH! ${ev.winner === 'player' ? state.player.species.name : 'Foe'} broke through.`);
+      pushLog(`CLASH! ${ev.winner === 'player' ? activeMon(state.player).species.name : 'Foe'} broke through.`);
       return;
     }
     if (ev.kind === 'strike') {
@@ -254,7 +259,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       return;
     }
     if (ev.kind === 'dodge') {
-      const who = ev.side === 'player' ? state.player.species.name : 'Foe ' + state.foe.species.name;
+      const who = ev.side === 'player' ? activeMon(state.player).species.name : 'Foe ' + activeMon(state.foe).species.name;
       pushLog(`${who} dodged it!`);
       animSide = ev.side;
       animKind = 'dodge';
@@ -273,7 +278,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (ev.kind === 'counter') {
       const att = opposite(ev.side);
       display[att].hp = Math.max(0, display[att].hp - ev.damage);
-      const who = ev.side === 'player' ? state.player.species.name : 'Foe';
+      const who = ev.side === 'player' ? activeMon(state.player).species.name : 'Foe';
       pushLog(`${who} countered!`);
       animSide = ev.side;
       animKind = 'counter';
@@ -290,12 +295,12 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       return;
     }
     if (ev.kind === 'winded') {
-      pushLog(`${ev.side === 'player' ? state.player.species.name : 'Foe'} is winded — heavy moves locked.`);
+      pushLog(`${ev.side === 'player' ? activeMon(state.player).species.name : 'Foe'} is winded — heavy moves locked.`);
       return;
     }
     if (ev.kind === 'exhausted') {
       display[ev.side].exhausted = true;
-      pushLog(`${ev.side === 'player' ? state.player.species.name : 'Foe'} is exhausted!`);
+      pushLog(`${ev.side === 'player' ? activeMon(state.player).species.name : 'Foe'} is exhausted!`);
       return;
     }
     if (ev.kind === 'breakProgress') {
@@ -313,7 +318,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
     if (ev.kind === 'ko') {
       display[ev.side].hp = 0;
-      pushLog(`${ev.side === 'player' ? state.player.species.name : 'Foe ' + state.foe.species.name} fainted!`);
+      pushLog(`${ev.side === 'player' ? activeMon(state.player).species.name : 'Foe ' + activeMon(state.foe).species.name} fainted!`);
       endingWinner = opposite(ev.side);
       return;
     }
@@ -322,13 +327,16 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function finishResolve(): void {
     // Snap display to engine final state for stamina/momentum settle that the
     // event stream did not cover (stamina costs, regen).
-    display = { player: snapshot(state.player), foe: snapshot(state.foe) };
+    display = {
+      player: snapshot(activeMon(state.player)),
+      foe: snapshot(activeMon(state.foe)),
+    };
     if (endingWinner !== null) {
       phase = 'end';
       const msg =
         endingWinner === 'player'
-          ? [`${state.player.species.name} wins!`, 'Press A to continue.']
-          : [`${state.player.species.name} fell.`, 'Press A to continue.'];
+          ? [`${activeMon(state.player).species.name} wins!`, 'Press A to continue.']
+          : [`${activeMon(state.player).species.name} fell.`, 'Press A to continue.'];
       setText(msg, () => {
         opts.onResolve(endingWinner!);
       });
@@ -366,7 +374,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
           setText(['Calls unlock after', 'your first win.'], () => {
             phase = 'menu';
           });
-        } else if (state.player.momentum < 1) {
+        } else if (activeMon(state.player).momentum < 1) {
           setText(
             ['No ★ yet —', 'win reads to charge:', 'counter, dodge, open.'],
             () => {
@@ -395,7 +403,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   }
 
   function handleMoveInput(key: InputKey): void {
-    const moves = state.player.species.moves;
+    const moves = activeMon(state.player).species.moves;
     if (key === 'up') moveCursor = (moveCursor + moves.length - 1) % moves.length;
     else if (key === 'down') moveCursor = (moveCursor + 1) % moves.length;
     else if (key === 'select') stanceIdx = (stanceIdx + 1) % 3;
@@ -403,13 +411,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     else if (key === 'a') {
       const moveName = moves[moveCursor]!;
       const move = MOVES[moveName]!;
-      if (state.player.st <= COMBAT.winded && (move.tier === 'heavy' || move.tier === 'nuke')) {
+      if (activeMon(state.player).st <= COMBAT.winded && (move.tier === 'heavy' || move.tier === 'nuke')) {
         setText(['Too winded for', 'heavy moves!'], () => {
           phase = 'move';
         });
         return;
       }
-      if (state.player.st < TIERS[move.tier].cost) {
+      if (activeMon(state.player).st < TIERS[move.tier].cost) {
         setText(['Not enough stamina!'], () => {
           phase = 'move';
         });
@@ -463,7 +471,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function drawFoePanel(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, FOE_PANEL.x, FOE_PANEL.y, FOE_PANEL.w, FOE_PANEL.h);
-    drawText(ctx, state.foe.species.name, FOE_PANEL.x + 8, FOE_PANEL.y + 6);
+    drawText(ctx, activeMon(state.foe).species.name, FOE_PANEL.x + 8, FOE_PANEL.y + 6);
     if (display.foe.staggered) drawText(ctx, 'STAG', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
     if (display.foe.exhausted) drawText(ctx, 'EXH', FOE_PANEL.x + 108, FOE_PANEL.y + 6, PALETTE.hpCrit);
     drawMomentum(ctx, FOE_PANEL.x + 132, FOE_PANEL.y + 6, display.foe.momentum, COMBAT.momentumCap);
@@ -478,8 +486,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       FOE_PANEL.y + 19,
       FOE_PANEL.w - 36,
       display.foe.hp,
-      state.foe.maxHp,
-      hpColor(display.foe.hp, state.foe.maxHp),
+      activeMon(state.foe).maxHp,
+      hpColor(display.foe.hp, activeMon(state.foe).maxHp),
     );
     drawText(ctx, 'ST', FOE_PANEL.x + 8, FOE_PANEL.y + 26, PALETTE.paperShadow);
     drawBar(
@@ -496,7 +504,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function drawPlayerPanel(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, PL_PANEL.x, PL_PANEL.y, PL_PANEL.w, PL_PANEL.h);
-    drawText(ctx, state.player.species.name, PL_PANEL.x + 8, PL_PANEL.y + 6);
+    drawText(ctx, activeMon(state.player).species.name, PL_PANEL.x + 8, PL_PANEL.y + 6);
     if (display.player.staggered) drawText(ctx, 'STAG', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
     if (display.player.exhausted) drawText(ctx, 'EXH', PL_PANEL.x + 108, PL_PANEL.y + 6, PALETTE.hpCrit);
     drawMomentum(ctx, PL_PANEL.x + 132, PL_PANEL.y + 6, display.player.momentum, COMBAT.momentumCap);
@@ -508,8 +516,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       PL_PANEL.y + 19,
       PL_PANEL.w - 36,
       display.player.hp,
-      state.player.maxHp,
-      hpColor(display.player.hp, state.player.maxHp),
+      activeMon(state.player).maxHp,
+      hpColor(display.player.hp, activeMon(state.player).maxHp),
     );
     drawText(ctx, 'ST', PL_PANEL.x + 8, PL_PANEL.y + 26, PALETTE.paperShadow);
     drawBar(
@@ -549,10 +557,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function drawBottomMenu(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
-    const items = ['FIGHT', opts.catchBreathUnlocked ? `CALL ★${state.player.momentum}` : 'CALL -', opts.canRun ? 'RUN' : 'STAY'];
+    const items = ['FIGHT', opts.catchBreathUnlocked ? `CALL ★${activeMon(state.player).momentum}` : 'CALL -', opts.canRun ? 'RUN' : 'STAY'];
     items.forEach((it, i) => {
       const dim =
-        (i === 1 && (!opts.catchBreathUnlocked || state.player.momentum < 1)) ||
+        (i === 1 && (!opts.catchBreathUnlocked || activeMon(state.player).momentum < 1)) ||
         (i === 2 && !opts.canRun);
       drawText(
         ctx,
@@ -574,13 +582,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function drawBottomMoves(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
-    const moves = state.player.species.moves;
+    const moves = activeMon(state.player).species.moves;
     moves.forEach((m, i) => {
       const move = MOVES[m]!;
       const tier = TIERS[move.tier];
       const locked =
-        (state.player.st <= COMBAT.winded && (move.tier === 'heavy' || move.tier === 'nuke')) ||
-        state.player.st < tier.cost;
+        (activeMon(state.player).st <= COMBAT.winded && (move.tier === 'heavy' || move.tier === 'nuke')) ||
+        activeMon(state.player).st < tier.cost;
       const color = locked ? PALETTE.paperDim : PALETTE.ink;
       drawText(ctx, `${moveCursor === i ? '>' : ' '}${m}`, BOTTOM.x + 8, BOTTOM.y + 8 + i * 10, color);
       drawTextRight(ctx, `ST${tier.cost}`, BOTTOM.x + 152, BOTTOM.y + 8 + i * 10, color);
@@ -593,8 +601,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // Order preview
     const previewMove = moves[moveCursor]!;
     const order = orderHint(
-      state.player,
-      state.foe,
+      activeMon(state.player),
+      activeMon(state.foe),
       previewMove,
       stance,
       actionMove(foeAction),
@@ -660,14 +668,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
       drawSpeciesInSlot(
         ctx,
-        { name: state.foe.species.name, type: state.foe.species.types[0] ?? null },
+        { name: activeMon(state.foe).species.name, type: activeMon(state.foe).species.types[0] ?? null },
         FOE_SLOT.x + spriteOffset('foe'),
         FOE_SLOT.y,
         { facing: 'left' },
       );
       drawSpeciesInSlot(
         ctx,
-        { name: state.player.species.name, type: state.player.species.types[0] ?? null },
+        { name: activeMon(state.player).species.name, type: activeMon(state.player).species.types[0] ?? null },
         PL_SLOT.x + spriteOffset('player'),
         PL_SLOT.y,
         { facing: 'right' },

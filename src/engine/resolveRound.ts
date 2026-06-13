@@ -2,7 +2,7 @@ import { COMBAT, TIERS } from './config';
 import { typeMult } from './data';
 import type { BattleEvent, CommitDescriptor, SideSnapshot } from './events';
 import type { RNG } from './rng';
-import { lookupMove, validateAction } from './state';
+import { lookupMove, setActiveMember, validateActionTeam } from './state';
 import type {
   Action,
   ArenaSchedule,
@@ -10,10 +10,11 @@ import type {
   Side,
   SideState,
   Stance,
+  Team,
   TraitTable,
   TypeChart,
 } from './types';
-import { isRhythmRound, traitMods } from './types';
+import { activeMon, firstSurvivor, isRhythmRound, traitMods } from './types';
 
 export interface RoundResult {
   readonly state: BattleState;
@@ -56,6 +57,7 @@ function actionMove(action: Action): string | null {
 function describeAction(action: Action, side: SideState): CommitDescriptor {
   if (action.kind === 'move') return { kind: 'move', move: action.move, stance: action.stance };
   if (action.kind === 'catchBreath') return { kind: 'catchBreath' };
+  if (action.kind === 'switch') return { kind: 'rest', reason: 'softlock' };
   return { kind: 'rest', reason: side.exhausted ? 'exhaustion' : 'softlock' };
 }
 
@@ -189,6 +191,10 @@ function paySide(
   if (action.kind === 'catchBreath') {
     return { ...side, st: Math.min(100, side.st + COMBAT.catchBreathRestore) };
   }
+  if (action.kind === 'switch') {
+    // Switching is the turn — no stamina change for the side that switched.
+    return side;
+  }
   const move = lookupMove(action.move);
   const tier = TIERS[move.tier];
   let cost = tier.cost;
@@ -224,21 +230,69 @@ export function resolveRound(
   foeAction: Action,
   rng: RNG,
 ): RoundResult {
-  validateAction(state.player, playerAction);
-  validateAction(state.foe, foeAction);
+  validateActionTeam(state.player, playerAction);
+  validateActionTeam(state.foe, foeAction);
 
   const events: BattleEvent[] = [];
+
+  // Team copies for write-back at the end.
+  let playerTeam: Team = state.player;
+  let foeTeam: Team = state.foe;
+
+  // Working active-mon variables. The rest of this function reads/writes
+  // pl/foe exactly as the legacy 1v1 path did. At teamSize 1 there's no
+  // switching, no bench, no faint flow — so RNG draws and event order
+  // match the pre-team lock byte-for-byte.
+  let pl: SideState = activeMon(playerTeam);
+  let foe: SideState = activeMon(foeTeam);
+
   events.push({
     kind: 'roundStart',
     round: state.round,
-    player: snapshot(state.player),
-    foe: snapshot(state.foe),
+    player: snapshot(pl),
+    foe: snapshot(foe),
   });
-  events.push({ kind: 'commit', side: 'player', action: describeAction(playerAction, state.player) });
-  events.push({ kind: 'commit', side: 'foe', action: describeAction(foeAction, state.foe) });
+  events.push({ kind: 'commit', side: 'player', action: describeAction(playerAction, pl) });
+  events.push({ kind: 'commit', side: 'foe', action: describeAction(foeAction, foe) });
 
-  let pl = state.player;
-  let foe = state.foe;
+  // Switch action — voluntary. Resolves before strikes; the switched-in
+  // mon takes any hit this round (handled naturally: actionMove is null
+  // for switch, so the switching side does not strike; the other side's
+  // strike targets the new active because pl/foe are reassigned here).
+  if (playerAction.kind === 'switch') {
+    const fromIndex = playerTeam.active;
+    events.push({
+      kind: 'switchOut',
+      side: 'player',
+      fromIndex,
+      species: pl.species.name,
+    });
+    playerTeam = { ...playerTeam, active: playerAction.toIndex };
+    pl = activeMon(playerTeam);
+    events.push({
+      kind: 'switchIn',
+      side: 'player',
+      toIndex: playerAction.toIndex,
+      species: pl.species.name,
+    });
+  }
+  if (foeAction.kind === 'switch') {
+    const fromIndex = foeTeam.active;
+    events.push({
+      kind: 'switchOut',
+      side: 'foe',
+      fromIndex,
+      species: foe.species.name,
+    });
+    foeTeam = { ...foeTeam, active: foeAction.toIndex };
+    foe = activeMon(foeTeam);
+    events.push({
+      kind: 'switchIn',
+      side: 'foe',
+      toIndex: foeAction.toIndex,
+      species: foe.species.name,
+    });
+  }
 
   if (playerAction.kind === 'catchBreath') {
     events.push({ kind: 'catchBreath', side: 'player', restored: COMBAT.catchBreathRestore });
@@ -324,10 +378,14 @@ export function resolveRound(
     }
   }
 
-  const koed = pl.hp <= 0 || foe.hp <= 0;
+  // Per-side settle. KO-stamina memo: the survivor settles stamina normally;
+  // the side whose active mon fainted forfeits its remaining action and does
+  // not settle. At teamSize 1 the battle ends here either way, so the
+  // observable difference vs. the legacy "skip both on any KO" is inert.
+  const plFainted = pl.hp <= 0;
+  const foeFainted = foe.hp <= 0;
 
-  // Matches demo: stamina settle is skipped on KO mid-round (battle is over).
-  if (!koed) {
+  if (!plFainted) {
     const plBefore = pl;
     pl = paySide(pl, playerAction, rhythm, arena);
     if (pl.st !== plBefore.st) {
@@ -340,6 +398,8 @@ export function resolveRound(
       });
     }
     emitFatigueTransitions(plBefore, pl, 'player', events);
+  }
+  if (!foeFainted) {
     const foeBefore = foe;
     foe = paySide(foe, foeAction, rhythm, arena);
     if (foe.st !== foeBefore.st) {
@@ -352,6 +412,44 @@ export function resolveRound(
       });
     }
     emitFatigueTransitions(foeBefore, foe, 'foe', events);
+  }
+
+  // Write the post-strike active mons back into their teams BEFORE
+  // resolving faints — firstSurvivor needs to see the current hp values.
+  playerTeam = setActiveMember(playerTeam, pl);
+  foeTeam = setActiveMember(foeTeam, foe);
+
+  // Faint flow: if a side's active mon hit 0 hp this round, emit 'faint'
+  // and (if the bench has a survivor) automatically forced-switch to the
+  // first surviving member. If no survivor, the team is wiped — the
+  // caller observes via isTeamWiped and ends the battle.
+  if (plFainted) {
+    events.push({ kind: 'faint', side: 'player', species: pl.species.name });
+    const next = firstSurvivor(playerTeam);
+    if (next !== null) {
+      playerTeam = { ...playerTeam, active: next };
+      const newActive = activeMon(playerTeam);
+      events.push({
+        kind: 'forcedSwitch',
+        side: 'player',
+        toIndex: next,
+        species: newActive.species.name,
+      });
+    }
+  }
+  if (foeFainted) {
+    events.push({ kind: 'faint', side: 'foe', species: foe.species.name });
+    const next = firstSurvivor(foeTeam);
+    if (next !== null) {
+      foeTeam = { ...foeTeam, active: next };
+      const newActive = activeMon(foeTeam);
+      events.push({
+        kind: 'forcedSwitch',
+        side: 'foe',
+        toIndex: next,
+        species: newActive.species.name,
+      });
+    }
   }
 
   // Break bar: count player read-wins from this round's events.
@@ -386,8 +484,8 @@ export function resolveRound(
 
   return {
     state: {
-      player: pl,
-      foe,
+      player: playerTeam,
+      foe: foeTeam,
       round: state.round + 1,
       typeChart: state.typeChart,
       traits: state.traits,

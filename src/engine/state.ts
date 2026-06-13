@@ -9,9 +9,11 @@ import type {
   Species,
   Stance,
   StatScale,
+  Team,
   TraitTable,
   TypeChart,
 } from './types';
+import { activeMon } from './types';
 
 export function createSide(species: Species, scale?: StatScale): SideState {
   const sp: Species = scale
@@ -40,14 +42,35 @@ export interface BattleSetup {
   readonly bossCard?: BossCard;
 }
 
+// Wrap one or more SideStates into a Team. The first member is active.
+// maxSize defaults to members.length; pass explicit maxSize when the team
+// can grow (currently unused — boss cards declare teamSize at battle setup).
+export function createTeam(members: readonly SideState[], maxSize?: number): Team {
+  if (members.length === 0) throw new Error('createTeam: empty members');
+  return {
+    active: 0,
+    members,
+    maxSize: maxSize ?? members.length,
+  };
+}
+
+function asTeam(side: SideState | Team): Team {
+  if ('members' in side) return side;
+  return createTeam([side]);
+}
+
+// createBattleState accepts either a SideState (1v1 convenience, wraps
+// into a 1-member team) or a Team (multi-mon). The 1v1 path performs
+// EXACTLY the same operations as the legacy single-side path — bit-
+// identical on RNG draws and on the active mon's state shape.
 export function createBattleState(
-  player: SideState,
-  foe: SideState,
+  player: SideState | Team,
+  foe: SideState | Team,
   setup: BattleSetup = {},
 ): BattleState {
   return {
-    player,
-    foe,
+    player: asTeam(player),
+    foe: asTeam(foe),
     round: 1,
     history: [],
     typeChart: setup.typeChart ?? LEGACY_TYPE_CHART,
@@ -55,6 +78,10 @@ export function createBattleState(
     ...(setup.bossCard !== undefined ? { bossCard: setup.bossCard } : {}),
   };
 }
+
+// activeMon re-exported here for convenience (engine consumers can
+// import it from './state' next to createSide/lookupMove).
+export { activeMon };
 
 const REGISTERED_MOVES: { [name: string]: Move } = {};
 
@@ -96,6 +123,9 @@ export function forcedAction(side: SideState): Action | null {
 }
 
 export function validateAction(side: SideState, action: Action): void {
+  if (action.kind === 'switch') {
+    throw new Error('validateAction: switch needs team context — use validateActionTeam');
+  }
   if (action.kind === 'rest') {
     if (!side.exhausted && affordableMoves(side).length > 0) {
       throw new Error('Rest illegal: side has affordable moves and is not exhausted');
@@ -119,4 +149,27 @@ export function validateAction(side: SideState, action: Action): void {
     throw new Error(`Cannot afford ${action.move}`);
   }
   void (action.stance satisfies Stance);
+}
+
+// Team-aware validator: handles 'switch' with bench access, delegates
+// other action kinds to validateAction on the active mon.
+export function validateActionTeam(team: Team, action: Action): void {
+  if (action.kind === 'switch') {
+    if (action.toIndex < 0 || action.toIndex >= team.members.length) {
+      throw new Error(`Switch target ${action.toIndex} out of range`);
+    }
+    if (action.toIndex === team.active) {
+      throw new Error('Cannot switch to active mon');
+    }
+    const target = team.members[action.toIndex]!;
+    if (target.hp <= 0) throw new Error('Cannot switch to fainted mon');
+    return;
+  }
+  validateAction(activeMon(team), action);
+}
+
+export function setActiveMember(team: Team, side: SideState): Team {
+  const newMembers = team.members.slice();
+  newMembers[team.active] = side;
+  return { ...team, members: newMembers };
 }
