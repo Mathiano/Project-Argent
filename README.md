@@ -2,7 +2,7 @@
 
 A from-scratch monster-battler in the body of Pokémon Silver and the soul of a fighting game: every battle is a read, every boss is a puzzle, and preparation is gameplay. 320×180 pixel art, TypeScript + Vite + Canvas, headless-simulable combat engine, ~42-hour content plan, 200 original species.
 
-**Status capsule — Falkner vertical slice sprint close (2026-06-13).**
+**Status capsule — Falkner seam sprint close (2026-06-13). Slice cold-walkable.**
 
 ## How this project runs
 
@@ -21,7 +21,8 @@ Dex content is commissioned from Gemini against `docs/mon-manifest.csv` (200 pre
 - `src/game` — Sprint 1 closed: 320×180 renderer replaying engine events; playable title → starter pick → wild → prep → rival → end loop.
 - Overworld kernel sprint closed (`KICKOFF-overworld.md`): JSON map pipeline, tile-locked grid movement with held-key dispatch, camera follow, warps with fade, interactables (A on faced sign → dialog), encounter zones pushing wild battles that pop back, step-on + auto script triggers with a session flag store.
 - Falkner vertical slice sprint closed (`KICKOFF-falkner.md`): engine hooks A1–A6 all landed (type chart injection, dex/move loaders, species traits + GUSTBORNE, arena rhythm, break bar, boss-card AI). Sim gates B1 (Falkner ladder, 15-cell lock at gust=1.4 hp=1.15 — 4/15 cells in target band, the rest reported) and B2 (CH1 batch sim audit). Game layer C1 (KINDRAKE/GRUBLEAF/SILTSKIP starter pick) + C2 (Route 31 FLITPECK grass + GRITHOAX cave) + C5 partial (Falkner fight reachable via `?skip=falkner` with all engine mechanics live, prep+gym-puzzle+trainer flow + Break-bar UI deferred).
-- Follow-up backlog: C3 (gym wind-puzzle map), C4 (gym trainer fight), Falkner-specific prep card + Break-bar pips + gust telegraph banner + team-battle engine hook (Sprint-2 KO-stamina memo applies).
+- Falkner seam sprint closed (`KICKOFF-falkner-seam.md`): graybox Violet gym map with two phased gust lanes that push the player, gym trainer NPC blocking the rear lane (one-shot fight via start-trainer-battle), gym door warp on Route 31, Falkner-specific prep card (scout report from the v2 boss card), Break-bar 2-pip widget + gust-telegraph banner + Break flash on the foe panel, data-driven SPROUT-without-TERRA signpost via the new if-flag script command.
+- Follow-up backlog: team-battle engine hook (the Sprint-2 KO-stamina memo applies — FLITPECK lead, GALEHAWK ace can't be expressed end-to-end yet), GALEHAWK + SILTSKIP + FLITPECK production sprites, Catching 2.0 to replace the demo-grade "defeat = adds type to party" shortcut feeding the signpost.
 - Next sprint: overworld kernel (`KICKOFF-overworld.md`). Then: Falkner vertical slice.
 
 ## Locked decisions (the short list)
