@@ -1,8 +1,8 @@
 export * from './types';
-export { isRhythmRound, traitMods, TRAITS } from './types';
+export { isRhythmRound, traitMods } from './types';
 export * from './events';
 export { COMBAT, TIERS } from './config';
-export { LEGACY_TYPE_CHART, MOVES, SPECIES, COUNTER_MAP, typeMult } from './data';
+export { LEGACY_TRAIT_TABLE, LEGACY_TYPE_CHART, MOVES, SPECIES, COUNTER_MAP, typeMult } from './data';
 export {
   mulberry32,
   rngPick,

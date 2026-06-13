@@ -9,12 +9,12 @@ import {
   createBattleState,
   createSide,
   falknerBossAI,
+  LEGACY_TRAIT_TABLE,
   loadDex,
   loadMoves,
   mulberry32,
   registerMoves,
   resolveRound,
-  TRAITS,
 } from '../engine';
 import type {
   Action,
@@ -25,6 +25,7 @@ import type {
   MoveJson,
   RNG,
   Species,
+  TraitTable,
   TypeChart,
 } from '../engine';
 import type { BotArchetype } from './archetypes';
@@ -60,34 +61,22 @@ function dexEntry(name: string): DexEntryJson {
 export function buildFalknerAce(opts: { aceHpMult: number; gustBorneDmgMult?: number }): {
   galehawk: Species;
   card: BossCard;
+  traits: TraitTable;
 } {
   ensureRegistered();
-  const base = dexEntry('GALEHAWK');
-  // Apply ace HP scale (card lever 3, default 1.15).
-  const scaled: DexEntryJson = {
-    ...base,
-    stats: {
-      ...base.stats,
-      hp: Math.round(base.stats.hp * opts.aceHpMult),
-    },
-  };
-  const galehawk = loadDex([scaled], FALKNER_ACE_LEVEL).GALEHAWK!;
-  // Wear the trait.
-  const speciesWithTrait: Species = { ...galehawk, trait: 'GUSTBORNE' };
-  // Patch TRAITS table for the test if a non-default dmg mult is requested.
-  // (TRAITS is a const but the mutation is intentional inside the ladder.)
-  if (opts.gustBorneDmgMult !== undefined) {
-    (TRAITS as { GUSTBORNE: { dmgMult: number; initMult: number } }).GUSTBORNE = {
-      dmgMult: opts.gustBorneDmgMult,
-      initMult: 1.25,
-    };
-  }
+  const galehawkBase = loadDex([dexEntry('GALEHAWK')], FALKNER_ACE_LEVEL).GALEHAWK!;
+  const speciesWithTrait: Species = { ...galehawkBase, trait: 'GUSTBORNE' };
   const card: BossCard = {
     species: speciesWithTrait,
+    statScale: { hp: opts.aceHpMult },
     arenaSchedule: ARENA,
     breakBar: 2,
   };
-  return { galehawk: speciesWithTrait, card };
+  const traits: TraitTable =
+    opts.gustBorneDmgMult === undefined
+      ? LEGACY_TRAIT_TABLE
+      : { GUSTBORNE: { dmgMult: opts.gustBorneDmgMult, initMult: 1.25 } };
+  return { galehawk: speciesWithTrait, card, traits };
 }
 
 export interface FalknerCellResult {
@@ -106,14 +95,15 @@ interface MatchOutcome {
 function runMatch(
   playerSpecies: Species,
   card: BossCard,
+  traits: TraitTable,
   archetype: BotArchetype,
   rng: RNG,
   maxRounds = 50,
 ): MatchOutcome {
   let state: BattleState = createBattleState(
     createSide(playerSpecies),
-    createSide(card.species),
-    { bossCard: card, typeChart: TYPECHART },
+    createSide(card.species, card.statScale),
+    { bossCard: card, typeChart: TYPECHART, traits },
   );
   for (let i = 0; i < maxRounds; i += 1) {
     const fAction: Action = falknerBossAI(state, 'foe', rng);
@@ -138,7 +128,7 @@ export function runFalknerLadder(opts: {
   seed: number;
 }): FalknerCellResult[] {
   ensureRegistered();
-  const { card } = buildFalknerAce(opts);
+  const { card, traits } = buildFalknerAce(opts);
   const starters: Species[] = ['KINDRAKE', 'GRUBLEAF', 'SILTSKIP'].map((name) => {
     const entry = dexEntry(name);
     return loadDex([entry], STARTER_LEVEL)[name]!;
@@ -151,7 +141,7 @@ export function runFalknerLadder(opts: {
       let totalRounds = 0;
       for (let i = 0; i < opts.n; i += 1) {
         const rng = mulberry32(opts.seed + i + player.name.length * 7919);
-        const r = runMatch(player, card, archetype, rng);
+        const r = runMatch(player, card, traits, archetype, rng);
         if (r.winner === 'player') wins += 1;
         totalRounds += r.rounds;
       }

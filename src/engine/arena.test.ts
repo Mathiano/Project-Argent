@@ -1,15 +1,15 @@
 import { describe, expect, test } from 'vitest';
 import {
+  LEGACY_TRAIT_TABLE,
   SPECIES,
   createBattleState,
   createSide,
   fixedRng,
   mulberry32,
   resolveRound,
-  TRAITS,
   isRhythmRound,
 } from './index';
-import type { BattleState, BossCard, Species } from './index';
+import type { BattleState, BossCard, Species, TraitTable } from './index';
 
 const ARENA = {
   rhythmEveryN: 3,
@@ -36,8 +36,51 @@ describe('arena rhythm + GUSTBORNE trait (A3 + A4)', () => {
     expect(isRhythmRound(undefined, 3)).toBe(false);
   });
 
-  test('TRAITS table exposes GUSTBORNE 1.3 / 1.25', () => {
-    expect(TRAITS.GUSTBORNE).toEqual({ dmgMult: 1.3, initMult: 1.25 });
+  test('LEGACY_TRAIT_TABLE ships GUSTBORNE at 1.3 / 1.25', () => {
+    expect(LEGACY_TRAIT_TABLE.GUSTBORNE).toEqual({ dmgMult: 1.3, initMult: 1.25 });
+  });
+
+  test('per-battle trait table overrides the default (no global mutation)', () => {
+    const overrideTraits: TraitTable = {
+      GUSTBORNE: { dmgMult: 2.0, initMult: 1.25 },
+    };
+    const card: BossCard = { species: SPECIES.EMBERCUB!, arenaSchedule: ARENA };
+    const baseline = createBattleState(
+      createSide(SPECIES.EMBERCUB!),
+      createSide(withGust(SPECIES.EMBERCUB!)),
+      { bossCard: card },
+    );
+    const boosted = createBattleState(
+      createSide(SPECIES.EMBERCUB!),
+      createSide(withGust(SPECIES.EMBERCUB!)),
+      { bossCard: card, traits: overrideTraits },
+    );
+
+    const off = resolveRound(
+      setRound(baseline, 3),
+      { kind: 'move', move: 'TACKLE', stance: 'G' },
+      { kind: 'move', move: 'TACKLE', stance: 'A' },
+      fixedRng([0.5, 0.5]),
+    );
+    const on = resolveRound(
+      setRound(boosted, 3),
+      { kind: 'move', move: 'TACKLE', stance: 'G' },
+      { kind: 'move', move: 'TACKLE', stance: 'A' },
+      fixedRng([0.5, 0.5]),
+    );
+
+    const offStrike = off.events.find(
+      (e): e is Extract<typeof e, { kind: 'strike' }> => e.kind === 'strike' && e.side === 'foe',
+    );
+    const onStrike = on.events.find(
+      (e): e is Extract<typeof e, { kind: 'strike' }> => e.kind === 'strike' && e.side === 'foe',
+    );
+    expect(offStrike).toBeDefined();
+    expect(onStrike).toBeDefined();
+    // 2.0 / 1.3 ≈ 1.538 between the two trait tables.
+    expect(onStrike!.damage / offStrike!.damage).toBeCloseTo(2.0 / 1.3, 4);
+    // Default table untouched after the override battle.
+    expect(LEGACY_TRAIT_TABLE.GUSTBORNE).toEqual({ dmgMult: 1.3, initMult: 1.25 });
   });
 
   test('GUSTBORNE damage x1.3 fires only on rhythm rounds', () => {

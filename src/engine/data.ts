@@ -1,4 +1,4 @@
-import type { ElementType, Move, Species, TypeChart } from './types';
+import type { ElementType, Move, Species, TraitTable, TypeChart } from './types';
 
 export const MOVES: { readonly [name: string]: Move } = {
   TACKLE: { name: 'TACKLE', tier: 'light', type: null },
@@ -67,6 +67,13 @@ export const LEGACY_TYPE_CHART: TypeChart = {
   Flame: { Sprout: 1.5, Splash: 0.67 },
   Sprout: { Splash: 1.5, Flame: 0.67 },
   Splash: { Flame: 1.5, Sprout: 0.67 },
+};
+
+// Default trait registry — what unspecified battles see. Bosses override
+// the table at battle setup; the engine never mutates this constant.
+// GUSTBORNE is the only trait that ships with v0.3.4 (Falkner card).
+export const LEGACY_TRAIT_TABLE: TraitTable = {
+  GUSTBORNE: { dmgMult: 1.3, initMult: 1.25 },
 };
 
 // Defender dual-type multipliers compose multiplicatively per type-chart.md

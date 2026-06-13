@@ -1,4 +1,4 @@
-# PROJECT ARGENT — Combat 2.0 Spec v0.3.3 (sim-validated)
+# PROJECT ARGENT — Combat 2.0 Spec v0.3.4 (sim-validated)
 
 **Format contract:** 320×180 screen, sprites + text box, D-pad/A/B/SELECT/START. No new buttons, no twitch inputs.
 **Budget rule:** every new system costs ≤1 bar or ≤1 glyph on screen. If it can't fit, it's cut.
@@ -214,6 +214,91 @@ Foe intent: ⚔ physical (Rollout building). You: Quilava, 62 ST, behind a pilla
 - `stamina` fires once per side during settle (unless skipped on KO mid-round) with `before`, `after`, and `netDelta` — lets the renderer animate the ST bar instead of snapping.
 
 These are purely informational: no extra RNG calls, no rule shifts, ladder regressions unchanged.
+
+## BattleState shape (v0.3.4)
+
+The engine's `BattleState` is the round-to-round container the renderer + sim consume. As shipped (post-Falkner seam + consolidation):
+
+```ts
+BattleState {
+  player: SideState                // active mon (1v1 today — 6v6 refactor pending)
+  foe:    SideState
+  round:  number                    // 1-indexed, increments at end of resolveRound
+  history: TurnHistoryEntry[]       // {player: Stance|null, foe: Stance|null} per round
+  typeChart: TypeChart              // INJECTED at setup; defaults to LEGACY_TYPE_CHART
+  traits:    TraitTable             // INJECTED at setup; defaults to LEGACY_TRAIT_TABLE
+  bossCard?: BossCard               // present for boss fights only
+  breakProgress?: number            // player's progress toward Break (Break-bar mechanic)
+  phase?:         number            // 1 at battle start, +1 per Break
+  rhythmAnchor?:  number            // round when the gust cycle was last anchored (defaults 0)
+}
+```
+
+`SideState` carries `species`, `hp`, `maxHp`, `st`, `exhausted`, `staggered`, `momentum`. `Species` carries `name`, `types[]`, stats, `moves[]`, optional `spr`, optional `trait`.
+
+## Type chart as injected data
+
+The chart is per-battle, not global. `createBattleState(player, foe, { typeChart })` carries the chart through `state.typeChart`; `typeMult(chart, attType, defTypes)` is the only lookup. Defender dual types multiply (1.3 × 0.7 = 0.91 per `docs/type-chart.md` rule 8). Default = `LEGACY_TYPE_CHART` (the pinned 1.5/0.67 demo matrix used by the rival-fight regression ladder). All CH1+ content passes `docs/typechart.json` (1.3/0.7).
+
+## Species traits as injected data
+
+Traits are conditional modifiers active on **arena-rhythm rounds only**. A trait id (e.g., `GUSTBORNE`) lives on `Species.trait`; the runtime lookup table `TraitTable: { [id]: { dmgMult, initMult } }` lives on `BattleState.traits` (injected at setup, defaults to `LEGACY_TRAIT_TABLE` shipped with the engine).
+
+Shipped trait — **GUSTBORNE** (Falkner's GALEHAWK + FLITPECK):
+- Active only on rhythm rounds (otherwise neutral 1×/1×)
+- Damage `×1.3`, initiative `×1.25`
+- Boss content overrides via per-battle `traits` arg without mutating any global. The B1 Falkner lock uses `GUSTBORNE: { dmgMult: 1.4, initMult: 1.25 }`.
+
+## Arena rhythm (BossCard.arenaSchedule)
+
+Boss cards carry an optional `ArenaSchedule` describing the recurring board effect. As shipped:
+
+```ts
+ArenaSchedule {
+  rhythmEveryN: number             // gust every Nth round
+  heavyExtraCost: number           // +ST cost for heavy moves on rhythm rounds
+  heavyExtraInitWeight: number     // initiative-weight multiplier for heavy moves
+  telegraphAheadBy: number         // renderer-only: telegraph N rounds early
+}
+```
+
+A rhythm round is defined by `(round - rhythmAnchor) % rhythmEveryN === 0`. On rhythm rounds:
+- Heavy moves cost `+heavyExtraCost` ST for **both sides**.
+- Heavy moves have their initiative weight `× heavyExtraInitWeight` for **both sides**.
+- Trait modifiers apply to trait-bearing species (see GUSTBORNE).
+
+The renderer reads the next round's rhythm status to draw the "the wind is rising…" telegraph. Falkner's schedule: `{ rhythmEveryN: 3, heavyExtraCost: 8, heavyExtraInitWeight: 1.3, telegraphAheadBy: 1 }`.
+
+## Break bar (BossCard.breakBar)
+
+Bosses optionally declare a Break threshold (Falkner: 2). The engine tracks `breakProgress` on `BattleState`; each player **read-win** (counter landed, opening landed, dodge succeeded, clash won) increments it. When `breakProgress >= breakBar`:
+
+- Engine emits `breakProgress` event (with `progress`/`threshold`) per round when progress changes
+- Engine emits `break` event with `newPhase`
+- `breakProgress` resets to 0
+- `phase` increments
+- `rhythmAnchor` resets to the current round → the gust cycle restarts
+
+Phase is purely informational data the boss AI policy reads (e.g., Falkner reads at 0% in phase 1, 15% in phase 2). The engine does not coerce the boss to rest on Break; the boss AI is responsible for respecting the phase change.
+
+## BossCard shape
+
+```ts
+BossCard {
+  species: Species
+  statScale?: StatScale       // { hp?, atk?, dfn?, spd? } applied via createSide(species, statScale)
+  breakBar?: number           // omitted = no break mechanic
+  arenaSchedule?: ArenaSchedule
+}
+```
+
+`statScale` is applied at side construction (`createSide(species, scale)`), not via manual mutation. Falkner card: `{ hp: 1.15 }` on GALEHAWK.
+
+## Deliberately not in v0.3.4
+
+- **Team battles (6v6).** `BattleState.player`/`foe` are single active mons. Full team support is the next sprint; see `docs/ARCHITECTURE-AUDIT.md` §5.
+- **Leader Calls.** Falkner intentionally Call-less per ratification — the Call system lands in the Bugsy slice where the player owns one symmetrically.
+- **Effect moves / status / terrain.** Move pool is damage-tier only (light/mid/heavy/nuke). Status, drain, terrain hooks are P1 (per `docs/move-pool.md`).
 
 ## Deliberately not doing
 

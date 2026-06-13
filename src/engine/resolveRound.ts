@@ -10,6 +10,7 @@ import type {
   Side,
   SideState,
   Stance,
+  TraitTable,
   TypeChart,
 } from './types';
 import { isRhythmRound, traitMods } from './types';
@@ -63,6 +64,7 @@ function initiative(
   moveName: string | null,
   rhythm: boolean,
   arena: ArenaSchedule | undefined,
+  traits: TraitTable,
 ): number {
   if (moveName === null) return COMBAT.restInitiative;
   const tier = TIERS[lookupMove(moveName).tier];
@@ -71,7 +73,7 @@ function initiative(
     weight *= arena.heavyExtraInitWeight;
   }
   let base = side.species.spd / weight;
-  const trait = traitMods(side, rhythm);
+  const trait = traitMods(side, rhythm, traits);
   base *= trait.initMult;
   return side.staggered ? base * COMBAT.staggerInitMult : base;
 }
@@ -98,6 +100,7 @@ function resolveStrike(
   rng: RNG,
   events: BattleEvent[],
   typeChart: TypeChart,
+  traits: TraitTable,
   rhythm: boolean,
 ): StrikeResult {
   const move = lookupMove(moveName);
@@ -111,7 +114,7 @@ function resolveStrike(
   d *= eff;
   d *= stanceOutMult(attStance);
   // Trait damage modifier (e.g., GUSTBORNE x1.3 on rhythm rounds).
-  d *= traitMods(attacker, rhythm).dmgMult;
+  d *= traitMods(attacker, rhythm, traits).dmgMult;
 
   // A vs F — dodge check
   if (attStance === 'A' && defStance === 'F') {
@@ -254,8 +257,8 @@ export function resolveRound(
   const arena = state.bossCard?.arenaSchedule;
   const rhythm = isRhythmRound(arena, state.round, state.rhythmAnchor ?? 0);
 
-  const plInit = initiative(pl, plMove, rhythm, arena);
-  const foeInit = initiative(foe, foeMove, rhythm, arena);
+  const plInit = initiative(pl, plMove, rhythm, arena, state.traits);
+  const foeInit = initiative(foe, foeMove, rhythm, arena, state.traits);
 
   let order: Side[];
   if (plInit < 0 && foeInit < 0) order = [];
@@ -288,7 +291,7 @@ export function resolveRound(
     if (plWins) {
       events.push({ kind: 'clash', winner: 'player' });
       pl = gainMomentum(pl, 'player', events);
-      const r = resolveStrike(pl, foe, plMove!, "A", "A", "player", rng, events, state.typeChart, rhythm);
+      const r = resolveStrike(pl, foe, plMove!, "A", "A", "player", rng, events, state.typeChart, state.traits, rhythm);
       pl = r.attacker;
       foe = r.defender;
       if (foe.hp > 0) {
@@ -298,7 +301,7 @@ export function resolveRound(
     } else {
       events.push({ kind: 'clash', winner: 'foe' });
       foe = gainMomentum(foe, 'foe', events);
-      const r = resolveStrike(foe, pl, foeMove!, "A", "A", "foe", rng, events, state.typeChart, rhythm);
+      const r = resolveStrike(foe, pl, foeMove!, "A", "A", "foe", rng, events, state.typeChart, state.traits, rhythm);
       foe = r.attacker;
       pl = r.defender;
       if (pl.hp > 0) {
@@ -310,11 +313,11 @@ export function resolveRound(
     for (const sideKey of order) {
       if (pl.hp <= 0 || foe.hp <= 0) break;
       if (sideKey === 'player' && plMove !== null) {
-        const r = resolveStrike(pl, foe, plMove, plStance, foeStance, "player", rng, events, state.typeChart, rhythm);
+        const r = resolveStrike(pl, foe, plMove, plStance, foeStance, "player", rng, events, state.typeChart, state.traits, rhythm);
         pl = r.attacker;
         foe = r.defender;
       } else if (sideKey === 'foe' && foeMove !== null) {
-        const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, "foe", rng, events, state.typeChart, rhythm);
+        const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, "foe", rng, events, state.typeChart, state.traits, rhythm);
         foe = r.attacker;
         pl = r.defender;
       }
@@ -387,6 +390,7 @@ export function resolveRound(
       foe,
       round: state.round + 1,
       typeChart: state.typeChart,
+      traits: state.traits,
       ...(state.bossCard !== undefined ? { bossCard: state.bossCard } : {}),
       ...(breakThreshold > 0 ? { breakProgress, phase, rhythmAnchor } : {}),
       history: [

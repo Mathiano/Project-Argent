@@ -63,6 +63,9 @@ export interface BattleState {
   readonly round: number;
   readonly history: readonly TurnHistoryEntry[];
   readonly typeChart: TypeChart;
+  // Trait modifier table for this battle. Defaults to LEGACY_TRAIT_TABLE
+  // when caller omits it; bosses can override per-card.
+  readonly traits: TraitTable;
   // Boss-side card driving arena rhythm + future hooks. Null/absent for
   // wild and rival fights — neutral state, no modifiers.
   readonly bossCard?: BossCard;
@@ -115,17 +118,25 @@ export function isRhythmRound(
   return (round - anchor) % schedule.rhythmEveryN === 0;
 }
 
-// GUSTBORNE: trait modifiers active only on rhythm rounds.
-export const TRAITS: { readonly [id: string]: { readonly dmgMult: number; readonly initMult: number } } = {
-  GUSTBORNE: { dmgMult: 1.3, initMult: 1.25 },
-};
+// Trait modifier definition: damage + initiative multipliers applied
+// to the trait-bearing species on rhythm rounds.
+export interface TraitMod {
+  readonly dmgMult: number;
+  readonly initMult: number;
+}
 
+export type TraitTable = { readonly [id: string]: TraitMod };
+
+// Trait lookup is data-driven: the active battle's traits table decides
+// the modifiers. traitMods returns the neutral mod for off-rhythm rounds,
+// species without a trait, or trait ids not present in the table.
 export function traitMods(
   side: SideState,
   rhythmRound: boolean,
-): { readonly dmgMult: number; readonly initMult: number } {
+  traits: TraitTable,
+): TraitMod {
   if (!rhythmRound) return { dmgMult: 1, initMult: 1 };
   const traitId = side.species.trait;
   if (!traitId) return { dmgMult: 1, initMult: 1 };
-  return TRAITS[traitId] ?? { dmgMult: 1, initMult: 1 };
+  return traits[traitId] ?? { dmgMult: 1, initMult: 1 };
 }

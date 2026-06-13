@@ -10,7 +10,6 @@ import {
   loadMoves,
   mulberry32,
   registerMoves,
-  TRAITS,
 } from '../engine';
 import type {
   Action,
@@ -22,6 +21,7 @@ import type {
   RNG,
   Species,
   Stance,
+  TraitTable,
   TypeChart,
 } from '../engine';
 import ch1BatchData from '../../docs/ch1-batch.json';
@@ -75,10 +75,11 @@ const FALKNER_ARENA: ArenaSchedule = {
   telegraphAheadBy: 1,
 };
 
-// Use the locked B1 levers: gust=1.4, hp=1.15.
-(TRAITS as { GUSTBORNE: { dmgMult: number; initMult: number } }).GUSTBORNE = {
-  dmgMult: 1.4,
-  initMult: 1.25,
+// Locked B1 trait table: GUSTBORNE dmgMult 1.4 (gust lever from the
+// boss-card sweep). Passed into createBattleState at Falkner setup time;
+// the global LEGACY_TRAIT_TABLE stays at 1.3/1.25 untouched.
+const FALKNER_TRAITS: TraitTable = {
+  GUSTBORNE: { dmgMult: 1.4, initMult: 1.25 },
 };
 
 void SPECIES;
@@ -206,21 +207,22 @@ function showRivalBattle(): void {
 
 function showFalknerFight(): void {
   const player = run.playerSpecies ?? STARTERS[0]!;
-  const galehawkBase = FALKNER_ACE_DEX.GALEHAWK!;
-  const galehawk: Species = {
-    ...galehawkBase,
-    hp: Math.round(galehawkBase.hp * 1.15),
-    trait: 'GUSTBORNE',
-  };
+  const galehawk: Species = { ...FALKNER_ACE_DEX.GALEHAWK!, trait: 'GUSTBORNE' };
   const card: BossCard = {
     species: galehawk,
+    statScale: { hp: 1.15 },
     arenaSchedule: FALKNER_ARENA,
     breakBar: 2,
   };
-  const state = createBattleState(createSide(player), createSide(galehawk), {
-    typeChart: TYPECHART_CH1,
-    bossCard: card,
-  });
+  const state = createBattleState(
+    createSide(player),
+    createSide(galehawk, card.statScale),
+    {
+      typeChart: TYPECHART_CH1,
+      traits: FALKNER_TRAITS,
+      bossCard: card,
+    },
+  );
   scenes.replace(
     createBattleScene({
       state,
@@ -386,21 +388,22 @@ function showFalknerFightFromOverworld(): void {
 
 function pushFalknerBattle(): void {
   const player = run.playerSpecies ?? STARTERS[0]!;
-  const galehawkBase = FALKNER_ACE_DEX.GALEHAWK!;
-  const galehawk: Species = {
-    ...galehawkBase,
-    hp: Math.round(galehawkBase.hp * 1.15),
-    trait: 'GUSTBORNE',
-  };
+  const galehawk: Species = { ...FALKNER_ACE_DEX.GALEHAWK!, trait: 'GUSTBORNE' };
   const card: BossCard = {
     species: galehawk,
+    statScale: { hp: 1.15 },
     arenaSchedule: FALKNER_ARENA,
     breakBar: 2,
   };
-  const state = createBattleState(createSide(player), createSide(galehawk), {
-    typeChart: TYPECHART_CH1,
-    bossCard: card,
-  });
+  const state = createBattleState(
+    createSide(player),
+    createSide(galehawk, card.statScale),
+    {
+      typeChart: TYPECHART_CH1,
+      traits: FALKNER_TRAITS,
+      bossCard: card,
+    },
+  );
   scenes.push(
     createBattleScene({
       state,

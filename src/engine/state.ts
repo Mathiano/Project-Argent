@@ -1,5 +1,5 @@
 import { COMBAT, TIERS } from './config';
-import { LEGACY_TYPE_CHART, MOVES } from './data';
+import { LEGACY_TRAIT_TABLE, LEGACY_TYPE_CHART, MOVES } from './data';
 import type {
   Action,
   BattleState,
@@ -9,6 +9,7 @@ import type {
   Species,
   Stance,
   StatScale,
+  TraitTable,
   TypeChart,
 } from './types';
 
@@ -35,6 +36,7 @@ export function createSide(species: Species, scale?: StatScale): SideState {
 
 export interface BattleSetup {
   readonly typeChart?: TypeChart;
+  readonly traits?: TraitTable;
   readonly bossCard?: BossCard;
 }
 
@@ -49,6 +51,7 @@ export function createBattleState(
     round: 1,
     history: [],
     typeChart: setup.typeChart ?? LEGACY_TYPE_CHART,
+    traits: setup.traits ?? LEGACY_TRAIT_TABLE,
     ...(setup.bossCard !== undefined ? { bossCard: setup.bossCard } : {}),
   };
 }
