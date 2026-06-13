@@ -1,7 +1,7 @@
 // Canonical sim archetypes — see docs/sim-archetypes.md.
 // These are measurement instruments; do not "improve" without a design ruling.
 
-import { MOVES, affordableMoves, forcedAction } from '../engine';
+import { affordableMoves, forcedAction, lookupMove } from '../engine';
 import type { Action, BattleState, RNG, Side, SideState, Stance } from '../engine';
 
 export interface BotArchetype {
@@ -14,9 +14,9 @@ const STANCES: readonly Stance[] = ['A', 'G', 'F'];
 function pickMidOrLight(side: SideState): string {
   const aff = affordableMoves(side);
   if (aff.length === 0) throw new Error('pickMidOrLight: no affordable moves');
-  const mid = aff.find((n) => MOVES[n]!.tier === 'mid');
+  const mid = aff.find((n) => lookupMove(n).tier === 'mid');
   if (mid) return mid;
-  const light = aff.find((n) => MOVES[n]!.tier === 'light');
+  const light = aff.find((n) => lookupMove(n).tier === 'light');
   if (light) return light;
   return aff[0]!;
 }
@@ -24,9 +24,9 @@ function pickMidOrLight(side: SideState): string {
 function pickHeaviest(side: SideState): string {
   const aff = affordableMoves(side);
   if (aff.length === 0) throw new Error('pickHeaviest: no affordable moves');
-  const heavy = aff.find((n) => MOVES[n]!.tier === 'heavy');
+  const heavy = aff.find((n) => lookupMove(n).tier === 'heavy');
   if (heavy) return heavy;
-  const mid = aff.find((n) => MOVES[n]!.tier === 'mid');
+  const mid = aff.find((n) => lookupMove(n).tier === 'mid');
   if (mid) return mid;
   return aff[0]!;
 }
@@ -46,6 +46,20 @@ function telegraphStance(telegraph?: Action): Stance | null {
 function pickRandomStance(rng: RNG): Stance {
   return STANCES[Math.floor(rng.next() * 3)]!;
 }
+
+// Button-masher: uniform-random move + uniform-random stance. Models the
+// player who isn't reading anything. Per the Falkner card's 25–35% target.
+export const buttonMasher: BotArchetype = {
+  name: 'button-masher',
+  chooseAction(state, side, rng) {
+    const me = state[side];
+    const forced = forcedAction(me);
+    if (forced) return forced;
+    const aff = affordableMoves(me);
+    const move = aff[Math.floor(rng.next() * aff.length)]!;
+    return { kind: 'move', move, stance: pickRandomStance(rng) };
+  },
+};
 
 export const staticGuard: BotArchetype = {
   name: 'static-guard',
@@ -153,10 +167,10 @@ function rivalMovePick(side: SideState): string {
   const aff = affordableMoves(side);
   if (aff.length === 0) throw new Error('rivalMovePick: no affordable moves');
   if (side.st > 70) {
-    const heavy = aff.find((n) => MOVES[n]!.tier === 'heavy');
+    const heavy = aff.find((n) => lookupMove(n).tier === 'heavy');
     if (heavy) return heavy;
   }
-  const mid = aff.find((n) => MOVES[n]!.tier === 'mid');
+  const mid = aff.find((n) => lookupMove(n).tier === 'mid');
   if (mid) return mid;
   return aff[0]!;
 }
@@ -177,6 +191,15 @@ export const rivalAI: BotArchetype = {
 
 export const PLAYER_ARCHETYPES: readonly BotArchetype[] = [
   staticGuard,
+  brute,
+  naiveTriangle,
+  staminaReader,
+  humanIsh,
+];
+
+// Falkner-ladder archetypes per the card's targets.
+export const FALKNER_LADDER_ARCHETYPES: readonly BotArchetype[] = [
+  buttonMasher,
   brute,
   naiveTriangle,
   staminaReader,

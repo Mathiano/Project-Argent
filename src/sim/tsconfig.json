@@ -2,11 +2,10 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
-    "rootDir": ".",
     "outDir": "../../node_modules/.tmp/tsbuild-sim",
     "lib": ["ES2022"],
     "types": ["node"]
   },
-  "include": ["**/*.ts"],
+  "include": ["**/*.ts", "../../docs/ch1-batch.json", "../../docs/moves.json", "../../docs/typechart.json"],
   "references": [{ "path": "../engine" }]
 }
