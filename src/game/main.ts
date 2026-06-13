@@ -4,15 +4,29 @@ import {
   affordableMoves,
   createBattleState,
   createSide,
+  falknerBossAI,
   forcedAction,
   loadDex,
   loadMoves,
   mulberry32,
   registerMoves,
+  TRAITS,
 } from '../engine';
-import type { Action, BattleState, DexEntryJson, MoveJson, RNG, Species, Stance } from '../engine';
+import type {
+  Action,
+  ArenaSchedule,
+  BattleState,
+  BossCard,
+  DexEntryJson,
+  MoveJson,
+  RNG,
+  Species,
+  Stance,
+  TypeChart,
+} from '../engine';
 import ch1BatchData from '../../docs/ch1-batch.json';
 import movesData from '../../docs/moves.json';
+import typechartData from '../../docs/typechart.json';
 import { rivalAI } from '../sim/archetypes';
 import { mountCanvas } from './canvas';
 import { createInputDispatcher } from './input';
@@ -41,11 +55,27 @@ const flagStore = {
 // Load CH1 dex + moves at startup.
 registerMoves(loadMoves(movesData as MoveJson[]));
 const CH1_LEVEL = 13;
+const FALKNER_ACE_LEVEL = 15;
 const CH1_DEX = loadDex(ch1BatchData as DexEntryJson[], CH1_LEVEL);
+const FALKNER_ACE_DEX = loadDex(ch1BatchData as DexEntryJson[], FALKNER_ACE_LEVEL);
+const TYPECHART_CH1 = typechartData as TypeChart;
 
 const STARTERS: readonly Species[] = ['KINDRAKE', 'GRUBLEAF', 'SILTSKIP'].map(
   (n) => CH1_DEX[n]!,
 );
+
+const FALKNER_ARENA: ArenaSchedule = {
+  rhythmEveryN: 3,
+  heavyExtraCost: 8,
+  heavyExtraInitWeight: 1.3,
+  telegraphAheadBy: 1,
+};
+
+// Use the locked B1 levers: gust=1.4, hp=1.15.
+(TRAITS as { GUSTBORNE: { dmgMult: number; initMult: number } }).GUSTBORNE = {
+  dmgMult: 1.4,
+  initMult: 1.25,
+};
 
 void SPECIES;
 void COUNTER_MAP;
@@ -158,6 +188,52 @@ function showRivalBattle(): void {
   );
 }
 
+function showFalknerFight(): void {
+  const player = run.playerSpecies ?? STARTERS[0]!;
+  const galehawkBase = FALKNER_ACE_DEX.GALEHAWK!;
+  const galehawk: Species = {
+    ...galehawkBase,
+    hp: Math.round(galehawkBase.hp * 1.15),
+    trait: 'GUSTBORNE',
+  };
+  const card: BossCard = {
+    species: galehawk,
+    arenaSchedule: FALKNER_ARENA,
+    breakBar: 2,
+  };
+  const state = createBattleState(createSide(player), createSide(galehawk), {
+    typeChart: TYPECHART_CH1,
+    bossCard: card,
+  });
+  scenes.replace(
+    createBattleScene({
+      state,
+      rng: run.rng,
+      chooseFoeAction: (s, r) => falknerBossAI(s, 'foe', r),
+      intro: [
+        'FALKNER: Welcome to my',
+        'rooftop. Read the wind!',
+        '— sent out GALEHAWK!',
+      ],
+      catchBreathUnlocked: true,
+      canRun: false,
+      onResolve: (winner) => {
+        if (winner === 'player') showBadgeAwarded();
+        else showFalknerFight();
+      },
+    }),
+  );
+}
+
+function showBadgeAwarded(): void {
+  scenes.replace(
+    createEndScene({
+      won: true,
+      onRestart: showTitle,
+    }),
+  );
+}
+
 function showEnd(won: boolean): void {
   scenes.replace(createEndScene({ won, onRestart: showTitle }));
 }
@@ -180,7 +256,10 @@ else if (skip === 'wild') {
 else if (skip === 'overworld') showOverworld('ROUTE31', 'default', false);
 else if (skip === 'lab') showOverworld('LAB', 'default', false);
 else if (skip === 'house') showOverworld('HOUSE', 'fromRoute', false);
-else showTitle();
+else if (skip === 'falkner') {
+  run.playerSpecies = STARTERS[0]!;
+  showFalknerFight();
+} else showTitle();
 
 function showOverworld(map: string, spawn: string, faded: boolean): void {
   const opts = {

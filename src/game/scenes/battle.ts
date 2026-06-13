@@ -295,6 +295,16 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       pushLog(`${ev.side === 'player' ? state.player.species.name : 'Foe'} is exhausted!`);
       return;
     }
+    if (ev.kind === 'breakProgress') {
+      pushLog(`★ Break progress ${ev.progress}/${ev.threshold}.`);
+      return;
+    }
+    if (ev.kind === 'break') {
+      pushLog(`The foe is BROKEN! Phase ${ev.newPhase}.`);
+      animKind = 'clash';
+      animT = 0.5;
+      return;
+    }
     if (ev.kind === 'ko') {
       display[ev.side].hp = 0;
       pushLog(`${ev.side === 'player' ? state.player.species.name : 'Foe ' + state.foe.species.name} fainted!`);
