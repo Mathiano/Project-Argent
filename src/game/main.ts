@@ -33,6 +33,7 @@ import { createInputDispatcher } from './input';
 import { SceneStack } from './scene';
 import { createBattleScene } from './scenes/battle';
 import { createEndScene } from './scenes/end';
+import { createFalknerPrepScene } from './scenes/falknerPrep';
 import { createOverworldScene } from './scenes/overworld';
 import { createPrepScene } from './scenes/prep';
 import { createStarterPickScene } from './scenes/starterPick';
@@ -49,6 +50,9 @@ const flagStore = {
   has: (flag: string): boolean => sessionFlags.has(flag),
   set: (flag: string): void => {
     sessionFlags.add(flag);
+  },
+  unset: (flag: string): void => {
+    sessionFlags.delete(flag);
   },
 };
 
@@ -86,14 +90,24 @@ const scenes = new SceneStack();
 interface RunState {
   playerSpecies: Species | null;
   catchBreathUnlocked: boolean;
+  partyTypes: Set<string>;
   rng: RNG;
 }
 
 const run: RunState = {
   playerSpecies: null,
   catchBreathUnlocked: false,
+  partyTypes: new Set<string>(),
   rng: mulberry32(RNG_SEED),
 };
+
+function recomputeSignpostFlags(): void {
+  const types = run.partyTypes;
+  const hasSprout = types.has('SPROUT');
+  const hasTerra = types.has('TERRA');
+  if (hasSprout && !hasTerra) flagStore.set('need_terra_nudge');
+  else flagStore.unset('need_terra_nudge');
+}
 
 function showTitle(): void {
   scenes.replace(createTitleScene({ onStart: showStarterPick }));
@@ -108,6 +122,8 @@ function showStarterPick(): void {
         run.catchBreathUnlocked = false;
         run.rng = mulberry32(RNG_SEED + species.name.length);
         sessionFlags.clear();
+        run.partyTypes = new Set(species.types);
+        recomputeSignpostFlags();
         showOverworld('LAB', 'default', false);
       },
     }),
@@ -258,10 +274,17 @@ else if (skip === 'lab') showOverworld('LAB', 'default', false);
 else if (skip === 'house') showOverworld('HOUSE', 'fromRoute', false);
 else if (skip === 'falkner') {
   run.playerSpecies = STARTERS[0]!;
+  run.partyTypes = new Set(STARTERS[0]!.types);
   showFalknerFight();
+} else if (skip === 'gym') {
+  run.playerSpecies = STARTERS[0]!;
+  run.partyTypes = new Set(STARTERS[0]!.types);
+  recomputeSignpostFlags();
+  showOverworld('GYM', 'fromRoute', false);
 } else showTitle();
 
 function showOverworld(map: string, spawn: string, faded: boolean): void {
+  recomputeSignpostFlags();
   const opts = {
     map,
     spawn,
@@ -276,6 +299,12 @@ function showOverworld(map: string, spawn: string, faded: boolean): void {
     onEncounter(foeSpecies: string) {
       pushWildEncounter(foeSpecies);
     },
+    onTrainerBattle(foeSpecies: string, winFlag: string) {
+      pushTrainerFight(foeSpecies, winFlag);
+    },
+    onBossBattle(bossId: string) {
+      if (bossId === 'falkner') showFalknerFightFromOverworld();
+    },
   };
   const sceneOpts = faded ? { ...opts, startFaded: true as const } : opts;
   scenes.replace(createOverworldScene(sceneOpts));
@@ -288,7 +317,9 @@ function pushWildEncounter(foeSpeciesName: string): void {
     console.warn(`Argent: encounter species not found: ${foeSpeciesName}`);
     return;
   }
-  const state = createBattleState(createSide(player), createSide(foe));
+  const state = createBattleState(createSide(player), createSide(foe), {
+    typeChart: TYPECHART_CH1,
+  });
   scenes.push(
     createBattleScene({
       state,
@@ -297,7 +328,96 @@ function pushWildEncounter(foeSpeciesName: string): void {
       intro: [`A wild ${foe.name}`, 'appeared!'],
       catchBreathUnlocked: run.catchBreathUnlocked,
       canRun: true,
-      onResolve: () => {
+      onResolve: (winner) => {
+        if (winner === 'player') {
+          // Demo-grade "catch": defeating a mon adds its type to the party,
+          // so the prep-loop signposts (need_terra_nudge) react. Catching 2.0
+          // is a later sprint.
+          for (const t of foe.types) run.partyTypes.add(t);
+          recomputeSignpostFlags();
+          run.catchBreathUnlocked = true;
+        }
+        scenes.pop();
+      },
+    }),
+  );
+}
+
+function pushTrainerFight(foeSpeciesName: string, winFlag: string): void {
+  const player = run.playerSpecies ?? STARTERS[0]!;
+  const foe = CH1_DEX[foeSpeciesName] ?? SPECIES[foeSpeciesName];
+  if (!foe) {
+    console.warn(`Argent: trainer species not found: ${foeSpeciesName}`);
+    return;
+  }
+  const state = createBattleState(createSide(player), createSide(foe), {
+    typeChart: TYPECHART_CH1,
+  });
+  scenes.push(
+    createBattleScene({
+      state,
+      rng: run.rng,
+      chooseFoeAction: (s, r) => wildFoeAI(s, r),
+      intro: ['Gym trainer sent out', `${foe.name}!`, 'Show your read!'],
+      catchBreathUnlocked: run.catchBreathUnlocked,
+      canRun: false,
+      onResolve: (winner) => {
+        if (winner === 'player') flagStore.set(winFlag);
+        scenes.pop();
+      },
+    }),
+  );
+}
+
+function showFalknerFightFromOverworld(): void {
+  // Push prep, then on continue push Falkner fight. On resolve, pop both
+  // back to the gym overworld + (on win) set the badge flag.
+  scenes.push(
+    createFalknerPrepScene({
+      playerSpecies: run.playerSpecies ?? STARTERS[0]!,
+      foeSpecies: FALKNER_ACE_DEX.GALEHAWK!,
+      onContinue: () => {
+        scenes.pop();
+        pushFalknerBattle();
+      },
+    }),
+  );
+}
+
+function pushFalknerBattle(): void {
+  const player = run.playerSpecies ?? STARTERS[0]!;
+  const galehawkBase = FALKNER_ACE_DEX.GALEHAWK!;
+  const galehawk: Species = {
+    ...galehawkBase,
+    hp: Math.round(galehawkBase.hp * 1.15),
+    trait: 'GUSTBORNE',
+  };
+  const card: BossCard = {
+    species: galehawk,
+    arenaSchedule: FALKNER_ARENA,
+    breakBar: 2,
+  };
+  const state = createBattleState(createSide(player), createSide(galehawk), {
+    typeChart: TYPECHART_CH1,
+    bossCard: card,
+  });
+  scenes.push(
+    createBattleScene({
+      state,
+      rng: run.rng,
+      chooseFoeAction: (s, r) => falknerBossAI(s, 'foe', r),
+      intro: [
+        'FALKNER: Welcome to my',
+        'rooftop. Read the wind!',
+        '— sent out GALEHAWK!',
+      ],
+      catchBreathUnlocked: true,
+      canRun: false,
+      onResolve: (winner) => {
+        if (winner === 'player') {
+          flagStore.set('falkner_beaten');
+          run.catchBreathUnlocked = true;
+        }
         scenes.pop();
       },
     }),

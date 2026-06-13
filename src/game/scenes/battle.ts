@@ -134,6 +134,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let state: BattleState = opts.state;
   let foeAction: Action = { kind: 'rest' };
   let display: Display = { player: snapshot(state.player), foe: snapshot(state.foe) };
+  const breakThreshold = state.bossCard?.breakBar ?? 0;
+  let displayBreakProgress = state.breakProgress ?? 0;
+  let breakFlashT = 0;
 
   let phase: 'text' | 'menu' | 'move' | 'resolve' | 'end' = 'text';
   let textQueue: string[] = [...opts.intro];
@@ -296,10 +299,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       return;
     }
     if (ev.kind === 'breakProgress') {
+      displayBreakProgress = ev.progress;
       pushLog(`★ Break progress ${ev.progress}/${ev.threshold}.`);
       return;
     }
     if (ev.kind === 'break') {
+      displayBreakProgress = 0;
+      breakFlashT = 0.6;
       pushLog(`The foe is BROKEN! Phase ${ev.newPhase}.`);
       animKind = 'clash';
       animT = 0.5;
@@ -438,12 +444,32 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   // ---------- draw ----------
 
+  function drawBreakPips(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    progress: number,
+    threshold: number,
+  ): void {
+    for (let i = 0; i < threshold; i += 1) {
+      const filled = i < progress;
+      ctx.fillStyle = filled ? '#e23a1e' : '#5a4a2a';
+      ctx.fillRect(x + i * 6, y + 1, 4, 4);
+      ctx.strokeStyle = PALETTE.ink;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + i * 6 + 0.5, y + 1 + 0.5, 3, 3);
+    }
+  }
+
   function drawFoePanel(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, FOE_PANEL.x, FOE_PANEL.y, FOE_PANEL.w, FOE_PANEL.h);
     drawText(ctx, state.foe.species.name, FOE_PANEL.x + 8, FOE_PANEL.y + 6);
     if (display.foe.staggered) drawText(ctx, 'STAG', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
     if (display.foe.exhausted) drawText(ctx, 'EXH', FOE_PANEL.x + 108, FOE_PANEL.y + 6, PALETTE.hpCrit);
     drawMomentum(ctx, FOE_PANEL.x + 132, FOE_PANEL.y + 6, display.foe.momentum, COMBAT.momentumCap);
+    if (breakThreshold > 0) {
+      drawBreakPips(ctx, FOE_PANEL.x + 110, FOE_PANEL.y + 6, displayBreakProgress, breakThreshold);
+    }
 
     drawText(ctx, 'HP', FOE_PANEL.x + 8, FOE_PANEL.y + 18, PALETTE.paperShadow);
     drawBar(
@@ -594,6 +620,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   return {
     update(dt) {
       tick += dt;
+      if (breakFlashT > 0) breakFlashT = Math.max(0, breakFlashT - dt);
       if (phase === 'resolve') tickResolve(dt);
     },
 
@@ -650,6 +677,25 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       drawPlayerPanel(ctx);
 
       if (phase === 'menu' || phase === 'move') drawIntent(ctx);
+
+      // Gust telegraph: the round AFTER this one is a rhythm round.
+      const arena = state.bossCard?.arenaSchedule;
+      if (arena && (phase === 'menu' || phase === 'move')) {
+        const nextRound = state.round + 1;
+        const anchor = state.rhythmAnchor ?? 0;
+        const nextIsRhythm = ((nextRound - anchor) % arena.rhythmEveryN) === 0;
+        if (nextIsRhythm) {
+          ctx.fillStyle = 'rgba(80,140,210,0.85)';
+          ctx.fillRect(0, 14, LOGICAL_W, 12);
+          drawText(ctx, '~~  THE WIND IS RISING…  ~~', 84, 16, PALETTE.paper);
+        }
+      }
+
+      if (breakFlashT > 0) {
+        const a = breakFlashT / 0.6;
+        ctx.fillStyle = `rgba(255,240,200,${0.6 * a})`;
+        ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+      }
 
       if (phase === 'text') drawBottomDialog(ctx, textQueue);
       else if (phase === 'menu') drawBottomMenu(ctx);

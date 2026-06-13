@@ -21,7 +21,10 @@ export type ScriptCommand =
   | { readonly kind: 'warp'; readonly target: string }
   | { readonly kind: 'start-battle'; readonly species: string }
   | { readonly kind: 'set-flag'; readonly flag: string }
-  | { readonly kind: 'move-player'; readonly dx: number; readonly dy: number };
+  | { readonly kind: 'move-player'; readonly dx: number; readonly dy: number }
+  | { readonly kind: 'start-trainer-battle'; readonly foeSpecies: string; readonly winFlag: string }
+  | { readonly kind: 'start-boss-battle'; readonly bossId: string }
+  | { readonly kind: 'if-flag'; readonly flag: string; readonly commands: readonly ScriptCommand[] };
 
 export type MapObject =
   | { readonly type: 'warp'; readonly x: number; readonly y: number; readonly target: string }
@@ -43,6 +46,26 @@ export type MapObject =
       readonly commands: readonly ScriptCommand[];
       readonly flag?: string;
       readonly once?: boolean;
+    }
+  | {
+      readonly type: 'npc';
+      readonly x: number;
+      readonly y: number;
+      readonly color?: string;
+      readonly blockedUntilFlag?: string;
+      readonly interact: readonly ScriptCommand[];
+      readonly interactAfterFlag?: readonly ScriptCommand[];
+    }
+  | {
+      readonly type: 'gust_pulse';
+      readonly x: number;
+      readonly y: number;
+      readonly width: number;
+      readonly height: number;
+      readonly periodSec: number;
+      readonly activeSec: number;
+      readonly phaseSec?: number;
+      readonly pushDir: Facing;
     };
 
 export interface MapData {

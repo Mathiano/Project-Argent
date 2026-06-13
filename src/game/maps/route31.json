@@ -3,7 +3,7 @@
   "width": 20,
   "height": 15,
   "tilesize": 16,
-  "tiles": "TTTTTTTTTTTTTTTTTTTT\nT..............MMM.T\nT..BBBB.......McM..T\nT..BBBB.......McM..T\nT..BDBB............T\nT..................T\nT..................T\nT.....pppppppppp...T\nT..S..pppppppppp...T\nT.....ppGGGGGGpp...T\nT.....ppGGGGGGpp...T\nT.....ppGGGGGGpp...T\nT.....pppppppppp...T\nT..................T\nTTTTTTTTTTTTTTTTTTTT",
+  "tiles": "TTTTTTTTTTTTTTTTTTTT\nT..............MMM.T\nT..BBBB.......McM..T\nT..BBBB.......McM..T\nT..BDBB............T\nT..................T\nT..................T\nT.....pppppppppp...T\nT..S..pppppppppp...T\nT.....ppGGGGGGpp...T\nT.....ppGGGGGGpp...T\nT.....ppGGGGGGpp...T\nT.....pppppppppp...T\nT.........pXp......T\nTTTTTTTTTTTTTTTTTTTT",
   "tileset": {
     "T": { "color": "#1d4a26", "solid": true, "label": "tree" },
     ".": { "color": "#86c06c", "solid": false, "label": "grass" },
@@ -13,7 +13,8 @@
     "G": { "color": "#4f9050", "solid": false, "label": "tall_grass" },
     "M": { "color": "#3a302a", "solid": true, "label": "cave_rock" },
     "c": { "color": "#0e0a08", "solid": false, "label": "cave_mouth" },
-    "S": { "color": "#7a3e0c", "solid": true, "label": "sign" }
+    "S": { "color": "#7a3e0c", "solid": true, "label": "sign" },
+    "X": { "color": "#7c4fa8", "solid": false, "label": "gym_door" }
   },
   "objects": [
     {
@@ -21,6 +22,12 @@
       "x": 4,
       "y": 4,
       "target": "LAB:fromRoute"
+    },
+    {
+      "type": "warp",
+      "x": 11,
+      "y": 13,
+      "target": "GYM:fromRoute"
     },
     {
       "type": "sign",
@@ -64,6 +71,7 @@
   "spawns": {
     "default": { "x": 9, "y": 7, "facing": "down" },
     "fromLab": { "x": 4, "y": 5, "facing": "down" },
-    "fromHouse": { "x": 13, "y": 5, "facing": "down" }
+    "fromHouse": { "x": 13, "y": 5, "facing": "down" },
+    "fromGym": { "x": 11, "y": 12, "facing": "up" }
   }
 }

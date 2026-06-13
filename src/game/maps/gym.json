@@ -1,0 +1,126 @@
+{
+  "name": "GYM",
+  "width": 16,
+  "height": 16,
+  "tilesize": 16,
+  "tiles": "WWWWWWWWWWWWWWWW\nW..............W\nW.....F........W\nW..............W\nW..............W\nW..............W\nWllllllllllllllW\nW..............W\nW..............W\nWllllllllllllllW\nW..............W\nW..............W\nW..............W\nW..............W\nW..............W\nWWWWWWWDWWWWWWWW",
+  "tileset": {
+    "W": { "color": "#7c6a52", "solid": true, "label": "rooftop_wall" },
+    ".": { "color": "#d6c7a3", "solid": false, "label": "rooftop_floor" },
+    "l": { "color": "#aebccc", "solid": false, "label": "gust_lane" },
+    "F": { "color": "#7c4fa8", "solid": true, "label": "leader_throne" },
+    "D": { "color": "#daa520", "solid": false, "label": "door" }
+  },
+  "objects": [
+    {
+      "type": "warp",
+      "x": 7,
+      "y": 15,
+      "target": "ROUTE31:fromGym"
+    },
+    {
+      "type": "sign",
+      "x": 2,
+      "y": 13,
+      "lines": [
+        "RULES OF THE ROOF:",
+        "the wind has its own",
+        "rhythm. Count, then",
+        "walk."
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 7,
+      "y": 12,
+      "color": "#3a7fbe",
+      "blockedUntilFlag": "gym_trainer_beaten",
+      "interact": [
+        { "kind": "dialog", "lines": [
+          "GYM TRAINER: Falkner's wind",
+          "favors the bold.",
+          "Let me see your read!"
+        ]},
+        { "kind": "start-trainer-battle", "foeSpecies": "FLITPECK", "winFlag": "gym_trainer_beaten" }
+      ],
+      "interactAfterFlag": [
+        { "kind": "dialog", "lines": [
+          "GYM TRAINER: Good show.",
+          "Falkner doubles when",
+          "the wind rises — count",
+          "to three."
+        ]}
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 6,
+      "y": 2,
+      "color": "#c2491a",
+      "blockedUntilFlag": "falkner_beaten",
+      "interact": [
+        { "kind": "dialog", "lines": [
+          "FALKNER: Step onto the",
+          "rooftop — the wind is",
+          "the third combatant."
+        ]},
+        { "kind": "start-boss-battle", "bossId": "falkner" }
+      ],
+      "interactAfterFlag": [
+        { "kind": "dialog", "lines": [
+          "FALKNER: The wind",
+          "remembers you. Onward."
+        ]}
+      ]
+    },
+    {
+      "type": "gust_pulse",
+      "x": 1,
+      "y": 6,
+      "width": 14,
+      "height": 1,
+      "periodSec": 3.6,
+      "activeSec": 1.4,
+      "phaseSec": 0,
+      "pushDir": "down"
+    },
+    {
+      "type": "gust_pulse",
+      "x": 1,
+      "y": 9,
+      "width": 14,
+      "height": 1,
+      "periodSec": 3.6,
+      "activeSec": 1.4,
+      "phaseSec": 1.8,
+      "pushDir": "down"
+    },
+    {
+      "type": "script",
+      "x": 7,
+      "y": 14,
+      "trigger": "auto",
+      "commands": [
+        {
+          "kind": "if-flag",
+          "flag": "need_terra_nudge",
+          "commands": [
+            {
+              "kind": "dialog",
+              "lines": [
+                "GYM GREETER: SPROUT lead?",
+                "Birds hate the stones",
+                "below — a cave-catch might",
+                "even the odds before you",
+                "ascend."
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "spawns": {
+    "fromRoute": { "x": 7, "y": 14, "facing": "up" }
+  }
+}

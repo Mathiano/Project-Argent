@@ -13,6 +13,7 @@ const FADE_DURATION = 0.25;
 export interface FlagStore {
   has(flag: string): boolean;
   set(flag: string): void;
+  unset(flag: string): void;
 }
 
 export interface OverworldSceneOpts {
@@ -23,6 +24,8 @@ export interface OverworldSceneOpts {
   readonly startFaded?: boolean;
   readonly onWarp: (target: string) => void;
   readonly onEncounter: (foeSpecies: string) => void;
+  readonly onTrainerBattle: (foeSpecies: string, winFlag: string) => void;
+  readonly onBossBattle: (bossId: string) => void;
 }
 
 export function createOverworldScene(opts: OverworldSceneOpts): Scene {
@@ -99,6 +102,20 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
         opts.onEncounter(cmd.species);
         return;
       }
+      if (cmd.kind === 'start-trainer-battle') {
+        opts.onTrainerBattle(cmd.foeSpecies, cmd.winFlag);
+        return;
+      }
+      if (cmd.kind === 'start-boss-battle') {
+        opts.onBossBattle(cmd.bossId);
+        return;
+      }
+      if (cmd.kind === 'if-flag') {
+        if (opts.flags.has(cmd.flag)) {
+          scriptQueue = [...cmd.commands, ...scriptQueue];
+        }
+        continue;
+      }
     }
   }
 
@@ -117,21 +134,49 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
 
   function tryStartMove(dir: Facing): void {
     facing = dir;
-    let dx = 0;
-    let dy = 0;
-    if (dir === 'up') dy = -1;
-    else if (dir === 'down') dy = 1;
-    else if (dir === 'left') dx = -1;
-    else if (dir === 'right') dx = 1;
+    const { dx, dy } = facingDelta(dir);
     const nx = tx + dx;
     const ny = ty + dy;
     if (!isWalkable(map, nx, ny)) return;
+    if (npcBlocksAt(nx, ny)) return;
     prevTx = tx;
     prevTy = ty;
     tx = nx;
     ty = ny;
     moveT = 0;
     moving = true;
+  }
+
+  function npcAt(x: number, y: number): Extract<MapObject, { type: 'npc' }> | null {
+    for (const obj of map.objects) {
+      if (obj.type !== 'npc') continue;
+      if (obj.x === x && obj.y === y) return obj;
+    }
+    return null;
+  }
+
+  function npcBlocksAt(x: number, y: number): boolean {
+    const npc = npcAt(x, y);
+    if (!npc) return false;
+    if (!npc.blockedUntilFlag) return true;
+    return !opts.flags.has(npc.blockedUntilFlag);
+  }
+
+  function activeGusts(): Array<Extract<MapObject, { type: 'gust_pulse' }>> {
+    const out: Array<Extract<MapObject, { type: 'gust_pulse' }>> = [];
+    for (const obj of map.objects) {
+      if (obj.type !== 'gust_pulse') continue;
+      const t = (tick + (obj.phaseSec ?? 0)) % obj.periodSec;
+      if (t < obj.activeSec) out.push(obj);
+    }
+    return out;
+  }
+
+  function gustAffecting(x: number, y: number): Extract<MapObject, { type: 'gust_pulse' }> | null {
+    for (const g of activeGusts()) {
+      if (x >= g.x && x < g.x + g.width && y >= g.y && y < g.y + g.height) return g;
+    }
+    return null;
   }
 
   function pollMovement(): void {
@@ -144,6 +189,24 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
   }
 
   function onStepFinish(): void {
+    // Wind pushes happen FIRST — caught mid-pulse means you get blown back
+    // before any warp / encounter resolves.
+    const gust = gustAffecting(tx, ty);
+    if (gust) {
+      const { dx, dy } = facingDelta(gust.pushDir);
+      const nx = tx + dx;
+      const ny = ty + dy;
+      if (isWalkable(map, nx, ny) && !npcBlocksAt(nx, ny)) {
+        prevTx = tx;
+        prevTy = ty;
+        tx = nx;
+        ty = ny;
+        moveT = 0;
+        moving = true;
+        return;
+      }
+    }
+
     const warp = findObjectAt(map, tx, ty, 'warp') as Extract<MapObject, { type: 'warp' }> | null;
     if (warp) {
       pendingWarp = warp.target;
@@ -241,6 +304,16 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
         const { dx, dy } = facingDelta(facing);
         const fx = tx + dx;
         const fy = ty + dy;
+        const npc = npcAt(fx, fy);
+        if (npc) {
+          const cmds =
+            npc.blockedUntilFlag && opts.flags.has(npc.blockedUntilFlag) && npc.interactAfterFlag
+              ? npc.interactAfterFlag
+              : npc.interact;
+          scriptQueue = [...cmds];
+          runNextCommand();
+          return;
+        }
         const sign = findObjectAt(map, fx, fy, 'sign') as
           | Extract<MapObject, { type: 'sign' }>
           | null;
@@ -259,12 +332,25 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
       ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
 
       drawTiles(ctx, map, rows, camX, camY);
-      drawObjectMarkers(ctx, map, camX, camY);
+      const gustState = drawGustOverlay(ctx, map, camX, camY, tick);
+      drawObjectMarkers(ctx, map, camX, camY, opts.flags);
       drawPlayer(ctx, px - camX, py - camY, map.tilesize, facing);
 
       ctx.fillStyle = 'rgba(32, 32, 44, 0.85)';
       ctx.fillRect(0, 0, LOGICAL_W, 10);
       drawText(ctx, `${map.name}  (${tx},${ty}) facing ${facing}`, 3, 1, PALETTE.paper);
+
+      if (gustState.active || gustState.telegraph) {
+        ctx.fillStyle = gustState.active ? 'rgba(80,140,210,0.85)' : 'rgba(80,140,210,0.5)';
+        ctx.fillRect(0, 10, LOGICAL_W, 10);
+        drawText(
+          ctx,
+          gustState.active ? 'GUST!  the wind blows you back' : 'the wind is rising…',
+          4,
+          11,
+          PALETTE.paper,
+        );
+      }
 
       if (fadeT < 1) {
         ctx.fillStyle = `rgba(0,0,0,${1 - fadeT})`;
@@ -331,20 +417,68 @@ function drawObjectMarkers(
   map: MapData,
   camX: number,
   camY: number,
+  flags: FlagStore,
 ): void {
   const ts = map.tilesize;
   for (const obj of map.objects) {
     if (obj.type === 'sign') {
       ctx.fillStyle = '#ffd700';
       ctx.fillRect(obj.x * ts - camX + ts / 2 - 1, obj.y * ts - camY + 2, 2, 4);
-    } else if (obj.type === 'warp') {
-      // Doors already render as the 'D' tile — no extra marker needed.
+    } else if (obj.type === 'warp' || obj.type === 'encounter_zone') {
       void obj;
-    } else if (obj.type === 'encounter_zone') {
-      // Grass tiles already render — no extra overlay during gameplay.
-      void obj;
+    } else if (obj.type === 'npc') {
+      const beaten = obj.blockedUntilFlag ? flags.has(obj.blockedUntilFlag) : false;
+      const color = beaten ? '#777' : obj.color ?? '#d22f2f';
+      const px = obj.x * ts - camX + 3;
+      const py = obj.y * ts - camY + 3;
+      ctx.fillStyle = color;
+      ctx.fillRect(px, py, ts - 6, ts - 6);
+      ctx.strokeStyle = '#1d1d28';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px + 0.5, py + 0.5, ts - 7, ts - 7);
     }
   }
+}
+
+function drawGustOverlay(
+  ctx: CanvasRenderingContext2D,
+  map: MapData,
+  camX: number,
+  camY: number,
+  tick: number,
+): { telegraph: boolean; active: boolean } {
+  const ts = map.tilesize;
+  let active = false;
+  let telegraph = false;
+  for (const obj of map.objects) {
+    if (obj.type !== 'gust_pulse') continue;
+    const t = (tick + (obj.phaseSec ?? 0)) % obj.periodSec;
+    const isActive = t < obj.activeSec;
+    const isWarning = !isActive && t > obj.periodSec - 0.6;
+    if (isActive) active = true;
+    if (isWarning) telegraph = true;
+    for (let y = obj.y; y < obj.y + obj.height; y += 1) {
+      for (let x = obj.x; x < obj.x + obj.width; x += 1) {
+        if (isActive) {
+          ctx.fillStyle = 'rgba(150, 200, 255, 0.55)';
+          ctx.fillRect(x * ts - camX, y * ts - camY, ts, ts);
+          // Direction streaks
+          ctx.fillStyle = 'rgba(220, 240, 255, 0.9)';
+          const dy = obj.pushDir === 'down' ? 1 : obj.pushDir === 'up' ? -1 : 0;
+          const dx = obj.pushDir === 'right' ? 1 : obj.pushDir === 'left' ? -1 : 0;
+          for (let i = 0; i < 3; i += 1) {
+            const ox = x * ts - camX + 4 + (Math.floor(tick * 30 + i * 5) % (ts - 8));
+            const oy = y * ts - camY + ts / 2 - 1;
+            ctx.fillRect(ox + dx * i, oy + dy * 2, 3, 1);
+          }
+        } else if (isWarning) {
+          ctx.fillStyle = 'rgba(150, 200, 255, 0.18)';
+          ctx.fillRect(x * ts - camX, y * ts - camY, ts, ts);
+        }
+      }
+    }
+  }
+  return { telegraph, active };
 }
 
 function drawPlayer(
