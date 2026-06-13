@@ -61,8 +61,8 @@ export const falknerBossAI: BossPolicy = (state, side, rng) => {
   if (forced) return forced;
 
   // Catch-breath if low ST and have momentum (the gym spec's tempo play).
-  // Phase 1 only — phase 2 holds the Call for "Now — full power" (NOT
-  // implemented in engine yet; flagged as a spec gap).
+  // Leader Calls deferred to Bugsy slice per design ruling; Falkner AI
+  // intentionally Call-less. Phase-2 swing carried by gust-round DIVE BOMB.
   if (me.momentum >= 1 && me.st < 25 && (state.phase ?? 1) === 1) {
     return { kind: 'catchBreath' };
   }

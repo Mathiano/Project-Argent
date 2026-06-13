@@ -23,7 +23,7 @@ GALEHAWK and FLITPECK carry it: **on arena-rhythm rounds, damage ×1.3 and initi
 ## Behavior script
 
 - **Phase 1 (Break 0–1, reads 0%):** the metronome. DIVE BOMB *only* on gust rounds — gust telegraph + heavy intent = a fully readable kill window. Off-gust: lights/mids, Fluid-leaning stances. The player learns: Guard the gust, counter the dive, or Fluid only if faster.
-- **Phase 2 (after first Break, reads 15%):** the metronome syncopates. He may WING CUT on a gust (bait) and holds his one Call — *"Now — full power!"* — for a gust-round DIVE BOMB when the player's ST is low.
+- **Phase 2 (after first Break, reads 15%):** the metronome syncopates. He may WING CUT on a gust (bait) and holds his one Call — *"Now — full power!"* — for a gust-round DIVE BOMB when the player's ST is low. *(Leader Call deferred — see Bugsy slice; phase-2 swing carried by gust-round DIVE BOMB.)*
 - **Break bar 2:** two read-wins → GALEHAWK is blown from the sky: loses a round, gust cycle resets, phase up.
 
 ## Scout report (prep phase, earned from the gym trainers)
