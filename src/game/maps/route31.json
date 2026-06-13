@@ -3,7 +3,7 @@
   "width": 20,
   "height": 15,
   "tilesize": 16,
-  "tiles": "TTTTTTTTTTTTTTTTTTTT\nT..................T\nT..BBBB.....BBBB...T\nT..BBBB.....BBBB...T\nT..BDBB.....BDBB...T\nT..................T\nT..................T\nT.....pppppppppp...T\nT..S..pppppppppp...T\nT.....ppGGGGGGpp...T\nT.....ppGGGGGGpp...T\nT.....ppGGGGGGpp...T\nT.....pppppppppp...T\nT..................T\nTTTTTTTTTTTTTTTTTTTT",
+  "tiles": "TTTTTTTTTTTTTTTTTTTT\nT..............MMM.T\nT..BBBB.......McM..T\nT..BBBB.......McM..T\nT..BDBB............T\nT..................T\nT..................T\nT.....pppppppppp...T\nT..S..pppppppppp...T\nT.....ppGGGGGGpp...T\nT.....ppGGGGGGpp...T\nT.....ppGGGGGGpp...T\nT.....pppppppppp...T\nT..................T\nTTTTTTTTTTTTTTTTTTTT",
   "tileset": {
     "T": { "color": "#1d4a26", "solid": true, "label": "tree" },
     ".": { "color": "#86c06c", "solid": false, "label": "grass" },
@@ -11,6 +11,8 @@
     "D": { "color": "#daa520", "solid": false, "label": "door" },
     "p": { "color": "#d8c08a", "solid": false, "label": "path" },
     "G": { "color": "#4f9050", "solid": false, "label": "tall_grass" },
+    "M": { "color": "#3a302a", "solid": true, "label": "cave_rock" },
+    "c": { "color": "#0e0a08", "solid": false, "label": "cave_mouth" },
     "S": { "color": "#7a3e0c", "solid": true, "label": "sign" }
   },
   "objects": [
@@ -21,16 +23,10 @@
       "target": "LAB:fromRoute"
     },
     {
-      "type": "warp",
-      "x": 13,
-      "y": 4,
-      "target": "HOUSE:fromRoute"
-    },
-    {
       "type": "sign",
       "x": 3,
       "y": 8,
-      "lines": ["ROUTE 31", "Wild mons in the", "tall grass ahead."]
+      "lines": ["ROUTE 31", "Wild mons in the", "tall grass ahead.", "And rocks rustle", "in the dark hollow."]
     },
     {
       "type": "encounter_zone",
@@ -38,8 +34,17 @@
       "y": 9,
       "width": 6,
       "height": 3,
-      "species": ["FUZZLET"],
+      "species": ["FLITPECK"],
       "rate": 0.3
+    },
+    {
+      "type": "encounter_zone",
+      "x": 15,
+      "y": 2,
+      "width": 1,
+      "height": 2,
+      "species": ["GRITHOAX"],
+      "rate": 0.45
     },
     {
       "type": "script",
@@ -51,7 +56,7 @@
       "commands": [
         {
           "kind": "dialog",
-          "lines": ["A rustle in the grass!", "Something is moving."]
+          "lines": ["A flutter in the grass!", "And something heavy in", "the cave hollow…"]
         }
       ]
     }

@@ -203,8 +203,8 @@ function showOverworld(map: string, spawn: string, faded: boolean): void {
 }
 
 function pushWildEncounter(foeSpeciesName: string): void {
-  const player = run.playerSpecies ?? SPECIES.EMBERCUB!;
-  const foe = SPECIES[foeSpeciesName];
+  const player = run.playerSpecies ?? STARTERS[0]!;
+  const foe = CH1_DEX[foeSpeciesName] ?? SPECIES[foeSpeciesName];
   if (!foe) {
     console.warn(`Argent: encounter species not found: ${foeSpeciesName}`);
     return;
