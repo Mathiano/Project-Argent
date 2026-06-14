@@ -44,6 +44,10 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
   let facing: Facing = spawn.facing;
   let moveT = 1;
   let moving = false;
+  // Walk cycle: stride flips between 1 and 2 each tile crossed; idle = 0.
+  // The renderer reads walkPhase (computed in draw) so the foot lifts
+  // mid-step and lands flat at the end of the move.
+  let stride: 1 | 2 = 1;
 
   type FadePhase = 'normal' | 'fadeIn' | 'fadeOut';
   let fadePhase: FadePhase = opts.startFaded ? 'fadeIn' : 'normal';
@@ -193,6 +197,9 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
   }
 
   function onStepFinish(): void {
+    // Flip the walk stride each completed tile so the next move starts
+    // on the opposite foot.
+    stride = stride === 1 ? 2 : 1;
     // Wind pushes happen FIRST — caught mid-pulse means you get blown back
     // before any warp / encounter resolves.
     const gust = gustAffecting(tx, ty);
@@ -342,7 +349,15 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
       }
       const gustState = drawGustOverlay(ctx, map, camX, camY, tick);
       drawObjectMarkers(ctx, map, camX, camY, opts.flags);
-      drawPlayer(ctx, px - camX, py - camY, map.tilesize, facing);
+      // Walk phase: idle (0) when standing; otherwise the current stride
+      // foot lifts for the middle 60% of the move and lands flat at the
+      // ends, so steps "land" visually instead of hovering.
+      const walkPhase: 0 | 1 | 2 = !moving
+        ? 0
+        : moveT > 0.2 && moveT < 0.8
+          ? stride
+          : 0;
+      drawPlayer(ctx, px - camX, py - camY, map.tilesize, facing, walkPhase);
 
       ctx.fillStyle = 'rgba(32, 32, 44, 0.85)';
       ctx.fillRect(0, 0, LOGICAL_W, 10);
@@ -572,33 +587,57 @@ function drawGustOverlay(
   return { telegraph, active };
 }
 
+// 3-frame walk cycle: 0 = idle (legs together), 1 = left-step, 2 = right-step.
+// Caller passes `walkPhase` derived from movement time so the legs swap
+// each tile crossed. PLACEHOLDER programmatic art — replace with sprite
+// sheet once the real character asset lands (drop a 16×48 spritesheet
+// JSON in the same format the tileset uses and read frames by id).
 function drawPlayer(
   ctx: CanvasRenderingContext2D,
   px: number,
   py: number,
   ts: number,
   facing: Facing,
+  walkPhase: 0 | 1 | 2,
 ): void {
-  const inset = 2;
-  ctx.fillStyle = '#d22f2f';
-  ctx.fillRect(px + inset, py + inset, ts - 2 * inset, ts - 2 * inset);
+  // Head
+  const headInset = 3;
+  const headH = 6;
+  ctx.fillStyle = '#f2c79a';
+  ctx.fillRect(px + headInset, py + 1, ts - 2 * headInset, headH);
   ctx.strokeStyle = '#1d1d28';
   ctx.lineWidth = 1;
-  ctx.strokeRect(px + inset + 0.5, py + inset + 0.5, ts - 2 * inset - 1, ts - 2 * inset - 1);
+  ctx.strokeRect(px + headInset + 0.5, py + 1 + 0.5, ts - 2 * headInset - 1, headH - 1);
 
-  ctx.fillStyle = '#f2c79a';
-  const eye = 2;
+  // Body / shirt
+  ctx.fillStyle = '#d22f2f';
+  ctx.fillRect(px + 3, py + 7, ts - 6, 5);
+  ctx.strokeRect(px + 3 + 0.5, py + 7 + 0.5, ts - 6 - 1, 5 - 1);
+
+  // Legs (walk cycle): two legs side-by-side, alternating Y offset by 1px.
+  const legW = 3;
+  const legY = py + 12;
+  // Leg offsets in pixels per phase. Idle = both grounded.
+  let lOff = 0;
+  let rOff = 0;
+  if (walkPhase === 1) lOff = -1; // left foot up
+  else if (walkPhase === 2) rOff = -1; // right foot up
+  ctx.fillStyle = '#3a3a4a';
+  ctx.fillRect(px + 4, legY + lOff, legW, 3);
+  ctx.fillRect(px + ts - 4 - legW, legY + rOff, legW, 3);
+
+  // Eyes facing direction — placed on the head.
+  ctx.fillStyle = '#1d1d28';
+  const eye = 1;
   if (facing === 'up') {
-    ctx.fillRect(px + 5, py + inset + 1, eye, eye);
-    ctx.fillRect(px + ts - 5 - eye, py + inset + 1, eye, eye);
+    // back of head — no eyes visible
+    ctx.fillRect(px + 6, py + 3, ts - 12, 1); // hair line
   } else if (facing === 'down') {
-    ctx.fillRect(px + 5, py + ts - inset - 1 - eye, eye, eye);
-    ctx.fillRect(px + ts - 5 - eye, py + ts - inset - 1 - eye, eye, eye);
+    ctx.fillRect(px + 6, py + 4, eye, 2);
+    ctx.fillRect(px + ts - 6 - eye, py + 4, eye, 2);
   } else if (facing === 'left') {
-    ctx.fillRect(px + inset + 1, py + 5, eye, eye);
-    ctx.fillRect(px + inset + 1, py + ts - 5 - eye, eye, eye);
+    ctx.fillRect(px + 4, py + 4, eye, 2);
   } else {
-    ctx.fillRect(px + ts - inset - 1 - eye, py + 5, eye, eye);
-    ctx.fillRect(px + ts - inset - 1 - eye, py + ts - 5 - eye, eye, eye);
+    ctx.fillRect(px + ts - 4 - eye, py + 4, eye, 2);
   }
 }
