@@ -82,10 +82,10 @@ export function createPauseMenuScene(opts: PauseMenuOpts): Scene {
       else if (key === 'b' || key === 'start') opts.onClose();
     },
     draw(ctx) {
-      // Translucent darkening over whatever stale frame is beneath
-      // (we're full-screen but the overworld's last paint may sit
-      // behind on the canvas; the wash flattens it so the menu reads).
-      ctx.fillStyle = 'rgba(16, 22, 34, 0.92)';
+      // Light wash over the overworld behind — just enough to push
+      // the panel forward without blacking the world out (per Phase 4
+      // sign-off: dim slightly, world stays visible).
+      ctx.fillStyle = 'rgba(16, 22, 34, 0.38)';
       ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
 
       drawPanel(ctx, PANEL.x, PANEL.y, PANEL.w, PANEL.h);
