@@ -147,6 +147,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let phase: 'text' | 'menu' | 'move' | 'resolve' | 'end' = 'text';
   let textQueue: string[] = [...opts.intro];
   let textNext: (() => void) | null = beginTurn;
+  // Dismissable dialogs (e.g. "Calls unlock", "Too winded") let B back
+  // out to the prior phase. Forced/sequential dialogs (intro, end-text,
+  // "Got away safely!") MUST be read — B is a no-op on them. Per the
+  // working agreement: B dismisses dismissable dialogs only.
+  let textDismissable = false;
   let log: string[] = [];
   let pendingEvents: BattleEvent[] = [];
   let eventTimer = 0;
@@ -166,10 +171,15 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (log.length > 3) log.shift();
   }
 
-  function setText(lines: readonly string[], then: () => void): void {
+  function setText(
+    lines: readonly string[],
+    then: () => void,
+    options: { dismissable?: boolean } = {},
+  ): void {
     phase = 'text';
     textQueue = [...lines];
     textNext = then;
+    textDismissable = options.dismissable ?? false;
   }
 
   function beginTurn(): void {
@@ -435,6 +445,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
           () => {
             phase = 'menu';
           },
+          { dismissable: true },
         );
       } else {
         commit({ kind: 'catchBreath' });
@@ -443,13 +454,18 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
     // RUN
     if (opts.canRun) {
+      // Forced — leaves the battle, no take-backs.
       setText(['Got away safely!'], () => {
         opts.onResolve('foe');
       });
     } else {
-      setText(['No running from', 'a rival!'], () => {
-        phase = 'menu';
-      });
+      setText(
+        ['No running from', 'a rival!'],
+        () => {
+          phase = 'menu';
+        },
+        { dismissable: true },
+      );
     }
   }
 
@@ -468,19 +484,27 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     else if (key === 'down') moveCursor = (moveCursor + 1) % moves.length;
     else if (key === 'select') stanceIdx = (stanceIdx + 1) % 3;
     else if (key === 'b') phase = 'menu';
-    else if (key === 'a') {
+    else if (key === 'a' || key === 'start') {
       const moveName = moves[moveCursor]!;
       const move = lookupMove(moveName);
       if (activeMon(state.player).st <= COMBAT.winded && (move.tier === 'heavy' || move.tier === 'nuke')) {
-        setText(['Too winded for', 'heavy moves!'], () => {
-          phase = 'move';
-        });
+        setText(
+          ['Too winded for', 'heavy moves!'],
+          () => {
+            phase = 'move';
+          },
+          { dismissable: true },
+        );
         return;
       }
       if (activeMon(state.player).st < TIERS[move.tier].cost) {
-        setText(['Not enough stamina!'], () => {
-          phase = 'move';
-        });
+        setText(
+          ['Not enough stamina!'],
+          () => {
+            phase = 'move';
+          },
+          { dismissable: true },
+        );
         return;
       }
       commit({ kind: 'move', move: moveName, stance: STANCES[stanceIdx]! });
@@ -488,17 +512,29 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   }
 
   function handleTextInput(key: InputKey): void {
+    if (key === 'b') {
+      // Only dismissable dialogs back out — sequential/forced dialogs
+      // (intro, end-text, "Got away safely!") must be read with A/Start.
+      if (!textDismissable) return;
+      const next = textNext;
+      textNext = null;
+      textQueue = [];
+      textDismissable = false;
+      if (next) next();
+      return;
+    }
     if (key !== 'a' && key !== 'start') return;
     textQueue.shift();
     if (textQueue.length === 0) {
       const next = textNext;
       textNext = null;
+      textDismissable = false;
       if (next) next();
     }
   }
 
   function handleResolveInput(key: InputKey): void {
-    if (key === 'a') skipResolve();
+    if (key === 'a' || key === 'start') skipResolve();
   }
 
   function spriteOffset(side: Side): number {

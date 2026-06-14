@@ -275,12 +275,64 @@ function showEnd(won: boolean): void {
   scenes.replace(createEndScene({ won, onRestart: showTitle }));
 }
 
-// Dev: skip ahead with ?skip=<scene>
-const skip = new URLSearchParams(window.location.search).get('skip');
+// ?skip=test-battle hook — a standalone wild battle that restarts on
+// resolve. Used to playtest combat in isolation without walking through
+// the overworld. Separate from pushWildEncounter (which pops back to an
+// overworld below it) because here there's nothing below.
+function showTestBattle(): void {
+  const player = run.playerSpecies ?? STARTERS[1]!;
+  const foe = CH1_DEX.FLITPECK ?? SPECIES.FUZZLET!;
+  const state = createBattleState(
+    createSide(player),
+    createSide(foe),
+    { typeChart: TYPECHART_CH1 },
+  );
+  scenes.replace(
+    createBattleScene({
+      state,
+      rng: run.rng,
+      chooseFoeAction: (s, r) => wildFoeAI(s, r),
+      intro: [`Test battle:`, `wild ${foe.name} appeared!`],
+      catchBreathUnlocked: run.catchBreathUnlocked,
+      canRun: true,
+      onResolve: () => {
+        // Loop so Mathias can hammer the input layer repeatedly.
+        showTestBattle();
+      },
+    }),
+  );
+}
+
+// Dev: skip ahead with ?skip=<scene> — the contract lives in
+// docs/playtest-hooks.md (read first, edit in lockstep). Hooks are
+// PERMANENT playtest infrastructure: every scene gets one the sprint
+// it lands, maintained across refactors. ?starter=<name> picks the
+// starter for any skip that needs one (default GRUBLEAF).
+const url = new URLSearchParams(window.location.search);
+const skip = url.get('skip');
+const starterName = url.get('starter');
+
+function pickStarter(): Species {
+  if (starterName) {
+    const s = STARTERS.find((sp) => sp.name === starterName);
+    if (s) return s;
+    console.warn(`Argent ?starter=${starterName}: not in STARTERS; defaulting to GRUBLEAF`);
+  }
+  return STARTERS.find((sp) => sp.name === 'GRUBLEAF') ?? STARTERS[1]!;
+}
+
 if (skip === 'starter') showStarterPick();
 else if (skip === 'wild') {
   run.playerSpecies = SPECIES.EMBERCUB!;
   showWildBattle();
+} else if (skip === 'test-battle') {
+  // Canonical Phase 0 hook: cold-start CH1 starter + a wild FLITPECK
+  // encounter, no overworld walk, no encounter RNG. Lets Mathias
+  // playtest combat in isolation in one click; the battle restarts
+  // on resolve so iteration is fast.
+  run.playerSpecies = pickStarter();
+  run.partyTypes = new Set(run.playerSpecies.types);
+  showTestBattle();
 } else if (skip === 'prep') {
   run.playerSpecies = SPECIES.EMBERCUB!;
   run.catchBreathUnlocked = true;
@@ -294,12 +346,12 @@ else if (skip === 'overworld') showOverworld('ROUTE31', 'default', false);
 else if (skip === 'lab') showOverworld('LAB', 'default', false);
 else if (skip === 'house') showOverworld('HOUSE', 'fromRoute', false);
 else if (skip === 'falkner') {
-  run.playerSpecies = STARTERS[0]!;
-  run.partyTypes = new Set(STARTERS[0]!.types);
+  run.playerSpecies = pickStarter();
+  run.partyTypes = new Set(run.playerSpecies.types);
   showFalknerFight();
 } else if (skip === 'gym') {
-  run.playerSpecies = STARTERS[0]!;
-  run.partyTypes = new Set(STARTERS[0]!.types);
+  run.playerSpecies = pickStarter();
+  run.partyTypes = new Set(run.playerSpecies.types);
   recomputeSignpostFlags();
   showOverworld('GYM', 'fromRoute', false);
 } else showTitle();

@@ -7,6 +7,8 @@
 
 import { describe, expect, test } from 'vitest';
 import {
+  SPECIES,
+  activeMon,
   createBattleState,
   createSide,
   createTeam,
@@ -14,8 +16,16 @@ import {
   loadMoves,
   mulberry32,
   registerMoves,
+  setActiveMember,
 } from '../../engine';
-import type { Action, BattleState, DexEntryJson, MoveJson, RNG } from '../../engine';
+import type {
+  Action,
+  BattleState,
+  DexEntryJson,
+  MoveJson,
+  RNG,
+  SideState,
+} from '../../engine';
 import ch1BatchData from '../../../docs/ch1-batch.json';
 import movesData from '../../../docs/moves.json';
 import { createBattleScene } from './battle';
@@ -286,5 +296,293 @@ describe('battle move menu — A commits the highlighted move; SELECT cycles sta
     ctx.reset();
     scene.draw(ctx);
     expect(ctx.texts).toContain('AGGR');
+  });
+});
+
+// ---- Phase 0 gap coverage ---------------------------------------------------
+// One complete pass over the battle-input layer. Every gap surfaced in the
+// kickoff is pinned here: CALL paths, RUN/STAY paths, move cursor wrap,
+// winded/affordability rejection, B-back, forced rest, resolve A-skip,
+// end-text A-dispatch, and the B-on-dialog dismissable/forced split.
+
+interface SceneBuildOpts {
+  readonly catchBreathUnlocked?: boolean;
+  readonly canRun?: boolean;
+  readonly playerPatch?: Partial<SideState>;
+  readonly intro?: readonly string[];
+  readonly foeAction?: Action;
+  readonly onResolve?: (w: 'player' | 'foe') => void;
+}
+
+function buildScene(opts: SceneBuildOpts = {}): {
+  scene: ReturnType<typeof createBattleScene>;
+  resolved: { winner: 'player' | 'foe' | null };
+} {
+  const player = CH1.GRUBLEAF!;
+  const foe = CH1.FLITPECK!;
+  let state = createBattleState(
+    createTeam([createSide(player)]),
+    createTeam([createSide(foe)]),
+  );
+  if (opts.playerPatch) {
+    const patched: SideState = { ...activeMon(state.player), ...opts.playerPatch };
+    state = { ...state, player: setActiveMember(state.player, patched) };
+  }
+  const resolved: { winner: 'player' | 'foe' | null } = { winner: null };
+  const scene = createBattleScene({
+    state,
+    rng: mulberry32(1),
+    chooseFoeAction: () => opts.foeAction ?? { kind: 'move', move: 'TACKLE', stance: 'G' },
+    intro: opts.intro ?? [],
+    catchBreathUnlocked: opts.catchBreathUnlocked ?? false,
+    canRun: opts.canRun ?? true,
+    onResolve: (w) => {
+      resolved.winner = w;
+      opts.onResolve?.(w);
+    },
+  });
+  return { scene, resolved };
+}
+
+function drainResolve(scene: ReturnType<typeof createBattleScene>): void {
+  // STEP_SEC=0.4 per event; 60×0.5s = 30s — long enough for any single
+  // round's events to drain plus the next beginTurn.
+  for (let i = 0; i < 60; i += 1) scene.update?.(0.5);
+}
+
+describe('battle menu — CALL paths', () => {
+  test('A on CALL (unlocked, momentum ≥ 1) commits a catchBreath action', () => {
+    const { scene } = buildScene({
+      catchBreathUnlocked: true,
+      playerPatch: { momentum: 1, st: 30 },
+    });
+    // No intro; FIGHT is cursor 0. DOWN once → CALL (cursor 1, enabled).
+    scene.input?.('down');
+    scene.input?.('a');
+    // Drain resolve. CALL commits {kind:'catchBreath'} which the engine
+    // processes (+35 ST, -1 momentum). Then beginTurn fires.
+    drainResolve(scene);
+
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    // Back at the FIGHT menu after the round resolves. No "No ★" dialog.
+    expect(screen).toContain('FIGHT');
+    expect(screen).not.toContain('No ★ yet');
+  });
+
+  test('A on CALL (unlocked, momentum = 0) surfaces "No ★ yet" dialog — dismissable', () => {
+    const { scene } = buildScene({
+      catchBreathUnlocked: true,
+      playerPatch: { momentum: 0 },
+    });
+    scene.input?.('down');
+    scene.input?.('a');
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('No ★ yet');
+
+    // B dismisses → back to menu.
+    scene.input?.('b');
+    ctx.reset();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('FIGHT');
+    expect(ctx.texts.join('|')).not.toContain('No ★ yet');
+  });
+});
+
+describe('battle menu — RUN / STAY paths', () => {
+  test('A on RUN (canRun true) shows "Got away safely!" then onResolve("foe")', () => {
+    const { scene, resolved } = buildScene({ canRun: true });
+    // CALL locked → DOWN from FIGHT skips it, lands on RUN.
+    scene.input?.('down');
+    scene.input?.('a');
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('Got away safely');
+    // Forced dialog — A advances; onResolve fires.
+    scene.input?.('a');
+    expect(resolved.winner).toBe('foe');
+  });
+
+  test('A on STAY (canRun false) shows "No running from a rival!" dialog — dismissable', () => {
+    const { scene, resolved } = buildScene({ canRun: false });
+    scene.input?.('down');
+    scene.input?.('a');
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('No running');
+    // Not onResolve — battle continues.
+    expect(resolved.winner).toBeNull();
+    // B dismisses → back to menu.
+    scene.input?.('b');
+    ctx.reset();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('FIGHT');
+  });
+});
+
+describe('battle move list — cursor wrap + rejection paths + B-back', () => {
+  test('UP wraps from move 0 to the last move; DOWN wraps from last to 0', () => {
+    const { scene } = buildScene();
+    scene.input?.('a'); // FIGHT
+    // GRUBLEAF: ['TACKLE', 'THORN FLICK', 'LEAF LASH', 'HEADBUTT']
+    scene.input?.('up'); // wraps to index 3 → HEADBUTT
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.some((t) => t.startsWith('>HEADBUTT'))).toBe(true);
+    scene.input?.('down'); // wraps back to index 0 → TACKLE
+    ctx.reset();
+    scene.draw(ctx);
+    expect(ctx.texts.some((t) => t.startsWith('>TACKLE'))).toBe(true);
+  });
+
+  test('A on a heavy move while winded (ST ≤ 25) surfaces "Too winded" — dismissable', () => {
+    // CH1 starters at lvl 13 don't have heavies yet, so we test the
+    // winded-locks-heavy rule with the legacy EMBERCUB (FLAME RUSH = heavy).
+    let state = createBattleState(
+      createTeam([createSide(SPECIES.EMBERCUB!)]),
+      createTeam([createSide(SPECIES.AQUAFIN!)]),
+    );
+    const patched: SideState = { ...activeMon(state.player), st: 25 };
+    state = { ...state, player: setActiveMember(state.player, patched) };
+    const scene = createBattleScene({
+      state,
+      rng: mulberry32(1),
+      chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'G' }),
+      intro: [],
+      catchBreathUnlocked: false,
+      canRun: true,
+      onResolve: () => {},
+    });
+    scene.input?.('a'); // FIGHT → move list
+    // EMBERCUB moves: TACKLE, EMBER SNAP, FLAME RUSH (heavy at index 2).
+    scene.input?.('down');
+    scene.input?.('down');
+    scene.input?.('a'); // confirm FLAME RUSH while winded → "Too winded"
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('Too winded');
+    // Dismissable — B backs out to the move list.
+    scene.input?.('b');
+    ctx.reset();
+    scene.draw(ctx);
+    expect(ctx.texts.some((t) => t.startsWith('>FLAME RUSH'))).toBe(true);
+  });
+
+  test('A on an unaffordable move surfaces "Not enough stamina!" — dismissable', () => {
+    // GRUBLEAF moves: TACKLE(12), THORN FLICK(12), LEAF LASH(22), HEADBUTT(22).
+    // ST=15 keeps the lights affordable (no auto-rest) but a mid is over.
+    // Cursor down twice to a mid move (LEAF LASH); A → "Not enough stamina".
+    const { scene } = buildScene({ playerPatch: { st: 15 } });
+    scene.input?.('a'); // FIGHT
+    scene.input?.('down'); // → THORN FLICK
+    scene.input?.('down'); // → LEAF LASH (mid, 22 ST)
+    scene.input?.('a'); // confirm → unaffordable
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('Not enough stamina');
+    // B dismisses → back to move list.
+    scene.input?.('b');
+    ctx.reset();
+    scene.draw(ctx);
+    expect(ctx.texts.some((t) => t.startsWith('>LEAF LASH'))).toBe(true);
+  });
+
+  test('B in the move list returns to the menu', () => {
+    const { scene } = buildScene();
+    scene.input?.('a'); // FIGHT → move
+    scene.input?.('b'); // back
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    // FIGHT/CALL/RUN visible again.
+    const screen = ctx.texts.join('|');
+    expect(screen).toContain('FIGHT');
+    expect(screen).not.toContain('>TACKLE');
+  });
+});
+
+describe('battle resolve + end-text', () => {
+  test('A in resolve phase skips the event animation (drains to next turn immediately)', () => {
+    const { scene } = buildScene();
+    scene.input?.('a'); // FIGHT
+    scene.input?.('a'); // TACKLE — commit → resolve
+
+    // Don't tick; instead press A — skipResolve should drain events
+    // synchronously and either return to menu or end the battle.
+    scene.input?.('a');
+
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    // Either back at FIGHT (next turn) or end-text — no longer "> TACKLE".
+    expect(screen).not.toContain('> TACKLE');
+    expect(screen.includes('FIGHT') || screen.includes('Press A')).toBe(true);
+  });
+
+  test('A on end-text dispatches onResolve (battle leaves the scene)', () => {
+    // Player at 1 HP attacks Aggressive — foe Guards (default foeAction
+    // in buildScene) → counter reflects 0.5×preMit, KOs the 1-HP player.
+    const { scene, resolved } = buildScene({ playerPatch: { hp: 1 } });
+    scene.input?.('a'); // FIGHT
+    scene.input?.('a'); // TACKLE — counter KOs player
+    scene.input?.('a'); // skipResolve → finishResolve → setText("Your team fell.","Press A to continue.")
+
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('Your team fell');
+
+    // End text is 2 lines — 2 A presses to advance past it, THEN onResolve fires.
+    scene.input?.('a');
+    scene.input?.('a');
+    expect(resolved.winner).toBe('foe');
+  });
+});
+
+describe('battle forced action (exhausted)', () => {
+  test('beginTurn on an exhausted active mon auto-commits rest (player never sees menu)', () => {
+    const { scene } = buildScene({ playerPatch: { st: 0, exhausted: true } });
+    // No intro → beginTurn fires at scene init. forcedAction returns rest.
+    // commit({kind:'rest'}) puts phase='resolve' immediately. No menu draws.
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    // No FIGHT menu — we're in resolve, drawing the log instead.
+    expect(screen).not.toContain('> FIGHT');
+    expect(screen).not.toContain('> TACKLE');
+  });
+});
+
+describe('B-on-dialog: dismissable backs out; forced is a no-op', () => {
+  test('B on a forced/sequential dialog (intro) does nothing — A/Start advance only', () => {
+    const { scene } = buildScene({
+      intro: ['A wild FLITPECK', 'appeared!'],
+    });
+    // B at intro line 1 should do nothing — text stays.
+    scene.input?.('b');
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    // Still seeing the intro text — not advanced to menu.
+    expect(ctx.texts.join('|')).toContain('A wild FLITPECK');
+    expect(ctx.texts.join('|')).not.toContain('FIGHT');
+  });
+
+  test('B on the Calls-locked dismissable dialog backs out to menu', () => {
+    // catchBreathUnlocked=true, momentum=0 → A on CALL = "No ★ yet" dialog.
+    const { scene } = buildScene({
+      catchBreathUnlocked: true,
+      playerPatch: { momentum: 0 },
+    });
+    scene.input?.('down');
+    scene.input?.('a');
+    let ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('No ★ yet');
+
+    scene.input?.('b');
+    ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('FIGHT');
+    expect(ctx.texts.join('|')).not.toContain('No ★ yet');
   });
 });

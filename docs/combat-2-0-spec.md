@@ -305,3 +305,12 @@ BossCard {
 - No twitch/reaction inputs — Fluid is a declared read, never a reflex test
 - No combo strings, no super meters beyond ★
 - No 5th move slot, no stamina items spam (one Ether-class item per battle, cap enforced)
+
+## Input contract — dialog semantics (Phase 0)
+
+The battle scene uses two kinds of text dialog with different B behaviour:
+
+- **Dismissable dialogs** (sub-dialogs surfaced from menu/move): `A` / `Start` advance; `B` immediately backs out to the prior phase. Examples: "Calls unlock after your first win.", "No ★ yet —", "Too winded for heavy moves!", "Not enough stamina!", "No running from a rival!"
+- **Forced/sequential dialogs** (intro, end-text, "Got away safely!" exit-text): `A` / `Start` advance; `B` is a no-op — these must be read.
+
+The split lives on `setText`'s `dismissable` flag; default is forced. Pinned by `src/game/scenes/battle.test.ts` (B-on-dialog block).

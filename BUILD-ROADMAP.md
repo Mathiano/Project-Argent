@@ -1,0 +1,79 @@
+# Project Argent — Master Build Roadmap
+
+The spine. This replaces ad-hoc sprint picking. Each phase depends only on what's built before it. We do NOT build a later item before its dependency exists. Art and story content are authored against this skeleton — the skeleton comes first.
+
+## The governing rule
+
+**Foundation → Content → Polish, in dependency order.** A sprint may only start when its prerequisites are green. Features are fun to build out of order; that is exactly how the project breaks. When tempted to jump ahead, log the idea in the backlog and stay on the critical path.
+
+## Three scope tiers (what "done" means)
+
+- **DEMO (the vertical slice):** New Bark → Route → Violet City → Falkner, playable start to finish with intro, save, party, healing, one real gym. This is the proof the game works. **Everything before "Phase 6" below is the demo.**
+- **CHAPTER 1 COMPLETE:** the demo + full Johto chapter 1 content (real routes, trainers, story beats, the rival's first fight).
+- **FULL GAME:** 8 Johto gyms + E4 + Kanto + Mt. Silver, all systems, ~42 hours. The long road; built chapter by chapter on the demo's foundation.
+
+---
+
+## PHASE 0 — Stabilize what exists (NOW, before anything new)
+Prerequisite: none. **We are here.**
+- Fix the battle-input layer completely (move-confirm, SELECT-stance, CALL, RUN, B-back) — one pass, fully tested, so it stops surfacing one bug at a time.
+- Confirm the cold-start walk + first battle is playable end to end with no skip flags.
+- **Gate:** a person can start the game, walk, fight a wild mon, win/lose. No new features until this is true.
+
+## PHASE 1 — The keystone refactor: 6v6 team battles
+Prerequisite: Phase 0. **Blocks: every trainer fight, every boss, switching, the bond track.**
+- Already scoped in `ARCHITECTURE-AUDIT.md` (~800 LOC, 4 engine + 3 sim + 2 game files).
+- The fixture + Falkner ladders must stay bit-identical at team-size 1 (the regression canary).
+- **Gate:** a 2v2 battle works; switching works; Falkner is a real 2-mon fight.
+
+## PHASE 2 — Save / load
+Prerequisite: Phase 1 (you save a party, so the party system must be real first... see note).
+- *Note:* minimal party state exists once 6v6 lands; full party MENU is Phase 4, but save/load of game state (party, position, flags, badges) is needed before any long playtest.
+- **Gate:** quit mid-game, reload, resume exactly where you were. **This unblocks all real playtesting.**
+
+## PHASE 3 — The opening (intro + context)
+Prerequisite: Phase 2 (the intro sets initial save state).
+- **This is the "why am I in an empty house" fix.** Title → new game → intro sequence (the professor/legacy framing from the scope doc) → starter choice in context → furnished starting town → a reason to walk out the door.
+- Furnished interiors (the house gets furniture, an NPC, a purpose), the first NPCs with real dialogue, the first story beat.
+- **Gate:** a new player understands who they are, where they are, and why they're leaving — without us explaining it to them.
+
+## PHASE 4 — The core RPG menus
+Prerequisite: Phase 1 (party) + Phase 2 (save).
+- Party menu (view/reorder/summary), Bag/inventory, the pause menu. Box system (storage).
+- **Gate:** the player can manage their team and items the way any Pokémon game allows.
+
+## PHASE 5 — The town loop: healing + economy
+Prerequisite: Phase 4 (bag/items exist to buy and use).
+- Pokémon Center (heal), Poké Mart (buy/sell), money, trainer payouts.
+- **Gate:** the route → town → heal → shop → next route rhythm works. *This is the heartbeat of Pokémon.* When this is done, **the DEMO is structurally complete.**
+
+## PHASE 6 — Evolution + Catching 2.0
+Prerequisite: Phase 1 (team) + Phase 5 (the loop).
+- Evolution at 16/34 (identity-critical, currently absent). Catching 2.0 (replace the placeholder catch with the read-based spec).
+- **Gate:** starters evolve; catching is the designed mini-game.
+
+## PHASE 7 — Content authoring tools + Chapter 1 content
+Prerequisite: Phases 1–6 (the systems all the content sits on).
+- Real Route 31 + Violet with proper trainers, the rival's first fight (KAMON v2 card — already queued), the first Rocket beat, gym trainers feeding scout reports.
+- **Gate:** Chapter 1 is a complete, authored ~2.5-hour experience. **CHAPTER 1 COMPLETE.**
+
+## PHASE 8+ — Scale to the full game (chapter by chapter)
+Prerequisite: Phase 7 (the chapter template proven once).
+- Gyms 2–8 (boss cards on the Whitney template), the Rocket arc, E4, Kanto, Mt. Silver, status conditions, held items, day/night, Phone 2.0, the bond track, the Gauntlet.
+- Each chapter reuses the Phase 7 template. Features interleave per the parity checklist order.
+
+---
+
+## Where ART fits (the deferral you asked for)
+**Art is authored AGAINST this skeleton, not before it, and everything is built visually swappable.**
+- The tileset/prefab/sprite systems are already data-driven — art is a data swap at any time, zero code change. This is the flexibility you asked to preserve; it already exists.
+- **Ruling: through Phase 5 (demo-complete), we use placeholder/first-pass art and do NOT sink major time into sprite/tile polish.** One real tileset (current style) is enough to make the demo not-graybox; the full per-city art set, all 200 mon sprites, and back sprites are a **post-demo art pass** (interleaved during Phase 7+).
+- The exception: mon sprites for the ~15 species the demo actually shows (starters + Falkner's birds + the cave mon) — those trickle in via the Gemini pipeline as time allows, but never block a sprint.
+
+## Where STORY fits
+- The intro/framing is **Phase 3** (it's foundation — context is not optional polish).
+- Per-chapter story beats are authored in **Phase 7+** alongside each chapter's content.
+- The overarching legacy/time narrative is designed now (it's in the scope doc) but *authored* chapter by chapter.
+
+## The backlog (ideas captured, NOT built until their phase)
+Anything we think of out of order lands here instead of derailing the critical path: bond track (Phase 8), temperaments/marked (needs the dex schema slice), Phone 2.0 (Phase 8), the Gauntlet (post-launch), day/night (Phase 8), the full art set (post-demo pass), Stance Beasts + cover legendary (Phase 8 content).
