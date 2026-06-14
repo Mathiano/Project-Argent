@@ -84,9 +84,39 @@
         {
           "kind": "dialog",
           "lines": [
-            "FARMER: Trainers used to come through every week.",
-            "FARMER: Bought eggs, told stories.",
-            "FARMER: Not many left who walk the routes."
+            "FARMER: Trainers used to come",
+            "through every week.",
+            "Bought eggs, told stories.",
+            "Not many left who walk the routes."
+          ]
+        }
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 9,
+      "y": 12,
+      "color": "#caa148",
+      "blockedUntilFlag": "player_has_starter",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "TOWN ELDER: Heading out?",
+            "Not without a partner,",
+            "you're not.",
+            "See the Professor first.",
+            "His door's been waiting."
+          ]
+        }
+      ],
+      "interactAfterFlag": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "TOWN ELDER: Good luck out there.",
+            "Roads need walking again.",
+            "It's been too quiet."
           ]
         }
       ]

@@ -58,24 +58,42 @@
         {
           "kind": "dialog",
           "lines": [
-            "LARCH: You came.",
-            "LARCH: I'm getting old. The era is ending — you can feel it.",
-            "LARCH: These three have been waiting for the right partner.",
-            "LARCH: Not the strongest. The right ONE.",
-            "LARCH: Strength fades. The bond is what lasts.",
-            "LARCH: ...Choose."
+            "LARCH: You're the last one who",
+            "answered. Years ago there'd be",
+            "a line of children at my door",
+            "on a morning like this.",
+            "Now... just you.",
+            "",
+            "LARCH: I'm not giving you a",
+            "partner — I'm asking you to",
+            "carry something.",
+            "The way of the trainer,",
+            "before it's gone for good.",
+            "",
+            "These three have been waiting.",
+            "Not for the strongest hand.",
+            "For the right one.",
+            "LARCH: Strength fades.",
+            "The bond is what lasts.",
+            "Prove me right."
           ]
         },
         { "kind": "show-starter-pick" }
       ],
       "interactAfterFlag": [
         {
-          "kind": "dialog",
-          "lines": [
-            "LARCH: ...Some bonds take longer to form than others.",
-            "LARCH: Head south, through Route 31.",
-            "LARCH: A parcel is waiting in the next town.",
-            "LARCH: Go on."
+          "kind": "if-flag",
+          "flag": "kamon_took_starter",
+          "commands": [
+            {
+              "kind": "dialog",
+              "lines": [
+                "LARCH: Head south,",
+                "through Route 31.",
+                "A parcel waits in the next town.",
+                "Go on."
+              ]
+            }
           ]
         }
       ],
@@ -95,8 +113,15 @@
           "lines": [
             "The lab door slams open.",
             "KAMON marches in.",
-            "KAMON: Larch. I'm taking one too.",
-            "LARCH: KAMON, wait —"
+            "",
+            "KAMON: Sentiment.",
+            "He hands the future to a kid",
+            "because of 'bonds.'",
+            "",
+            "KAMON: Strength is the only",
+            "thing that's ever lasted.",
+            "Not feelings.",
+            "Not some old man's hope."
           ]
         },
         {
@@ -107,9 +132,15 @@
               "kind": "dialog",
               "lines": [
                 "KAMON grabs the SILTSKIP.",
-                "KAMON: Water beats fire. Yours loses.",
-                "KAMON: Sentiment doesn't.",
-                "(The SILTSKIP hesitates in his arms.)"
+                "",
+                "KAMON: I'll prove it with the",
+                "one that beats yours.",
+                "Don't take it personally —",
+                "I intend to be right.",
+                "",
+                "(The SILTSKIP hesitates",
+                "in his arms.)",
+                "KAMON: ...It'll learn."
               ]
             },
             { "kind": "set-flag", "flag": "kamon_took_siltskip" }
@@ -123,9 +154,15 @@
               "kind": "dialog",
               "lines": [
                 "KAMON grabs the KINDRAKE.",
-                "KAMON: Fire beats grass. Yours loses.",
-                "KAMON: Sentiment doesn't.",
-                "(The KINDRAKE hesitates in his arms.)"
+                "",
+                "KAMON: I'll prove it with the",
+                "one that beats yours.",
+                "Don't take it personally —",
+                "I intend to be right.",
+                "",
+                "(The KINDRAKE hesitates",
+                "in his arms.)",
+                "KAMON: ...It'll learn."
               ]
             },
             { "kind": "set-flag", "flag": "kamon_took_kindrake" }
@@ -139,9 +176,15 @@
               "kind": "dialog",
               "lines": [
                 "KAMON grabs the GRUBLEAF.",
-                "KAMON: Grass beats water. Yours loses.",
-                "KAMON: Sentiment doesn't.",
-                "(The GRUBLEAF hesitates in his arms.)"
+                "",
+                "KAMON: I'll prove it with the",
+                "one that beats yours.",
+                "Don't take it personally —",
+                "I intend to be right.",
+                "",
+                "(The GRUBLEAF hesitates",
+                "in his arms.)",
+                "KAMON: ...It'll learn."
               ]
             },
             { "kind": "set-flag", "flag": "kamon_took_grubleaf" }
@@ -150,13 +193,63 @@
         {
           "kind": "dialog",
           "lines": [
-            "KAMON: Strength is the only thing that lasts.",
             "KAMON storms out.",
-            "LARCH watches the door for a long moment.",
-            "LARCH: ...He's wrong, you know.",
-            "LARCH: Head south, through Route 31.",
-            "LARCH: A parcel is waiting in the next town.",
-            "LARCH: Go on."
+            "",
+            "LARCH watches the door",
+            "for a long moment.",
+            "",
+            "LARCH: ...He's wrong, you know."
+          ]
+        },
+        {
+          "kind": "if-flag",
+          "flag": "starter_kindrake",
+          "commands": [
+            {
+              "kind": "dialog",
+              "lines": [
+                "LARCH: That FLAME of yours —",
+                "give it time.",
+                "Fire trusts slowly."
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "if-flag",
+          "flag": "starter_grubleaf",
+          "commands": [
+            {
+              "kind": "dialog",
+              "lines": [
+                "LARCH: That SPROUT of yours —",
+                "give it time.",
+                "Roots grow patient."
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "if-flag",
+          "flag": "starter_siltskip",
+          "commands": [
+            {
+              "kind": "dialog",
+              "lines": [
+                "LARCH: That SPLASH of yours —",
+                "give it time.",
+                "Water remembers."
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "dialog",
+          "lines": [
+            "LARCH: Head south,",
+            "through Route 31.",
+            "A parcel waits in the next town.",
+            "Go on."
           ]
         },
         { "kind": "set-flag", "flag": "kamon_took_starter" },

@@ -69,6 +69,8 @@ Flags the intro sets, in order:
 - `kamon_took_<species>` — the species KAMON took (counter-type to your pick)
 - `pushed_south` — set by Larch's post-theft push speech
 
+**HARD gate (system-critical):** the Hearthwick south exit (the only path to Route 31) is blocked by a TOWN ELDER NPC until `player_has_starter` is set. This prevents a starterless player reaching wild encounters they can't fight. All other intro beats (letter, Mom, town flavor NPCs) are SOFT — reachable but skippable.
+
 Combat in isolation still bypasses the intro: `?skip=test-battle`, `?skip=test-battle-2v2`, `?skip=falkner` all preload a starter and skip the ceremony.
 
 ### Phase 2 — save / load + the Continue path
