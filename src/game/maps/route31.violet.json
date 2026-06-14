@@ -1,0 +1,88 @@
+{
+  "name": "ROUTE31",
+  "_placeholder": "Re-skinned ROUTE31 using outdoor_violet placeholder tiles + house/gym prefabs. Layout matches the graybox; the visible look will change when the real tileset lands.",
+  "tilesetRef": "outdoor_violet",
+  "width": 20,
+  "height": 15,
+  "tilesize": 16,
+  "baseTile": "grass",
+  "tileMap": {
+    ".": "grass",
+    "p": "path",
+    "G": "tall_grass",
+    "T": "tree",
+    "M": "cave_rock",
+    "c": "cave_mouth",
+    "S": "sign_post",
+    "X": "gym_door"
+  },
+  "cells": [
+    "TTTTTTTTTTTTTTTTTTTT",
+    "T..............MMM.T",
+    "T.............McM..T",
+    "T.............McM..T",
+    "T..................T",
+    "T..................T",
+    "T..................T",
+    "T.....pppppppppp...T",
+    "T..S..pppppppppp...T",
+    "T.....ppGGGGGGpp...T",
+    "T.....ppGGGGGGpp...T",
+    "T.....ppGGGGGGpp...T",
+    "T.....pppppppppp...T",
+    "T.........p.p......T",
+    "TTTTTTTTTTTTTTTTTTTT"
+  ],
+  "prefabs": [
+    { "name": "house_violet", "x": 4, "y": 4 },
+    { "name": "gym_violet", "x": 11, "y": 13 }
+  ],
+  "objects": [
+    { "type": "warp", "x": 4, "y": 4, "target": "LAB:fromRoute" },
+    { "type": "warp", "x": 11, "y": 13, "target": "GYM:fromRoute" },
+    {
+      "type": "sign",
+      "x": 3,
+      "y": 8,
+      "lines": ["ROUTE 31", "Wild mons in the", "tall grass ahead.", "And rocks rustle", "in the dark hollow."]
+    },
+    {
+      "type": "encounter_zone",
+      "x": 7,
+      "y": 9,
+      "width": 6,
+      "height": 3,
+      "species": ["FLITPECK"],
+      "rate": 0.3
+    },
+    {
+      "type": "encounter_zone",
+      "x": 15,
+      "y": 2,
+      "width": 1,
+      "height": 2,
+      "species": ["GRITHOAX"],
+      "rate": 0.45
+    },
+    {
+      "type": "script",
+      "x": 9,
+      "y": 8,
+      "trigger": "step-on",
+      "flag": "route31_warning",
+      "once": true,
+      "commands": [
+        {
+          "kind": "dialog",
+          "lines": ["A flutter in the grass!", "And something heavy in", "the cave hollow…"]
+        }
+      ]
+    }
+  ],
+  "spawns": {
+    "default": { "x": 9, "y": 7, "facing": "down" },
+    "fromLab": { "x": 4, "y": 5, "facing": "down" },
+    "fromHouse": { "x": 4, "y": 5, "facing": "down" },
+    "fromGym": { "x": 11, "y": 12, "facing": "up" }
+  }
+}

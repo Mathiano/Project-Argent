@@ -1,0 +1,12 @@
+{
+  "name": "house_violet",
+  "_placeholder": "PLACEHOLDER prefab — door at anchor; redesign by editing this file alone, all maps update.",
+  "width": 4,
+  "height": 3,
+  "anchor": { "x": 1, "y": 2 },
+  "tiles": [
+    ["roof_l", "roof_m", "roof_m", "roof_r"],
+    ["wall_brick", "wall_brick", "wall_brick", "wall_brick"],
+    ["wall_brick", "wall_door", "wall_brick", "wall_brick"]
+  ]
+}

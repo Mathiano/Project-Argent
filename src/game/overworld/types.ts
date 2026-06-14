@@ -16,6 +16,15 @@ export interface Spawn {
   readonly facing: Facing;
 }
 
+// Map-level prefab placement: stamp the named prefab so its anchor cell
+// lands on (x, y). Per-cell solidity from the prefab overrides the
+// tileset's `solid` flag (lets a roof have a walkable door cutout).
+export interface PrefabPlacement {
+  readonly name: string;
+  readonly x: number;
+  readonly y: number;
+}
+
 export type ScriptCommand =
   | { readonly kind: 'dialog'; readonly lines: readonly string[] }
   | { readonly kind: 'warp'; readonly target: string }
@@ -73,14 +82,32 @@ export interface MapData {
   readonly width: number;
   readonly height: number;
   readonly tilesize: number;
+  // Legacy graybox: single char per tile + inline tileset (flat colors).
   readonly tiles: string;
   readonly tileset: { readonly [key: string]: TileDef };
   readonly objects: readonly MapObject[];
   readonly spawns: { readonly [id: string]: Spawn };
+  // Data-driven format hook. When `cells` is set, the renderer uses
+  // `tilesetRef` (resolved via the tileset registry) instead of the
+  // legacy flat-color tileset; `tiles` is then unused. `solidOverrides`
+  // captures per-cell collision from stamped prefabs (a door cell in a
+  // mostly-solid roof prefab, etc.). Both stay optional so legacy maps
+  // load unchanged.
+  readonly cells?: ReadonlyArray<ReadonlyArray<string>>;
+  readonly solidOverrides?: ReadonlyArray<ReadonlyArray<boolean | null>>;
+  readonly tilesetRef?: string;
 }
 
 export function tileAt(map: MapData, x: number, y: number): TileDef | null {
   if (x < 0 || y < 0 || x >= map.width || y >= map.height) return null;
+  // Data-driven path: cells hold full tile-ids; the loader synthesizes
+  // a flat-color tileset keyed by id so this lookup still resolves a
+  // TileDef (color used as fallback when the pixel cache is absent).
+  if (map.cells !== undefined) {
+    const id = map.cells[y]?.[x];
+    if (id === undefined) return null;
+    return map.tileset[id] ?? null;
+  }
   const row = map.tiles.split('\n')[y];
   if (!row) return null;
   const ch = row[x];
@@ -89,6 +116,14 @@ export function tileAt(map: MapData, x: number, y: number): TileDef | null {
 }
 
 export function isWalkable(map: MapData, x: number, y: number): boolean {
+  if (x < 0 || y < 0 || x >= map.width || y >= map.height) return false;
+  // Data-driven path: prefab solidOverrides take priority over the
+  // tileset's own `solid` flag (so a roof prefab can carve a walkable
+  // door cell into an otherwise-solid silhouette).
+  if (map.solidOverrides !== undefined) {
+    const override = map.solidOverrides[y]?.[x];
+    if (override !== null && override !== undefined) return !override;
+  }
   const tile = tileAt(map, x, y);
   if (!tile) return false;
   return !tile.solid;

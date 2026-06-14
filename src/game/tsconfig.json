@@ -11,7 +11,9 @@
     "**/*.json",
     "../../docs/ch1-batch.json",
     "../../docs/moves.json",
-    "../../docs/typechart.json"
+    "../../docs/typechart.json",
+    "../../assets/tilesets/*.json",
+    "../../assets/prefabs/*.json"
   ],
   "references": [{ "path": "../engine" }, { "path": "../sim" }]
 }

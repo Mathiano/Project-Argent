@@ -1,6 +1,8 @@
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import type { InputState } from '../input';
 import { getMap } from '../overworld/maps';
+import type { Tile, Tileset } from '../overworld/tileset';
+import { getTileset } from '../overworld/tilesetCatalog';
 import type { Facing, MapData, MapObject, ScriptCommand } from '../overworld/types';
 import { findObjectAt, isWalkable } from '../overworld/types';
 import { PALETTE } from '../palette';
@@ -31,6 +33,8 @@ export interface OverworldSceneOpts {
 export function createOverworldScene(opts: OverworldSceneOpts): Scene {
   const map = getMap(opts.map);
   const rows = map.tiles.split('\n');
+  const tileset = map.tilesetRef !== undefined ? getTileset(map.tilesetRef) : null;
+  const tileCache = tileset ? bakeTileCache(tileset) : null;
   const spawn = map.spawns[opts.spawn] ?? Object.values(map.spawns)[0]!;
 
   let tx = spawn.x;
@@ -331,7 +335,11 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
 
-      drawTiles(ctx, map, rows, camX, camY);
+      if (map.cells !== undefined && tileset !== null) {
+        drawTilesetCells(ctx, map, tileset, tileCache, camX, camY);
+      } else {
+        drawTiles(ctx, map, rows, camX, camY);
+      }
       const gustState = drawGustOverlay(ctx, map, camX, camY, tick);
       drawObjectMarkers(ctx, map, camX, camY, opts.flags);
       drawPlayer(ctx, px - camX, py - camY, map.tilesize, facing);
@@ -408,6 +416,89 @@ function drawTiles(
       if (!def) continue;
       ctx.fillStyle = def.color;
       ctx.fillRect(x * ts - camX, y * ts - camY, ts, ts);
+    }
+  }
+}
+
+// Pre-bake each tile to an OffscreenCanvas / canvas at load time so the
+// per-frame render is one drawImage per visible tile. Without this, the
+// data-driven path would fillRect each pixel (~60k/frame for a 20×15
+// map) and stutter immediately. Falls back gracefully — if neither
+// OffscreenCanvas nor document is available (tests), returns null and
+// drawTilesetCells per-pixel-fills instead.
+function bakeTileCache(
+  tileset: Tileset,
+): Map<string, HTMLCanvasElement | OffscreenCanvas> | null {
+  const hasDom = typeof document !== 'undefined' || typeof OffscreenCanvas !== 'undefined';
+  if (!hasDom) return null;
+  const cache = new Map<string, HTMLCanvasElement | OffscreenCanvas>();
+  const ts = tileset.tilesize;
+  for (const id of Object.keys(tileset.tiles)) {
+    const tile = tileset.tiles[id]!;
+    const c: HTMLCanvasElement | OffscreenCanvas =
+      typeof OffscreenCanvas !== 'undefined'
+        ? new OffscreenCanvas(ts, ts)
+        : Object.assign(document.createElement('canvas'), { width: ts, height: ts });
+    const cctx = (c as HTMLCanvasElement).getContext('2d') as CanvasRenderingContext2D | null;
+    if (!cctx) continue;
+    cctx.imageSmoothingEnabled = false;
+    for (let py = 0; py < ts; py += 1) {
+      for (let px = 0; px < ts; px += 1) {
+        const color = tile.pixels[py * ts + px];
+        if (color === null || color === undefined) continue;
+        cctx.fillStyle = color;
+        cctx.fillRect(px, py, 1, 1);
+      }
+    }
+    cache.set(id, c);
+  }
+  return cache;
+}
+
+function drawTilesetCells(
+  ctx: CanvasRenderingContext2D,
+  map: MapData,
+  tileset: Tileset,
+  cache: Map<string, HTMLCanvasElement | OffscreenCanvas> | null,
+  camX: number,
+  camY: number,
+): void {
+  const ts = map.tilesize;
+  const minX = Math.max(0, Math.floor(camX / ts));
+  const maxX = Math.min(map.width, Math.ceil((camX + LOGICAL_W) / ts) + 1);
+  const minY = Math.max(0, Math.floor(camY / ts));
+  const maxY = Math.min(map.height, Math.ceil((camY + LOGICAL_H) / ts) + 1);
+  const cells = map.cells!;
+  for (let y = minY; y < maxY; y += 1) {
+    const row = cells[y]!;
+    for (let x = minX; x < maxX; x += 1) {
+      const id = row[x];
+      if (id === undefined) continue;
+      const tile = tileset.tiles[id];
+      if (!tile) continue;
+      const baked = cache?.get(id);
+      if (baked) {
+        ctx.drawImage(baked as CanvasImageSource, x * ts - camX, y * ts - camY);
+      } else {
+        drawTilePixels(ctx, tile, x * ts - camX, y * ts - camY, ts);
+      }
+    }
+  }
+}
+
+function drawTilePixels(
+  ctx: CanvasRenderingContext2D,
+  tile: Tile,
+  ox: number,
+  oy: number,
+  ts: number,
+): void {
+  for (let py = 0; py < ts; py += 1) {
+    for (let px = 0; px < ts; px += 1) {
+      const color = tile.pixels[py * ts + px];
+      if (color === null || color === undefined) continue;
+      ctx.fillStyle = color;
+      ctx.fillRect(ox + px, oy + py, 1, 1);
     }
   }
 }

@@ -1,0 +1,11 @@
+{
+  "name": "gym_violet",
+  "_placeholder": "PLACEHOLDER prefab — door at anchor; redesign by editing this file alone, all maps update.",
+  "width": 5,
+  "height": 2,
+  "anchor": { "x": 2, "y": 1 },
+  "tiles": [
+    ["gym_facade_l", "gym_facade_m", "gym_facade_m", "gym_facade_m", "gym_facade_r"],
+    ["gym_facade_l", "gym_facade_m", "gym_door", "gym_facade_m", "gym_facade_r"]
+  ]
+}
