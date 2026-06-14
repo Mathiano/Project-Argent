@@ -28,6 +28,7 @@ URL: `http://localhost:5173/?skip=<value>[&starter=<species>]`
 | `house`         | Overworld at HOUSE, fromBedroom spawn                                 | Phase 3 furnished interior — parent NPC + furniture signs. Stairs up to BEDROOM, door south to HEARTHWICK. |
 | `hearthwick`    | Overworld at HEARTHWICK, fromHouse spawn                              | Small town. 3 flavor NPCs + sign. Player house top-left, lab top-right, south path warp → Route 31. Sets the active starter via `?starter` / `?party`. |
 | `overworld`     | Overworld at ROUTE31, default spawn                                   | Re-skinned tileset (`?graybox=1` toggles legacy). Phase 3: the northern building now warps to HEARTHWICK, not LAB. |
+| **`overworld-party`** | **Overworld at ROUTE31 with a 3-mon party (GRUBLEAF + KINDRAKE + SILTSKIP)** | **Phase 4 hook — exercises the pause/party menus + reorder out of the box.** `?party=A,B,C` overrides the default roster. Sets `player_has_starter` so the south gate is open. |
 | `gym`           | Overworld at GYM, fromRoute spawn                                     | Sets the active starter via `?starter` (default GRUBLEAF).            |
 | `wild`          | Wild battle vs FUZZLET (legacy SPECIES)                               | Legacy path; reset via end → showTitle.                               |
 | **`test-battle`** | **Wild battle vs FLITPECK with a CH1 starter; restarts on end** | **Canonical Phase 0 combat-in-isolation hook.** Sets `?starter`.   |
@@ -57,6 +58,17 @@ URL: `http://localhost:5173/?skip=<value>[&starter=<species>]`
 - `http://localhost:5173/?skip=overworld&graybox=1` — Route 31 in legacy graybox tiles.
 - `http://localhost:5173/?wipe` — clear save, then show the title (no save → no Continue offered).
 - `http://localhost:5173/?wipe&skip=test-battle` — clear save, then drop straight into the test battle.
+
+### Phase 4 — the pause + party menu
+
+Press **START** (Enter) in the overworld to open the pause menu. Rows: POKEMON, SAVE, OPTIONS, BAG (greyed — Phase 5), BOX (greyed — Phase 5), EXIT. Up/down skips greyed rows. A/Start confirms; B/Start closes.
+
+- **POKEMON** → party list. Each row shows species, lead/fainted tag, and an HP bar. A on a mon → action sub-menu (SUMMARY / MOVE / BACK). SUMMARY shows types, HP/ST, moveset + tier tags, and a labelled BOND placeholder (the forward-hook for the bond system). MOVE lifts the mon — up/down swap it with its neighbour, A or B drops it. B in the list closes back to the pause menu.
+- **SAVE** = manual save on top of Phase 2's autosave. Flashes "Saved." for a beat.
+- **OPTIONS** = stub. "Text speed, audio, controls — coming in a later sprint."
+- **EXIT** closes back to the overworld.
+
+Combat-only test hooks (`?skip=test-battle`, etc.) don't wire `onPauseMenu`, so START in those scenes is a no-op.
 
 ### Phase 3 — the opening intro
 

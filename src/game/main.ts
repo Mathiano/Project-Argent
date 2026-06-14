@@ -38,6 +38,8 @@ import { createBattleScene } from './scenes/battle';
 import { createEndScene } from './scenes/end';
 import { createFalknerPrepScene } from './scenes/falknerPrep';
 import { createOverworldScene } from './scenes/overworld';
+import { createPartyMenuScene } from './scenes/partyMenu';
+import { createPauseMenuScene } from './scenes/pauseMenu';
 import { createPrepScene } from './scenes/prep';
 import { createStarterPickScene } from './scenes/starterPick';
 import { createTitleScene } from './scenes/title';
@@ -259,6 +261,33 @@ function pushStarterPick(): void {
         autosaveNow();
         scenes.pop();
       },
+    }),
+  );
+}
+
+// Phase 4 — pause menu (START in overworld). Sits on top of the
+// overworld; POKEMON pushes the party menu, SAVE invokes the manual
+// autosave, OPTIONS is a stub, EXIT closes back to the overworld.
+function pushPauseMenu(): void {
+  scenes.push(
+    createPauseMenuScene({
+      onPokemon: () => pushPartyMenu(),
+      onSave: () => autosaveNow(),
+      onOptions: () => {},
+      onClose: () => scenes.pop(),
+    }),
+  );
+}
+
+// Phase 4 — party menu pushed from the pause menu's POKEMON row. The
+// party array is passed by reference so reorder mutates run.party in
+// place; onReorder fires autosave so the new order persists.
+function pushPartyMenu(): void {
+  scenes.push(
+    createPartyMenuScene({
+      party: run.party,
+      onReorder: () => autosaveNow(),
+      onClose: () => scenes.pop(),
     }),
   );
 }
@@ -602,6 +631,21 @@ if (skip === 'starter') {
   showRivalBattle();
 } else if (skip === 'end') showEnd(true);
 else if (skip === 'overworld') showOverworld('ROUTE31', 'default', false);
+else if (skip === 'overworld-party') {
+  // Phase 4 hook — drop into ROUTE31 with a multi-mon party so the
+  // pause/party menus exercise reorder + summary out of the box.
+  if (!partyParam) {
+    const g = STARTERS.find((s) => s.name === 'GRUBLEAF');
+    const k = STARTERS.find((s) => s.name === 'KINDRAKE');
+    const s = STARTERS.find((s) => s.name === 'SILTSKIP');
+    run.party = [createSide(g!), createSide(k!), createSide(s!)];
+  } else {
+    applyPartyFromUrl();
+  }
+  sessionFlags.add('player_has_starter');
+  recomputeSignpostFlags();
+  showOverworld('ROUTE31', 'default', false);
+}
 else if (skip === 'bedroom') showOverworld('BEDROOM', 'default', false);
 else if (skip === 'hearthwick') {
   applyPartyFromUrl();
@@ -649,6 +693,9 @@ function showOverworld(
     },
     onStarterPick() {
       pushStarterPick();
+    },
+    onPauseMenu() {
+      pushPauseMenu();
     },
   };
   const sceneOpts = {

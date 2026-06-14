@@ -36,6 +36,10 @@ export interface OverworldSceneOpts {
   // main.ts can push the starter-pick scene + handle the chosen
   // species. Maps without this verb in their scripts don't need it.
   readonly onStarterPick?: () => void;
+  // Phase 4 — opt-in. START key in the overworld delegates to this
+  // callback so main.ts can push the pause menu. No callback = no
+  // pause menu (used by combat-only test hooks).
+  readonly onPauseMenu?: () => void;
 }
 
 // Richer Scene the autosave reads — currentPosition() lets main.ts
@@ -344,6 +348,12 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         return;
       }
       if (fadePhase !== 'normal') return;
+      if (key === 'start' && opts.onPauseMenu) {
+        // Phase 4: START opens the pause menu when wired. No-op when
+        // not wired (combat-only test hooks).
+        opts.onPauseMenu();
+        return;
+      }
       if (key === 'a') {
         const { dx, dy } = facingDelta(facing);
         const fx = tx + dx;
