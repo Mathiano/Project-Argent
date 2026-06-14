@@ -301,8 +301,17 @@ describe('Phase 5a GATE — Pokémon Center heal-party script verb wires through
     });
 
     function walkOne(dir: 'up' | 'down' | 'left' | 'right'): void {
+      // Gen-2 input model: hold until the move commits (tile coord
+      // changes), then release + let MOVE_DURATION elapse so
+      // onStepFinish runs. Covers both "facing matches" (immediate
+      // walk) and "facing doesn't match" (turn-then-walk) cases.
+      const startPos = scene.currentPosition();
       input.press(dir);
-      scene.update?.(0.02);
+      for (let i = 0; i < 30; i += 1) {
+        scene.update?.(0.02);
+        const p = scene.currentPosition();
+        if (p.x !== startPos.x || p.y !== startPos.y) break;
+      }
       input.release(dir);
       for (let i = 0; i < 12; i += 1) scene.update?.(0.02);
     }

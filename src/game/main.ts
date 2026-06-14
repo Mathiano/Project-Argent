@@ -831,6 +831,10 @@ function pushWildEncounter(foeSpeciesName: string): void {
           run.catchBreathUnlocked = true;
         }
         scenes.pop();
+        // Classic post-battle grace — the very next step on tall
+        // grass won't roll another encounter, so the player can
+        // never get trapped in an immediate chain.
+        currentOverworldScene?.armPostBattleGrace();
         autosaveNow();
       },
     }),
@@ -874,6 +878,10 @@ function pushTrainerFight(foeSpec: string | readonly string[], winFlag: string):
         writebackParty(finalState);
         if (winner === 'player') flagStore.set(winFlag);
         scenes.pop();
+        // Trainer fights aren't grass-rolled, but the grace also
+        // protects against the player stepping onto adjacent grass
+        // immediately after a trainer victory and getting chained.
+        currentOverworldScene?.armPostBattleGrace();
         autosaveNow();
       },
     }),

@@ -1,8 +1,12 @@
 // Cold-start warp round-trip regression. The seam acceptance was
 // previously verified only via ?skip flags; this drives the scene
 // programmatically to catch crashes a real walk would surface.
+//
+// Phase-5a-fixup additions: Hearthwick Pokémon Center door round-trip,
+// Gen-2 tap-vs-hold input model, encounter-roll suppression on
+// turn-in-place, and the post-battle encounter grace one-shot.
 
-import { describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { createOverworldScene } from './overworld';
 import type { InputKey } from '../scene';
 
@@ -54,9 +58,11 @@ function tickStep(scene: ReturnType<typeof createOverworldScene>, durationSec = 
   for (let t = 0; t < durationSec; t += dt) scene.update?.(dt);
 }
 
-// Press for ONE tick (just enough for pollMovement to start the move),
-// then release so we don't over-step, then tick out the move duration.
-function walkOne(
+// Tap-only: press for one tick + release. With the Gen-2 input model
+// this turns the player to face `dir` WITHOUT starting a walk (the
+// turn-hold timer is cancelled when the key releases before delay
+// elapses). Useful for facing NPCs/signs before pressing A.
+function tapTurn(
   scene: ReturnType<typeof createOverworldScene>,
   input: MockInputState,
   dir: 'up' | 'down' | 'left' | 'right',
@@ -64,7 +70,31 @@ function walkOne(
   input.press(dir);
   scene.update?.(0.02);
   input.release(dir);
-  // Move duration is 0.18s; 12 ticks of 0.02 = 0.24s — runs onStepFinish.
+  scene.update?.(0.02);
+}
+
+// Walk one tile in `dir`. Holds the direction until the move actually
+// starts (tile coordinate changes) — covers BOTH cases: facing already
+// matches (immediate walk) and facing doesn't match (turn delay first).
+// Releases as soon as the move is committed, then ticks out
+// MOVE_DURATION so onStepFinish (warps, scripts, encounter rolls) runs.
+function walkOne(
+  scene: ReturnType<typeof createOverworldScene>,
+  input: MockInputState,
+  dir: 'up' | 'down' | 'left' | 'right',
+): void {
+  const startPos = scene.currentPosition();
+  input.press(dir);
+  // Hold until tx/ty change (the move committed). Cap to a generous
+  // bound so a blocked direction doesn't loop forever — tx won't change
+  // and the loop falls through to release.
+  for (let i = 0; i < 30; i += 1) {
+    scene.update?.(0.02);
+    const p = scene.currentPosition();
+    if (p.x !== startPos.x || p.y !== startPos.y) break;
+  }
+  input.release(dir);
+  // Let the in-flight move complete + onStepFinish fire.
   for (let i = 0; i < 12; i += 1) scene.update?.(0.02);
 }
 
@@ -156,5 +186,233 @@ describe('overworld cold-start warp round-trip', () => {
     tickStep(scene, 0.4);
 
     expect(warpTarget).toBe('ROUTE31:fromGym');
+  });
+});
+
+describe('Phase 5a fix — Hearthwick Pokémon Center door round-trip', () => {
+  test('Hearthwick door tile (3, 11) warps INTO the Pokémon Center', () => {
+    let warpTarget: string | null = null;
+    const input = mockInput();
+    const scene = createOverworldScene({
+      map: 'HEARTHWICK',
+      // Spawn close to the door so the test isn't sensitive to layout
+      // drift on the rest of the map.
+      spawn: 'fromCenter',
+      inputState: input,
+      flags: mockFlags(),
+      onWarp: (target) => {
+        warpTarget = target;
+      },
+      onEncounter: () => {},
+      onTrainerBattle: () => {},
+      onBossBattle: () => {},
+      startFaded: true,
+    });
+    tickStep(scene, 0.4);
+
+    // fromCenter spawn is (3, 12) facing down — one tile south of the
+    // door at (3, 11). Walk up onto the door to fire the warp.
+    walkOne(scene, input, 'up');
+    tickStep(scene, 0.4);
+
+    expect(warpTarget).toBe('HEARTHWICK_CENTER:fromHearthwick');
+  });
+
+  test('CENTER door tile warps BACK to Hearthwick — completing the round-trip', () => {
+    let warpTarget: string | null = null;
+    const input = mockInput();
+    const scene = createOverworldScene({
+      map: 'HEARTHWICK_CENTER',
+      spawn: 'fromHearthwick',
+      inputState: input,
+      flags: mockFlags(),
+      onWarp: (target) => {
+        warpTarget = target;
+      },
+      onEncounter: () => {},
+      onTrainerBattle: () => {},
+      onBossBattle: () => {},
+      startFaded: true,
+    });
+    tickStep(scene, 0.4);
+
+    // Center fromHearthwick spawn is (4, 6) facing up; the south door
+    // warp lives at (4, 7).
+    walkOne(scene, input, 'down');
+    tickStep(scene, 0.4);
+
+    expect(warpTarget).toBe('HEARTHWICK:fromCenter');
+  });
+});
+
+describe('Phase 5a fix — Gen-2 input model (tap turns, hold walks)', () => {
+  test('tap of a new direction TURNS the player but does NOT move them', () => {
+    const input = mockInput();
+    const scene = createOverworldScene({
+      map: 'LAB',
+      spawn: 'default',
+      inputState: input,
+      flags: mockFlags(),
+      onWarp: () => {},
+      onEncounter: () => {},
+      onTrainerBattle: () => {},
+      onBossBattle: () => {},
+    });
+    const start = scene.currentPosition();
+    expect(start.facing).toBe('up'); // LAB default spawn faces up.
+
+    // Tap LEFT — should turn-only, no move.
+    tapTurn(scene, input, 'left');
+
+    const after = scene.currentPosition();
+    expect(after.facing).toBe('left');
+    expect(after.x).toBe(start.x);
+    expect(after.y).toBe(start.y);
+  });
+
+  test('hold of a new direction TURNS then WALKS (single step on the press)', () => {
+    const input = mockInput();
+    const scene = createOverworldScene({
+      map: 'LAB',
+      spawn: 'default',
+      inputState: input,
+      flags: mockFlags(),
+      onWarp: () => {},
+      onEncounter: () => {},
+      onTrainerBattle: () => {},
+      onBossBattle: () => {},
+    });
+    const start = scene.currentPosition();
+    // LAB default faces up; holding DOWN should turn-then-walk south.
+    walkOne(scene, input, 'down');
+    const after = scene.currentPosition();
+    expect(after.facing).toBe('down');
+    expect(after.y).toBe(start.y + 1);
+    expect(after.x).toBe(start.x);
+  });
+
+  test('walking in the already-faced direction takes a single step (turnHold=0 fast path)', () => {
+    // LAB default faces up. Holding UP exercises the "facing already
+    // matches" branch where turnHold is set to 0 and the move starts
+    // on the same tick as the rising edge — distinct from the
+    // turn-then-walk case above.
+    const input = mockInput();
+    const scene = createOverworldScene({
+      map: 'LAB',
+      spawn: 'default',
+      inputState: input,
+      flags: mockFlags(),
+      onWarp: () => {},
+      onEncounter: () => {},
+      onTrainerBattle: () => {},
+      onBossBattle: () => {},
+    });
+    const start = scene.currentPosition();
+    expect(start.facing).toBe('up');
+
+    walkOne(scene, input, 'up');
+    const after = scene.currentPosition();
+    expect(after.y).toBe(start.y - 1);
+    expect(after.facing).toBe('up');
+  });
+
+  test('continuous hold WALKS tile after tile (Gen-2 hold-to-walk)', () => {
+    const input = mockInput();
+    const scene = createOverworldScene({
+      map: 'LAB',
+      spawn: 'default',
+      inputState: input,
+      flags: mockFlags(),
+      onWarp: () => {},
+      onEncounter: () => {},
+      onTrainerBattle: () => {},
+      onBossBattle: () => {},
+    });
+    const start = scene.currentPosition();
+    // Hold DOWN long enough for two full tiles of movement. With the
+    // continuous-hold model the player should advance ≥2 tiles south
+    // before stopping (door warp at (5, 10) ends the chain by firing
+    // onWarp; for this test we only need to confirm ≥2 steps happened).
+    input.press('down');
+    for (let i = 0; i < 60; i += 1) scene.update?.(0.02);
+    input.release('down');
+    for (let i = 0; i < 4; i += 1) scene.update?.(0.02);
+
+    const after = scene.currentPosition();
+    expect(after.y).toBeGreaterThanOrEqual(start.y + 2);
+  });
+});
+
+describe('Phase 5a fix — encounter rolls only on real moves + post-battle grace', () => {
+  // Math.random is stubbed to 0 so the per-step encounter check would
+  // always fire (rate is checked as `Math.random() < zone.rate`, and
+  // any rate > 0 succeeds at value 0). Lets us prove the GATING logic
+  // (turn-vs-move, grace flag) without false negatives from RNG.
+  beforeEach(() => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test('turning in place while standing on a grass tile does NOT roll an encounter', () => {
+    let encounters = 0;
+    const input = mockInput();
+    const scene = createOverworldScene({
+      map: 'ROUTE31',
+      // Drop the player onto a tall-grass tile directly via spawnAt.
+      spawn: 'default',
+      spawnAt: { x: 9, y: 10, facing: 'down' },
+      inputState: input,
+      flags: mockFlags(),
+      onWarp: () => {},
+      onEncounter: () => {
+        encounters += 1;
+      },
+      onTrainerBattle: () => {},
+      onBossBattle: () => {},
+    });
+    tickStep(scene, 0.1);
+
+    // Tap-turn through every direction. None should roll an encounter
+    // because onStepFinish only runs after a real move completes.
+    tapTurn(scene, input, 'left');
+    tapTurn(scene, input, 'up');
+    tapTurn(scene, input, 'right');
+    tapTurn(scene, input, 'down');
+
+    expect(encounters).toBe(0);
+  });
+
+  test('post-battle grace: armPostBattleGrace skips exactly ONE encounter roll', () => {
+    let encounters = 0;
+    const input = mockInput();
+    const scene = createOverworldScene({
+      map: 'ROUTE31',
+      // Start ABOVE the tall grass and walk DOWN into it twice.
+      spawn: 'default',
+      spawnAt: { x: 9, y: 8, facing: 'down' },
+      inputState: input,
+      flags: mockFlags(),
+      onWarp: () => {},
+      onEncounter: () => {
+        encounters += 1;
+      },
+      onTrainerBattle: () => {},
+      onBossBattle: () => {},
+    });
+    tickStep(scene, 0.1);
+
+    // Arm the grace as main.ts does after a battle pop.
+    scene.armPostBattleGrace();
+
+    // First step onto grass — grace consumed, no encounter despite
+    // Math.random() = 0.
+    walkOne(scene, input, 'down'); // → (9, 9), tall grass
+    expect(encounters).toBe(0);
+
+    // Second step — grace already spent, encounter fires.
+    walkOne(scene, input, 'down'); // → (9, 10), still tall grass
+    expect(encounters).toBe(1);
   });
 });

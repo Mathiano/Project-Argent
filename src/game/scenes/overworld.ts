@@ -11,6 +11,13 @@ import { drawPanel, drawText } from '../ui';
 
 const MOVE_DURATION = 0.18;
 const FADE_DURATION = 0.25;
+// Gen-2-style turn-in-place: when a direction is pressed and the player
+// is NOT already facing that way, set the facing immediately and wait
+// this long before committing to a walk. Released within the window =
+// pure turn; held past it = walk. Tuned to feel like a single deliberate
+// frame — short enough not to lag a held-direction walk, long enough
+// that a tap reliably ends as a turn-only.
+const TURN_HOLD_DELAY = 0.1;
 
 export interface FlagStore {
   has(flag: string): boolean;
@@ -48,8 +55,14 @@ export interface OverworldSceneOpts {
 // Richer Scene the autosave reads — currentPosition() lets main.ts
 // snapshot the player's location at any moment without scene-internal
 // peeking. Plain Scene callers ignore the extra method.
+//
+// armPostBattleGrace() is the one-shot "skip the next encounter roll"
+// hook main.ts calls after a wild/trainer battle pops back to the
+// overworld scene. Matches classic Gen-2 behavior: you don't immediately
+// chain into a second battle on the same tile you just landed on.
 export interface OverworldScene extends Scene {
   currentPosition(): { readonly map: string; readonly x: number; readonly y: number; readonly facing: Facing };
+  armPostBattleGrace(): void;
 }
 
 export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
@@ -87,6 +100,20 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
 
   let scriptQueue: ScriptCommand[] = [];
   let autoTriggersFired = false;
+
+  // Per-direction edge + hold state for Gen-2 turn-in-place. The press
+  // history lets us detect rising edges without an event-based input
+  // dispatcher (the polled InputState only reports current held).
+  // `turnHold[dir]` is the time remaining before a held direction
+  // commits to a walk; null means we're not in a hold-pending state.
+  const wasPressed: Record<Facing, boolean> = { up: false, down: false, left: false, right: false };
+  const turnHold: { [K in Facing]: number | null } = { up: null, down: null, left: null, right: null };
+
+  // One-shot: when true, the next onStepFinish skips its encounter roll.
+  // main.ts arms this after a wild/trainer battle resolves so the player
+  // can't chain straight into a second encounter on the very tile they
+  // just landed back on.
+  let skipNextEncounter = false;
 
   function openDialog(lines: readonly string[]): void {
     dialogLines = [...lines];
@@ -231,13 +258,87 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
     return null;
   }
 
-  function pollMovement(): void {
-    if (moving || fadePhase !== 'normal' || dialogLines !== null) return;
+  // Gen-2 input model — distinguishes a tap from a hold.
+  //
+  //   * Rising edge in a direction the player isn't facing:
+  //     turn immediately + start a hold timer. Released before the
+  //     timer fires = pure turn (no move). Held past the timer = walk.
+  //   * Rising edge in the direction already faced: walk immediately.
+  //   * Steady-state hold (no rising edge this frame): walk on the
+  //     same direction once any in-progress turn timer expires.
+  //
+  // First-pressed direction wins when multiple are held. We poll in a
+  // stable up/down/left/right order so the player's input feels
+  // predictable on edge cases.
+  function pollMovement(dt: number): void {
+    if (fadePhase !== 'normal' || dialogLines !== null) {
+      // Reset edge memory while blocked so resuming play counts the
+      // next press as a fresh edge (not a steady-state hold left over
+      // from before a dialog).
+      for (const dir of ['up', 'down', 'left', 'right'] as const) {
+        wasPressed[dir] = false;
+        turnHold[dir] = null;
+      }
+      return;
+    }
     const s = opts.inputState;
-    if (s.pressed('up')) tryStartMove('up');
-    else if (s.pressed('down')) tryStartMove('down');
-    else if (s.pressed('left')) tryStartMove('left');
-    else if (s.pressed('right')) tryStartMove('right');
+    const dirs: readonly Facing[] = ['up', 'down', 'left', 'right'];
+    const pressedNow: Record<Facing, boolean> = {
+      up: s.pressed('up'),
+      down: s.pressed('down'),
+      left: s.pressed('left'),
+      right: s.pressed('right'),
+    };
+
+    // First handle rising edges (turn + maybe queue a walk).
+    for (const dir of dirs) {
+      if (pressedNow[dir] && !wasPressed[dir]) {
+        if (facing !== dir) {
+          // Tap-to-turn: change facing, defer walk until hold delay.
+          facing = dir;
+          turnHold[dir] = TURN_HOLD_DELAY;
+        } else {
+          // Already facing — held in the same direction, walk now.
+          turnHold[dir] = 0;
+        }
+      } else if (!pressedNow[dir]) {
+        // Released. Any pending hold-timer is cancelled — this was a
+        // turn-only tap.
+        turnHold[dir] = null;
+      }
+      wasPressed[dir] = pressedNow[dir];
+    }
+
+    if (moving) return;
+
+    // Tick down any active hold timers. The first direction whose
+    // timer reaches zero and is still held this frame starts a move.
+    for (const dir of dirs) {
+      const t = turnHold[dir];
+      if (t === null) continue;
+      if (!pressedNow[dir]) {
+        turnHold[dir] = null;
+        continue;
+      }
+      const next = t - dt;
+      if (next <= 0) {
+        turnHold[dir] = null;
+        tryStartMove(dir);
+        return;
+      }
+      turnHold[dir] = next;
+    }
+
+    // Continuous hold-to-walk: no rising edge / hold timer pending,
+    // but a direction is steady-held and matches the current facing.
+    // Start the next step on this tick so the player walks smoothly
+    // tile-by-tile while the key remains down (classic GBC feel).
+    for (const dir of dirs) {
+      if (pressedNow[dir] && facing === dir && turnHold[dir] === null) {
+        tryStartMove(dir);
+        return;
+      }
+    }
   }
 
   function onStepFinish(): void {
@@ -279,9 +380,17 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
     const zone = findObjectAt(map, tx, ty, 'encounter_zone') as
       | Extract<MapObject, { type: 'encounter_zone' }>
       | null;
-    if (zone && Math.random() < zone.rate) {
-      const foe = zone.species[Math.floor(Math.random() * zone.species.length)]!;
-      opts.onEncounter(foe);
+    if (zone) {
+      // Post-battle grace: skip exactly one encounter roll on the very
+      // first step after returning from a wild/trainer battle. Consume
+      // the flag whether or not the roll would have hit — the contract
+      // is "the very next step", not "the next attempted roll".
+      if (skipNextEncounter) {
+        skipNextEncounter = false;
+      } else if (Math.random() < zone.rate) {
+        const foe = zone.species[Math.floor(Math.random() * zone.species.length)]!;
+        opts.onEncounter(foe);
+      }
     }
   }
 
@@ -313,6 +422,9 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
   return {
     currentPosition() {
       return { map: opts.map, x: tx, y: ty, facing };
+    },
+    armPostBattleGrace() {
+      skipNextEncounter = true;
     },
     update(dt) {
       tick += dt;
@@ -349,7 +461,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
           onStepFinish();
         }
       }
-      pollMovement();
+      pollMovement(dt);
     },
 
     input(key: InputKey) {

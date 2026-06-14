@@ -35,13 +35,13 @@
     },
     {
       "type": "warp",
-      "x": 2,
+      "x": 3,
       "y": 11,
       "target": "HEARTHWICK_CENTER:fromHearthwick"
     },
     {
       "type": "sign",
-      "x": 3,
+      "x": 4,
       "y": 11,
       "lines": [
         "POKÉMON CENTER",
@@ -142,6 +142,6 @@
     "fromHouse": { "x": 3, "y": 4, "facing": "down" },
     "fromLab": { "x": 15, "y": 4, "facing": "down" },
     "fromRoute": { "x": 9, "y": 12, "facing": "up" },
-    "fromCenter": { "x": 2, "y": 12, "facing": "down" }
+    "fromCenter": { "x": 3, "y": 12, "facing": "down" }
   }
 }
