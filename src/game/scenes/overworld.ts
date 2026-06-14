@@ -40,6 +40,9 @@ export interface OverworldSceneOpts {
   // callback so main.ts can push the pause menu. No callback = no
   // pause menu (used by combat-only test hooks).
   readonly onPauseMenu?: () => void;
+  // Phase 5a — opt-in. heal-party script verb (Pokémon Center NPC)
+  // fires this so main.ts can fully restore run.party + autosave.
+  readonly onHealParty?: () => void;
 }
 
 // Richer Scene the autosave reads — currentPosition() lets main.ts
@@ -153,6 +156,13 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         // back. Maps without an onStarterPick wiring no-op silently.
         opts.onStarterPick?.();
         return;
+      }
+      if (cmd.kind === 'heal-party') {
+        // Phase 5a Pokémon Center. Game-layer effect — main.ts
+        // mutates run.party + autosaves. The script continues with
+        // the next command (typically a confirmation dialog).
+        opts.onHealParty?.();
+        continue;
       }
     }
   }

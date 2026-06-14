@@ -25,6 +25,16 @@ export interface SaveState {
   // RNG: fresh mulberry32(seed) on load. Overworld encounter rolls
   // still use raw Math.random() — see backlog in BUILD-ROADMAP.
   readonly rngSeed: number;
+  // Phase 5a bag. Additive — pre-Phase-5a saves don't carry this
+  // field; applySave treats missing as []. Keeps version=1 since
+  // older clients reading a newer save just ignore the unknown
+  // field (validator pre-Phase-5a didn't require it either).
+  readonly bag?: readonly SavedBagEntry[];
+}
+
+export interface SavedBagEntry {
+  readonly itemId: string;
+  readonly qty: number;
 }
 
 export interface SavedSide {
@@ -149,5 +159,16 @@ function validateSave(value: unknown): SaveState | null {
   if (!Array.isArray(v.flags) || v.flags.some((f) => typeof f !== 'string')) return null;
   if (typeof v.catchBreathUnlocked !== 'boolean') return null;
   if (typeof v.rngSeed !== 'number') return null;
+  // bag is optional (pre-Phase-5a saves). When present, validate
+  // each entry — a single bad row nukes the save (loud-fail).
+  if (v.bag !== undefined) {
+    if (!Array.isArray(v.bag)) return null;
+    for (const e of v.bag) {
+      if (typeof e !== 'object' || e === null) return null;
+      const ee = e as Record<string, unknown>;
+      if (typeof ee.itemId !== 'string') return null;
+      if (typeof ee.qty !== 'number') return null;
+    }
+  }
   return value as SaveState;
 }

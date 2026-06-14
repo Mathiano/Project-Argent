@@ -45,7 +45,12 @@ export type ScriptCommand =
   // boss/trainer battle launchers). On pick, the scene's onResolve
   // writes the chosen species into run.party and sets the player_has_starter
   // + starter_<name> flags.
-  | { readonly kind: 'show-starter-pick' };
+  | { readonly kind: 'show-starter-pick' }
+  // Phase 5a: Pokémon Center heal. Restores every party member to
+  // full HP/ST, clears exhausted/staggered/momentum. The verb is a
+  // game-layer call (main.ts mutates run.party + autosaves); the
+  // engine doesn't see it.
+  | { readonly kind: 'heal-party' };
 
 export type MapObject =
   | { readonly type: 'warp'; readonly x: number; readonly y: number; readonly target: string }

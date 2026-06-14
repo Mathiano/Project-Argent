@@ -13,12 +13,13 @@ import { drawPanel, drawText } from '../ui';
 
 export interface PauseMenuOpts {
   readonly onPokemon: () => void;
+  readonly onBag: () => void;
   readonly onSave: () => void;
   readonly onOptions: () => void;
   readonly onClose: () => void;
 }
 
-type RowKind = 'pokemon' | 'save' | 'options' | 'bag' | 'box' | 'exit';
+type RowKind = 'pokemon' | 'bag' | 'save' | 'options' | 'box' | 'exit';
 interface Row {
   readonly kind: RowKind;
   readonly label: string;
@@ -30,10 +31,11 @@ const PANEL = { x: 200, y: 12, w: 110, h: 150 } as const;
 export function createPauseMenuScene(opts: PauseMenuOpts): Scene {
   const rows: Row[] = [
     { kind: 'pokemon', label: 'POKEMON', enabled: true },
+    { kind: 'bag', label: 'BAG', enabled: true },
     { kind: 'save', label: 'SAVE', enabled: true },
     { kind: 'options', label: 'OPTIONS', enabled: true },
-    { kind: 'bag', label: 'BAG (Phase 5)', enabled: false },
-    { kind: 'box', label: 'BOX (Phase 5)', enabled: false },
+    // BOX (PC storage) ships with catching/release in Phase 6.
+    { kind: 'box', label: 'BOX (Phase 6)', enabled: false },
     { kind: 'exit', label: 'EXIT', enabled: true },
   ];
   let cursor = 0;
@@ -57,6 +59,7 @@ export function createPauseMenuScene(opts: PauseMenuOpts): Scene {
     const row = rows[cursor];
     if (!row || !row.enabled) return;
     if (row.kind === 'pokemon') opts.onPokemon();
+    else if (row.kind === 'bag') opts.onBag();
     else if (row.kind === 'save') {
       opts.onSave();
       savedFlashSec = 1.0;

@@ -36,6 +36,7 @@ import { createInputDispatcher } from './input';
 import { SceneStack } from './scene';
 import { createBattleScene } from './scenes/battle';
 import { createEndScene } from './scenes/end';
+import { createBagMenuScene } from './scenes/bagMenu';
 import { createFalknerPrepScene } from './scenes/falknerPrep';
 import { createOverworldScene } from './scenes/overworld';
 import { createPartyMenuScene } from './scenes/partyMenu';
@@ -43,6 +44,8 @@ import { createPauseMenuScene } from './scenes/pauseMenu';
 import { createPrepScene } from './scenes/prep';
 import { createStarterPickScene } from './scenes/starterPick';
 import { createTitleScene } from './scenes/title';
+import { bagAdd, ITEMS } from './items';
+import type { BagEntry } from './items';
 import {
   fromSavedSide,
   hasSave,
@@ -118,12 +121,16 @@ interface RunState {
   // Length-1 today (starter); grows via ?party= for testing, future
   // NPC gifts (Phase 3+), and Catching 2.0 (Phase 6).
   party: SideState[];
+  // Phase 5a inventory. Mutated by bag UI use / future shop buys;
+  // persisted via save (additive field — pre-5a saves load as []).
+  bag: BagEntry[];
   catchBreathUnlocked: boolean;
   rng: RNG;
 }
 
 const run: RunState = {
   party: [],
+  bag: [],
   catchBreathUnlocked: false,
   rng: mulberry32(RNG_SEED),
 };
@@ -208,6 +215,7 @@ function autosaveNow(): void {
     flags: Array.from(sessionFlags),
     catchBreathUnlocked: run.catchBreathUnlocked,
     rngSeed: currentRngSeed,
+    bag: run.bag.map((e) => ({ itemId: e.itemId, qty: e.qty })),
   };
   saveToStorage(state);
 }
@@ -230,10 +238,15 @@ function showTitle(): void {
 // starter pick now happens in the lab via the LARCH NPC's
 // `show-starter-pick` script verb. Wipes any prior save (the player
 // chose fresh) and seeds the run with a fresh RNG.
+//
+// Phase 5a — also seeds the starting bag (3 POTIONs) so the survival
+// loop is testable from the first wild encounter, before shops exist.
 function startNewGame(): void {
   currentOverworldScene = null;
   wipeStorage();
   run.party = [];
+  run.bag = [];
+  bagAdd(run.bag, 'POTION', 3);
   run.catchBreathUnlocked = false;
   currentRngSeed = 0xa9c0;
   run.rng = mulberry32(currentRngSeed);
@@ -268,15 +281,48 @@ function pushStarterPick(): void {
 // Phase 4 — pause menu (START in overworld). Sits on top of the
 // overworld; POKEMON pushes the party menu, SAVE invokes the manual
 // autosave, OPTIONS is a stub, EXIT closes back to the overworld.
+// Phase 5a — BAG row now wired to pushBagMenu.
 function pushPauseMenu(): void {
   scenes.push(
     createPauseMenuScene({
       onPokemon: () => pushPartyMenu(),
+      onBag: () => pushBagMenu(),
       onSave: () => autosaveNow(),
       onOptions: () => {},
       onClose: () => scenes.pop(),
     }),
   );
+}
+
+// Phase 5a — bag menu pushed from the pause menu's BAG row. Both
+// run.bag and run.party are passed by reference — using an item
+// mutates them in place; onChange fires autosave.
+function pushBagMenu(): void {
+  scenes.push(
+    createBagMenuScene({
+      bag: run.bag,
+      party: run.party,
+      onChange: () => autosaveNow(),
+      onClose: () => scenes.pop(),
+    }),
+  );
+}
+
+// Phase 5a — Pokémon Center heal. Wired from the overworld script
+// verb `heal-party` on the NURSE NPC.
+function healParty(): void {
+  for (let i = 0; i < run.party.length; i += 1) {
+    const s = run.party[i]!;
+    run.party[i] = {
+      ...s,
+      hp: s.maxHp,
+      st: 100,
+      momentum: 0,
+      exhausted: false,
+      staggered: false,
+    };
+  }
+  autosaveNow();
 }
 
 // Phase 4 — party menu pushed from the pause menu's POKEMON row. The
@@ -296,6 +342,18 @@ function pushPartyMenu(): void {
 // the exact saved position. Called from the title's Continue option.
 function applySave(saved: SaveState): void {
   run.party = saved.party.map((s) => fromSavedSide(s, resolveSpecies));
+  // Phase 5a: bag is additive — pre-Phase-5a saves don't carry the
+  // field; treat missing as []. Skip unknown item ids loudly.
+  run.bag = [];
+  if (saved.bag) {
+    for (const e of saved.bag) {
+      if (ITEMS[e.itemId]) {
+        run.bag.push({ itemId: e.itemId, qty: e.qty });
+      } else {
+        console.warn(`Argent save: unknown item "${e.itemId}" in saved bag — dropped`);
+      }
+    }
+  }
   run.catchBreathUnlocked = saved.catchBreathUnlocked;
   currentRngSeed = saved.rngSeed;
   run.rng = mulberry32(currentRngSeed);
@@ -550,8 +608,25 @@ const skip = url.get('skip');
 const starterName = url.get('starter');
 const partyParam = url.get('party');
 const wipeParam = url.has('wipe');
+// Phase 5a — ?bag=POTION:3,SUPER POTION:1 seeds a test bag for any
+// hook that needs items. Item ids match the ITEMS registry (case-
+// sensitive, spaces ok). Unknown ids warn-and-skip.
+const bagParam = url.get('bag');
 
 if (wipeParam) wipeStorage();
+
+function applyBagFromUrl(): void {
+  if (!bagParam) return;
+  for (const entry of bagParam.split(',').map((s) => s.trim()).filter(Boolean)) {
+    const [id, qtyStr] = entry.includes(':') ? entry.split(':') : [entry, '1'];
+    const qty = Number.parseInt(qtyStr ?? '1', 10);
+    if (!id || !ITEMS[id]) {
+      console.warn(`Argent ?bag=${entry}: unknown item id; skipped`);
+      continue;
+    }
+    bagAdd(run.bag, id, Number.isFinite(qty) ? qty : 1);
+  }
+}
 
 // Autosave on tab close / refresh. The browser fires beforeunload
 // synchronously; localStorage.setItem returns before the unload
@@ -631,9 +706,24 @@ if (skip === 'starter') {
   showRivalBattle();
 } else if (skip === 'end') showEnd(true);
 else if (skip === 'overworld') showOverworld('ROUTE31', 'default', false);
-else if (skip === 'overworld-party') {
+else if (skip === 'center') {
+  // Phase 5a hook — drop into the Hearthwick Pokémon Center with a
+  // damaged party + a few potions, for fast heal testing.
+  applyPartyFromUrl();
+  if (run.bag.length === 0) bagAdd(run.bag, 'POTION', 3);
+  applyBagFromUrl();
+  // Pre-damage the party so the heal is visible.
+  for (let i = 0; i < run.party.length; i += 1) {
+    const s = run.party[i]!;
+    run.party[i] = { ...s, hp: Math.max(1, Math.floor(s.maxHp * 0.4)), st: 35 };
+  }
+  recomputeSignpostFlags();
+  showOverworld('HEARTHWICK_CENTER', 'fromHearthwick', false);
+} else if (skip === 'overworld-party') {
   // Phase 4 hook — drop into ROUTE31 with a multi-mon party so the
   // pause/party menus exercise reorder + summary out of the box.
+  // Phase 5a: also seeds 3 POTIONs so the bag UI is testable from
+  // the same hook. ?bag= adds on top.
   if (!partyParam) {
     const g = STARTERS.find((s) => s.name === 'GRUBLEAF');
     const k = STARTERS.find((s) => s.name === 'KINDRAKE');
@@ -642,6 +732,8 @@ else if (skip === 'overworld-party') {
   } else {
     applyPartyFromUrl();
   }
+  bagAdd(run.bag, 'POTION', 3);
+  applyBagFromUrl();
   sessionFlags.add('player_has_starter');
   recomputeSignpostFlags();
   showOverworld('ROUTE31', 'default', false);
@@ -696,6 +788,9 @@ function showOverworld(
     },
     onPauseMenu() {
       pushPauseMenu();
+    },
+    onHealParty() {
+      healParty();
     },
   };
   const sceneOpts = {

@@ -222,6 +222,66 @@ describe('Phase 2 GATE — writeback: damage from one battle persists into the n
   });
 });
 
+describe('Phase 5a — bag round-trip + back-compat with pre-Phase-5a saves', () => {
+  test('save → load preserves the bag entries (itemId + qty)', () => {
+    const storage = memoryStorage();
+    const state: SaveState = {
+      version: 1,
+      party: [{ speciesName: 'GRUBLEAF', hp: 30, st: 80, momentum: 0 }],
+      position: { map: 'HEARTHWICK', x: 8, y: 8, facing: 'down' },
+      flags: [],
+      catchBreathUnlocked: false,
+      rngSeed: 1,
+      bag: [
+        { itemId: 'POTION', qty: 3 },
+        { itemId: 'SUPER POTION', qty: 1 },
+      ],
+    };
+    saveToStorage(state, storage);
+    const loaded = loadFromStorage(storage)!;
+    expect(loaded.bag).toEqual([
+      { itemId: 'POTION', qty: 3 },
+      { itemId: 'SUPER POTION', qty: 1 },
+    ]);
+  });
+
+  test('pre-Phase-5a saves (no bag field) load successfully with bag undefined', () => {
+    const storage = memoryStorage();
+    // The exact JSON shape a Phase 4 client wrote (no bag field).
+    storage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 1,
+        party: [{ speciesName: 'GRUBLEAF', hp: 54, st: 100, momentum: 0 }],
+        position: { map: 'LAB', x: 6, y: 7, facing: 'down' },
+        flags: [],
+        catchBreathUnlocked: false,
+        rngSeed: 1,
+      }),
+    );
+    const loaded = loadFromStorage(storage);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.bag).toBeUndefined();
+  });
+
+  test('loadFromStorage rejects a malformed bag entry (loud-fail)', () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 1,
+        party: [{ speciesName: 'GRUBLEAF', hp: 54, st: 100, momentum: 0 }],
+        position: { map: 'LAB', x: 6, y: 7, facing: 'down' },
+        flags: [],
+        catchBreathUnlocked: false,
+        rngSeed: 1,
+        bag: [{ itemId: 'POTION' /* missing qty */ }],
+      }),
+    );
+    expect(loadFromStorage(storage)).toBeNull();
+  });
+});
+
 describe('Phase 2 — New Game wipes the save; Continue restores it', () => {
   test('wipe clears the slot; subsequent load returns null', () => {
     const storage = memoryStorage();
