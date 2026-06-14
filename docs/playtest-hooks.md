@@ -29,7 +29,8 @@ URL: `http://localhost:5173/?skip=<value>[&starter=<species>]`
 | `hearthwick`    | Overworld at HEARTHWICK, fromHouse spawn                              | Small town. 3 flavor NPCs + sign. Player house top-left, lab top-right, south path warp → Route 31. Sets the active starter via `?starter` / `?party`. |
 | `overworld`     | Overworld at ROUTE31, default spawn                                   | Re-skinned tileset (`?graybox=1` toggles legacy). Phase 3: the northern building now warps to HEARTHWICK, not LAB. |
 | **`overworld-party`** | **Overworld at ROUTE31 with a 3-mon party (GRUBLEAF + KINDRAKE + SILTSKIP)** | **Phase 4 hook — exercises the pause/party menus + reorder out of the box.** `?party=A,B,C` overrides the default roster. Phase 5a: also seeds the default 3 POTIONs, and `?bag=` overrides the seeded inventory. Sets `player_has_starter` so the south gate is open. |
-| **`center`**    | **Overworld at HEARTHWICK_CENTER with a 3-mon party pre-damaged to 40% HP + 35 ST** | **Phase 5a hook — exercises the Pokémon Center heal loop AND the bag (3 POTIONs seeded by default; `?bag=` overrides).** Talk to the NURSE → full party heal. Open BAG via START → use a POTION on a damaged mon. `?party=` / `?starter=` work normally. |
+| **`center`**    | **Overworld at HEARTHWICK_CENTER with a 3-mon party pre-damaged to 40% HP + 35 ST** | **Phase 5a hook — exercises the Pokémon Center heal loop AND the bag (3 POTIONs seeded by default; `?bag=` overrides).** Talk to the NURSE → full party heal. Open BAG via START → use a POTION on a damaged mon. `?party=` / `?starter=` work normally. `?money=` seeds the wallet. |
+| **`mart`**      | **Overworld at HEARTHWICK_MART with a ₽5000 wallet + 2 POTIONs**     | **Phase 5b hook — exercises the Poké Mart BUY/SELL loop.** Talk to the CLERK → BUY (stock: POTION / SUPER POTION / FULL HEAL) or SELL (half price). `?money=N` overrides the wallet; `?bag=` overrides the seeded stock; `?party=` / `?starter=` work normally. |
 | `gym`           | Overworld at GYM, fromRoute spawn                                     | Sets the active starter via `?starter` (default GRUBLEAF).            |
 | `wild`          | Wild battle vs FUZZLET (legacy SPECIES)                               | Legacy path; reset via end → showTitle.                               |
 | **`test-battle`** | **Wild battle vs FLITPECK with a CH1 starter; restarts on end** | **Canonical Phase 0 combat-in-isolation hook.** Sets `?starter`.   |
@@ -47,7 +48,8 @@ URL: `http://localhost:5173/?skip=<value>[&starter=<species>]`
 | `?party=A,B,C`      | Build a multi-mon test party from a comma-separated species list. Wins over `?starter` when present. RNG seeded by a stable hash of the party (same party → same seed). Species must exist in STARTERS or the CH1 dex. Examples: `?party=GRUBLEAF,SILTSKIP` (Phase 1 default); `?party=GRUBLEAF,KINDRAKE,SILTSKIP` (full triangle). |
 | `?graybox=1`        | Force the legacy graybox tilemap for any map that has both a graybox and a data-driven version. Useful for layout-vs-art comparison. |
 | `?wipe`             | Clears the localStorage save before any other handling runs. Phase 2 — used to QA the New Game / first-time-player path repeatedly without leaving the browser. Stacks with any `?skip=`. |
-| `?bag=POTION:3,SUPER POTION:1` | Phase 5a — override the seeded bag inventory for any hook that seeds one (`?skip=center`, `?skip=overworld-party`). Comma-separated `ID:qty` pairs; whitespace around the comma is allowed. Unknown item ids warn-and-skip. |
+| `?bag=POTION:3,SUPER POTION:1` | Phase 5a — override the seeded bag inventory for any hook that seeds one (`?skip=center`, `?skip=overworld-party`, `?skip=mart`, `?skip=hearthwick`). Comma-separated `ID:qty` pairs; whitespace around the comma is allowed. Unknown item ids warn-and-skip. |
+| `?money=2500`       | Phase 5b — seed the wallet (₽) for shop testing. Non-negative integer; a bad value warns-and-ignores. Applied by the economy hooks (`?skip=mart`, `?skip=center`, `?skip=hearthwick`, `?skip=overworld-party`) after party/bag seeding. |
 
 ### Example URLs
 
@@ -63,6 +65,8 @@ URL: `http://localhost:5173/?skip=<value>[&starter=<species>]`
 - `http://localhost:5173/?skip=center` — Phase 5a Pokémon Center, party pre-damaged + 3 POTIONs in the bag. Heal via NURSE or via BAG → POTION → target.
 - `http://localhost:5173/?skip=center&bag=POTION:1,SUPER POTION:2,FULL HEAL:1` — same hook with a custom inventory.
 - `http://localhost:5173/?skip=overworld-party&bag=FULL HEAL:1` — Phase 4 party hook with a single FULL HEAL on hand.
+- `http://localhost:5173/?skip=mart` — Phase 5b Poké Mart, ₽5000 wallet + 2 POTIONs. Talk to the CLERK to BUY / SELL.
+- `http://localhost:5173/?skip=mart&money=300` — same hook with a tight wallet, to exercise the can't-overspend gate.
 
 ### Phase 4 / 5a — the pause + party + bag menu
 
@@ -88,6 +92,17 @@ New Game seeds **3 POTIONs** in the bag. Items live in `src/game/items.ts` (data
 `?bag=…` overrides the seeded inventory for the seeding hooks. The bag schema persists via the Phase 2 save (additive `bag?: SavedBagEntry[]` field — pre-Phase-5a saves load with no bag and `version:1` is unchanged).
 
 **Out of scope for Phase 5a** (deferred per kickoff): money, Poké Mart shopping, in-battle item use (needs a new Action kind in the engine — stop-and-flag rather than reach in), berries / balls / key-item effects.
+
+### Phase 5b — money + Poké Mart (the economy)
+
+The town loop now earns and spends. `run.money` (₽) is seeded by New Game (`STARTING_MONEY = 3000`) and persisted via the Phase 2 save (additive `money?` field — a pre-5b save loads as `STARTING_MONEY`, version stays `1`).
+
+- **Earning.** Winning a **trainer** battle awards money — a per-trainer `reward` declared on the `start-trainer-battle` script command, paid in the game layer (`main.ts`) on resolve, then autosaved. Wild wins pay nothing (trainers-only, anti-grind). Demo-loop trainers: YOUNGSTER JAY on Route 31 (₽500, NPC at (8,5), gated by `route31_trainer_beaten`) and the gym trainer (₽800).
+- **Spending.** A real **Poké Mart** sits in Hearthwick (bottom-right building, door at (14,11) → `HEARTHWICK_MART`), the classic Center+Mart pair. The CLERK NPC runs the `open-mart` script verb (terminal, like `show-starter-pick`) → the Mart scene. **BUY** (stock: POTION / SUPER POTION / FULL HEAL) charges the listed price and adds to the bag; a quantity selector caps to what the wallet can afford — **overspending is impossible**. **SELL** gives half price (classic) and decrements the bag. The Phase-5a "MART — coming soon" noticeboard in the Center now points at the open shop.
+- **Bag integration.** Purchases feed the same `run.bag` the Phase 5a bag UI shows; money is displayed top-right in both the bag and the Mart.
+- Prices live on the item registry (`items.ts`); the buy/sell/payout math is pure in `economy.ts`. **Engine untouched** — money is a game-layer concern; both ladders stay bit-identical.
+
+**Out of scope for Phase 5b** (deferred): held items, item effects beyond healing, balls / catching (Phase 6), berries' effects, the Game Corner (cut), in-battle item use (its own engine sprint).
 
 ### Phase 3 — the opening intro
 

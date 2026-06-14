@@ -37,6 +37,7 @@ import { SceneStack } from './scene';
 import { createBattleScene } from './scenes/battle';
 import { createEndScene } from './scenes/end';
 import { createBagMenuScene } from './scenes/bagMenu';
+import { createMartMenuScene } from './scenes/martMenu';
 import { createFalknerPrepScene } from './scenes/falknerPrep';
 import { createOverworldScene } from './scenes/overworld';
 import { createPartyMenuScene } from './scenes/partyMenu';
@@ -46,6 +47,7 @@ import { createStarterPickScene } from './scenes/starterPick';
 import { createTitleScene } from './scenes/title';
 import { bagAdd, ITEMS } from './items';
 import type { BagEntry } from './items';
+import { STARTING_MONEY, awardMoney, buyItem, sellItem } from './economy';
 import {
   fromSavedSide,
   hasSave,
@@ -121,9 +123,12 @@ interface RunState {
   // Length-1 today (starter); grows via ?party= for testing, future
   // NPC gifts (Phase 3+), and Catching 2.0 (Phase 6).
   party: SideState[];
-  // Phase 5a inventory. Mutated by bag UI use / future shop buys;
+  // Phase 5a inventory. Mutated by bag UI use / Phase 5b shop buys;
   // persisted via save (additive field — pre-5a saves load as []).
   bag: BagEntry[];
+  // Phase 5b wallet. Earned from trainer wins, spent at the Mart;
+  // persisted via save (additive — pre-5b saves load as STARTING_MONEY).
+  money: number;
   catchBreathUnlocked: boolean;
   rng: RNG;
 }
@@ -131,6 +136,7 @@ interface RunState {
 const run: RunState = {
   party: [],
   bag: [],
+  money: STARTING_MONEY,
   catchBreathUnlocked: false,
   rng: mulberry32(RNG_SEED),
 };
@@ -216,6 +222,7 @@ function autosaveNow(): void {
     catchBreathUnlocked: run.catchBreathUnlocked,
     rngSeed: currentRngSeed,
     bag: run.bag.map((e) => ({ itemId: e.itemId, qty: e.qty })),
+    money: run.money,
   };
   saveToStorage(state);
 }
@@ -247,6 +254,7 @@ function startNewGame(): void {
   run.party = [];
   run.bag = [];
   bagAdd(run.bag, 'POTION', 3);
+  run.money = STARTING_MONEY;
   run.catchBreathUnlocked = false;
   currentRngSeed = 0xa9c0;
   run.rng = mulberry32(currentRngSeed);
@@ -302,7 +310,39 @@ function pushBagMenu(): void {
     createBagMenuScene({
       bag: run.bag,
       party: run.party,
+      money: run.money,
       onChange: () => autosaveNow(),
+      onClose: () => scenes.pop(),
+    }),
+  );
+}
+
+// Phase 5b — Poké Mart pushed from the CLERK NPC's open-mart verb. The
+// buy/sell math lives in economy.ts (pure, tested); main.ts owns the
+// run.money + run.bag mutation + autosave so the persisted state stays
+// a single source of truth (same pattern as the bag's item-use).
+function pushMartMenu(stock: readonly string[]): void {
+  scenes.push(
+    createMartMenuScene({
+      stock,
+      bag: run.bag,
+      getMoney: () => run.money,
+      onBuy: (itemId, qty) => {
+        const { money, bought } = buyItem(run.money, run.bag, itemId, qty);
+        if (bought) {
+          run.money = money;
+          autosaveNow();
+        }
+        return bought;
+      },
+      onSell: (itemId, qty) => {
+        const { money, sold } = sellItem(run.money, run.bag, itemId, qty);
+        if (sold) {
+          run.money = money;
+          autosaveNow();
+        }
+        return sold;
+      },
       onClose: () => scenes.pop(),
     }),
   );
@@ -354,6 +394,9 @@ function applySave(saved: SaveState): void {
       }
     }
   }
+  // Phase 5b: money is additive — a pre-5b save with no money field
+  // loads as the starting wallet rather than penniless.
+  run.money = saved.money ?? STARTING_MONEY;
   run.catchBreathUnlocked = saved.catchBreathUnlocked;
   currentRngSeed = saved.rngSeed;
   run.rng = mulberry32(currentRngSeed);
@@ -612,8 +655,21 @@ const wipeParam = url.has('wipe');
 // hook that needs items. Item ids match the ITEMS registry (case-
 // sensitive, spaces ok). Unknown ids warn-and-skip.
 const bagParam = url.get('bag');
+// Phase 5b — ?money=N seeds the wallet for shop testing. Applied by the
+// skip hooks below (after any party/bag seeding). Clamped to ≥0.
+const moneyParam = url.get('money');
 
 if (wipeParam) wipeStorage();
+
+function applyMoneyFromUrl(): void {
+  if (moneyParam === null) return;
+  const n = Number.parseInt(moneyParam, 10);
+  if (Number.isFinite(n) && n >= 0) {
+    run.money = n;
+  } else {
+    console.warn(`Argent ?money=${moneyParam}: not a non-negative integer; ignored`);
+  }
+}
 
 function applyBagFromUrl(): void {
   if (!bagParam) return;
@@ -717,8 +773,21 @@ else if (skip === 'center') {
     const s = run.party[i]!;
     run.party[i] = { ...s, hp: Math.max(1, Math.floor(s.maxHp * 0.4)), st: 35 };
   }
+  applyMoneyFromUrl();
   recomputeSignpostFlags();
   showOverworld('HEARTHWICK_CENTER', 'fromHearthwick', false);
+} else if (skip === 'mart') {
+  // Phase 5b hook — drop into the Hearthwick Poké Mart with a wallet
+  // (default a generous ₽5000 for shop testing; ?money= overrides) and
+  // a couple of potions so SELL has stock. Talk to the CLERK to shop.
+  applyPartyFromUrl();
+  if (run.bag.length === 0) bagAdd(run.bag, 'POTION', 2);
+  applyBagFromUrl();
+  run.money = 5000;
+  applyMoneyFromUrl();
+  sessionFlags.add('player_has_starter');
+  recomputeSignpostFlags();
+  showOverworld('HEARTHWICK_MART', 'fromHearthwick', false);
 } else if (skip === 'overworld-party') {
   // Phase 4 hook — drop into ROUTE31 with a multi-mon party so the
   // pause/party menus exercise reorder + summary out of the box.
@@ -734,6 +803,7 @@ else if (skip === 'center') {
   }
   bagAdd(run.bag, 'POTION', 3);
   applyBagFromUrl();
+  applyMoneyFromUrl();
   sessionFlags.add('player_has_starter');
   recomputeSignpostFlags();
   showOverworld('ROUTE31', 'default', false);
@@ -741,6 +811,8 @@ else if (skip === 'center') {
 else if (skip === 'bedroom') showOverworld('BEDROOM', 'default', false);
 else if (skip === 'hearthwick') {
   applyPartyFromUrl();
+  applyBagFromUrl();
+  applyMoneyFromUrl();
   recomputeSignpostFlags();
   showOverworld('HEARTHWICK', 'fromHouse', false);
 }
@@ -777,11 +849,14 @@ function showOverworld(
     onEncounter(foeSpecies: string) {
       pushWildEncounter(foeSpecies);
     },
-    onTrainerBattle(foeSpecies: string | readonly string[], winFlag: string) {
-      pushTrainerFight(foeSpecies, winFlag);
+    onTrainerBattle(foeSpecies: string | readonly string[], winFlag: string, reward?: number) {
+      pushTrainerFight(foeSpecies, winFlag, reward);
     },
     onBossBattle(bossId: string) {
       if (bossId === 'falkner') showFalknerFightFromOverworld();
+    },
+    onOpenMart(stock: readonly string[]) {
+      pushMartMenu(stock);
     },
     onStarterPick() {
       pushStarterPick();
@@ -859,7 +934,11 @@ function buildTrainerTeam(spec: string | readonly string[]): ReturnType<typeof c
   return createTeam(sides);
 }
 
-function pushTrainerFight(foeSpec: string | readonly string[], winFlag: string): void {
+function pushTrainerFight(
+  foeSpec: string | readonly string[],
+  winFlag: string,
+  reward?: number,
+): void {
   const foeTeam = buildTrainerTeam(foeSpec);
   if (!foeTeam) return;
   const leadName = activeMon(foeTeam).species.name;
@@ -876,7 +955,12 @@ function pushTrainerFight(foeSpec: string | readonly string[], winFlag: string):
       canRun: false,
       onResolve: (winner, finalState) => {
         writebackParty(finalState);
-        if (winner === 'player') flagStore.set(winFlag);
+        if (winner === 'player') {
+          flagStore.set(winFlag);
+          // Phase 5b — trainer payout (game-layer; engine untouched).
+          // Wild wins never reach here (trainers-only, anti-grind).
+          if (reward && reward > 0) run.money = awardMoney(run.money, reward);
+        }
         scenes.pop();
         // Trainer fights aren't grass-rolled, but the grace also
         // protects against the player stepping onto adjacent grass

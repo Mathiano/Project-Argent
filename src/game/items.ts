@@ -30,6 +30,11 @@ export interface Item {
   // medicine items target a mon; berries (future) too; key items
   // typically don't. Drives the bag's target-picker mode.
   readonly targetsParty: boolean;
+  // Phase 5b — Poké Mart buy price (in ₽). Sell price is half this
+  // (classic), computed in economy.ts so the haircut lives in one
+  // place. Every shippable item carries a price; key items (Phase 6+)
+  // that shouldn't be sellable will opt out via a future flag.
+  readonly price: number;
 }
 
 // Pockets in DISPLAY order — the bag's tab order is this array.
@@ -52,6 +57,7 @@ export const ITEMS: { readonly [id: string]: Item } = {
     description: 'Restores 20 HP to one party member.',
     effect: { kind: 'heal-hp', amount: 20 },
     targetsParty: true,
+    price: 300,
   },
   'SUPER POTION': {
     id: 'SUPER POTION',
@@ -60,6 +66,7 @@ export const ITEMS: { readonly [id: string]: Item } = {
     description: 'Restores 50 HP to one party member.',
     effect: { kind: 'heal-hp', amount: 50 },
     targetsParty: true,
+    price: 700,
   },
   'FULL HEAL': {
     id: 'FULL HEAL',
@@ -68,6 +75,7 @@ export const ITEMS: { readonly [id: string]: Item } = {
     description: 'Restores all HP and clears status.',
     effect: { kind: 'heal-hp-full' },
     targetsParty: true,
+    price: 600,
   },
 };
 

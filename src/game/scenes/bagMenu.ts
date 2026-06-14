@@ -20,6 +20,7 @@ import {
 } from '../items';
 import type { BagEntry, ItemCategory } from '../items';
 import type { SideState } from '../../engine';
+import { formatMoney } from '../economy';
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
@@ -29,6 +30,10 @@ export interface BagMenuOpts {
   // Live references — both arrays are mutated when an item is used.
   readonly bag: BagEntry[];
   readonly party: SideState[];
+  // Phase 5b — wallet display. Read at construction; the bag is pushed
+  // fresh each time it opens, so a snapshot is fine (the bag can't
+  // change money — only the Mart does).
+  readonly money: number;
   // Fired after a successful use so main.ts can autosave.
   readonly onChange: () => void;
   readonly onClose: () => void;
@@ -167,6 +172,14 @@ export function createBagMenuScene(opts: BagMenuOpts): Scene {
 
       drawPanel(ctx, PANEL.x, PANEL.y, PANEL.w, PANEL.h);
       drawText(ctx, 'BAG', PANEL.x + 8, PANEL.y + 4, PALETTE.paperShadow);
+      // Money, top-right (Phase 5b).
+      drawText(
+        ctx,
+        `MONEY ${formatMoney(opts.money)}`,
+        PANEL.x + PANEL.w - 110,
+        PANEL.y + 4,
+        PALETTE.ink,
+      );
 
       // Pocket tabs
       POCKETS.forEach((p, i) => {

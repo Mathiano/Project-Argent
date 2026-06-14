@@ -41,7 +41,7 @@
           "favors the bold.",
           "Let me see your read!"
         ]},
-        { "kind": "start-trainer-battle", "foeSpecies": ["FLITPECK", "FLITPECK"], "winFlag": "gym_trainer_beaten" }
+        { "kind": "start-trainer-battle", "foeSpecies": ["FLITPECK", "FLITPECK"], "winFlag": "gym_trainer_beaten", "reward": 800 }
       ],
       "interactAfterFlag": [
         { "kind": "dialog", "lines": [

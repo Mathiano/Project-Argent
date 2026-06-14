@@ -200,6 +200,7 @@ describe('Phase 5a GATE — bag UI: pocket reflects inventory + use mutates stat
     const scene = createBagMenuScene({
       bag,
       party,
+      money: 0,
       onChange: () => {
         changes += 1;
       },
@@ -223,6 +224,7 @@ describe('Phase 5a GATE — bag UI: pocket reflects inventory + use mutates stat
     const scene = createBagMenuScene({
       bag,
       party,
+      money: 0,
       onChange: () => {},
       onClose: () => {},
     });
@@ -239,6 +241,7 @@ describe('Phase 5a GATE — bag UI: pocket reflects inventory + use mutates stat
     const scene = createBagMenuScene({
       bag,
       party,
+      money: 0,
       onChange: () => {
         changes += 1;
       },
@@ -256,6 +259,7 @@ describe('Phase 5a GATE — bag UI: pocket reflects inventory + use mutates stat
     const scene = createBagMenuScene({
       bag: [],
       party: [createSide(CH1.GRUBLEAF!)],
+      money: 0,
       onChange: () => {},
       onClose: () => {
         closes += 1;
@@ -271,6 +275,7 @@ describe('Phase 5a GATE — bag UI: pocket reflects inventory + use mutates stat
     const scene = createBagMenuScene({
       bag: [{ itemId: 'POTION', qty: 1 }],
       party: [createSide(CH1.GRUBLEAF!)],
+      money: 0,
       onChange: () => {},
       onClose: () => {},
     });
@@ -340,5 +345,59 @@ describe('Phase 5a GATE — Pokémon Center heal-party script verb wires through
     scene.input?.('a'); // page 2 of first dialog
     scene.input?.('a'); // closes first dialog → runs heal-party + opens 2nd
     expect(healCalls).toBe(1);
+  });
+});
+
+describe('Phase 5b GATE — Poké Mart open-mart verb wires through the CLERK NPC', () => {
+  test('interacting with the CLERK fires onOpenMart with the shop stock', () => {
+    let martStock: readonly string[] | null = null;
+    const input = mockInput();
+    const scene = createOverworldScene({
+      map: 'HEARTHWICK_MART',
+      spawn: 'fromHearthwick',
+      inputState: input,
+      flags: mockFlags(),
+      onWarp: () => {},
+      onEncounter: () => {},
+      onTrainerBattle: () => {},
+      onBossBattle: () => {},
+      onOpenMart: (stock) => {
+        martStock = stock;
+      },
+    });
+
+    function walkOne(dir: 'up' | 'down' | 'left' | 'right'): void {
+      const startPos = scene.currentPosition();
+      input.press(dir);
+      for (let i = 0; i < 30; i += 1) {
+        scene.update?.(0.02);
+        const p = scene.currentPosition();
+        if (p.x !== startPos.x || p.y !== startPos.y) break;
+      }
+      input.release(dir);
+      for (let i = 0; i < 12; i += 1) scene.update?.(0.02);
+    }
+
+    // fromHearthwick spawn is (4, 6) facing up. CLERK is at (2, 2);
+    // stand at (2, 3) facing up and press A (same approach as the
+    // Center NURSE).
+    walkOne('left'); // (3, 6)
+    walkOne('left'); // (2, 6)
+    walkOne('up'); // (2, 5)
+    walkOne('up'); // (2, 4)
+    walkOne('up'); // (2, 3) — in front of the CLERK
+    expect(scene.currentPosition()).toEqual({
+      map: 'HEARTHWICK_MART',
+      x: 2,
+      y: 3,
+      facing: 'up',
+    });
+
+    // CLERK.interact: dialog (5 lines = 2 pages) → open-mart.
+    scene.input?.('a'); // dialog page 1
+    expect(martStock).toBeNull();
+    scene.input?.('a'); // dialog page 2
+    scene.input?.('a'); // closes dialog → fires open-mart
+    expect(martStock).toEqual(['POTION', 'SUPER POTION', 'FULL HEAL']);
   });
 });

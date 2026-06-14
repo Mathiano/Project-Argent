@@ -36,7 +36,11 @@ export interface OverworldSceneOpts {
   readonly spawnAt?: { readonly x: number; readonly y: number; readonly facing: Facing };
   readonly onWarp: (target: string) => void;
   readonly onEncounter: (foeSpecies: string) => void;
-  readonly onTrainerBattle: (foeSpecies: string | readonly string[], winFlag: string) => void;
+  readonly onTrainerBattle: (
+    foeSpecies: string | readonly string[],
+    winFlag: string,
+    reward?: number,
+  ) => void;
   readonly onBossBattle: (bossId: string) => void;
   // Phase 3 — opt-in. When the active map's script runs
   // `show-starter-pick`, the overworld delegates to this callback so
@@ -50,6 +54,10 @@ export interface OverworldSceneOpts {
   // Phase 5a — opt-in. heal-party script verb (Pokémon Center NPC)
   // fires this so main.ts can fully restore run.party + autosave.
   readonly onHealParty?: () => void;
+  // Phase 5b — opt-in. open-mart script verb (Poké Mart CLERK NPC)
+  // fires this with the shop's stock so main.ts can push the Mart
+  // scene. No callback = no shop (maps without a Mart don't need it).
+  readonly onOpenMart?: (stock: readonly string[]) => void;
 }
 
 // Richer Scene the autosave reads — currentPosition() lets main.ts
@@ -164,7 +172,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         return;
       }
       if (cmd.kind === 'start-trainer-battle') {
-        opts.onTrainerBattle(cmd.foeSpecies, cmd.winFlag);
+        opts.onTrainerBattle(cmd.foeSpecies, cmd.winFlag, cmd.reward);
         return;
       }
       if (cmd.kind === 'start-boss-battle') {
@@ -190,6 +198,13 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         // the next command (typically a confirmation dialog).
         opts.onHealParty?.();
         continue;
+      }
+      if (cmd.kind === 'open-mart') {
+        // Phase 5b Poké Mart. Terminal — hand control to main.ts to
+        // push the shop scene (same delegation as show-starter-pick).
+        // Maps without an onOpenMart wiring no-op silently.
+        opts.onOpenMart?.(cmd.stock);
+        return;
       }
     }
   }

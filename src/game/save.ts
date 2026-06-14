@@ -30,6 +30,10 @@ export interface SaveState {
   // older clients reading a newer save just ignore the unknown
   // field (validator pre-Phase-5a didn't require it either).
   readonly bag?: readonly SavedBagEntry[];
+  // Phase 5b wallet. Additive, same pattern as bag — pre-5b saves
+  // don't carry it; applySave treats missing as the starting wallet
+  // (STARTING_MONEY) so an old save isn't penniless. version stays 1.
+  readonly money?: number;
 }
 
 export interface SavedBagEntry {
@@ -170,5 +174,8 @@ function validateSave(value: unknown): SaveState | null {
       if (typeof ee.qty !== 'number') return null;
     }
   }
+  // money is optional (pre-5b saves). When present it must be a number;
+  // a non-number nukes the save (loud-fail, same as a bad bag row).
+  if (v.money !== undefined && typeof v.money !== 'number') return null;
   return value as SaveState;
 }

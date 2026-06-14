@@ -3,13 +3,14 @@
   "width": 20,
   "height": 14,
   "tilesize": 16,
-  "tiles": "TTTTTTTTTTTTTTTTTTTT\nT..................T\nT.HH.HH....LL.LL...T\nT.HD.HH....LL.LD...T\nT..................T\nT..................T\nT.........X........T\nT.........X........T\nT.........X........T\nT..................T\nT.HH.HH............T\nT.HD.HH............T\nT..................T\nTTTTTTTTTpTTTTTTTTTT",
-  "_layout": "20x14 town. T=tree border, H=house wall, D=house door (warp), L=lab wall, LD=lab door, X=path, p=southern exit to Route 31. Player house top-left (HH/HD), lab top-right (LL/LD), one decoration house bottom-left.",
+  "tiles": "TTTTTTTTTTTTTTTTTTTT\nT..................T\nT.HH.HH....LL.LL...T\nT.HD.HH....LL.LD...T\nT..................T\nT..................T\nT.........X........T\nT.........X........T\nT.........X........T\nT..................T\nT.HH.HH......MMM...T\nT.HD.HH......MDM...T\nT..................T\nTTTTTTTTTpTTTTTTTTTT",
+  "_layout": "20x14 town. T=tree border, H=house wall, D=house/center/mart door (warp), L=lab wall, LD=lab door, M=mart wall, X=path, p=southern exit to Route 31. Player house top-left (HH/HD), lab top-right (LL/LD), Pokémon Center bottom-left (HH/HD door at 3,11), Poké Mart bottom-right (MMM/MDM door at 14,11) — the classic Center+Mart pair.",
   "tileset": {
     "T": { "color": "#1d4a26", "solid": true, "label": "tree" },
     ".": { "color": "#86c06c", "solid": false, "label": "grass" },
     "H": { "color": "#7a4e2d", "solid": true, "label": "house_wall" },
     "L": { "color": "#9c8a78", "solid": true, "label": "lab_wall" },
+    "M": { "color": "#3a6ea5", "solid": true, "label": "mart_wall" },
     "D": { "color": "#daa520", "solid": false, "label": "house_door" },
     "X": { "color": "#d8c08a", "solid": false, "label": "path" },
     "p": { "color": "#d8c08a", "solid": false, "label": "path_exit" }
@@ -47,6 +48,22 @@
         "POKÉMON CENTER",
         "Heal your team —",
         "free for trainers."
+      ]
+    },
+    {
+      "type": "warp",
+      "x": 14,
+      "y": 11,
+      "target": "HEARTHWICK_MART:fromHearthwick"
+    },
+    {
+      "type": "sign",
+      "x": 16,
+      "y": 11,
+      "lines": [
+        "POKÉ MART",
+        "Potions, and a little",
+        "of everything."
       ]
     },
     {
@@ -142,6 +159,7 @@
     "fromHouse": { "x": 3, "y": 4, "facing": "down" },
     "fromLab": { "x": 15, "y": 4, "facing": "down" },
     "fromRoute": { "x": 9, "y": 12, "facing": "up" },
-    "fromCenter": { "x": 3, "y": 12, "facing": "down" }
+    "fromCenter": { "x": 3, "y": 12, "facing": "down" },
+    "fromMart": { "x": 14, "y": 12, "facing": "down" }
   }
 }

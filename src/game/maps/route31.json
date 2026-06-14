@@ -66,6 +66,31 @@
           "lines": ["A flutter in the grass!", "And something heavy in", "the cave hollow…"]
         }
       ]
+    },
+    {
+      "type": "npc",
+      "x": 8,
+      "y": 5,
+      "color": "#b14e9c",
+      "blockedUntilFlag": "route31_trainer_beaten",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": ["YOUNGSTER JAY: You walk", "the routes? Then read", "this!"]
+        },
+        {
+          "kind": "start-trainer-battle",
+          "foeSpecies": "FLITPECK",
+          "winFlag": "route31_trainer_beaten",
+          "reward": 500
+        }
+      ],
+      "interactAfterFlag": [
+        {
+          "kind": "dialog",
+          "lines": ["YOUNGSTER JAY: Good read.", "Spend that at the Mart", "back in town."]
+        }
+      ]
     }
   ],
   "spawns": {

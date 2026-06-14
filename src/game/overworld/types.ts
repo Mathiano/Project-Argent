@@ -38,6 +38,10 @@ export type ScriptCommand =
       // the rest. Maps written before S6 keep working as-is.
       readonly foeSpecies: string | readonly string[];
       readonly winFlag: string;
+      // Phase 5b: money awarded on a win (a per-trainer reward).
+      // Optional — a trainer with no reward (or a legacy map) pays
+      // nothing. Awarded in the game layer on resolve, then autosaved.
+      readonly reward?: number;
     }
   | { readonly kind: 'start-boss-battle'; readonly bossId: string }
   | { readonly kind: 'if-flag'; readonly flag: string; readonly commands: readonly ScriptCommand[] }
@@ -50,7 +54,12 @@ export type ScriptCommand =
   // full HP/ST, clears exhausted/staggered/momentum. The verb is a
   // game-layer call (main.ts mutates run.party + autosaves); the
   // engine doesn't see it.
-  | { readonly kind: 'heal-party' };
+  | { readonly kind: 'heal-party' }
+  // Phase 5b: Poké Mart. Launches the shop scene with `stock` (item
+  // ids for sale). Terminal in the script, same shape as
+  // show-starter-pick — the shop scene owns closing back to the
+  // overworld. main.ts wires onOpenMart; maps without it no-op.
+  | { readonly kind: 'open-mart'; readonly stock: readonly string[] };
 
 export type MapObject =
   | { readonly type: 'warp'; readonly x: number; readonly y: number; readonly target: string }

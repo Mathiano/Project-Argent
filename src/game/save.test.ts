@@ -35,6 +35,7 @@ import {
   wipeStorage,
 } from './save';
 import type { SaveState, StorageLike } from './save';
+import { awardMoney } from './economy';
 
 registerMoves(loadMoves(movesData as MoveJson[]));
 const CH1 = loadDex(ch1BatchData as DexEntryJson[], 13);
@@ -276,6 +277,78 @@ describe('Phase 5a — bag round-trip + back-compat with pre-Phase-5a saves', ()
         catchBreathUnlocked: false,
         rngSeed: 1,
         bag: [{ itemId: 'POTION' /* missing qty */ }],
+      }),
+    );
+    expect(loadFromStorage(storage)).toBeNull();
+  });
+});
+
+describe('Phase 5b — money round-trip + back-compat with pre-5b saves', () => {
+  test('save → load preserves the wallet', () => {
+    const storage = memoryStorage();
+    const state: SaveState = {
+      version: 1,
+      party: [{ speciesName: 'GRUBLEAF', hp: 54, st: 100, momentum: 0 }],
+      position: { map: 'HEARTHWICK', x: 14, y: 12, facing: 'down' },
+      flags: [],
+      catchBreathUnlocked: false,
+      rngSeed: 1,
+      money: 4200,
+    };
+    saveToStorage(state, storage);
+    expect(loadFromStorage(storage)!.money).toBe(4200);
+  });
+
+  test('a trainer payout persists across a save round-trip', () => {
+    // Mirrors the main.ts payout: awardMoney bumps the wallet on a win,
+    // autosave writes it, a later load restores it.
+    const storage = memoryStorage();
+    const earned = awardMoney(3000, 500); // starting + a 500 reward
+    saveToStorage(
+      {
+        version: 1,
+        party: [{ speciesName: 'GRUBLEAF', hp: 54, st: 100, momentum: 0 }],
+        position: { map: 'ROUTE31', x: 8, y: 6, facing: 'up' },
+        flags: ['route31_trainer_beaten'],
+        catchBreathUnlocked: true,
+        rngSeed: 1,
+        money: earned,
+      },
+      storage,
+    );
+    expect(loadFromStorage(storage)!.money).toBe(3500);
+  });
+
+  test('pre-5b saves (no money field) load with money undefined (caller defaults it)', () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 1,
+        party: [{ speciesName: 'GRUBLEAF', hp: 54, st: 100, momentum: 0 }],
+        position: { map: 'LAB', x: 6, y: 7, facing: 'down' },
+        flags: [],
+        catchBreathUnlocked: false,
+        rngSeed: 1,
+      }),
+    );
+    const loaded = loadFromStorage(storage);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.money).toBeUndefined();
+  });
+
+  test('a non-number money field nukes the save (loud-fail)', () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 1,
+        party: [{ speciesName: 'GRUBLEAF', hp: 54, st: 100, momentum: 0 }],
+        position: { map: 'LAB', x: 6, y: 7, facing: 'down' },
+        flags: [],
+        catchBreathUnlocked: false,
+        rngSeed: 1,
+        money: 'lots',
       }),
     );
     expect(loadFromStorage(storage)).toBeNull();
