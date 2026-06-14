@@ -184,3 +184,107 @@ describe('battle menu — FIGHT must open the move list, NOT the Calls-locked di
     expect(screen).not.toContain('Calls unlock');
   });
 });
+
+describe('battle move menu — A commits the highlighted move; SELECT cycles stance', () => {
+  function driveToMoveList(onResolve: (w: 'player' | 'foe') => void = () => {}): {
+    scene: ReturnType<typeof createBattleScene>;
+    foeMove: { kind: 'move'; move: string; stance: 'A' | 'G' | 'F' };
+  } {
+    const player = CH1.GRUBLEAF!;
+    const foe = CH1.FLITPECK!;
+    const state = createBattleState(
+      createTeam([createSide(player)]),
+      createTeam([createSide(foe)]),
+    );
+    const foeMove = { kind: 'move' as const, move: 'TACKLE', stance: 'G' as const };
+    const scene = createBattleScene({
+      state,
+      rng: mulberry32(1),
+      chooseFoeAction: () => foeMove,
+      intro: ['A wild FLITPECK', 'appeared!'],
+      catchBreathUnlocked: false,
+      canRun: true,
+      onResolve,
+    });
+    // 2 A's intro, 1 A confirms FIGHT → phase=move.
+    scene.input?.('a');
+    scene.input?.('a');
+    scene.input?.('a');
+    return { scene, foeMove };
+  }
+
+  test('pressing A on the move list commits the highlighted move (phase leaves move; resolve runs)', () => {
+    const { scene } = driveToMoveList();
+    const ctx = stubCtx();
+
+    // Sanity: we're in the move list.
+    ctx.reset();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('TACKLE');
+
+    // Press A to commit TACKLE.
+    scene.input?.('a');
+
+    // The commit transitions phase → resolve and seeds pendingEvents
+    // from resolveRound. The resolve tickResolve drains events on
+    // update; after a few seconds of ticks, finishResolve fires and
+    // calls beginTurn (or onResolve on team-wipe). Either way, the
+    // bottom row is no longer the move list once events drain.
+    for (let i = 0; i < 60; i += 1) scene.update?.(0.5);
+
+    ctx.reset();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    // After commit + resolve + next-turn beginTurn, the menu (or end
+    // text) is back on screen — TACKLE should NOT still be drawn as
+    // the cursor-prefixed move-list row. If A had been silently
+    // dropped, we'd still be staring at "> TACKLE" with no progress.
+    expect(screen).not.toContain('> TACKLE');
+    // We expect either the FIGHT menu again, or end text.
+    expect(screen.includes('FIGHT') || screen.includes('Press A')).toBe(true);
+  });
+
+  test('pressing A in the move list with a CH1 (registered-only) move still commits — no silent drop', () => {
+    // GRUBLEAF has THORN FLICK (only in REGISTERED_MOVES, not LEGACY MOVES).
+    // The earlier lookupMove fix means this should not throw; here we
+    // verify A on THORN FLICK doesn't silently drop either.
+    const { scene } = driveToMoveList();
+    // Move cursor down once to land on THORN FLICK (GRUBLEAF moves order:
+    // TACKLE, THORN FLICK, LEAF LASH, HEADBUTT).
+    scene.input?.('down');
+    scene.input?.('a');
+    // Drain resolve.
+    for (let i = 0; i < 60; i += 1) scene.update?.(0.5);
+
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    expect(screen).not.toContain('> THORN FLICK');
+  });
+
+  test('SELECT in the move list cycles stance A → G → F → A (visible in the stance badge label)', () => {
+    const { scene } = driveToMoveList();
+    const ctx = stubCtx();
+
+    ctx.reset();
+    scene.draw(ctx);
+    // Default stance is A (AGGR). The UI helper draws STANCE_NAME[stance]
+    // — for 'A' that's "AGGR".
+    expect(ctx.texts).toContain('AGGR');
+
+    scene.input?.('select');
+    ctx.reset();
+    scene.draw(ctx);
+    expect(ctx.texts).toContain('GUARD');
+
+    scene.input?.('select');
+    ctx.reset();
+    scene.draw(ctx);
+    expect(ctx.texts).toContain('FLUID');
+
+    scene.input?.('select');
+    ctx.reset();
+    scene.draw(ctx);
+    expect(ctx.texts).toContain('AGGR');
+  });
+});
