@@ -1,10 +1,10 @@
 import {
   COMBAT,
-  MOVES,
   TIERS,
   activeMon,
   forcedAction,
   isTeamWiped,
+  lookupMove,
   resolveRound,
 } from '../../engine';
 import type {
@@ -88,7 +88,7 @@ function opposite(side: Side): Side {
 
 function computeInit(side: SideState, moveName: string | null, stance: Stance): number {
   if (moveName === null) return -1;
-  const tier = MOVES[moveName]!.tier;
+  const tier = lookupMove(moveName).tier;
   const weight = TIERS[tier].weight;
   const base = side.species.spd / weight;
   const stag = side.staggered ? base * COMBAT.staggerInitMult : base;
@@ -130,7 +130,7 @@ function describeFoeIntent(action: Action): { stance: Stance | null; tag: string
   if (action.kind === 'rest') return { stance: null, tag: 'RESTING' };
   if (action.kind === 'catchBreath') return { stance: null, tag: 'RECOVERING' };
   if (action.kind === 'switch') return { stance: null, tag: 'SWITCHING' };
-  return { stance: action.stance, tag: `${TIER_TAG[MOVES[action.move]!.tier]} ATTACK` };
+  return { stance: action.stance, tag: `${TIER_TAG[lookupMove(action.move).tier]} ATTACK` };
 }
 
 export function createBattleScene(opts: BattleSceneOpts): Scene {
@@ -442,7 +442,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     else if (key === 'b') phase = 'menu';
     else if (key === 'a') {
       const moveName = moves[moveCursor]!;
-      const move = MOVES[moveName]!;
+      const move = lookupMove(moveName);
       if (activeMon(state.player).st <= COMBAT.winded && (move.tier === 'heavy' || move.tier === 'nuke')) {
         setText(['Too winded for', 'heavy moves!'], () => {
           phase = 'move';
@@ -616,7 +616,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     const moves = activeMon(state.player).species.moves;
     moves.forEach((m, i) => {
-      const move = MOVES[m]!;
+      const move = lookupMove(m);
       const tier = TIERS[move.tier];
       const locked =
         (activeMon(state.player).st <= COMBAT.winded && (move.tier === 'heavy' || move.tier === 'nuke')) ||
