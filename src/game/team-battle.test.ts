@@ -34,6 +34,7 @@ import type {
   TypeChart,
 } from '../engine';
 import { createBattleScene } from './scenes/battle';
+import { drawBar } from './ui';
 
 registerMoves(loadMoves(movesData as MoveJson[]));
 const CH1 = loadDex(ch1BatchData as DexEntryJson[], 13);
@@ -266,6 +267,66 @@ describe('Phase 1 GATE — 2v2 player battle, voluntary + forced switching', () 
     scene.input?.('a'); // advance end-text line 1
     scene.input?.('a'); // advance end-text line 2 → onResolve('foe')
     expect(resolved).toBe('foe');
+  });
+});
+
+describe('Phase 1 — HP bar render contract on switch-in (regression)', () => {
+  test('after a voluntary switch, the player panel shows the new mon (never the old) before any new round', () => {
+    // SILTSKIP lead (67/67) switches to GRUBLEAF (54/54). Pre-fix the
+    // panel read activeMon(state.player) so the NAME swapped to
+    // GRUBLEAF immediately while display.hp lagged at 67 → bar showed
+    // 67/54 = 124% overflow on a panel named GRUBLEAF. The fix routes
+    // panel reads through display (which carries species + maxHp
+    // together), so name and hp stay paired.
+    const silt = createSide(CH1.SILTSKIP!);
+    const grub = createSide(CH1.GRUBLEAF!);
+    const scene = buildScene({
+      playerParty: [silt, grub],
+      foeParty: [createSide(CH1.FLITPECK!)],
+    });
+
+    // Initial draw: SILTSKIP is the active.
+    let ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts).toContain('SILTSKIP');
+
+    // Open PKMN → confirm switch to GRUBLEAF → commit fires.
+    scene.input?.('down');
+    scene.input?.('a');
+    scene.input?.('a');
+    // Drain resolve (skipResolve) — switch + foe TACKLE round finishes.
+    scene.input?.('a');
+    for (let i = 0; i < 5; i += 1) scene.update?.(0.1);
+
+    ctx = stubCtx();
+    scene.draw(ctx);
+    // After the switch round, GRUBLEAF is active. The panel shows it.
+    expect(ctx.texts).toContain('GRUBLEAF');
+    // And SILTSKIP is no longer the active label — only appears in
+    // bench indicators (color, not text).
+    expect(ctx.texts).not.toContain('SILTSKIP');
+  });
+
+  test('drawBar clamps fill to width (defensive: even if value > max, no overflow)', () => {
+    // Belt-and-suspenders: import drawBar and call directly with a
+    // value > max. Verify via a recording ctx that the second fillRect
+    // (the fill, not the background) uses width <= bar width.
+    // (The first fillRect is the empty background with width = w.)
+    type Rect = { w: number };
+    const rects: Rect[] = [];
+    const ctx: Partial<CanvasRenderingContext2D> = {
+      fillStyle: '',
+      strokeStyle: '',
+      lineWidth: 0,
+      fillRect: (_x: number, _y: number, w: number) => {
+        rects.push({ w });
+      },
+      strokeRect: () => {},
+    };
+    drawBar(ctx as CanvasRenderingContext2D, 0, 0, 100, 200, 100, '#0f0'); // value=200 > max=100
+    // First rect = background (w=100). Second rect = fill (should be ≤100).
+    expect(rects.length).toBeGreaterThanOrEqual(2);
+    expect(rects[1]!.w).toBeLessThanOrEqual(100);
   });
 });
 

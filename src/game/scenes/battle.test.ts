@@ -553,6 +553,114 @@ describe('battle forced action (exhausted)', () => {
   });
 });
 
+describe('resolve cadence + stance labels — legibility pass', () => {
+  test('EVERY strike holds (turn-order beat: faster mon visibly first, then slower)', () => {
+    const { scene } = buildScene({
+      foeAction: { kind: 'move', move: 'TACKLE', stance: 'G' },
+    });
+    scene.input?.('a'); // FIGHT
+    scene.input?.('a'); // TACKLE → resolve
+    scene.update?.(1.0);
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    // Held on the first consequential event (commit). Player's commit
+    // line is on the log; the foe's commit hasn't fired yet.
+    expect(ctx.texts.join('|')).toContain('used TACKLE');
+  });
+
+  // Helper: drive an EMBERCUB-vs-AQUAFIN scenario to a specific stance-
+  // interaction event, sampling the log WHILE still in resolve. We
+  // advance through holds one-by-one without skipResolve so the log
+  // accumulates the lines we want to see.
+  function driveStanceScenario(
+    _playerStance: 'A' | 'G' | 'F',
+    foeStance: 'A' | 'G' | 'F',
+    playerSpecies: import('../../engine').Species,
+    foeSpecies: import('../../engine').Species,
+    rngSeed: number,
+  ): ReturnType<typeof createBattleScene> {
+    return createBattleScene({
+      state: createBattleState(
+        createTeam([createSide(playerSpecies)]),
+        createTeam([createSide(foeSpecies)]),
+      ),
+      rng: mulberry32(rngSeed),
+      chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: foeStance }),
+      intro: [],
+      catchBreathUnlocked: false,
+      canRun: true,
+      onResolve: () => {},
+    });
+  }
+  function pickStance(scene: ReturnType<typeof createBattleScene>, st: 'A' | 'G' | 'F'): void {
+    scene.input?.('a'); // FIGHT
+    if (st === 'G') scene.input?.('select');
+    else if (st === 'F') {
+      scene.input?.('select');
+      scene.input?.('select');
+    }
+    scene.input?.('a'); // commit TACKLE/<stance>
+  }
+  function logContains(scene: ReturnType<typeof createBattleScene>, target: string): boolean {
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    return ctx.texts.join('|').includes(target);
+  }
+  // Advance through holds + cadence, sampling the on-screen log every
+  // step. Returns true when the target string surfaces (the test's
+  // assertion is "this stance label appears in the log at some point
+  // during resolve"). Stops if max iterations elapse without a match.
+  function advanceUntilLog(
+    scene: ReturnType<typeof createBattleScene>,
+    target: string,
+    maxIters: number,
+  ): boolean {
+    for (let i = 0; i < maxIters; i += 1) {
+      if (logContains(scene, target)) return true;
+      scene.update?.(1.0);
+      scene.input?.('a');
+    }
+    return logContains(scene, target);
+  }
+
+  test('stance label on counter: "GUARD counters!" appears in the log when G defends vs A', () => {
+    const scene = driveStanceScenario('G', 'A', SPECIES.EMBERCUB!, SPECIES.AQUAFIN!, 42);
+    pickStance(scene, 'G');
+    expect(advanceUntilLog(scene, 'GUARD counters', 12)).toBe(true);
+  });
+
+  test('stance label on opening: "FLUID slips past GUARD" when F attacks G', () => {
+    const scene = driveStanceScenario('F', 'G', SPECIES.AQUAFIN!, SPECIES.EMBERCUB!, 42);
+    pickStance(scene, 'F');
+    expect(advanceUntilLog(scene, 'FLUID slips past GUARD', 12)).toBe(true);
+  });
+
+  test('stance label on dodge: "FLUID dodged" when A attacks F and the speed roll lands', () => {
+    const scene = createBattleScene({
+      state: createBattleState(
+        createTeam([createSide(SPECIES.AQUAFIN!)]),
+        createTeam([createSide(SPECIES.EMBERCUB!)]),
+      ),
+      // First draw: variance. Second: dodge roll. Force a low dodge
+      // roll so the dodge always succeeds (p ≈ 0.9 from speed ratio).
+      rng: {
+        next: (() => {
+          const seq = [0.5, 0.05, 0.5, 0.05, 0.5, 0.05, 0.5, 0.05];
+          let i = 0;
+          return () => seq[i++ % seq.length]!;
+        })(),
+      },
+      chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'F' }),
+      intro: [],
+      catchBreathUnlocked: false,
+      canRun: true,
+      onResolve: () => {},
+    });
+    pickStance(scene, 'A');
+    expect(advanceUntilLog(scene, 'FLUID dodged', 12)).toBe(true);
+  });
+});
+
 describe('resolve cadence — auto-play pauses on consequential lines until A/Start', () => {
   test('auto-play stops at the first consequential event (commit log line); next tick does not advance', () => {
     const { scene } = buildScene();

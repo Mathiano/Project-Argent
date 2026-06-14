@@ -345,17 +345,22 @@ function showTestBattle(): void {
 }
 
 // ?skip=test-battle-2v2 hook — Phase 1 combat-in-isolation that
-// exercises switching as a tactical READ, not just a mechanism.
-// Lead GRUBLEAF (SPROUT) vs wild KILNDRAKE (FLAME) is the classic
-// triangle disadvantage: FLAME→SPROUT = 1.3 punishes the lead;
-// SPLASH→FLAME = 1.3 makes SILTSKIP (the bench) the correct answer.
-// User ruling: KINDRAKE can't be "the answer" against a FLAME foe
-// (FLAME→FLAME=0.7), so we substitute the available CH1 triangle.
+// exercises switching as a tactical READ on BOTH sides:
+//   - Player party: GRUBLEAF (SPROUT) lead at FLAME-punished
+//     disadvantage; SILTSKIP (SPLASH) on bench is the answer.
+//   - Foe team: KILNDRAKE (FLAME) lead → FLITPECK (GALE) as the
+//     forced-switch successor. Once the player swaps to SILTSKIP and
+//     KOs KILNDRAKE, foe-side forced-switch fires and FLITPECK takes
+//     the field — putting the player back at a switching decision
+//     (GALE→SPROUT 1.3 punishes the GRUBLEAF bench).
+// Both sides' switch flow is testable from this one hook.
 function showTestBattle2v2(): void {
-  const foe = CH1_DEX.KILNDRAKE ?? CH1_DEX.KINDRAKE ?? SPECIES.FUZZLET!;
+  const foeLead = CH1_DEX.KILNDRAKE ?? CH1_DEX.KINDRAKE ?? SPECIES.FUZZLET!;
+  const foeSecond = CH1_DEX.FLITPECK ?? SPECIES.FUZZLET!;
+  const foeTeam = createTeam([createSide(foeLead), createSide(foeSecond)]);
   const state = createBattleState(
     buildPlayerTeam(),
-    createSide(foe),
+    foeTeam,
     { typeChart: TYPECHART_CH1 },
   );
   scenes.replace(
@@ -365,7 +370,7 @@ function showTestBattle2v2(): void {
       chooseFoeAction: (s, r) => wildFoeAI(s, r),
       intro: [
         `2v2 test:`,
-        `wild ${foe.name} appeared!`,
+        `wild ${foeLead.name} appeared!`,
         `Lead is at a type`,
         `disadvantage — switch?`,
       ],

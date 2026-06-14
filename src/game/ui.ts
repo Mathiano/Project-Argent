@@ -30,7 +30,11 @@ export function drawBar(
 ): void {
   ctx.fillStyle = PALETTE.barEmpty;
   ctx.fillRect(x, y, w, 4);
-  const filled = Math.max(0, Math.round((w * value) / Math.max(1, max)));
+  // Clamp to [0, w] so an upstream value > max (e.g. a stale display
+  // pre-switch) can never overflow the bar past the panel border.
+  // The real fix is keeping value + max in sync (see battle.ts display
+  // contract); this is belt-and-suspenders.
+  const filled = Math.max(0, Math.min(w, Math.round((w * value) / Math.max(1, max))));
   ctx.fillStyle = color;
   ctx.fillRect(x, y, filled, 4);
   ctx.strokeStyle = PALETTE.ink;

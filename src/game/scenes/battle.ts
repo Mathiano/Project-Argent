@@ -15,6 +15,7 @@ import type {
   RNG,
   Side,
   SideState,
+  Species,
   Stance,
   Team,
 } from '../../engine';
@@ -65,12 +66,22 @@ export interface BattleSceneOpts {
   readonly onResolve: (winner: 'player' | 'foe') => void;
 }
 
+// Display carries everything the panel needs about the CURRENTLY-SHOWN
+// mon (its species, maxHp, and live hp/st/etc). It LAGS the engine
+// across a switch — state.player.active updates synchronously at
+// commit, but display.player only catches up when the switchIn event
+// applies. Routing the panel through display (not activeMon(state))
+// keeps name + bar matched: the HP bar's numerator AND denominator
+// always come from the same mon, so the bar can't overflow or appear
+// to "regain" on switch-in.
 interface DisplaySide {
   hp: number;
+  maxHp: number;
   st: number;
   momentum: number;
   exhausted: boolean;
   staggered: boolean;
+  species: Species;
 }
 
 interface Display {
@@ -81,10 +92,12 @@ interface Display {
 function snapshot(side: SideState): DisplaySide {
   return {
     hp: side.hp,
+    maxHp: side.maxHp,
     st: side.st,
     momentum: side.momentum,
     exhausted: side.exhausted,
     staggered: side.staggered,
+    species: side.species,
   };
 }
 
@@ -232,7 +245,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // after applying one of these until the player presses A/Start.
   function isConsequential(ev: BattleEvent): boolean {
     if (ev.kind === 'commit' && ev.action.kind === 'move') return true;
-    if (ev.kind === 'strike' && ev.effectiveness !== 1) return true;
+    // EVERY strike holds — gives the player a visible beat between the
+    // faster and slower mon's actions. Initiative is computed by the
+    // engine; the renderer surfaces "who acted now" by pausing between
+    // each strike.
+    if (ev.kind === 'strike') return true;
     if (ev.kind === 'dodge') return true;
     if (ev.kind === 'opening') return true;
     if (ev.kind === 'counter') return true;
@@ -244,15 +261,24 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function applyEvent(ev: BattleEvent): void {
     if (ev.kind === 'roundStart') {
+      // roundStart's snapshot is of the PRE-resolve active mon — before
+      // any in-round switch fires. Preserve display.species (which is
+      // also the pre-resolve mon) so the panel name + hp/maxHp stay
+      // consistent. switchIn / forcedSwitch fire later in the event
+      // stream and reseat species too.
       display.player = {
+        ...display.player,
         hp: ev.player.hp,
+        maxHp: ev.player.maxHp,
         st: ev.player.st,
         momentum: ev.player.momentum,
         exhausted: ev.player.exhausted,
         staggered: ev.player.staggered,
       };
       display.foe = {
+        ...display.foe,
         hp: ev.foe.hp,
+        maxHp: ev.foe.maxHp,
         st: ev.foe.st,
         momentum: ev.foe.momentum,
         exhausted: ev.foe.exhausted,
@@ -308,27 +334,30 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       return;
     }
     if (ev.kind === 'dodge') {
-      const who = ev.side === 'player' ? activeMon(state.player).species.name : 'Foe ' + activeMon(state.foe).species.name;
-      pushLog(`${who} dodged it!`);
+      // Stance label teaches WHY: FLUID dodged an Aggressive strike.
+      const who = ev.side === 'player' ? display.player.species.name : 'Foe ' + display.foe.species.name;
+      pushLog(`${who}'s FLUID dodged it!`);
       animSide = ev.side;
       animKind = 'dodge';
       animT = 0.25;
       return;
     }
     if (ev.kind === 'opening') {
+      // Stance label teaches WHY: FLUID slipped past a GUARD stance.
       const def = opposite(ev.side);
       display[def].hp = Math.max(0, display[def].hp - ev.damage);
-      pushLog('Found an opening!');
+      pushLog('FLUID slips past GUARD — opening!');
       animSide = ev.side;
       animKind = 'opening';
       animT = 0.25;
       return;
     }
     if (ev.kind === 'counter') {
+      // Stance label teaches WHY: GUARD countered an Aggressive strike.
       const att = opposite(ev.side);
       display[att].hp = Math.max(0, display[att].hp - ev.damage);
-      const who = ev.side === 'player' ? activeMon(state.player).species.name : 'Foe';
-      pushLog(`${who} countered!`);
+      const who = ev.side === 'player' ? display.player.species.name : 'Foe';
+      pushLog(`${who}'s GUARD counters!`);
       animSide = ev.side;
       animKind = 'counter';
       animT = 0.25;
@@ -727,7 +756,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function drawFoePanel(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, FOE_PANEL.x, FOE_PANEL.y, FOE_PANEL.w, FOE_PANEL.h);
-    drawText(ctx, activeMon(state.foe).species.name, FOE_PANEL.x + 8, FOE_PANEL.y + 6);
+    drawText(ctx, display.foe.species.name, FOE_PANEL.x + 8, FOE_PANEL.y + 6);
     if (display.foe.staggered) drawText(ctx, 'STAG', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
     if (display.foe.exhausted) drawText(ctx, 'EXH', FOE_PANEL.x + 108, FOE_PANEL.y + 6, PALETTE.hpCrit);
     drawMomentum(ctx, FOE_PANEL.x + 132, FOE_PANEL.y + 6, display.foe.momentum, COMBAT.momentumCap);
@@ -742,8 +771,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       FOE_PANEL.y + 19,
       FOE_PANEL.w - 36,
       display.foe.hp,
-      activeMon(state.foe).maxHp,
-      hpColor(display.foe.hp, activeMon(state.foe).maxHp),
+      display.foe.maxHp,
+      hpColor(display.foe.hp, display.foe.maxHp),
     );
     drawText(ctx, 'ST', FOE_PANEL.x + 8, FOE_PANEL.y + 26, PALETTE.paperShadow);
     drawBar(
@@ -764,7 +793,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function drawPlayerPanel(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, PL_PANEL.x, PL_PANEL.y, PL_PANEL.w, PL_PANEL.h);
-    drawText(ctx, activeMon(state.player).species.name, PL_PANEL.x + 8, PL_PANEL.y + 6);
+    drawText(ctx, display.player.species.name, PL_PANEL.x + 8, PL_PANEL.y + 6);
     if (display.player.staggered) drawText(ctx, 'STAG', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
     if (display.player.exhausted) drawText(ctx, 'EXH', PL_PANEL.x + 108, PL_PANEL.y + 6, PALETTE.hpCrit);
     drawMomentum(ctx, PL_PANEL.x + 132, PL_PANEL.y + 6, display.player.momentum, COMBAT.momentumCap);
@@ -776,8 +805,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       PL_PANEL.y + 19,
       PL_PANEL.w - 36,
       display.player.hp,
-      activeMon(state.player).maxHp,
-      hpColor(display.player.hp, activeMon(state.player).maxHp),
+      display.player.maxHp,
+      hpColor(display.player.hp, display.player.maxHp),
     );
     drawText(ctx, 'ST', PL_PANEL.x + 8, PL_PANEL.y + 26, PALETTE.paperShadow);
     drawBar(
@@ -994,14 +1023,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
       drawSpeciesInSlot(
         ctx,
-        { name: activeMon(state.foe).species.name, type: activeMon(state.foe).species.types[0] ?? null },
+        { name: display.foe.species.name, type: display.foe.species.types[0] ?? null },
         FOE_SLOT.x + spriteOffset('foe'),
         FOE_SLOT.y,
         { facing: 'left' },
       );
       drawSpeciesInSlot(
         ctx,
-        { name: activeMon(state.player).species.name, type: activeMon(state.player).species.types[0] ?? null },
+        { name: display.player.species.name, type: display.player.species.types[0] ?? null },
         PL_SLOT.x + spriteOffset('player'),
         PL_SLOT.y,
         { facing: 'right' },

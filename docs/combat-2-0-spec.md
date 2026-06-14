@@ -325,3 +325,18 @@ Battle menu rows are FIGHT / PKMN / CALL / RUN, in display order. The cursor ski
 - **Forced switch is a tactical READ**, not a confirmation — picking the next mon is core to the pillar, not polish.
 
 Pinned by `src/game/team-battle.test.ts`.
+
+## Resolve replay — cadence + stance labels (Phase 1 legibility pass)
+
+Combat is mechanically correct; the replay surfaces it for human reading:
+
+- **Cadence**: between non-hold log lines, the renderer auto-advances at ~0.9s — slow enough to read short lines without animation help.
+- **Holds (read-required beats)**: auto-play PAUSES indefinitely on consequential events until A/Start. Consequential = `commit` (move), `strike` (every one, so faster-then-slower turn order is a visible beat — not a simultaneous resolve), `dodge`, `opening`, `counter`, `clash`, `faint`, `break`.
+- **A on a hold**: releases just that hold; auto-play continues to the next hold.
+- **A when NOT held**: still flushes via `skipResolve` (impatient replay).
+- **Stance labels on stance-interaction lines** (teach the player WHY a stance outcome happened):
+  - dodge: `"X's FLUID dodged it!"`
+  - opening: `"FLUID slips past GUARD — opening!"`
+  - counter: `"X's GUARD counters!"`
+
+Pinned by `src/game/scenes/battle.test.ts` (resolve-cadence + stance-labels block).
