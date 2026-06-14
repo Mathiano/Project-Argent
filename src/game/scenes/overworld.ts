@@ -24,24 +24,38 @@ export interface OverworldSceneOpts {
   readonly inputState: InputState;
   readonly flags: FlagStore;
   readonly startFaded?: boolean;
+  // Optional override: land at exact (x, y, facing) instead of looking
+  // up by spawn id. Used by save/load to restore an arbitrary position.
+  readonly spawnAt?: { readonly x: number; readonly y: number; readonly facing: Facing };
   readonly onWarp: (target: string) => void;
   readonly onEncounter: (foeSpecies: string) => void;
   readonly onTrainerBattle: (foeSpecies: string | readonly string[], winFlag: string) => void;
   readonly onBossBattle: (bossId: string) => void;
 }
 
-export function createOverworldScene(opts: OverworldSceneOpts): Scene {
+// Richer Scene the autosave reads — currentPosition() lets main.ts
+// snapshot the player's location at any moment without scene-internal
+// peeking. Plain Scene callers ignore the extra method.
+export interface OverworldScene extends Scene {
+  currentPosition(): { readonly map: string; readonly x: number; readonly y: number; readonly facing: Facing };
+}
+
+export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
   const map = getMap(opts.map);
   const rows = map.tiles.split('\n');
   const tileset = map.tilesetRef !== undefined ? getTileset(map.tilesetRef) : null;
   const tileCache = tileset ? bakeTileCache(tileset) : null;
   const spawn = map.spawns[opts.spawn] ?? Object.values(map.spawns)[0]!;
+  // spawnAt overrides the named-spawn lookup — used by the save/load
+  // restore path to land at the exact previous position. Falls back to
+  // the named spawn for normal play.
+  const landAt = opts.spawnAt ?? spawn;
 
-  let tx = spawn.x;
-  let ty = spawn.y;
+  let tx = landAt.x;
+  let ty = landAt.y;
   let prevTx = tx;
   let prevTy = ty;
-  let facing: Facing = spawn.facing;
+  let facing: Facing = landAt.facing;
   let moveT = 1;
   let moving = false;
   // Walk cycle: stride flips between 1 and 2 each tile crossed; idle = 0.
@@ -267,6 +281,9 @@ export function createOverworldScene(opts: OverworldSceneOpts): Scene {
   }
 
   return {
+    currentPosition() {
+      return { map: opts.map, x: tx, y: ty, facing };
+    },
     update(dt) {
       tick += dt;
       if (fadePhase === 'fadeIn') {

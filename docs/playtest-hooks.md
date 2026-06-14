@@ -41,6 +41,7 @@ URL: `http://localhost:5173/?skip=<value>[&starter=<species>]`
 | `?starter=KINDRAKE` | Pick the cold-start starter for any hook that needs one. Valid: `KINDRAKE` / `GRUBLEAF` / `SILTSKIP`. Default: `GRUBLEAF`. |
 | `?party=A,B,C`      | Build a multi-mon test party from a comma-separated species list. Wins over `?starter` when present. RNG seeded by a stable hash of the party (same party → same seed). Species must exist in STARTERS or the CH1 dex. Examples: `?party=GRUBLEAF,SILTSKIP` (Phase 1 default); `?party=GRUBLEAF,KINDRAKE,SILTSKIP` (full triangle). |
 | `?graybox=1`        | Force the legacy graybox tilemap for any map that has both a graybox and a data-driven version. Useful for layout-vs-art comparison. |
+| `?wipe`             | Clears the localStorage save before any other handling runs. Phase 2 — used to QA the New Game / first-time-player path repeatedly without leaving the browser. Stacks with any `?skip=`. |
 
 ### Example URLs
 
@@ -51,6 +52,15 @@ URL: `http://localhost:5173/?skip=<value>[&starter=<species>]`
 - `http://localhost:5173/?skip=falkner&starter=KINDRAKE` — jump to the Falkner fight as KINDRAKE.
 - `http://localhost:5173/?skip=falkner&party=GRUBLEAF,SILTSKIP` — Falkner with a 2-mon party.
 - `http://localhost:5173/?skip=overworld&graybox=1` — Route 31 in legacy graybox tiles.
+- `http://localhost:5173/?wipe` — clear save, then show the title (no save → no Continue offered).
+- `http://localhost:5173/?wipe&skip=test-battle` — clear save, then drop straight into the test battle.
+
+### Phase 2 — save / load + the Continue path
+
+- **Autosave** fires silently on every overworld scene-transition (warp completion, battle resolve) and on `window.beforeunload` (tab close / refresh). Never mid-battle.
+- **Continue** appears on the title screen only when a save exists. Selecting it restores party (hp/st/momentum), position (map/x/y/facing), flags, call-unlock, and the RNG seed. `New Game` wipes the save.
+- **Save shape** is `version: 1` (see `src/game/save.ts`). Unknown / older versions are treated as no save.
+- To test the New Game flow without ending up with a stale save: append `?wipe` to whatever URL you're loading.
 
 ---
 

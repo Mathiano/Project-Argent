@@ -41,6 +41,15 @@ import { createOverworldScene } from './scenes/overworld';
 import { createPrepScene } from './scenes/prep';
 import { createStarterPickScene } from './scenes/starterPick';
 import { createTitleScene } from './scenes/title';
+import {
+  fromSavedSide,
+  hasSave,
+  loadFromStorage,
+  saveToStorage,
+  toSavedSide,
+  wipeStorage,
+} from './save';
+import type { SaveState } from './save';
 
 const host = document.getElementById('app');
 if (!host) throw new Error('Argent: #app element missing in index.html');
@@ -93,6 +102,14 @@ const RNG_SEED = 0xa9c0;
 
 const scenes = new SceneStack();
 
+// Reference to the currently-active overworld scene (null when title /
+// starter pick / battle-only paths are on top). The autosave hook
+// snapshots position from this reference; if null, position isn't
+// persisted (no overworld = nothing to remember).
+let currentOverworldScene: import('./scenes/overworld').OverworldScene | null = null;
+// Stable seed for the current run. Persisted as part of the save.
+let currentRngSeed: number = 0;
+
 interface RunState {
   // Phase 1: party is a list of rich SideStates — hp/st/momentum
   // persist across battles per canon (KO-stamina memo from CLAUDE.md).
@@ -144,39 +161,115 @@ function partySeed(): number {
 
 // Build the player Team for a battle from the current party. Uses the
 // rich SideStates from run.party (preserves hp/st/momentum across
-// battles per the KO-stamina canon — but until save/load lands in
-// Phase 2 we rebuild fresh each battle via the partyLead fallback).
-//
-// FLAGGED for design: state writeback after a battle (so a 1-HP
-// survivor stays 1-HP next encounter) is not wired yet. Today each
-// battle starts at full HP/ST. Phase 2 (save/load) is the natural
-// home for the writeback.
+// battles per the KO-stamina canon — Phase 2 writeback wires this).
 function buildPlayerTeam(): ReturnType<typeof createTeam> {
   if (run.party.length === 0) return createTeam([createSide(STARTERS[0]!)]);
-  // Re-create sides so a battle's hp/st changes don't bleed into the
-  // run state until writeback exists. Same shape, fresh values.
-  const fresh = run.party.map((side) => createSide(side.species));
+  // Clone the SideStates so a battle's exhausted/staggered flags
+  // (round-local) don't bleed into run.party between battles.
+  // hp/st/momentum carry through — that's the writeback.
+  const fresh = run.party.map((side) => ({ ...side, exhausted: false, staggered: false }));
   return createTeam(fresh);
 }
 
+// Resolve a species name across the CH1 dex + LEGACY fixture (skip-
+// flag paths use legacy species). Throws if a saved name is unknown.
+function resolveSpecies(name: string): Species {
+  const sp = CH1_DEX[name] ?? SPECIES[name];
+  if (!sp) throw new Error(`Argent: unknown species "${name}" — dex drift?`);
+  return sp;
+}
+
+// The Phase 2 writeback. Called from every battle's onResolve with the
+// final BattleState — extracts the post-battle Team's members back
+// into run.party so hp/st/momentum carry forward. Uses toSavedSide /
+// fromSavedSide so the writeback shape MATCHES the save/load shape
+// exactly (single source of truth — the two consumers can't drift).
+function writebackParty(finalState: BattleState): void {
+  run.party = finalState.player.members.map((m) =>
+    fromSavedSide(toSavedSide(m), resolveSpecies),
+  );
+}
+
+// Silent autosave to localStorage. Fires on every overworld scene-
+// transition (warp completion, battle resolve) AND on browser
+// beforeunload so a tab-close preserves the in-overworld position.
+// Skipped when no overworld is active (title/starter pick — nothing
+// meaningful to remember yet).
+function autosaveNow(): void {
+  if (currentOverworldScene === null) return;
+  if (run.party.length === 0) return;
+  const pos = currentOverworldScene.currentPosition();
+  const state: SaveState = {
+    version: 1,
+    party: run.party.map(toSavedSide),
+    position: pos,
+    flags: Array.from(sessionFlags),
+    catchBreathUnlocked: run.catchBreathUnlocked,
+    rngSeed: currentRngSeed,
+  };
+  saveToStorage(state);
+}
+
 function showTitle(): void {
-  scenes.replace(createTitleScene({ onStart: showStarterPick }));
+  currentOverworldScene = null;
+  // Continue is offered only when a save exists; selecting it restores
+  // the run from localStorage. Phase 2 save/load. exactOptionalProps
+  // wants us to omit the field rather than pass undefined.
+  scenes.replace(
+    createTitleScene(
+      hasSave()
+        ? { onStart: showStarterPick, onContinue: continueFromSave }
+        : { onStart: showStarterPick },
+    ),
+  );
 }
 
 function showStarterPick(): void {
+  currentOverworldScene = null;
   scenes.replace(
     createStarterPickScene({
       starters: STARTERS,
       onPick: (species) => {
+        // New game — wipe any old save (the player chose a fresh start).
+        wipeStorage();
         run.party = [createSide(species)];
         run.catchBreathUnlocked = false;
-        run.rng = mulberry32(partySeed());
+        currentRngSeed = partySeed();
+        run.rng = mulberry32(currentRngSeed);
         sessionFlags.clear();
         recomputeSignpostFlags();
         showOverworld('LAB', 'default', false);
       },
     }),
   );
+}
+
+// Phase 2 — restore the run from a SaveState and spawn the player at
+// the exact saved position. Called from the title's Continue option.
+function applySave(saved: SaveState): void {
+  run.party = saved.party.map((s) => fromSavedSide(s, resolveSpecies));
+  run.catchBreathUnlocked = saved.catchBreathUnlocked;
+  currentRngSeed = saved.rngSeed;
+  run.rng = mulberry32(currentRngSeed);
+  sessionFlags.clear();
+  for (const f of saved.flags) sessionFlags.add(f);
+  recomputeSignpostFlags();
+  showOverworld(saved.position.map, 'default', true, {
+    x: saved.position.x,
+    y: saved.position.y,
+    facing: saved.position.facing,
+  });
+}
+
+function continueFromSave(): void {
+  const saved = loadFromStorage();
+  if (!saved) {
+    // Save vanished between title render and click — fall back to new
+    // game flow.
+    showStarterPick();
+    return;
+  }
+  applySave(saved);
 }
 
 // Simple wild AI: uniform-random affordable move + 40A/30G/30F stance mix.
@@ -201,7 +294,8 @@ function showWildBattle(): void {
       intro: ['A wild FUZZLET', 'appeared!', 'TIP: SELECT cycles', 'your STANCE.'],
       catchBreathUnlocked: false,
       canRun: true,
-      onResolve: (winner) => {
+      onResolve: (winner, finalState) => {
+        writebackParty(finalState);
         if (winner === 'player') {
           run.catchBreathUnlocked = true;
           showPrep();
@@ -247,7 +341,10 @@ function showRivalBattle(): void {
       ],
       catchBreathUnlocked: run.catchBreathUnlocked,
       canRun: false,
-      onResolve: (winner) => showEnd(winner === 'player'),
+      onResolve: (winner, finalState) => {
+        writebackParty(finalState);
+        showEnd(winner === 'player');
+      },
     }),
   );
 }
@@ -296,7 +393,8 @@ function showFalknerFight(): void {
       ],
       catchBreathUnlocked: true,
       canRun: false,
-      onResolve: (winner) => {
+      onResolve: (winner, finalState) => {
+        writebackParty(finalState);
         if (winner === 'player') showBadgeAwarded();
         else showFalknerFight();
       },
@@ -336,8 +434,11 @@ function showTestBattle(): void {
       intro: [`Test battle:`, `wild ${foe.name} appeared!`],
       catchBreathUnlocked: run.catchBreathUnlocked,
       canRun: true,
-      onResolve: () => {
+      onResolve: (_winner, finalState) => {
         // Loop so Mathias can hammer the input layer repeatedly.
+        // Writeback still fires so the next iteration reflects
+        // injuries — same writeback shape as the real game.
+        writebackParty(finalState);
         showTestBattle();
       },
     }),
@@ -376,7 +477,8 @@ function showTestBattle2v2(): void {
       ],
       catchBreathUnlocked: run.catchBreathUnlocked,
       canRun: true,
-      onResolve: () => {
+      onResolve: (_winner, finalState) => {
+        writebackParty(finalState);
         showTestBattle2v2();
       },
     }),
@@ -391,10 +493,24 @@ function showTestBattle2v2(): void {
 //                              (default GRUBLEAF).
 //   ?party=<A,B,...>           builds a multi-mon test party for any
 //                              skip; overrides ?starter when present.
+//   ?wipe                      clears the localStorage save before any
+//                              handling runs (Phase 2 — QA the New
+//                              Game path repeatedly without leaving
+//                              the browser).
 const url = new URLSearchParams(window.location.search);
 const skip = url.get('skip');
 const starterName = url.get('starter');
 const partyParam = url.get('party');
+const wipeParam = url.has('wipe');
+
+if (wipeParam) wipeStorage();
+
+// Autosave on tab close / refresh. The browser fires beforeunload
+// synchronously; localStorage.setItem returns before the unload
+// completes, so the snapshot is durable.
+window.addEventListener('beforeunload', () => {
+  autosaveNow();
+});
 
 function pickStarter(): Species {
   if (starterName) {
@@ -471,7 +587,12 @@ else if (skip === 'falkner') {
   showOverworld('GYM', 'fromRoute', false);
 } else showTitle();
 
-function showOverworld(map: string, spawn: string, faded: boolean): void {
+function showOverworld(
+  map: string,
+  spawn: string,
+  faded: boolean,
+  spawnAt?: { readonly x: number; readonly y: number; readonly facing: import('./overworld/types').Facing },
+): void {
   recomputeSignpostFlags();
   const opts = {
     map,
@@ -494,8 +615,18 @@ function showOverworld(map: string, spawn: string, faded: boolean): void {
       if (bossId === 'falkner') showFalknerFightFromOverworld();
     },
   };
-  const sceneOpts = faded ? { ...opts, startFaded: true as const } : opts;
-  scenes.replace(createOverworldScene(sceneOpts));
+  const sceneOpts = {
+    ...opts,
+    ...(faded ? { startFaded: true as const } : {}),
+    ...(spawnAt ? { spawnAt } : {}),
+  };
+  const scene = createOverworldScene(sceneOpts);
+  currentOverworldScene = scene;
+  scenes.replace(scene);
+  // Autosave on the new map landing — the player just transitioned;
+  // the snapshot captures their fresh position (or the restored spawn
+  // when applySave called us).
+  autosaveNow();
 }
 
 function pushWildEncounter(foeSpeciesName: string): void {
@@ -515,14 +646,14 @@ function pushWildEncounter(foeSpeciesName: string): void {
       intro: [`A wild ${foe.name}`, 'appeared!'],
       catchBreathUnlocked: run.catchBreathUnlocked,
       canRun: true,
-      onResolve: (winner) => {
+      onResolve: (winner, finalState) => {
+        writebackParty(finalState);
         if (winner === 'player') {
-          // Demo-grade signpost only — the type-add-on-defeat shortcut
-          // was removed with run.partyTypes; real catching is Phase 6.
           recomputeSignpostFlags();
           run.catchBreathUnlocked = true;
         }
         scenes.pop();
+        autosaveNow();
       },
     }),
   );
@@ -561,9 +692,11 @@ function pushTrainerFight(foeSpec: string | readonly string[], winFlag: string):
       intro: ['Gym trainer sent out', `${leadName}!`, 'Show your read!'],
       catchBreathUnlocked: run.catchBreathUnlocked,
       canRun: false,
-      onResolve: (winner) => {
+      onResolve: (winner, finalState) => {
+        writebackParty(finalState);
         if (winner === 'player') flagStore.set(winFlag);
         scenes.pop();
+        autosaveNow();
       },
     }),
   );
@@ -607,12 +740,14 @@ function pushFalknerBattle(): void {
       ],
       catchBreathUnlocked: true,
       canRun: false,
-      onResolve: (winner) => {
+      onResolve: (winner, finalState) => {
+        writebackParty(finalState);
         if (winner === 'player') {
           flagStore.set('falkner_beaten');
           run.catchBreathUnlocked = true;
         }
         scenes.pop();
+        autosaveNow();
       },
     }),
   );

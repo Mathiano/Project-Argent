@@ -63,7 +63,10 @@ export interface BattleSceneOpts {
   readonly intro: readonly string[];
   readonly catchBreathUnlocked: boolean;
   readonly canRun: boolean;
-  readonly onResolve: (winner: 'player' | 'foe') => void;
+  // Final BattleState is handed back so the caller can write party
+  // hp/st/momentum forward (the Phase 2 writeback). 1v1 callers can
+  // ignore `finalState`; team callers extract state.player.members.
+  readonly onResolve: (winner: 'player' | 'foe', finalState: BattleState) => void;
 }
 
 // Display carries everything the panel needs about the CURRENTLY-SHOWN
@@ -458,7 +461,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
           ? ['You won the battle!', 'Press A to continue.']
           : ['Your team fell.', 'Press A to continue.'];
       setText(msg, () => {
-        opts.onResolve(endingWinner!);
+        opts.onResolve(endingWinner!, state);
       });
       return;
     }
@@ -571,7 +574,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (opts.canRun) {
       // Forced — leaves the battle, no take-backs.
       setText(['Got away safely!'], () => {
-        opts.onResolve('foe');
+        opts.onResolve('foe', state);
       });
     } else {
       setText(

@@ -1,0 +1,153 @@
+// Save / load — the one and only state shape that persists across a
+// page reload, and the same serialization seam the in-memory writeback
+// uses after a battle (so the two paths can never drift).
+//
+// Per the Phase 2 design ruling:
+//   - PERSISTED:  party (hp/st/momentum), position (map/x/y/facing),
+//                 flags, catchBreathUnlocked, rngSeed.
+//   - NOT persisted: maxHp (recomputed from species), exhausted /
+//                    staggered (round-local), partyTypes (derived),
+//                    active BattleState (no mid-battle save).
+//
+// localStorage adapter lives here too. Node tests inject the storage
+// shim so we don't depend on the DOM.
+
+import type { Facing } from './overworld/types';
+import { createSide } from '../engine';
+import type { SideState, Species } from '../engine';
+
+export interface SaveState {
+  readonly version: 1;
+  readonly party: readonly SavedSide[];
+  readonly position: SavedPosition;
+  readonly flags: readonly string[];
+  readonly catchBreathUnlocked: boolean;
+  // RNG: fresh mulberry32(seed) on load. Overworld encounter rolls
+  // still use raw Math.random() — see backlog in BUILD-ROADMAP.
+  readonly rngSeed: number;
+}
+
+export interface SavedSide {
+  readonly speciesName: string;
+  readonly hp: number;
+  readonly st: number;
+  readonly momentum: number;
+}
+
+export interface SavedPosition {
+  readonly map: string;
+  readonly x: number;
+  readonly y: number;
+  readonly facing: Facing;
+}
+
+// Serialization seam — used by save/load AND by the post-battle
+// writeback. Round-local fields (exhausted, staggered) are dropped on
+// purpose; they reset at the start of the next battle anyway.
+export function toSavedSide(side: SideState): SavedSide {
+  return {
+    speciesName: side.species.name,
+    hp: side.hp,
+    st: side.st,
+    momentum: side.momentum,
+  };
+}
+
+// Inverse seam. Resolves the species via a dex lookup (the player
+// can't mutate species data yet, so species is a name reference).
+// Reconstructs maxHp from the species definition; clamps hp to that.
+// Round-local fields reset (exhausted false, staggered false).
+export function fromSavedSide(
+  saved: SavedSide,
+  resolveSpecies: (name: string) => Species,
+): SideState {
+  const species = resolveSpecies(saved.speciesName);
+  const fresh = createSide(species);
+  return {
+    ...fresh,
+    hp: Math.max(0, Math.min(fresh.maxHp, saved.hp)),
+    st: Math.max(0, Math.min(100, saved.st)),
+    momentum: Math.max(0, Math.min(2, saved.momentum)),
+  };
+}
+
+// ---- localStorage adapter -------------------------------------------------
+
+export interface StorageLike {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+export const SAVE_KEY = 'argent.save.v1';
+
+// Resolves the platform storage at call time so a Node test can pass
+// its own shim. Returns null when no storage is available (e.g., SSR
+// or sandboxed) — callers treat null as "save disabled".
+function defaultStorage(): StorageLike | null {
+  if (typeof localStorage !== 'undefined') return localStorage;
+  return null;
+}
+
+export function saveToStorage(state: SaveState, storage: StorageLike | null = defaultStorage()): void {
+  if (!storage) return;
+  try {
+    storage.setItem(SAVE_KEY, JSON.stringify(state));
+  } catch (err) {
+    // Quota exceeded, private-mode lockout, etc. — swallow; the
+    // autosave is best-effort, not load-bearing for the round.
+    console.warn('Argent save: storage write failed', err);
+  }
+}
+
+export function loadFromStorage(storage: StorageLike | null = defaultStorage()): SaveState | null {
+  if (!storage) return null;
+  const raw = storage.getItem(SAVE_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return validateSave(parsed);
+  } catch (err) {
+    console.warn('Argent save: parse failed; treating as no save', err);
+    return null;
+  }
+}
+
+export function wipeStorage(storage: StorageLike | null = defaultStorage()): void {
+  if (!storage) return;
+  storage.removeItem(SAVE_KEY);
+}
+
+export function hasSave(storage: StorageLike | null = defaultStorage()): boolean {
+  if (!storage) return false;
+  return storage.getItem(SAVE_KEY) !== null;
+}
+
+// Loud-fail validator. A malformed save is treated as no save (the
+// Continue option is hidden, the player starts fresh). Versions other
+// than 1 are likewise rejected until a migrator exists.
+function validateSave(value: unknown): SaveState | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (v.version !== 1) return null;
+  if (!Array.isArray(v.party)) return null;
+  for (const m of v.party) {
+    if (typeof m !== 'object' || m === null) return null;
+    const mm = m as Record<string, unknown>;
+    if (typeof mm.speciesName !== 'string') return null;
+    if (typeof mm.hp !== 'number') return null;
+    if (typeof mm.st !== 'number') return null;
+    if (typeof mm.momentum !== 'number') return null;
+  }
+  if (typeof v.position !== 'object' || v.position === null) return null;
+  const pos = v.position as Record<string, unknown>;
+  if (typeof pos.map !== 'string') return null;
+  if (typeof pos.x !== 'number' || typeof pos.y !== 'number') return null;
+  if (pos.facing !== 'up' && pos.facing !== 'down' && pos.facing !== 'left' && pos.facing !== 'right') {
+    return null;
+  }
+  if (!Array.isArray(v.flags) || v.flags.some((f) => typeof f !== 'string')) return null;
+  if (typeof v.catchBreathUnlocked !== 'boolean') return null;
+  if (typeof v.rngSeed !== 'number') return null;
+  return value as SaveState;
+}
