@@ -21,10 +21,13 @@ URL: `http://localhost:5173/?skip=<value>[&starter=<species>]`
 |-----------------|----------------------------------------------------------------------|-----------------------------------------------------------------------|
 | _(none)_        | Title screen, the cold-start                                         | The Phase 0 gate is the cold-start path with no skip.                |
 | `title`         | _(same as none, when set explicitly)_                                 | — currently no-op since absence already routes to title.              |
-| `starter`       | Starter pick scene                                                    | A picks the cursor-default; advances to overworld(LAB).               |
-| `lab`           | Overworld at LAB, default spawn                                       | Player at (6,7) facing down. Door warp at (4,8) → ROUTE31.            |
-| `house`         | Overworld at HOUSE, fromRoute spawn                                   | Unreachable in normal play yet; useful for layout review.             |
-| `overworld`     | Overworld at ROUTE31, default spawn                                   | Re-skinned tileset (`?graybox=1` toggles legacy).                     |
+| **`intro`**     | **Phase 3 canonical cold-start: New Game → BEDROOM.**                 | **Same as picking New Game on the title with no save.** Walk through bedroom (letter) → house (parent) → Hearthwick (town) → lab (Larch + starter ceremony + KAMON theft + push south) → Route 31. |
+| `starter`       | Same as `?skip=intro` (back-compat — starter pick is now in-lab)      | Drops player at the bedroom; the starter ceremony lives on Larch's NPC interact in the lab. |
+| `bedroom`       | Overworld at BEDROOM, default spawn                                   | Direct-jump for layout testing.                                       |
+| `lab`           | Overworld at LAB, default spawn                                       | Phase 3 lab. Starter ceremony is on the Larch NPC; KAMON theft is a step-on near the door, gated by `player_has_starter`. South door → HEARTHWICK. |
+| `house`         | Overworld at HOUSE, fromBedroom spawn                                 | Phase 3 furnished interior — parent NPC + furniture signs. Stairs up to BEDROOM, door south to HEARTHWICK. |
+| `hearthwick`    | Overworld at HEARTHWICK, fromHouse spawn                              | Small town. 3 flavor NPCs + sign. Player house top-left, lab top-right, south path warp → Route 31. Sets the active starter via `?starter` / `?party`. |
+| `overworld`     | Overworld at ROUTE31, default spawn                                   | Re-skinned tileset (`?graybox=1` toggles legacy). Phase 3: the northern building now warps to HEARTHWICK, not LAB. |
 | `gym`           | Overworld at GYM, fromRoute spawn                                     | Sets the active starter via `?starter` (default GRUBLEAF).            |
 | `wild`          | Wild battle vs FUZZLET (legacy SPECIES)                               | Legacy path; reset via end → showTitle.                               |
 | **`test-battle`** | **Wild battle vs FLITPECK with a CH1 starter; restarts on end** | **Canonical Phase 0 combat-in-isolation hook.** Sets `?starter`.   |
@@ -54,6 +57,19 @@ URL: `http://localhost:5173/?skip=<value>[&starter=<species>]`
 - `http://localhost:5173/?skip=overworld&graybox=1` — Route 31 in legacy graybox tiles.
 - `http://localhost:5173/?wipe` — clear save, then show the title (no save → no Continue offered).
 - `http://localhost:5173/?wipe&skip=test-battle` — clear save, then drop straight into the test battle.
+
+### Phase 3 — the opening intro
+
+The cold-start `?skip=intro` walks the player through the six beats of `docs/opening-design.md`: bedroom letter → furnished house + parent → Hearthwick town (3 flavor NPCs + "trainers are rare" sign) → lab (Larch's inheritance speech + starter ceremony) → KAMON theft (gated by `player_has_starter`, branched per starter via `if-flag`) → push south → Route 31.
+
+Flags the intro sets, in order:
+- `spoke_to_parent` — talked to Mom in the house
+- `player_has_starter` — set by the starter-pick onPick (also `starter_<name>`)
+- `kamon_theft_fired` — set by the step-on script in the lab (one-shot marker)
+- `kamon_took_<species>` — the species KAMON took (counter-type to your pick)
+- `pushed_south` — set by Larch's post-theft push speech
+
+Combat in isolation still bypasses the intro: `?skip=test-battle`, `?skip=test-battle-2v2`, `?skip=falkner` all preload a starter and skip the ceremony.
 
 ### Phase 2 — save / load + the Continue path
 

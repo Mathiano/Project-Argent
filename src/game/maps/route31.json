@@ -21,7 +21,7 @@
       "type": "warp",
       "x": 4,
       "y": 4,
-      "target": "LAB:fromRoute"
+      "target": "HEARTHWICK:fromRoute"
     },
     {
       "type": "warp",
@@ -71,6 +71,7 @@
   "spawns": {
     "default": { "x": 9, "y": 7, "facing": "down" },
     "fromLab": { "x": 4, "y": 5, "facing": "down" },
+    "fromHearthwick": { "x": 4, "y": 5, "facing": "down" },
     "fromHouse": { "x": 13, "y": 5, "facing": "down" },
     "fromGym": { "x": 11, "y": 12, "facing": "up" }
   }

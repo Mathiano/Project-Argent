@@ -218,27 +218,46 @@ function showTitle(): void {
   scenes.replace(
     createTitleScene(
       hasSave()
-        ? { onStart: showStarterPick, onContinue: continueFromSave }
-        : { onStart: showStarterPick },
+        ? { onStart: startNewGame, onContinue: continueFromSave }
+        : { onStart: startNewGame },
     ),
   );
 }
 
-function showStarterPick(): void {
+// Phase 3 — New Game starts in the bedroom with an EMPTY party. The
+// starter pick now happens in the lab via the LARCH NPC's
+// `show-starter-pick` script verb. Wipes any prior save (the player
+// chose fresh) and seeds the run with a fresh RNG.
+function startNewGame(): void {
   currentOverworldScene = null;
-  scenes.replace(
+  wipeStorage();
+  run.party = [];
+  run.catchBreathUnlocked = false;
+  currentRngSeed = 0xa9c0;
+  run.rng = mulberry32(currentRngSeed);
+  sessionFlags.clear();
+  recomputeSignpostFlags();
+  showOverworld('BEDROOM', 'default', false);
+}
+
+// Phase 3 — wired into the overworld's `show-starter-pick` script
+// verb. Pushes the existing starter pick scene; on pick, seeds
+// run.party, sets the gating flags, and pops back to the overworld
+// (LARCH NPC). The KAMON theft step-on then fires when the player
+// walks toward the door.
+function pushStarterPick(): void {
+  scenes.push(
     createStarterPickScene({
       starters: STARTERS,
       onPick: (species) => {
-        // New game — wipe any old save (the player chose a fresh start).
-        wipeStorage();
         run.party = [createSide(species)];
-        run.catchBreathUnlocked = false;
         currentRngSeed = partySeed();
         run.rng = mulberry32(currentRngSeed);
-        sessionFlags.clear();
+        sessionFlags.add('player_has_starter');
+        sessionFlags.add(`starter_${species.name.toLowerCase()}`);
         recomputeSignpostFlags();
-        showOverworld('LAB', 'default', false);
+        autosaveNow();
+        scenes.pop();
       },
     }),
   );
@@ -264,9 +283,9 @@ function applySave(saved: SaveState): void {
 function continueFromSave(): void {
   const saved = loadFromStorage();
   if (!saved) {
-    // Save vanished between title render and click — fall back to new
-    // game flow.
-    showStarterPick();
+    // Save vanished between title render and click — fall back to
+    // the new-game flow.
+    startNewGame();
     return;
   }
   applySave(saved);
@@ -542,8 +561,16 @@ function applyPartyFromUrl(): void {
   run.party = [createSide(pickStarter())];
 }
 
-if (skip === 'starter') showStarterPick();
-else if (skip === 'wild') {
+if (skip === 'starter') {
+  // Phase 3 — the starter pick is now an in-lab ceremony, not a top-
+  // level scene. ?skip=starter is back-compat: it jumps to the lab so
+  // a tester can drive the LARCH NPC interaction directly.
+  startNewGame();
+} else if (skip === 'intro') {
+  // Phase 3 canonical hook — start fresh at the bedroom. Same as
+  // pressing New Game on the title with no save, just one click.
+  startNewGame();
+} else if (skip === 'wild') {
   run.party = [createSide(SPECIES.EMBERCUB!)];
   showWildBattle();
 } else if (skip === 'test-battle') {
@@ -575,8 +602,14 @@ else if (skip === 'wild') {
   showRivalBattle();
 } else if (skip === 'end') showEnd(true);
 else if (skip === 'overworld') showOverworld('ROUTE31', 'default', false);
+else if (skip === 'bedroom') showOverworld('BEDROOM', 'default', false);
+else if (skip === 'hearthwick') {
+  applyPartyFromUrl();
+  recomputeSignpostFlags();
+  showOverworld('HEARTHWICK', 'fromHouse', false);
+}
 else if (skip === 'lab') showOverworld('LAB', 'default', false);
-else if (skip === 'house') showOverworld('HOUSE', 'fromRoute', false);
+else if (skip === 'house') showOverworld('HOUSE', 'fromBedroom', false);
 else if (skip === 'falkner') {
   applyPartyFromUrl();
   recomputeSignpostFlags();
@@ -613,6 +646,9 @@ function showOverworld(
     },
     onBossBattle(bossId: string) {
       if (bossId === 'falkner') showFalknerFightFromOverworld();
+    },
+    onStarterPick() {
+      pushStarterPick();
     },
   };
   const sceneOpts = {

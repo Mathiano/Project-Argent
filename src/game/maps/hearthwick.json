@@ -1,0 +1,100 @@
+{
+  "name": "HEARTHWICK",
+  "width": 20,
+  "height": 14,
+  "tilesize": 16,
+  "tiles": "TTTTTTTTTTTTTTTTTTTT\nT..................T\nT.HH.HH....LL.LL...T\nT.HD.HH....LL.LD...T\nT..................T\nT..................T\nT.........X........T\nT.........X........T\nT.........X........T\nT..................T\nT.HH.HH............T\nT.HD.HH............T\nT..................T\nTTTTTTTTTpTTTTTTTTTT",
+  "_layout": "20x14 town. T=tree border, H=house wall, D=house door (warp), L=lab wall, LD=lab door, X=path, p=southern exit to Route 31. Player house top-left (HH/HD), lab top-right (LL/LD), one decoration house bottom-left.",
+  "tileset": {
+    "T": { "color": "#1d4a26", "solid": true, "label": "tree" },
+    ".": { "color": "#86c06c", "solid": false, "label": "grass" },
+    "H": { "color": "#7a4e2d", "solid": true, "label": "house_wall" },
+    "L": { "color": "#9c8a78", "solid": true, "label": "lab_wall" },
+    "D": { "color": "#daa520", "solid": false, "label": "house_door" },
+    "X": { "color": "#d8c08a", "solid": false, "label": "path" },
+    "p": { "color": "#d8c08a", "solid": false, "label": "path_exit" }
+  },
+  "objects": [
+    {
+      "type": "warp",
+      "x": 3,
+      "y": 3,
+      "target": "HOUSE:fromHearthwick"
+    },
+    {
+      "type": "warp",
+      "x": 15,
+      "y": 3,
+      "target": "LAB:fromHearthwick"
+    },
+    {
+      "type": "warp",
+      "x": 9,
+      "y": 13,
+      "target": "ROUTE31:fromHearthwick"
+    },
+    {
+      "type": "sign",
+      "x": 1,
+      "y": 5,
+      "lines": [
+        "HEARTHWICK",
+        "Population: 27.",
+        "(Was 31 last year.)"
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 7,
+      "y": 5,
+      "color": "#3a7fbe",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "OLD WOMAN: You're Larch's new one, aren't you?",
+            "OLD WOMAN: You're the first kid to take up training here in years.",
+            "OLD WOMAN: ...Be careful out there. The roads aren't what they were."
+          ]
+        }
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 13,
+      "y": 8,
+      "color": "#caa148",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "BOY: Larch is in the lab.",
+            "BOY: He's been waiting all morning.",
+            "BOY: I hope you pick the SPLASH one. It looks soft."
+          ]
+        }
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 5,
+      "y": 11,
+      "color": "#7c4fa8",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "FARMER: Trainers used to come through every week.",
+            "FARMER: Bought eggs, told stories.",
+            "FARMER: Not many left who walk the routes."
+          ]
+        }
+      ]
+    }
+  ],
+  "spawns": {
+    "fromHouse": { "x": 3, "y": 4, "facing": "down" },
+    "fromLab": { "x": 15, "y": 4, "facing": "down" },
+    "fromRoute": { "x": 9, "y": 12, "facing": "up" }
+  }
+}

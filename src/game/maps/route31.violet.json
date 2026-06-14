@@ -38,7 +38,7 @@
     { "name": "gym_violet", "x": 11, "y": 13 }
   ],
   "objects": [
-    { "type": "warp", "x": 4, "y": 4, "target": "LAB:fromRoute" },
+    { "type": "warp", "x": 4, "y": 4, "target": "HEARTHWICK:fromRoute" },
     { "type": "warp", "x": 11, "y": 13, "target": "GYM:fromRoute" },
     {
       "type": "sign",
@@ -116,6 +116,7 @@
   "spawns": {
     "default": { "x": 9, "y": 7, "facing": "down" },
     "fromLab": { "x": 4, "y": 5, "facing": "down" },
+    "fromHearthwick": { "x": 4, "y": 5, "facing": "down" },
     "fromHouse": { "x": 4, "y": 5, "facing": "down" },
     "fromGym": { "x": 11, "y": 12, "facing": "up" }
   }

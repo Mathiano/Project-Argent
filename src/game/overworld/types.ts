@@ -40,7 +40,12 @@ export type ScriptCommand =
       readonly winFlag: string;
     }
   | { readonly kind: 'start-boss-battle'; readonly bossId: string }
-  | { readonly kind: 'if-flag'; readonly flag: string; readonly commands: readonly ScriptCommand[] };
+  | { readonly kind: 'if-flag'; readonly flag: string; readonly commands: readonly ScriptCommand[] }
+  // Phase 3: launches the starter-pick scene (same pattern as the
+  // boss/trainer battle launchers). On pick, the scene's onResolve
+  // writes the chosen species into run.party and sets the player_has_starter
+  // + starter_<name> flags.
+  | { readonly kind: 'show-starter-pick' };
 
 export type MapObject =
   | { readonly type: 'warp'; readonly x: number; readonly y: number; readonly target: string }
@@ -62,6 +67,11 @@ export type MapObject =
       readonly commands: readonly ScriptCommand[];
       readonly flag?: string;
       readonly once?: boolean;
+      // Phase 3: skip-fire when this flag is NOT set. Used by
+      // post-event triggers (e.g., KAMON theft requires player has a
+      // starter first) so a player who wanders out early doesn't burn
+      // the `flag`+`once` marker on a no-op.
+      readonly requiresFlag?: string;
     }
   | {
       readonly type: 'npc';

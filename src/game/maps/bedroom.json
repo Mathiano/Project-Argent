@@ -1,0 +1,52 @@
+{
+  "name": "BEDROOM",
+  "width": 9,
+  "height": 8,
+  "tilesize": 16,
+  "tiles": "WWWWWWWWW\nWbb.D...W\nWbb.....W\nW.......W\nW.......W\nW.......W\nW.......W\nWWWWdWWWW",
+  "_layout": "9 wide, 8 tall. bed (2x2) NW; desk single tile at col 4 row 1; door warp south at (4,7).",
+  "tileset": {
+    "W": { "color": "#4a3c1f", "solid": true, "label": "wall" },
+    ".": { "color": "#cec3a0", "solid": false, "label": "floor" },
+    "b": { "color": "#8aa0c4", "solid": true, "label": "bed" },
+    "D": { "color": "#6c4a28", "solid": true, "label": "desk" },
+    "d": { "color": "#daa520", "solid": false, "label": "door" }
+  },
+  "objects": [
+    {
+      "type": "warp",
+      "x": 4,
+      "y": 7,
+      "target": "HOUSE:fromBedroom"
+    },
+    {
+      "type": "sign",
+      "x": 4,
+      "y": 1,
+      "lines": [
+        "A worn letter on the desk.",
+        "PROF. LARCH:",
+        "It's time, my friend.",
+        "Before the season turns.",
+        "Come to the lab today.",
+        "— L"
+      ]
+    },
+    {
+      "type": "sign",
+      "x": 1,
+      "y": 1,
+      "lines": ["Your bed.", "Already cooling."]
+    },
+    {
+      "type": "sign",
+      "x": 2,
+      "y": 1,
+      "lines": ["A worn pillow.", "Smells like home."]
+    }
+  ],
+  "spawns": {
+    "default": { "x": 4, "y": 4, "facing": "down" },
+    "fromHouse": { "x": 4, "y": 6, "facing": "up" }
+  }
+}

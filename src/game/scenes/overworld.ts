@@ -31,6 +31,11 @@ export interface OverworldSceneOpts {
   readonly onEncounter: (foeSpecies: string) => void;
   readonly onTrainerBattle: (foeSpecies: string | readonly string[], winFlag: string) => void;
   readonly onBossBattle: (bossId: string) => void;
+  // Phase 3 — opt-in. When the active map's script runs
+  // `show-starter-pick`, the overworld delegates to this callback so
+  // main.ts can push the starter-pick scene + handle the chosen
+  // species. Maps without this verb in their scripts don't need it.
+  readonly onStarterPick?: () => void;
 }
 
 // Richer Scene the autosave reads — currentPosition() lets main.ts
@@ -138,10 +143,21 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         }
         continue;
       }
+      if (cmd.kind === 'show-starter-pick') {
+        // Pass control to main.ts to push the starter-pick scene.
+        // The pick handler is responsible for setting flags + popping
+        // back. Maps without an onStarterPick wiring no-op silently.
+        opts.onStarterPick?.();
+        return;
+      }
     }
   }
 
   function fireScript(script: Extract<MapObject, { type: 'script' }>): void {
+    // requiresFlag: skip-fire when the gate flag isn't set. Stops a
+    // step-on trigger from burning its `flag`+`once` marker on a
+    // no-op (e.g., player wanders out before picking a starter).
+    if (script.requiresFlag && !opts.flags.has(script.requiresFlag)) return;
     if (script.once && script.flag && opts.flags.has(script.flag)) return;
     if (script.once && script.flag) opts.flags.set(script.flag);
     scriptQueue = [...script.commands];

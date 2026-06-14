@@ -1,32 +1,172 @@
 {
   "name": "LAB",
-  "width": 12,
-  "height": 9,
+  "width": 14,
+  "height": 11,
   "tilesize": 16,
-  "tiles": "WWWWWWWWWWWW\nW..b.......W\nW..b.......W\nW....S.....W\nW..........W\nW..........W\nW..........W\nW..........W\nWWWWDWWWWWWW",
+  "tiles": "WWWWWWWWWWWWWW\nW..b........bW\nW..b........bW\nW............W\nW............W\nW............W\nW............W\nW.SSS........W\nW............W\nW............W\nWWWWWdWWWWWWWW",
+  "_layout": "14x11. Bookshelves cap NW/NE corners (b). Three pedestals SSS at (2-4, 7) — the starter pedestals (visual; the actual choice is via Larch's interact). Larch NPC at (3,4). KAMON theft step-on at (5,9), requiresFlag=player_has_starter. South door (d) → HEARTHWICK.",
   "tileset": {
     "W": { "color": "#5a4a2a", "solid": true, "label": "wall" },
     ".": { "color": "#b9bcc9", "solid": false, "label": "floor" },
     "b": { "color": "#4a3c1f", "solid": true, "label": "bookshelf" },
-    "S": { "color": "#7a3e0c", "solid": true, "label": "sign" },
-    "D": { "color": "#daa520", "solid": false, "label": "door" }
+    "S": { "color": "#7a3e0c", "solid": true, "label": "pedestal" },
+    "d": { "color": "#daa520", "solid": false, "label": "door" }
   },
   "objects": [
     {
       "type": "warp",
-      "x": 4,
-      "y": 8,
-      "target": "ROUTE31:fromLab"
+      "x": 5,
+      "y": 10,
+      "target": "HEARTHWICK:fromLab"
     },
     {
       "type": "sign",
+      "x": 1,
+      "y": 7,
+      "lines": [
+        "Pedestal: KINDRAKE",
+        "Sturdy. Slow.",
+        "Take a hit, dish one back."
+      ]
+    },
+    {
+      "type": "sign",
+      "x": 2,
+      "y": 7,
+      "lines": [
+        "Pedestal: GRUBLEAF",
+        "Quick. Light.",
+        "Reads beat raw force."
+      ]
+    },
+    {
+      "type": "sign",
+      "x": 3,
+      "y": 7,
+      "lines": [
+        "Pedestal: SILTSKIP",
+        "Patient. Heavy.",
+        "Turns aggression back on itself."
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 3,
+      "y": 4,
+      "color": "#c5cfe2",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "LARCH: You came.",
+            "LARCH: I'm getting old. The era is ending — you can feel it.",
+            "LARCH: These three have been waiting for the right partner.",
+            "LARCH: Not the strongest. The right ONE.",
+            "LARCH: Strength fades. The bond is what lasts.",
+            "LARCH: ...Choose."
+          ]
+        },
+        { "kind": "show-starter-pick" }
+      ],
+      "interactAfterFlag": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "LARCH: ...Some bonds take longer to form than others.",
+            "LARCH: Head south, through Route 31.",
+            "LARCH: A parcel is waiting in the next town.",
+            "LARCH: Go on."
+          ]
+        }
+      ],
+      "blockedUntilFlag": "player_has_starter"
+    },
+    {
+      "type": "script",
       "x": 5,
-      "y": 3,
-      "lines": ["PROF LARCH:", "Head south to", "the tall grass."]
+      "y": 9,
+      "trigger": "step-on",
+      "requiresFlag": "player_has_starter",
+      "flag": "kamon_theft_fired",
+      "once": true,
+      "commands": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "The lab door slams open.",
+            "KAMON marches in.",
+            "KAMON: Larch. I'm taking one too.",
+            "LARCH: KAMON, wait —"
+          ]
+        },
+        {
+          "kind": "if-flag",
+          "flag": "starter_kindrake",
+          "commands": [
+            {
+              "kind": "dialog",
+              "lines": [
+                "KAMON grabs the SILTSKIP.",
+                "KAMON: Water beats fire. Yours loses.",
+                "KAMON: Sentiment doesn't.",
+                "(The SILTSKIP hesitates in his arms.)"
+              ]
+            },
+            { "kind": "set-flag", "flag": "kamon_took_siltskip" }
+          ]
+        },
+        {
+          "kind": "if-flag",
+          "flag": "starter_grubleaf",
+          "commands": [
+            {
+              "kind": "dialog",
+              "lines": [
+                "KAMON grabs the KINDRAKE.",
+                "KAMON: Fire beats grass. Yours loses.",
+                "KAMON: Sentiment doesn't.",
+                "(The KINDRAKE hesitates in his arms.)"
+              ]
+            },
+            { "kind": "set-flag", "flag": "kamon_took_kindrake" }
+          ]
+        },
+        {
+          "kind": "if-flag",
+          "flag": "starter_siltskip",
+          "commands": [
+            {
+              "kind": "dialog",
+              "lines": [
+                "KAMON grabs the GRUBLEAF.",
+                "KAMON: Grass beats water. Yours loses.",
+                "KAMON: Sentiment doesn't.",
+                "(The GRUBLEAF hesitates in his arms.)"
+              ]
+            },
+            { "kind": "set-flag", "flag": "kamon_took_grubleaf" }
+          ]
+        },
+        {
+          "kind": "dialog",
+          "lines": [
+            "KAMON: Strength is the only thing that lasts.",
+            "KAMON storms out.",
+            "LARCH watches the door for a long moment.",
+            "LARCH: ...He's wrong, you know.",
+            "LARCH: Head south, through Route 31.",
+            "LARCH: A parcel is waiting in the next town.",
+            "LARCH: Go on."
+          ]
+        },
+        { "kind": "set-flag", "flag": "kamon_took_starter" },
+        { "kind": "set-flag", "flag": "pushed_south" }
+      ]
     }
   ],
   "spawns": {
-    "default": { "x": 6, "y": 7, "facing": "down" },
-    "fromRoute": { "x": 4, "y": 7, "facing": "up" }
+    "default": { "x": 5, "y": 8, "facing": "up" },
+    "fromHearthwick": { "x": 5, "y": 9, "facing": "up" },
+    "fromRoute": { "x": 5, "y": 9, "facing": "up" }
   }
 }

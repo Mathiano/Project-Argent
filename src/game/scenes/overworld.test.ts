@@ -69,7 +69,10 @@ function walkOne(
 }
 
 describe('overworld cold-start warp round-trip', () => {
-  test('LAB → ROUTE31 fires onWarp with the correct target', () => {
+  test('LAB → HEARTHWICK fires onWarp with the correct target', () => {
+    // Phase 3 rewire: the lab now lives inside Hearthwick town.
+    // Its south door warps to HEARTHWICK:fromLab (was ROUTE31:fromLab
+    // when the lab was on the route).
     let warpTarget: string | null = null;
     const input = mockInput();
     const scene = createOverworldScene({
@@ -85,24 +88,25 @@ describe('overworld cold-start warp round-trip', () => {
       onBossBattle: () => {},
     });
 
-    // Default LAB spawn is (6, 7) facing down. Door warp is at (4, 8).
-    // Walk left twice, then down once onto the door tile.
-    walkOne(scene, input, 'left'); // (5, 7)
-    walkOne(scene, input, 'left'); // (4, 7)
-    walkOne(scene, input, 'down'); // (4, 8) — onStepFinish queues warp + starts fadeOut
+    // Phase 3 LAB default spawn is (5, 8) facing up. Door warp is at (5, 10).
+    // Walk down twice to reach the door tile.
+    walkOne(scene, input, 'down'); // (5, 9)
+    walkOne(scene, input, 'down'); // (5, 10) → warp fires
 
-    // Run the fade timer (FADE_DURATION = 0.25s) to completion.
     tickStep(scene, 0.4);
 
-    expect(warpTarget).toBe('ROUTE31:fromLab');
+    expect(warpTarget).toBe('HEARTHWICK:fromLab');
   });
 
-  test('round-trip: ROUTE31:fromLab spawn is valid and walking back into the LAB door warps to LAB:fromRoute', () => {
+  test('round-trip: ROUTE31:fromHearthwick spawn is valid and walking back into the town door warps to HEARTHWICK:fromRoute', () => {
+    // Phase 3 rewire: Route 31's northern building used to warp to
+    // LAB:fromRoute (lab was on the route). It now warps to
+    // HEARTHWICK:fromRoute (lab is inside Hearthwick town).
     let warpTarget: string | null = null;
     const input = mockInput();
     const scene = createOverworldScene({
       map: 'ROUTE31',
-      spawn: 'fromLab',
+      spawn: 'fromHearthwick',
       inputState: input,
       flags: mockFlags(),
       onWarp: (target) => {
@@ -117,13 +121,14 @@ describe('overworld cold-start warp round-trip', () => {
     // Let the fade-in finish so input is accepted.
     tickStep(scene, 0.4);
 
-    // ROUTE31 fromLab spawn is (4, 5) facing down. The LAB door warp is at (4, 4).
+    // ROUTE31 fromHearthwick spawn is (4, 5) facing down. The town
+    // door warp is at (4, 4).
     walkOne(scene, input, 'up'); // (4, 4)
 
     // Fade timer for outbound warp.
     tickStep(scene, 0.4);
 
-    expect(warpTarget).toBe('LAB:fromRoute');
+    expect(warpTarget).toBe('HEARTHWICK:fromRoute');
   });
 
   test('GYM:fromRoute spawn loads + the gym door at (7,15) warps back to ROUTE31:fromGym', () => {

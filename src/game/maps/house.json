@@ -1,31 +1,89 @@
 {
   "name": "HOUSE",
-  "width": 10,
-  "height": 8,
+  "width": 12,
+  "height": 9,
   "tilesize": 16,
-  "tiles": "WWWWWWWWWW\nW..b.....W\nW........W\nW..S.....W\nW........W\nW........W\nW........W\nWWWDWWWWWW",
+  "tiles": "WWWWWWWsWWWW\nW..........W\nW.TT....F..W\nW.TT....F..W\nW.......b..W\nW.FF.......W\nW.FF.......W\nW..........W\nWWWWdWWWWWWW",
+  "_layout": "12 wide, 9 tall. Stairs at (7,0) warp to bedroom; door warp south (4,8). TT kitchen table NW; F potted fern (decoration) NE+SW; b bookshelf NE. Parent NPC at (8,7) — to the side so the central path stays clear.",
   "tileset": {
     "W": { "color": "#5a4a2a", "solid": true, "label": "wall" },
     ".": { "color": "#cec3a0", "solid": false, "label": "floor" },
-    "b": { "color": "#4a3c1f", "solid": true, "label": "table" },
-    "S": { "color": "#7a3e0c", "solid": true, "label": "sign" },
-    "D": { "color": "#daa520", "solid": false, "label": "door" }
+    "T": { "color": "#7a4e2d", "solid": true, "label": "table" },
+    "F": { "color": "#4f7a3a", "solid": true, "label": "fern" },
+    "b": { "color": "#4a3c1f", "solid": true, "label": "bookshelf" },
+    "s": { "color": "#d8c08a", "solid": false, "label": "stairs" },
+    "d": { "color": "#daa520", "solid": false, "label": "door" }
   },
   "objects": [
     {
       "type": "warp",
-      "x": 3,
-      "y": 7,
-      "target": "ROUTE31:fromHouse"
+      "x": 7,
+      "y": 0,
+      "target": "BEDROOM:fromHouse"
+    },
+    {
+      "type": "warp",
+      "x": 4,
+      "y": 8,
+      "target": "HEARTHWICK:fromHouse"
     },
     {
       "type": "sign",
-      "x": 3,
-      "y": 3,
-      "lines": ["Just an empty house.", "Cozy, though."]
+      "x": 2,
+      "y": 2,
+      "lines": ["A small kitchen table.", "Two chairs.", "Always just the two of you."]
+    },
+    {
+      "type": "sign",
+      "x": 8,
+      "y": 2,
+      "lines": ["A potted fern by the window.", "Older than you are."]
+    },
+    {
+      "type": "sign",
+      "x": 8,
+      "y": 4,
+      "lines": ["Mom's bookshelf.", "Old field guides.", "She used to travel too."]
+    },
+    {
+      "type": "sign",
+      "x": 2,
+      "y": 5,
+      "lines": ["A row of houseplants.", "She tends to them every morning."]
+    },
+    {
+      "type": "npc",
+      "x": 8,
+      "y": 7,
+      "color": "#c25a36",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "MOM: You're awake.",
+            "MOM: Larch's letter — yes, I saw.",
+            "MOM: I knew this day was coming.",
+            "MOM: ...Go on. Don't keep him waiting.",
+            "MOM: And come home when you can."
+          ]
+        },
+        { "kind": "set-flag", "flag": "spoke_to_parent" }
+      ],
+      "interactAfterFlag": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "MOM: The town will feel emptier without you.",
+            "MOM: ...Be safe."
+          ]
+        }
+      ],
+      "blockedUntilFlag": "spoke_to_parent"
     }
   ],
   "spawns": {
-    "fromRoute": { "x": 3, "y": 6, "facing": "up" }
+    "fromBedroom": { "x": 7, "y": 1, "facing": "down" },
+    "fromHearthwick": { "x": 4, "y": 7, "facing": "up" },
+    "fromRoute": { "x": 4, "y": 7, "facing": "up" }
   }
 }
