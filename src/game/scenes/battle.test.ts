@@ -232,15 +232,11 @@ describe('battle move menu — A commits the highlighted move; SELECT cycles sta
     scene.draw(ctx);
     expect(ctx.texts.join('|')).toContain('TACKLE');
 
-    // Press A to commit TACKLE.
+    // Press A to commit TACKLE → phase=resolve. drainResolve presses A
+    // again to flush via skipResolve (no hold engaged yet), then ticks
+    // briefly to let finishResolve → beginTurn / end-text settle.
     scene.input?.('a');
-
-    // The commit transitions phase → resolve and seeds pendingEvents
-    // from resolveRound. The resolve tickResolve drains events on
-    // update; after a few seconds of ticks, finishResolve fires and
-    // calls beginTurn (or onResolve on team-wipe). Either way, the
-    // bottom row is no longer the move list once events drain.
-    for (let i = 0; i < 60; i += 1) scene.update?.(0.5);
+    drainResolve(scene);
 
     ctx.reset();
     scene.draw(ctx);
@@ -263,8 +259,7 @@ describe('battle move menu — A commits the highlighted move; SELECT cycles sta
     // TACKLE, THORN FLICK, LEAF LASH, HEADBUTT).
     scene.input?.('down');
     scene.input?.('a');
-    // Drain resolve.
-    for (let i = 0; i < 60; i += 1) scene.update?.(0.5);
+    drainResolve(scene);
 
     const ctx = stubCtx();
     scene.draw(ctx);
@@ -345,9 +340,14 @@ function buildScene(opts: SceneBuildOpts = {}): {
 }
 
 function drainResolve(scene: ReturnType<typeof createBattleScene>): void {
-  // STEP_SEC=0.4 per event; 60×0.5s = 30s — long enough for any single
-  // round's events to drain plus the next beginTurn.
-  for (let i = 0; i < 60; i += 1) scene.update?.(0.5);
+  // Resolve now HOLDS on consequential events (commit, dodge/opening/
+  // counter/clash, eff-≠-1 strike, faint, break) until A/Start. A press
+  // when not held still flushes via skipResolve. For tests we want a
+  // deterministic, fast drain — press A first (no hold yet, so this
+  // triggers skipResolve and flushes the round in one go), then tick
+  // briefly to let the subsequent setText / beginTurn settle.
+  scene.input?.('a');
+  for (let i = 0; i < 5; i += 1) scene.update?.(0.1);
 }
 
 describe('battle menu — CALL paths', () => {
@@ -550,6 +550,76 @@ describe('battle forced action (exhausted)', () => {
     // No FIGHT menu — we're in resolve, drawing the log instead.
     expect(screen).not.toContain('> FIGHT');
     expect(screen).not.toContain('> TACKLE');
+  });
+});
+
+describe('resolve cadence — auto-play pauses on consequential lines until A/Start', () => {
+  test('auto-play stops at the first consequential event (commit log line); next tick does not advance', () => {
+    const { scene } = buildScene();
+    scene.input?.('a'); // FIGHT
+    scene.input?.('a'); // TACKLE → phase=resolve, no hold yet, no events processed
+
+    // Tick a single STEP_SEC. The first non-hold event (roundStart) is
+    // applied, then the second (player's commit) is applied AND the
+    // hold engages — auto-advance stops.
+    scene.update?.(1.0);
+
+    // Capture the log on screen at this paused state.
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const before = ctx.texts.join('|');
+
+    // Tick a LOT more — without input, the screen must not change.
+    for (let i = 0; i < 30; i += 1) scene.update?.(1.0);
+
+    ctx.reset();
+    scene.draw(ctx);
+    const after = ctx.texts.join('|');
+    expect(after).toBe(before);
+    // Sanity: the commit line did make it onto the log.
+    expect(before).toContain('used TACKLE');
+  });
+
+  test('A on a held resolve releases just that hold; auto-play resumes (does NOT skip to end)', () => {
+    const { scene } = buildScene();
+    scene.input?.('a'); // FIGHT
+    scene.input?.('a'); // TACKLE → resolve
+    scene.update?.(1.0); // first hold (commit)
+
+    // Release the hold — auto-play continues to the next event, which
+    // for a non-clash A-vs-G round is the next commit (also held).
+    scene.input?.('a');
+    scene.update?.(1.0);
+
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    // We should be at the foe's commit (held) now — two commit log lines
+    // on screen, but NOT yet finished (resolve hasn't called beginTurn).
+    const screen = ctx.texts.join('|');
+    expect(screen).toContain('GRUBLEAF used TACKLE');
+    expect(screen).toContain('Foe FLITPECK used TACKLE');
+    // Still in resolve phase: no FIGHT menu, no end-text yet.
+    expect(screen).not.toContain('>FIGHT');
+    expect(screen).not.toContain('Press A to continue');
+  });
+
+  test('A when NOT held flushes the rest fast (skipResolve), past every remaining event', () => {
+    // Drive to a steady "between holds" state, then A flushes to end.
+    const { scene } = buildScene();
+    scene.input?.('a'); // FIGHT
+    scene.input?.('a'); // TACKLE → resolve
+    // No ticks yet → no hold engaged → A press triggers skipResolve.
+    scene.input?.('a');
+
+    // Settle.
+    for (let i = 0; i < 5; i += 1) scene.update?.(0.1);
+
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    // Resolve done; back at menu (or end-text on KO). Either way the
+    // hold is gone and we're past resolve.
+    expect(screen.includes('FIGHT') || screen.includes('Press A')).toBe(true);
   });
 });
 

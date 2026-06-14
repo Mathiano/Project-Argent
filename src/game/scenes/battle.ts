@@ -32,7 +32,11 @@ import {
   hpColor,
 } from '../ui';
 
-const STEP_SEC = 0.4;
+// Auto-cadence between non-hold log lines. Tuned so a human can read a
+// short line at default speed without animation help; consequential
+// lines (commits, dodge/opening/counter, eff ≠ 1 strikes, faints,
+// breaks) then HOLD the playback until A/Start.
+const STEP_SEC = 0.9;
 const STANCES: readonly Stance[] = ['A', 'G', 'F'];
 
 const FOE_PANEL = { x: 2, y: 2, w: 170, h: 36 } as const;
@@ -155,6 +159,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let log: string[] = [];
   let pendingEvents: BattleEvent[] = [];
   let eventTimer = 0;
+  // resolveHeld: the last applied event was "consequential" (a commit,
+  // a dodge/opening/counter/clash, a typed-effective strike, a faint,
+  // a break). Auto-advance is paused until A/Start releases it.
+  // A press while NOT held still triggers skipResolve (impatient flush).
+  let resolveHeld = false;
   let endingWinner: 'player' | 'foe' | null = null;
 
   let menuCursor = 0;
@@ -200,8 +209,26 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     state = result.state;
     pendingEvents = [...result.events];
     eventTimer = 0;
+    resolveHeld = false;
     // Display state is reseated by the first roundStart event's snapshot.
     phase = 'resolve';
+  }
+
+  // A line is "consequential" when it carries information the player
+  // needs to actually read before the round resolves: which move was
+  // committed, type-effective hits, the read-vs-read events (dodge,
+  // opening, counter, clash), and faints/breaks. tickResolve pauses
+  // after applying one of these until the player presses A/Start.
+  function isConsequential(ev: BattleEvent): boolean {
+    if (ev.kind === 'commit' && ev.action.kind === 'move') return true;
+    if (ev.kind === 'strike' && ev.effectiveness !== 1) return true;
+    if (ev.kind === 'dodge') return true;
+    if (ev.kind === 'opening') return true;
+    if (ev.kind === 'counter') return true;
+    if (ev.kind === 'clash') return true;
+    if (ev.kind === 'faint') return true;
+    if (ev.kind === 'break') return true;
+    return false;
   }
 
   function applyEvent(ev: BattleEvent): void {
@@ -389,10 +416,19 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function tickResolve(dt: number): void {
     if (animT > 0) animT = Math.max(0, animT - dt);
+    // While held on a consequential event, auto-advance pauses entirely
+    // — eventTimer doesn't tick, no new events pop. handleResolveInput
+    // releases the hold and play continues.
+    if (resolveHeld) return;
     eventTimer -= dt;
     while (eventTimer <= 0 && pendingEvents.length > 0) {
       const ev = pendingEvents.shift()!;
       applyEvent(ev);
+      if (isConsequential(ev)) {
+        resolveHeld = true;
+        eventTimer = 0;
+        return;
+      }
       eventTimer += STEP_SEC;
     }
     if (pendingEvents.length === 0 && eventTimer <= 0) finishResolve();
@@ -401,6 +437,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function skipResolve(): void {
     while (pendingEvents.length > 0) applyEvent(pendingEvents.shift()!);
     eventTimer = 0;
+    resolveHeld = false;
     finishResolve();
   }
 
@@ -534,7 +571,17 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   }
 
   function handleResolveInput(key: InputKey): void {
-    if (key === 'a' || key === 'start') skipResolve();
+    if (key !== 'a' && key !== 'start') return;
+    if (resolveHeld) {
+      // Release just this hold; auto-play continues until the next
+      // consequential event or the end. Gives the reader pace control
+      // without forcing them to skip the rest.
+      resolveHeld = false;
+      eventTimer = 0;
+      return;
+    }
+    // Between holds (or hold-free runs): flush fast for impatient replay.
+    skipResolve();
   }
 
   function spriteOffset(side: Side): number {

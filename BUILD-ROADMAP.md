@@ -77,3 +77,5 @@ Prerequisite: Phase 7 (the chapter template proven once).
 
 ## The backlog (ideas captured, NOT built until their phase)
 Anything we think of out of order lands here instead of derailing the critical path: bond track (Phase 8), temperaments/marked (needs the dex schema slice), Phone 2.0 (Phase 8), the Gauntlet (post-launch), day/night (Phase 8), the full art set (post-demo pass), Stance Beasts + cover legendary (Phase 8 content).
+
+- **Mobile touch-control UX pass.** Current controls are keyboard-placeholder only. The game is phone-first; there is no SELECT on a phone. Needs on-screen D-pad + A/B + tappable stance / actions, and stance must be a VISIBLE control — it cannot stay hidden under an unlabeled SELECT cycle in the shipping mobile UI. Phase TBD (likely interleaves with Phase 4 menus / before Phase 7 chapter content); whichever sprint covers it owns the input-layer rewrite so handleMoveInput etc. consume action intents rather than raw key codes.
