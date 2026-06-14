@@ -28,6 +28,7 @@ URL: `http://localhost:5173/?skip=<value>[&starter=<species>]`
 | `gym`           | Overworld at GYM, fromRoute spawn                                     | Sets the active starter via `?starter` (default GRUBLEAF).            |
 | `wild`          | Wild battle vs FUZZLET (legacy SPECIES)                               | Legacy path; reset via end → showTitle.                               |
 | **`test-battle`** | **Wild battle vs FLITPECK with a CH1 starter; restarts on end** | **Canonical Phase 0 combat-in-isolation hook.** Sets `?starter`.   |
+| **`test-battle-2v2`** | **2-mon player party (GRUBLEAF lead + SILTSKIP bench) vs wild KILNDRAKE** | **Phase 1 hook — switching-as-a-read.** Lead is at type disadvantage (FLAME→SPROUT 1.3 punish); SILTSKIP (SPLASH) is the bench answer (SPLASH→FLAME 1.3). Exercises voluntary switch + forced-switch + bench indicators. Restarts on resolve. Override the party with `?party=A,B`. |
 | `prep`          | Rival prep scene (legacy EMBERCUB vs KAMON-counter)                   | Legacy demo flow.                                                     |
 | `rival`         | Rival battle (legacy)                                                  | Legacy demo flow.                                                     |
 | `falkner`       | Falkner boss fight (2-mon FLITPECK→GALEHAWK)                          | Sets the active starter via `?starter` (default GRUBLEAF).            |
@@ -38,13 +39,17 @@ URL: `http://localhost:5173/?skip=<value>[&starter=<species>]`
 | Parameter           | Effect                                                                                |
 |---------------------|---------------------------------------------------------------------------------------|
 | `?starter=KINDRAKE` | Pick the cold-start starter for any hook that needs one. Valid: `KINDRAKE` / `GRUBLEAF` / `SILTSKIP`. Default: `GRUBLEAF`. |
+| `?party=A,B,C`      | Build a multi-mon test party from a comma-separated species list. Wins over `?starter` when present. RNG seeded by a stable hash of the party (same party → same seed). Species must exist in STARTERS or the CH1 dex. Examples: `?party=GRUBLEAF,SILTSKIP` (Phase 1 default); `?party=GRUBLEAF,KINDRAKE,SILTSKIP` (full triangle). |
 | `?graybox=1`        | Force the legacy graybox tilemap for any map that has both a graybox and a data-driven version. Useful for layout-vs-art comparison. |
 
 ### Example URLs
 
 - `http://localhost:5173/?skip=test-battle` — drop straight into a wild battle with GRUBLEAF vs FLITPECK.
 - `http://localhost:5173/?skip=test-battle&starter=SILTSKIP` — same, but with SILTSKIP.
+- `http://localhost:5173/?skip=test-battle-2v2` — Phase 1 2v2 scenario; GRUBLEAF lead at type disadvantage, SILTSKIP on the bench.
+- `http://localhost:5173/?skip=test-battle-2v2&party=GRUBLEAF,KINDRAKE,SILTSKIP` — same 2v2 hook with a 3-mon party.
 - `http://localhost:5173/?skip=falkner&starter=KINDRAKE` — jump to the Falkner fight as KINDRAKE.
+- `http://localhost:5173/?skip=falkner&party=GRUBLEAF,SILTSKIP` — Falkner with a 2-mon party.
 - `http://localhost:5173/?skip=overworld&graybox=1` — Route 31 in legacy graybox tiles.
 
 ---

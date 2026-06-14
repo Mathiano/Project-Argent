@@ -3,6 +3,7 @@ import {
   TIERS,
   activeMon,
   forcedAction,
+  hasBenchSurvivor,
   isTeamWiped,
   lookupMove,
   resolveRound,
@@ -15,6 +16,7 @@ import type {
   Side,
   SideState,
   Stance,
+  Team,
 } from '../../engine';
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
@@ -148,9 +150,18 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let displayBreakProgress = state.breakProgress ?? 0;
   let breakFlashT = 0;
 
-  let phase: 'text' | 'menu' | 'move' | 'resolve' | 'end' = 'text';
+  let phase: 'text' | 'menu' | 'move' | 'party' | 'resolve' | 'end' = 'text';
   let textQueue: string[] = [...opts.intro];
   let textNext: (() => void) | null = beginTurn;
+  // Party-picker mode. 'voluntary' = opened from FIGHT menu's PKMN row
+  // (switch is a turn action; B cancels back to menu). 'forced' = opened
+  // by a faint→forcedSwitch event mid-resolve (player MUST pick the
+  // next mon — choosing the next survivor is a tactical READ per the
+  // Phase 1 ruling, not just a confirmation). On a forced switch we
+  // resume the resolve drain after the player confirms.
+  let partyMode: 'voluntary' | 'forced' | null = null;
+  let partyCursor = 0;
+  let resumeResolveAfterParty = false;
   // Dismissable dialogs (e.g. "Calls unlock", "Too winded") let B back
   // out to the prior phase. Forced/sequential dialogs (intro, end-text,
   // "Got away safely!") MUST be read — B is a no-op on them. Per the
@@ -385,6 +396,17 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       pushLog(`${who}!`);
       const fresh = activeMon(state[ev.side]);
       display[ev.side] = snapshot(fresh);
+      // PLAYER side: open the party picker so the player CHOOSES the
+      // next mon. The engine's auto-pick (ev.toIndex) becomes the
+      // default highlight; the player can confirm or override. This is
+      // the Phase 1 ruling — picking the next mon is a tactical read,
+      // not a confirmation. Resume the resolve drain after the choice.
+      if (ev.side === 'player' && state.player.members.length > 1) {
+        partyMode = 'forced';
+        partyCursor = ev.toIndex;
+        phase = 'party';
+        resumeResolveAfterParty = true;
+      }
       return;
     }
   }
@@ -424,6 +446,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     while (eventTimer <= 0 && pendingEvents.length > 0) {
       const ev = pendingEvents.shift()!;
       applyEvent(ev);
+      // applyEvent may flip phase (forcedSwitch on player → 'party').
+      // Stop draining so the renderer can show the party picker.
+      if (phase !== 'resolve') return;
       if (isConsequential(ev)) {
         resolveHeld = true;
         eventTimer = 0;
@@ -435,7 +460,18 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   }
 
   function skipResolve(): void {
-    while (pendingEvents.length > 0) applyEvent(pendingEvents.shift()!);
+    while (pendingEvents.length > 0) {
+      applyEvent(pendingEvents.shift()!);
+      // applyEvent may flip phase (forcedSwitch on player → 'party').
+      // Stop draining + don't call finishResolve — that would call
+      // beginTurn and overwrite the party picker. Resumes when the
+      // player confirms in handlePartyInput.
+      if (phase !== 'resolve') {
+        eventTimer = 0;
+        resolveHeld = false;
+        return;
+      }
+    }
     eventTimer = 0;
     resolveHeld = false;
     finishResolve();
@@ -445,10 +481,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // cursor can rest on this row — disabled rows render greyed and are
   // skipped during up/down navigation. Keeping the row visible (not
   // collapsing it) preserves a stable visual layout as state changes.
-  type MenuKind = 'fight' | 'call' | 'run';
+  type MenuKind = 'fight' | 'pkmn' | 'call' | 'run';
   function menuItems(): ReadonlyArray<{ readonly kind: MenuKind; readonly enabled: boolean }> {
     return [
       { kind: 'fight', enabled: true },
+      // PKMN enabled only when the bench has a non-fainted non-active
+      // mon (so voluntary switching is meaningful). Single-mon teams
+      // see this row greyed; the cursor skips it.
+      { kind: 'pkmn', enabled: hasBenchSurvivor(state.player) },
       { kind: 'call', enabled: opts.catchBreathUnlocked },
       // RUN row stays enabled even when canRun is false — confirming it
       // surfaces the "No running from a rival!" dialog (intentional UX).
@@ -473,6 +513,15 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (focus.kind === 'fight') {
       phase = 'move';
       moveCursor = 0;
+      return;
+    }
+    if (focus.kind === 'pkmn') {
+      // Voluntary switch — switching is a turn action. Open party
+      // picker with the first selectable bench mon highlighted; A
+      // confirms (commits {kind:'switch'}); B cancels back to menu.
+      partyMode = 'voluntary';
+      partyCursor = stepPartyCursor(state.player.active, 1);
+      phase = 'party';
       return;
     }
     if (focus.kind === 'call') {
@@ -513,6 +562,70 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // shortcut used to fire CALL even when the user thought they were
     // confirming the FIGHT row, which is the bug this guards against).
     else if (key === 'a' || key === 'start') confirmMenu();
+  }
+
+  // Party-picker — used for both voluntary switching (PKMN menu) and
+  // forced switching (faint with bench survivor). In voluntary mode the
+  // cursor skips the currently-active mon (you can't switch to yourself)
+  // and B cancels back to menu. In forced mode the cursor lands on the
+  // engine's auto-pick (firstSurvivor) by default but the player can
+  // pick any survivor; B is a no-op (must choose someone).
+  function isPartySelectable(idx: number): boolean {
+    const team = state.player;
+    const m = team.members[idx];
+    if (!m) return false;
+    if (m.hp <= 0) return false;
+    if (partyMode === 'voluntary' && idx === team.active) return false;
+    return true;
+  }
+
+  function stepPartyCursor(start: number, dir: 1 | -1): number {
+    const n = state.player.members.length;
+    let i = start;
+    for (let k = 0; k < n; k += 1) {
+      i = (i + dir + n) % n;
+      if (isPartySelectable(i)) return i;
+    }
+    return start;
+  }
+
+  function handlePartyInput(key: InputKey): void {
+    if (key === 'up') partyCursor = stepPartyCursor(partyCursor, -1);
+    else if (key === 'down') partyCursor = stepPartyCursor(partyCursor, 1);
+    else if (key === 'b') {
+      // Voluntary switches can be cancelled. Forced switches require a
+      // pick — B is a no-op (per the working agreement, B is no-op on
+      // forced/sequential prompts the player must answer).
+      if (partyMode === 'voluntary') {
+        partyMode = null;
+        phase = 'menu';
+      }
+    } else if (key === 'a' || key === 'start') {
+      if (!isPartySelectable(partyCursor)) return;
+      const mode = partyMode;
+      partyMode = null;
+      if (mode === 'voluntary') {
+        // Switching is a turn action — commit it and the round resolves.
+        commit({ kind: 'switch', toIndex: partyCursor });
+        return;
+      }
+      if (mode === 'forced') {
+        // Override the engine's auto-pick if the player chose otherwise.
+        const team = state.player;
+        if (partyCursor !== team.active) {
+          const nextTeam: Team = { ...team, active: partyCursor };
+          state = { ...state, player: nextTeam };
+          display.player = snapshot(activeMon(nextTeam));
+        }
+        if (resumeResolveAfterParty) {
+          resumeResolveAfterParty = false;
+          phase = 'resolve';
+        } else {
+          // Out-of-round forced (rare path): fall back to beginTurn.
+          beginTurn();
+        }
+      }
+    }
   }
 
   function handleMoveInput(key: InputKey): void {
@@ -643,6 +756,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       PALETTE.stamina,
     );
     drawWindedNotch(ctx, FOE_PANEL.x + 26, FOE_PANEL.y + 27, FOE_PANEL.w - 36);
+    // Bench indicators (S5): tucked just under the panel, 4×4 dots
+    // tinted by status (active / alive / fainted). For 1-mon "teams"
+    // nothing draws — the row stays empty and clean.
+    drawBenchIndicators(ctx, FOE_PANEL.x + 8, FOE_PANEL.y + FOE_PANEL.h + 2, state.foe);
   }
 
   function drawPlayerPanel(ctx: CanvasRenderingContext2D): void {
@@ -673,6 +790,34 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       PALETTE.stamina,
     );
     drawWindedNotch(ctx, PL_PANEL.x + 26, PL_PANEL.y + 27, PL_PANEL.w - 36);
+    drawBenchIndicators(ctx, PL_PANEL.x + 8, PL_PANEL.y + PL_PANEL.h + 2, state.player);
+  }
+
+  // Bench dots (one per team member) tinted by status. Suppressed
+  // during resolve to keep focus on the strike. Only draws when the
+  // team has >1 mon — solo "teams" leave the strip empty.
+  function drawBenchIndicators(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    team: Team,
+  ): void {
+    if (team.members.length <= 1) return;
+    if (phase === 'resolve' || phase === 'end' || phase === 'text') return;
+    for (let i = 0; i < team.members.length; i += 1) {
+      const mon = team.members[i]!;
+      const fainted = mon.hp <= 0;
+      const isActive = i === team.active;
+      let fill: string;
+      if (fainted) fill = '#1d1d28';
+      else if (isActive) fill = PALETTE.hpOk;
+      else fill = PALETTE.paperDim;
+      ctx.fillStyle = fill;
+      ctx.fillRect(x + i * 6, y, 4, 4);
+      ctx.strokeStyle = PALETTE.ink;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + i * 6 + 0.5, y + 0.5, 3, 3);
+    }
   }
 
   function drawIntent(ctx: CanvasRenderingContext2D): void {
@@ -700,16 +845,25 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function drawBottomMenu(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
-    const items = ['FIGHT', opts.catchBreathUnlocked ? `CALL ★${activeMon(state.player).momentum}` : 'CALL -', opts.canRun ? 'RUN' : 'STAY'];
+    const me = activeMon(state.player);
+    const labels: { readonly [K in 'fight' | 'pkmn' | 'call' | 'run']: string } = {
+      fight: 'FIGHT',
+      pkmn: 'PKMN',
+      call: opts.catchBreathUnlocked ? `CALL ★${me.momentum}` : 'CALL -',
+      run: opts.canRun ? 'RUN' : 'STAY',
+    };
+    const items = menuItems();
     items.forEach((it, i) => {
-      const dim =
-        (i === 1 && (!opts.catchBreathUnlocked || activeMon(state.player).momentum < 1)) ||
-        (i === 2 && !opts.canRun);
+      // PKMN is dimmed when no bench survivor; CALL when locked or 0 ★;
+      // RUN never dimmed (its row dispatches the "no running" text when
+      // canRun is false). FIGHT always lit.
+      let dim = !it.enabled;
+      if (it.kind === 'call' && (!opts.catchBreathUnlocked || me.momentum < 1)) dim = true;
       drawText(
         ctx,
-        `${menuCursor === i ? '>' : ' '} ${it}`,
+        `${menuCursor === i ? '>' : ' '} ${labels[it.kind]}`,
         BOTTOM.x + 10,
-        BOTTOM.y + 10 + i * 12,
+        BOTTOM.y + 8 + i * 10,
         dim ? PALETTE.paperDim : PALETTE.ink,
       );
     });
@@ -721,6 +875,31 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       BOTTOM.y + BOTTOM.h - 12,
       PALETTE.paperDim,
     );
+  }
+
+  function drawBottomParty(ctx: CanvasRenderingContext2D): void {
+    drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+    drawText(
+      ctx,
+      partyMode === 'forced' ? 'SEND OUT WHO?' : 'PARTY',
+      BOTTOM.x + 8,
+      BOTTOM.y + 4,
+      PALETTE.paperShadow,
+    );
+    const team = state.player;
+    team.members.forEach((side, i) => {
+      const isActive = i === team.active;
+      const fainted = side.hp <= 0;
+      const selectable = isPartySelectable(i);
+      const color = !selectable ? PALETTE.paperDim : PALETTE.ink;
+      const cursor = partyCursor === i ? '>' : ' ';
+      const hpStr = `HP ${Math.round(side.hp)}/${side.maxHp}`;
+      const tag = fainted ? 'FNT' : isActive ? 'ACT' : '';
+      const row = `${cursor}${side.species.name.padEnd(10, ' ')} ${hpStr.padEnd(10, ' ')} ${tag}`;
+      drawText(ctx, row, BOTTOM.x + 8, BOTTOM.y + 14 + i * 9, color);
+    });
+    const help = partyMode === 'forced' ? 'A: send out' : 'A: switch  B: back';
+    drawText(ctx, help, BOTTOM.x + 10, BOTTOM.y + BOTTOM.h - 12, PALETTE.paperDim);
   }
 
   function drawBottomMoves(ctx: CanvasRenderingContext2D): void {
@@ -788,6 +967,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         handleMoveInput(key);
         return;
       }
+      if (phase === 'party') {
+        handlePartyInput(key);
+        return;
+      }
       if (phase === 'resolve') {
         handleResolveInput(key);
         return;
@@ -851,6 +1034,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       if (phase === 'text') drawBottomDialog(ctx, textQueue);
       else if (phase === 'menu') drawBottomMenu(ctx);
       else if (phase === 'move') drawBottomMoves(ctx);
+      else if (phase === 'party') drawBottomParty(ctx);
       else if (phase === 'resolve' || phase === 'end') drawBottomLog(ctx);
     },
   };

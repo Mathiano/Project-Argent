@@ -26,7 +26,7 @@ export interface OverworldSceneOpts {
   readonly startFaded?: boolean;
   readonly onWarp: (target: string) => void;
   readonly onEncounter: (foeSpecies: string) => void;
-  readonly onTrainerBattle: (foeSpecies: string, winFlag: string) => void;
+  readonly onTrainerBattle: (foeSpecies: string | readonly string[], winFlag: string) => void;
   readonly onBossBattle: (bossId: string) => void;
 }
 

@@ -21,6 +21,7 @@ import type {
   DexEntryJson,
   MoveJson,
   RNG,
+  SideState,
   Species,
   Stance,
   TraitTable,
@@ -93,25 +94,69 @@ const RNG_SEED = 0xa9c0;
 const scenes = new SceneStack();
 
 interface RunState {
-  playerSpecies: Species | null;
+  // Phase 1: party is a list of rich SideStates — hp/st/momentum
+  // persist across battles per canon (KO-stamina memo from CLAUDE.md).
+  // Length-1 today (starter); grows via ?party= for testing, future
+  // NPC gifts (Phase 3+), and Catching 2.0 (Phase 6).
+  party: SideState[];
   catchBreathUnlocked: boolean;
-  partyTypes: Set<string>;
   rng: RNG;
 }
 
 const run: RunState = {
-  playerSpecies: null,
+  party: [],
   catchBreathUnlocked: false,
-  partyTypes: new Set<string>(),
   rng: mulberry32(RNG_SEED),
 };
 
+function partyTypes(): Set<string> {
+  const out = new Set<string>();
+  for (const side of run.party) {
+    for (const t of side.species.types) out.add(t);
+  }
+  return out;
+}
+
+function partyLead(): Species {
+  if (run.party.length === 0) return STARTERS[0]!;
+  return run.party[0]!.species;
+}
+
 function recomputeSignpostFlags(): void {
-  const types = run.partyTypes;
+  const types = partyTypes();
   const hasSprout = types.has('SPROUT');
   const hasTerra = types.has('TERRA');
   if (hasSprout && !hasTerra) flagStore.set('need_terra_nudge');
   else flagStore.unset('need_terra_nudge');
+}
+
+// Stable RNG seed from the party composition. Same party → same seed
+// so test runs are reproducible across the ?party= modifier.
+function partySeed(): number {
+  let h = RNG_SEED >>> 0;
+  for (const side of run.party) {
+    for (const ch of side.species.name) {
+      h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    }
+  }
+  return h;
+}
+
+// Build the player Team for a battle from the current party. Uses the
+// rich SideStates from run.party (preserves hp/st/momentum across
+// battles per the KO-stamina canon — but until save/load lands in
+// Phase 2 we rebuild fresh each battle via the partyLead fallback).
+//
+// FLAGGED for design: state writeback after a battle (so a 1-HP
+// survivor stays 1-HP next encounter) is not wired yet. Today each
+// battle starts at full HP/ST. Phase 2 (save/load) is the natural
+// home for the writeback.
+function buildPlayerTeam(): ReturnType<typeof createTeam> {
+  if (run.party.length === 0) return createTeam([createSide(STARTERS[0]!)]);
+  // Re-create sides so a battle's hp/st changes don't bleed into the
+  // run state until writeback exists. Same shape, fresh values.
+  const fresh = run.party.map((side) => createSide(side.species));
+  return createTeam(fresh);
 }
 
 function showTitle(): void {
@@ -123,11 +168,10 @@ function showStarterPick(): void {
     createStarterPickScene({
       starters: STARTERS,
       onPick: (species) => {
-        run.playerSpecies = species;
+        run.party = [createSide(species)];
         run.catchBreathUnlocked = false;
-        run.rng = mulberry32(RNG_SEED + species.name.length);
+        run.rng = mulberry32(partySeed());
         sessionFlags.clear();
-        run.partyTypes = new Set(species.types);
         recomputeSignpostFlags();
         showOverworld('LAB', 'default', false);
       },
@@ -148,8 +192,7 @@ function wildFoeAI(state: BattleState, rng: RNG): Action {
 }
 
 function showWildBattle(): void {
-  const player = run.playerSpecies!;
-  const state = createBattleState(createSide(player), createSide(SPECIES.FUZZLET!));
+  const state = createBattleState(buildPlayerTeam(), createSide(SPECIES.FUZZLET!));
   scenes.replace(
     createBattleScene({
       state,
@@ -171,7 +214,7 @@ function showWildBattle(): void {
 }
 
 function showPrep(): void {
-  const player = run.playerSpecies!;
+  const player = partyLead();
   const foe = SPECIES[COUNTER_MAP[player.name]!]!;
   scenes.replace(
     createPrepScene({
@@ -184,10 +227,10 @@ function showPrep(): void {
 }
 
 function showRivalBattle(): void {
-  const player = run.playerSpecies!;
+  const player = partyLead();
   const foe = SPECIES[COUNTER_MAP[player.name]!]!;
   const state = createBattleState(
-    createSide(player),
+    buildPlayerTeam(),
     createSide(foe, { atk: 0.85, dfn: 0.85 }),
   );
   scenes.replace(
@@ -231,10 +274,9 @@ function buildFalknerTeam(): { team: ReturnType<typeof createTeam>; card: BossCa
 }
 
 function showFalknerFight(): void {
-  const player = run.playerSpecies ?? STARTERS[0]!;
   const { team, card } = buildFalknerTeam();
   const state = createBattleState(
-    createTeam([createSide(player)]),
+    buildPlayerTeam(),
     team,
     {
       typeChart: TYPECHART_CH1,
@@ -280,10 +322,9 @@ function showEnd(won: boolean): void {
 // the overworld. Separate from pushWildEncounter (which pops back to an
 // overworld below it) because here there's nothing below.
 function showTestBattle(): void {
-  const player = run.playerSpecies ?? STARTERS[1]!;
   const foe = CH1_DEX.FLITPECK ?? SPECIES.FUZZLET!;
   const state = createBattleState(
-    createSide(player),
+    buildPlayerTeam(),
     createSide(foe),
     { typeChart: TYPECHART_CH1 },
   );
@@ -303,14 +344,52 @@ function showTestBattle(): void {
   );
 }
 
+// ?skip=test-battle-2v2 hook — Phase 1 combat-in-isolation that
+// exercises switching as a tactical READ, not just a mechanism.
+// Lead GRUBLEAF (SPROUT) vs wild KILNDRAKE (FLAME) is the classic
+// triangle disadvantage: FLAME→SPROUT = 1.3 punishes the lead;
+// SPLASH→FLAME = 1.3 makes SILTSKIP (the bench) the correct answer.
+// User ruling: KINDRAKE can't be "the answer" against a FLAME foe
+// (FLAME→FLAME=0.7), so we substitute the available CH1 triangle.
+function showTestBattle2v2(): void {
+  const foe = CH1_DEX.KILNDRAKE ?? CH1_DEX.KINDRAKE ?? SPECIES.FUZZLET!;
+  const state = createBattleState(
+    buildPlayerTeam(),
+    createSide(foe),
+    { typeChart: TYPECHART_CH1 },
+  );
+  scenes.replace(
+    createBattleScene({
+      state,
+      rng: run.rng,
+      chooseFoeAction: (s, r) => wildFoeAI(s, r),
+      intro: [
+        `2v2 test:`,
+        `wild ${foe.name} appeared!`,
+        `Lead is at a type`,
+        `disadvantage — switch?`,
+      ],
+      catchBreathUnlocked: run.catchBreathUnlocked,
+      canRun: true,
+      onResolve: () => {
+        showTestBattle2v2();
+      },
+    }),
+  );
+}
+
 // Dev: skip ahead with ?skip=<scene> — the contract lives in
 // docs/playtest-hooks.md (read first, edit in lockstep). Hooks are
 // PERMANENT playtest infrastructure: every scene gets one the sprint
-// it lands, maintained across refactors. ?starter=<name> picks the
-// starter for any skip that needs one (default GRUBLEAF).
+// it lands, maintained across refactors.
+//   ?starter=<name>            picks the starter for any 1-mon skip
+//                              (default GRUBLEAF).
+//   ?party=<A,B,...>           builds a multi-mon test party for any
+//                              skip; overrides ?starter when present.
 const url = new URLSearchParams(window.location.search);
 const skip = url.get('skip');
 const starterName = url.get('starter');
+const partyParam = url.get('party');
 
 function pickStarter(): Species {
   if (starterName) {
@@ -321,24 +400,56 @@ function pickStarter(): Species {
   return STARTERS.find((sp) => sp.name === 'GRUBLEAF') ?? STARTERS[1]!;
 }
 
+// Build the initial run.party from URL modifiers. ?party= wins; else
+// ?starter= picks a single mon; else GRUBLEAF.
+function applyPartyFromUrl(): void {
+  if (partyParam) {
+    const names = partyParam.split(',').map((n) => n.trim()).filter(Boolean);
+    const sides: SideState[] = [];
+    for (const name of names) {
+      const sp = STARTERS.find((s) => s.name === name) ?? CH1_DEX[name];
+      if (!sp) {
+        console.warn(`Argent ?party=${name}: not in dex; skipped`);
+        continue;
+      }
+      sides.push(createSide(sp));
+    }
+    if (sides.length === 0) sides.push(createSide(pickStarter()));
+    run.party = sides;
+    return;
+  }
+  run.party = [createSide(pickStarter())];
+}
+
 if (skip === 'starter') showStarterPick();
 else if (skip === 'wild') {
-  run.playerSpecies = SPECIES.EMBERCUB!;
+  run.party = [createSide(SPECIES.EMBERCUB!)];
   showWildBattle();
 } else if (skip === 'test-battle') {
   // Canonical Phase 0 hook: cold-start CH1 starter + a wild FLITPECK
-  // encounter, no overworld walk, no encounter RNG. Lets Mathias
-  // playtest combat in isolation in one click; the battle restarts
-  // on resolve so iteration is fast.
-  run.playerSpecies = pickStarter();
-  run.partyTypes = new Set(run.playerSpecies.types);
+  // encounter. Lets Mathias playtest combat in isolation in one click.
+  applyPartyFromUrl();
+  recomputeSignpostFlags();
   showTestBattle();
+} else if (skip === 'test-battle-2v2') {
+  // Phase 1 hook: two-mon player party vs a wild foe positioned so
+  // switching is the right read. Default party is [GRUBLEAF, SILTSKIP]
+  // (the CH1 triangle answer to a FLAME foe); ?party= overrides.
+  if (!partyParam) {
+    const grubleaf = STARTERS.find((s) => s.name === 'GRUBLEAF');
+    const siltskip = STARTERS.find((s) => s.name === 'SILTSKIP');
+    run.party = [createSide(grubleaf!), createSide(siltskip!)];
+  } else {
+    applyPartyFromUrl();
+  }
+  recomputeSignpostFlags();
+  showTestBattle2v2();
 } else if (skip === 'prep') {
-  run.playerSpecies = SPECIES.EMBERCUB!;
+  run.party = [createSide(SPECIES.EMBERCUB!)];
   run.catchBreathUnlocked = true;
   showPrep();
 } else if (skip === 'rival') {
-  run.playerSpecies = SPECIES.EMBERCUB!;
+  run.party = [createSide(SPECIES.EMBERCUB!)];
   run.catchBreathUnlocked = true;
   showRivalBattle();
 } else if (skip === 'end') showEnd(true);
@@ -346,12 +457,11 @@ else if (skip === 'overworld') showOverworld('ROUTE31', 'default', false);
 else if (skip === 'lab') showOverworld('LAB', 'default', false);
 else if (skip === 'house') showOverworld('HOUSE', 'fromRoute', false);
 else if (skip === 'falkner') {
-  run.playerSpecies = pickStarter();
-  run.partyTypes = new Set(run.playerSpecies.types);
+  applyPartyFromUrl();
+  recomputeSignpostFlags();
   showFalknerFight();
 } else if (skip === 'gym') {
-  run.playerSpecies = pickStarter();
-  run.partyTypes = new Set(run.playerSpecies.types);
+  applyPartyFromUrl();
   recomputeSignpostFlags();
   showOverworld('GYM', 'fromRoute', false);
 } else showTitle();
@@ -372,7 +482,7 @@ function showOverworld(map: string, spawn: string, faded: boolean): void {
     onEncounter(foeSpecies: string) {
       pushWildEncounter(foeSpecies);
     },
-    onTrainerBattle(foeSpecies: string, winFlag: string) {
+    onTrainerBattle(foeSpecies: string | readonly string[], winFlag: string) {
       pushTrainerFight(foeSpecies, winFlag);
     },
     onBossBattle(bossId: string) {
@@ -384,13 +494,12 @@ function showOverworld(map: string, spawn: string, faded: boolean): void {
 }
 
 function pushWildEncounter(foeSpeciesName: string): void {
-  const player = run.playerSpecies ?? STARTERS[0]!;
   const foe = CH1_DEX[foeSpeciesName] ?? SPECIES[foeSpeciesName];
   if (!foe) {
     console.warn(`Argent: encounter species not found: ${foeSpeciesName}`);
     return;
   }
-  const state = createBattleState(createSide(player), createSide(foe), {
+  const state = createBattleState(buildPlayerTeam(), createSide(foe), {
     typeChart: TYPECHART_CH1,
   });
   scenes.push(
@@ -403,10 +512,8 @@ function pushWildEncounter(foeSpeciesName: string): void {
       canRun: true,
       onResolve: (winner) => {
         if (winner === 'player') {
-          // Demo-grade "catch": defeating a mon adds its type to the party,
-          // so the prep-loop signposts (need_terra_nudge) react. Catching 2.0
-          // is a later sprint.
-          for (const t of foe.types) run.partyTypes.add(t);
+          // Demo-grade signpost only — the type-add-on-defeat shortcut
+          // was removed with run.partyTypes; real catching is Phase 6.
           recomputeSignpostFlags();
           run.catchBreathUnlocked = true;
         }
@@ -416,14 +523,29 @@ function pushWildEncounter(foeSpeciesName: string): void {
   );
 }
 
-function pushTrainerFight(foeSpeciesName: string, winFlag: string): void {
-  const player = run.playerSpecies ?? STARTERS[0]!;
-  const foe = CH1_DEX[foeSpeciesName] ?? SPECIES[foeSpeciesName];
-  if (!foe) {
-    console.warn(`Argent: trainer species not found: ${foeSpeciesName}`);
-    return;
+// Build a foe Team from a roster spec (string OR string[]). Single-
+// string back-compat preserved so legacy map scripts keep working
+// while S6 lets gym trainers carry multi-mon rosters.
+function buildTrainerTeam(spec: string | readonly string[]): ReturnType<typeof createTeam> | null {
+  const names = typeof spec === 'string' ? [spec] : spec;
+  const sides: SideState[] = [];
+  for (const n of names) {
+    const sp = CH1_DEX[n] ?? SPECIES[n];
+    if (!sp) {
+      console.warn(`Argent: trainer roster species not found: ${n}`);
+      continue;
+    }
+    sides.push(createSide(sp));
   }
-  const state = createBattleState(createSide(player), createSide(foe), {
+  if (sides.length === 0) return null;
+  return createTeam(sides);
+}
+
+function pushTrainerFight(foeSpec: string | readonly string[], winFlag: string): void {
+  const foeTeam = buildTrainerTeam(foeSpec);
+  if (!foeTeam) return;
+  const leadName = activeMon(foeTeam).species.name;
+  const state = createBattleState(buildPlayerTeam(), foeTeam, {
     typeChart: TYPECHART_CH1,
   });
   scenes.push(
@@ -431,7 +553,7 @@ function pushTrainerFight(foeSpeciesName: string, winFlag: string): void {
       state,
       rng: run.rng,
       chooseFoeAction: (s, r) => wildFoeAI(s, r),
-      intro: ['Gym trainer sent out', `${foe.name}!`, 'Show your read!'],
+      intro: ['Gym trainer sent out', `${leadName}!`, 'Show your read!'],
       catchBreathUnlocked: run.catchBreathUnlocked,
       canRun: false,
       onResolve: (winner) => {
@@ -447,7 +569,7 @@ function showFalknerFightFromOverworld(): void {
   // back to the gym overworld + (on win) set the badge flag.
   scenes.push(
     createFalknerPrepScene({
-      playerSpecies: run.playerSpecies ?? STARTERS[0]!,
+      playerSpecies: partyLead(),
       foeSpecies: FALKNER_ACE_DEX.GALEHAWK!,
       onContinue: () => {
         scenes.pop();
@@ -458,10 +580,9 @@ function showFalknerFightFromOverworld(): void {
 }
 
 function pushFalknerBattle(): void {
-  const player = run.playerSpecies ?? STARTERS[0]!;
   const { team, card } = buildFalknerTeam();
   const state = createBattleState(
-    createTeam([createSide(player)]),
+    buildPlayerTeam(),
     team,
     {
       typeChart: TYPECHART_CH1,

@@ -31,7 +31,14 @@ export type ScriptCommand =
   | { readonly kind: 'start-battle'; readonly species: string }
   | { readonly kind: 'set-flag'; readonly flag: string }
   | { readonly kind: 'move-player'; readonly dx: number; readonly dy: number }
-  | { readonly kind: 'start-trainer-battle'; readonly foeSpecies: string; readonly winFlag: string }
+  | {
+      readonly kind: 'start-trainer-battle';
+      // Single string (back-compat) OR a roster array — the trainer
+      // sends out the first surviving mon, then forced-switch handles
+      // the rest. Maps written before S6 keep working as-is.
+      readonly foeSpecies: string | readonly string[];
+      readonly winFlag: string;
+    }
   | { readonly kind: 'start-boss-battle'; readonly bossId: string }
   | { readonly kind: 'if-flag'; readonly flag: string; readonly commands: readonly ScriptCommand[] };
 

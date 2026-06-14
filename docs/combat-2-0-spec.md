@@ -314,3 +314,14 @@ The battle scene uses two kinds of text dialog with different B behaviour:
 - **Forced/sequential dialogs** (intro, end-text, "Got away safely!" exit-text): `A` / `Start` advance; `B` is a no-op — these must be read.
 
 The split lives on `setText`'s `dismissable` flag; default is forced. Pinned by `src/game/scenes/battle.test.ts` (B-on-dialog block).
+
+## Menu surface — Phase 1 (PKMN + party picker)
+
+Battle menu rows are FIGHT / PKMN / CALL / RUN, in display order. The cursor skips disabled rows (CALL when locked, PKMN when no bench survivor). Switching is a turn action.
+
+- **Voluntary switch** (PKMN row): A on PKMN opens the party picker; cursor lands on the first selectable bench mon; A confirms (commits `{kind: 'switch', toIndex}`); B cancels back to menu. Picker shows party as a vertical list with HP, fainted/active tags, cursor-skip on fainted mons and on the current active.
+- **Forced switch** (faint on the player's active with at least one bench survivor): same party picker, opened by the engine's `forcedSwitch` event. The engine's auto-advance (`firstSurvivor`) becomes the **default highlight** — the player CHOOSES the next mon (can confirm the auto-pick or override). B is a no-op (must pick). After confirmation, resolve resumes draining remaining events.
+- **Bench indicators**: tucked under each side's HP/ST panel — one 4×4 dot per team member, tinted active / alive / fainted. Suppressed during resolve to keep focus on the strike. Solo "teams" render no dots (no team to indicate).
+- **Forced switch is a tactical READ**, not a confirmation — picking the next mon is core to the pillar, not polish.
+
+Pinned by `src/game/team-battle.test.ts`.
