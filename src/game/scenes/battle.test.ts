@@ -20,16 +20,25 @@ import ch1BatchData from '../../../docs/ch1-batch.json';
 import movesData from '../../../docs/moves.json';
 import { createBattleScene } from './battle';
 
-// Stub CanvasRenderingContext2D — record nothing, no-op everything draw
-// the battle scene actually calls. The point is to prove no throw, not
-// to validate pixel output.
-function stubCtx(): CanvasRenderingContext2D {
+// Stub CanvasRenderingContext2D — records every fillText so tests can
+// assert what's on screen. Everything else is a no-op; we don't render
+// pixels in Node.
+interface RecordingCtx extends CanvasRenderingContext2D {
+  readonly texts: string[];
+  reset(): void;
+}
+
+function stubCtx(): RecordingCtx {
   const noop = () => {};
   const path = { fill: noop, stroke: noop, ellipse: noop };
+  const texts: string[] = [];
   return new Proxy(
-    {},
+    { texts, reset: () => texts.splice(0) },
     {
-      get(_, prop) {
+      get(target, prop) {
+        if (prop === 'texts') return (target as { texts: string[] }).texts;
+        if (prop === 'reset') return (target as { reset: () => void }).reset;
+        if (prop === 'fillText') return (text: string) => texts.push(String(text));
         if (prop === 'beginPath') return () => path;
         if (prop === 'measureText') return () => ({ width: 10 });
         if (prop === 'canvas') return { width: 320, height: 180 };
@@ -41,7 +50,7 @@ function stubCtx(): CanvasRenderingContext2D {
         return true;
       },
     },
-  ) as unknown as CanvasRenderingContext2D;
+  ) as unknown as RecordingCtx;
 }
 
 // One-time CH1 move registration so lookupMove finds THORN FLICK etc.
@@ -94,5 +103,84 @@ describe('battle scene — cold-start crash regression', () => {
     const grubleaf = CH1.GRUBLEAF!;
     expect(grubleaf.moves).toContain('THORN FLICK');
     expect(grubleaf.moves).toContain('HEADBUTT');
+  });
+});
+
+describe('battle menu — FIGHT must open the move list, NOT the Calls-locked dialog', () => {
+  function makeWildScene(): ReturnType<typeof createBattleScene> {
+    const player = CH1.GRUBLEAF!;
+    const foe = CH1.FLITPECK!;
+    const state = createBattleState(
+      createTeam([createSide(player)]),
+      createTeam([createSide(foe)]),
+    );
+    return createBattleScene({
+      state,
+      rng: mulberry32(1),
+      chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'G' }),
+      // 2-line intro matches main.ts pushWildEncounter (`A wild X`, `appeared!`).
+      intro: ['A wild FLITPECK', 'appeared!'],
+      catchBreathUnlocked: false, // first wild battle — Calls locked
+      canRun: true,
+      onResolve: () => {},
+    });
+  }
+
+  test('cold-start: A through 2-line intro lands at FIGHT; A opens move list (no Calls dialog)', () => {
+    const scene = makeWildScene();
+    const ctx = stubCtx();
+
+    // Two A presses to clear the 2-line intro → beginTurn → phase=menu, cursor=0.
+    scene.input?.('a');
+    scene.input?.('a');
+    // One A press should select FIGHT (cursor 0 default).
+    scene.input?.('a');
+
+    ctx.reset();
+    scene.draw(ctx);
+    // The move menu shows the player's moves down the left edge. If
+    // FIGHT opened correctly we should see TACKLE listed. If the Calls-
+    // locked dialog fired instead, we'd see "Calls unlock after" / "your
+    // first win.".
+    expect(ctx.texts.join('|')).toContain('TACKLE');
+    expect(ctx.texts.join('|')).not.toContain('Calls unlock');
+  });
+
+  test('cursor skips the locked CALL row: DOWN from FIGHT lands on RUN, not CALL', () => {
+    const scene = makeWildScene();
+    const ctx = stubCtx();
+
+    scene.input?.('a');
+    scene.input?.('a');
+    // DOWN from FIGHT must skip the greyed CALL row (Calls locked here)
+    // and land on RUN. A then confirms RUN → "Got away safely!" dialog.
+    scene.input?.('down');
+    scene.input?.('a');
+
+    ctx.reset();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    expect(screen).toContain('Got away safely');
+    expect(screen).not.toContain('Calls unlock');
+  });
+
+  test('START key acts as a second confirm — does NOT shortcut to CALL', () => {
+    // Regression: an old START handler forced menuCursor=1 and dispatched
+    // A, surfacing the Calls-locked dialog when the user thought they
+    // were confirming FIGHT. START should now just confirm the focused
+    // row (FIGHT by default → move list).
+    const scene = makeWildScene();
+    const ctx = stubCtx();
+
+    // Use START to advance the intro and confirm FIGHT.
+    scene.input?.('start');
+    scene.input?.('start');
+    scene.input?.('start');
+
+    ctx.reset();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    expect(screen).toContain('TACKLE');
+    expect(screen).not.toContain('Calls unlock');
   });
 });

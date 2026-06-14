@@ -394,44 +394,72 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     finishResolve();
   }
 
-  function handleMenuInput(key: InputKey): void {
-    if (key === 'up') menuCursor = (menuCursor + 2) % 3;
-    else if (key === 'down') menuCursor = (menuCursor + 1) % 3;
-    else if (key === 'a') {
-      if (menuCursor === 0) {
-        phase = 'move';
-        moveCursor = 0;
-      } else if (menuCursor === 1) {
-        if (!opts.catchBreathUnlocked) {
-          setText(['Calls unlock after', 'your first win.'], () => {
-            phase = 'menu';
-          });
-        } else if (activeMon(state.player).momentum < 1) {
-          setText(
-            ['No ★ yet —', 'win reads to charge:', 'counter, dodge, open.'],
-            () => {
-              phase = 'menu';
-            },
-          );
-        } else {
-          commit({ kind: 'catchBreath' });
-        }
-      } else {
-        if (opts.canRun) {
-          setText(['Got away safely!'], () => {
-            opts.onResolve('foe');
-          });
-        } else {
-          setText(['No running from', 'a rival!'], () => {
-            phase = 'menu';
-          });
-        }
-      }
-    } else if (key === 'start') {
-      // START shortcut for CALL
-      menuCursor = 1;
-      handleMenuInput('a');
+  // Menu rows in DISPLAY order. The `enabled` flag controls whether the
+  // cursor can rest on this row — disabled rows render greyed and are
+  // skipped during up/down navigation. Keeping the row visible (not
+  // collapsing it) preserves a stable visual layout as state changes.
+  type MenuKind = 'fight' | 'call' | 'run';
+  function menuItems(): ReadonlyArray<{ readonly kind: MenuKind; readonly enabled: boolean }> {
+    return [
+      { kind: 'fight', enabled: true },
+      { kind: 'call', enabled: opts.catchBreathUnlocked },
+      // RUN row stays enabled even when canRun is false — confirming it
+      // surfaces the "No running from a rival!" dialog (intentional UX).
+      { kind: 'run', enabled: true },
+    ];
+  }
+
+  function stepCursor(start: number, dir: 1 | -1): number {
+    const items = menuItems();
+    let i = start;
+    for (let n = 0; n < items.length; n += 1) {
+      i = (i + dir + items.length) % items.length;
+      if (items[i]!.enabled) return i;
     }
+    return start;
+  }
+
+  function confirmMenu(): void {
+    const items = menuItems();
+    const focus = items[menuCursor];
+    if (!focus || !focus.enabled) return;
+    if (focus.kind === 'fight') {
+      phase = 'move';
+      moveCursor = 0;
+      return;
+    }
+    if (focus.kind === 'call') {
+      if (activeMon(state.player).momentum < 1) {
+        setText(
+          ['No ★ yet —', 'win reads to charge:', 'counter, dodge, open.'],
+          () => {
+            phase = 'menu';
+          },
+        );
+      } else {
+        commit({ kind: 'catchBreath' });
+      }
+      return;
+    }
+    // RUN
+    if (opts.canRun) {
+      setText(['Got away safely!'], () => {
+        opts.onResolve('foe');
+      });
+    } else {
+      setText(['No running from', 'a rival!'], () => {
+        phase = 'menu';
+      });
+    }
+  }
+
+  function handleMenuInput(key: InputKey): void {
+    if (key === 'up') menuCursor = stepCursor(menuCursor, -1);
+    else if (key === 'down') menuCursor = stepCursor(menuCursor, 1);
+    // START acts as a second confirm — no auto-jump to CALL (that
+    // shortcut used to fire CALL even when the user thought they were
+    // confirming the FIGHT row, which is the bug this guards against).
+    else if (key === 'a' || key === 'start') confirmMenu();
   }
 
   function handleMoveInput(key: InputKey): void {
