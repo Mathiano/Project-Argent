@@ -92,7 +92,7 @@ New Game seeds **3 POTIONs** in the bag. Items live in `src/game/items.ts` (data
 
 `?bag=…` overrides the seeded inventory for the seeding hooks. The bag schema persists via the Phase 2 save (additive `bag?: SavedBagEntry[]` field — pre-Phase-5a saves load with no bag and `version:1` is unchanged).
 
-**Out of scope for Phase 5a** (deferred per kickoff): money, Poké Mart shopping, in-battle item use (needs a new Action kind in the engine — stop-and-flag rather than reach in), berries / balls / key-item effects.
+**Out of scope for Phase 5a** (deferred per kickoff): money, Poké Mart shopping, berries / balls / key-item effects. (In-battle item use is **not** deferred — it is **cut by canon**: items heal in the overworld, the Recover Call heals in battle. See `combat-2-0-spec.md`.)
 
 ### Phase 5b — money + Poké Mart (the economy)
 
@@ -103,7 +103,7 @@ The town loop now earns and spends. `run.money` (₽) is seeded by New Game (`ST
 - **Bag integration.** Purchases feed the same `run.bag` the Phase 5a bag UI shows; money is displayed top-right in both the bag and the Mart.
 - Prices live on the item registry (`items.ts`); the buy/sell/payout math is pure in `economy.ts`. **Engine untouched** — money is a game-layer concern; both ladders stay bit-identical.
 
-**Out of scope for Phase 5b** (deferred): held items, item effects beyond healing, balls / catching (Phase 6), berries' effects, the Game Corner (cut), in-battle item use (its own engine sprint).
+**Out of scope for Phase 5b** (deferred): held items, item effects beyond healing, balls / catching (Phase 6), berries' effects, the Game Corner (cut). In-battle item use is **cut by canon** — battle healing is the Recover Call (`combat-2-0-spec.md`).
 
 ### Phase 3 — the opening intro
 

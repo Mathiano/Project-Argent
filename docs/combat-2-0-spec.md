@@ -111,9 +111,18 @@ Momentum fills from read-wins, dodges, super-effective hits, clash wins → ★ 
 | "Hang on!" | Survive this action at 1 HP |
 | "Now — full power!" | Next move +50%, ignores stance modifiers |
 | "Catch your breath!" | Skip move, +35 stamina |
+| **"Recover!"** | **Skip move, heal HP and/or clear a status** |
 | "Get back!" | Free pivot switch that evades the incoming move |
 
 Leaders have Calls too — with bark-line tells (*"Miltank, wear them down..."*) that double as readable boss telegraphs.
+
+### In-battle healing is a CALL, not an item (canon — Mathias, 2026-06-15)
+
+**Mid-battle healing and status-cure come from the "Recover" Call — never from items.** It's anime-true (you call out to your mon; you don't spray a potion mid-fight) and bonds-over-stuff aligned. This is the canonical resolution of the long-deferred **"in-battle item use"** question: **we do not build it.**
+
+- **Items heal in the OVERWORLD** (the bag, Phase 5a). **Calls heal in BATTLE** (the Recover Call).
+- The Recover Call lands with the **Call economy** (the Bugsy slice, per the Falkner-card ratification) — not before. The bag's "in-battle item use deferred / needs an engine Action kind" notes are **retired** in favor of this ruling.
+- ★-cost and exact heal/cure values are tuned with the rest of the Call set; treat the row above as the design intent, not final numbers.
 
 ---
 

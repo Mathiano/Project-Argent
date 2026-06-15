@@ -117,6 +117,10 @@ const scenes = new SceneStack();
 let currentOverworldScene: import('./scenes/overworld').OverworldScene | null = null;
 // Stable seed for the current run. Persisted as part of the save.
 let currentRngSeed: number = 0;
+// Black-out respawn: the last Pokémon Center the player healed at. A
+// wild/trainer loss warps here, healed (classic black-out). The demo
+// has one Center; updated in healParty so it extends to later Centers.
+let lastCenterTarget = 'HEARTHWICK_CENTER:fromHearthwick';
 
 interface RunState {
   // Phase 1: party is a list of rich SideStates — hp/st/momentum
@@ -360,9 +364,9 @@ function pushMartMenu(stock: readonly string[]): void {
   );
 }
 
-// Phase 5a — Pokémon Center heal. Wired from the overworld script
-// verb `heal-party` on the NURSE NPC.
-function healParty(): void {
+// Fully restore the party (HP/ST/momentum, clear status). Shared by the
+// Center heal and the black-out. Does NOT autosave — callers decide.
+function healPartyInPlace(): void {
   for (let i = 0; i < run.party.length; i += 1) {
     const s = run.party[i]!;
     run.party[i] = {
@@ -374,6 +378,33 @@ function healParty(): void {
       staggered: false,
     };
   }
+}
+
+// Phase 5a — Pokémon Center heal. Wired from the overworld script
+// verb `heal-party` on the NURSE NPC. Also records this Center as the
+// black-out respawn (the last place you healed — classic).
+function healParty(): void {
+  healPartyInPlace();
+  const here = currentOverworldScene?.currentPosition().map;
+  if (here && here.endsWith('_CENTER')) {
+    // The demo's Center entrance spawn is 'fromHearthwick'; later Centers
+    // can register their own respawn spawn the same way.
+    lastCenterTarget = `${here}:fromHearthwick`;
+  }
+  autosaveNow();
+}
+
+// BUG 2 — black-out. A wild/trainer loss must NOT leave a fainted party
+// in the field (free to stumble into the next fight). Instead: heal the
+// whole party and warp to the last Pokémon Center, the classic
+// consequence. Pops the battle scene on top, then warps.
+function blackout(): void {
+  healPartyInPlace();
+  scenes.pop(); // remove the battle scene
+  const colon = lastCenterTarget.indexOf(':');
+  const map = colon >= 0 ? lastCenterTarget.slice(0, colon) : lastCenterTarget;
+  const spawn = colon >= 0 ? lastCenterTarget.slice(colon + 1) : 'fromHearthwick';
+  showOverworld(map, spawn, true);
   autosaveNow();
 }
 
@@ -585,7 +616,13 @@ function showFalknerFight(): void {
       onResolve: (winner, finalState) => {
         writebackParty(finalState);
         if (winner === 'player') showBadgeAwarded();
-        else showFalknerFight();
+        else {
+          // ?skip=falkner standalone retry — heal first so the refight
+          // isn't with a fainted party (BUG 2, the skip-path mirror of
+          // the real instant-retry).
+          healPartyInPlace();
+          showFalknerFight();
+        }
       },
     }),
   );
@@ -961,17 +998,21 @@ function pushWildEncounter(foeSpeciesName: string): void {
       canRun: true,
       onResolve: (winner, finalState) => {
         writebackParty(finalState);
-        if (winner === 'player') {
-          recomputeSignpostFlags();
-          // Demo-complete S4 (design intent, build in Phase 8 with the
-          // bond system): the first Trainer Call should unlock from an
-          // EARNED BOND MOMENT — the mon reacts to the player / senses
-          // the stakes / shows trust — NOT this win counter, and NOT
-          // gated to the badge. For the demo it stays simply unlocked
-          // (here, on the first wild win) so the bond system doesn't
-          // block the demo. See docs/falkner-boss-card.md + memory.
-          run.catchBreathUnlocked = true;
+        // BUG 2 — a wild loss blacks out (heal + warp to the Center)
+        // rather than leaving a fainted party in the grass.
+        if (winner !== 'player') {
+          blackout();
+          return;
         }
+        recomputeSignpostFlags();
+        // Demo-complete S4 (design intent, build in Phase 8 with the
+        // bond system): the first Trainer Call should unlock from an
+        // EARNED BOND MOMENT — the mon reacts to the player / senses
+        // the stakes / shows trust — NOT this win counter, and NOT
+        // gated to the badge. For the demo it stays simply unlocked
+        // (here, on the first wild win) so the bond system doesn't
+        // block the demo. See docs/falkner-boss-card.md + memory.
+        run.catchBreathUnlocked = true;
         scenes.pop();
         // Classic post-battle grace — the very next step on tall
         // grass won't roll another encounter, so the player can
@@ -1026,12 +1067,18 @@ function pushTrainerFight(
       canRun: false,
       onResolve: (winner, finalState) => {
         writebackParty(finalState);
-        if (winner === 'player') {
-          flagStore.set(winFlag);
-          // Phase 5b — trainer payout (game-layer; engine untouched).
-          // Wild wins never reach here (trainers-only, anti-grind).
-          if (reward && reward > 0) run.money = awardMoney(run.money, reward);
+        // BUG 2 — losing a trainer fight must NOT leave the player
+        // fainted in place (free to walk into the next fight, e.g.
+        // Falkner). Black out: heal + warp to the last Center. The win
+        // flag is NOT set, so progress does not advance.
+        if (winner !== 'player') {
+          blackout();
+          return;
         }
+        flagStore.set(winFlag);
+        // Phase 5b — trainer payout (game-layer; engine untouched).
+        // Wild wins never reach here (trainers-only, anti-grind).
+        if (reward && reward > 0) run.money = awardMoney(run.money, reward);
         scenes.pop();
         // Trainer fights aren't grass-rolled, but the grace also
         // protects against the player stepping onto adjacent grass
@@ -1096,7 +1143,13 @@ function pushFalknerBattle(): void {
             autosaveNow();
           });
         } else {
+          // BUG 2 — a boss loss heals + offers INSTANT RETRY (the
+          // "instant boss retry" pillar), not a fainted party stuck on
+          // the rooftop and not a long walk back from a Center. Re-open
+          // the prep → fight in place with a fresh party.
+          healPartyInPlace();
           autosaveNow();
+          showFalknerFightFromOverworld();
         }
       },
     }),

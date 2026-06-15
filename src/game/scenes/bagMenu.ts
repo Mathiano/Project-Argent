@@ -6,10 +6,10 @@
 // onChange so main.ts persists (autosave). Empty pockets show a
 // labelled '— empty —' so the player can see future surface area.
 //
-// In-battle bag access is OUT OF SCOPE for Phase 5a (kickoff:
-// "in-battle bag access can wait for 5b or a later pass IF it adds
-// engine risk — flag the call"). It needs a new Action kind in the
-// engine — flagged in the report.
+// In-battle bag access is intentionally NOT built — and never will be.
+// Canon ruling (combat-2-0-spec.md): items heal in the OVERWORLD; mid-
+// battle healing is the "Recover" CALL, not an item. The old "needs a
+// new engine Action kind" deferral is retired in favor of that.
 
 import {
   POCKETS,

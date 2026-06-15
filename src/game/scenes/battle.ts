@@ -165,6 +165,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   const breakThreshold = state.bossCard?.breakBar ?? 0;
   let displayBreakProgress = state.breakProgress ?? 0;
   let breakFlashT = 0;
+  // BUG 3 — boss legibility. Track the displayed phase + a short flash
+  // when the break meter ticks up, so the metronome boss READS like one.
+  let displayPhase = state.phase ?? 1;
+  let breakPipFlashT = 0;
 
   let phase: 'text' | 'menu' | 'move' | 'party' | 'resolve' | 'end' = 'text';
   let textQueue: string[] = [...opts.intro];
@@ -386,13 +390,15 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
     if (ev.kind === 'breakProgress') {
       displayBreakProgress = ev.progress;
-      pushLog(`★ Break progress ${ev.progress}/${ev.threshold}.`);
+      breakPipFlashT = 0.6; // BUG 3 — flash the meter as it fills
+      pushLog(`★ BREAK ${ev.progress}/${ev.threshold} — read landed!`);
       return;
     }
     if (ev.kind === 'break') {
       displayBreakProgress = 0;
+      displayPhase = ev.newPhase;
       breakFlashT = 0.6;
-      pushLog(`The foe is BROKEN! Phase ${ev.newPhase}.`);
+      pushLog(`BREAK! ${display.foe.species.name} reels — PHASE ${ev.newPhase}!`);
       animKind = 'clash';
       animT = 0.5;
       return;
@@ -740,32 +746,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   // ---------- draw ----------
 
-  function drawBreakPips(
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    progress: number,
-    threshold: number,
-  ): void {
-    for (let i = 0; i < threshold; i += 1) {
-      const filled = i < progress;
-      ctx.fillStyle = filled ? '#e23a1e' : '#5a4a2a';
-      ctx.fillRect(x + i * 6, y + 1, 4, 4);
-      ctx.strokeStyle = PALETTE.ink;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x + i * 6 + 0.5, y + 1 + 0.5, 3, 3);
-    }
-  }
-
   function drawFoePanel(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, FOE_PANEL.x, FOE_PANEL.y, FOE_PANEL.w, FOE_PANEL.h);
     drawText(ctx, display.foe.species.name, FOE_PANEL.x + 8, FOE_PANEL.y + 6);
     if (display.foe.staggered) drawText(ctx, 'STAG', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
     if (display.foe.exhausted) drawText(ctx, 'EXH', FOE_PANEL.x + 108, FOE_PANEL.y + 6, PALETTE.hpCrit);
     drawMomentum(ctx, FOE_PANEL.x + 132, FOE_PANEL.y + 6, display.foe.momentum, COMBAT.momentumCap);
-    if (breakThreshold > 0) {
-      drawBreakPips(ctx, FOE_PANEL.x + 110, FOE_PANEL.y + 6, displayBreakProgress, breakThreshold);
-    }
+    // Break meter moved to the dedicated boss strip below the panel
+    // (BUG 3 — the in-panel pips were too small to notice).
 
     drawText(ctx, 'HP', FOE_PANEL.x + 8, FOE_PANEL.y + 18, PALETTE.paperShadow);
     drawBar(
@@ -790,8 +778,52 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawWindedNotch(ctx, FOE_PANEL.x + 26, FOE_PANEL.y + 27, FOE_PANEL.w - 36);
     // Bench indicators (S5): tucked just under the panel, 4×4 dots
     // tinted by status (active / alive / fainted). For 1-mon "teams"
-    // nothing draws — the row stays empty and clean.
-    drawBenchIndicators(ctx, FOE_PANEL.x + 8, FOE_PANEL.y + FOE_PANEL.h + 2, state.foe);
+    // nothing draws — the row stays empty and clean. Suppressed for a
+    // boss fight, where the boss strip owns that row.
+    if (breakThreshold === 0) {
+      drawBenchIndicators(ctx, FOE_PANEL.x + 8, FOE_PANEL.y + FOE_PANEL.h + 2, state.foe);
+    }
+  }
+
+  // BUG 3 — boss status strip under the foe panel: PHASE + a labeled,
+  // legible BREAK meter that fills on read-wins (flashes when it ticks),
+  // plus a compact bench row. Only for boss fights (breakThreshold > 0).
+  function drawBossStrip(ctx: CanvasRenderingContext2D): void {
+    const x = FOE_PANEL.x;
+    const y = FOE_PANEL.y + FOE_PANEL.h + 1;
+    const w = FOE_PANEL.w;
+    ctx.fillStyle = 'rgba(28,30,46,0.92)';
+    ctx.fillRect(x, y, w, 11);
+    drawText(ctx, `PHASE ${displayPhase}`, x + 3, y + 2, PALETTE.paper);
+    drawText(
+      ctx,
+      'BREAK',
+      x + 50,
+      y + 2,
+      breakPipFlashT > 0 ? '#ffd76a' : PALETTE.paperShadow,
+    );
+    const pipX = x + 84;
+    for (let i = 0; i < breakThreshold; i += 1) {
+      const filled = i < displayBreakProgress;
+      const isNewest = breakPipFlashT > 0 && i === Math.max(0, displayBreakProgress - 1);
+      ctx.fillStyle = isNewest ? '#fff4c2' : filled ? '#e23a1e' : '#4a3c24';
+      ctx.fillRect(pipX + i * 9, y + 2, 7, 7);
+      ctx.strokeStyle = PALETTE.ink;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(pipX + i * 9 + 0.5, y + 2 + 0.5, 6, 6);
+    }
+    // Compact bench row at the far right (always visible for the boss).
+    const foe = state.foe;
+    if (foe.members.length > 1) {
+      const bx = x + w - foe.members.length * 6 - 3;
+      for (let i = 0; i < foe.members.length; i += 1) {
+        const mon = foe.members[i]!;
+        ctx.fillStyle = mon.hp <= 0 ? '#1d1d28' : i === foe.active ? PALETTE.hpOk : PALETTE.paperDim;
+        ctx.fillRect(bx + i * 6, y + 3, 4, 4);
+        ctx.strokeStyle = PALETTE.ink;
+        ctx.strokeRect(bx + i * 6 + 0.5, y + 3 + 0.5, 3, 3);
+      }
+    }
   }
 
   function drawPlayerPanel(ctx: CanvasRenderingContext2D): void {
@@ -983,6 +1015,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     update(dt) {
       tick += dt;
       if (breakFlashT > 0) breakFlashT = Math.max(0, breakFlashT - dt);
+      if (breakPipFlashT > 0) breakPipFlashT = Math.max(0, breakPipFlashT - dt);
       if (phase === 'resolve') tickResolve(dt);
     },
 
@@ -1040,20 +1073,32 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       );
 
       drawFoePanel(ctx);
+      if (breakThreshold > 0) drawBossStrip(ctx);
       drawPlayerPanel(ctx);
 
       if (phase === 'menu' || phase === 'move') drawIntent(ctx);
 
-      // Gust telegraph: the round AFTER this one is a rhythm round.
+      // BUG 3 — gust legibility. Two distinct states:
+      //  • ACTIVE: the round in play IS a gust round (this is what the
+      //    "wind is rising" was only ever warning about) — say what it
+      //    DOES. During resolve the round counter has already advanced,
+      //    so the round being resolved is state.round - 1.
+      //  • TELEGRAPH: the NEXT round will be a gust round.
       const arena = state.bossCard?.arenaSchedule;
-      if (arena && (phase === 'menu' || phase === 'move')) {
-        const nextRound = state.round + 1;
+      if (arena && arena.rhythmEveryN > 0) {
         const anchor = state.rhythmAnchor ?? 0;
-        const nextIsRhythm = ((nextRound - anchor) % arena.rhythmEveryN) === 0;
-        if (nextIsRhythm) {
-          ctx.fillStyle = 'rgba(80,140,210,0.85)';
+        const activeRound = phase === 'resolve' ? state.round - 1 : state.round;
+        const currentIsGust = (activeRound - anchor) % arena.rhythmEveryN === 0;
+        const nextIsGust = (state.round + 1 - anchor) % arena.rhythmEveryN === 0;
+        if (currentIsGust && (phase === 'menu' || phase === 'move' || phase === 'resolve')) {
+          const pulse = 0.7 + 0.3 * Math.sin(tick * 6);
+          ctx.fillStyle = `rgba(70,150,230,${pulse})`;
           ctx.fillRect(0, 14, LOGICAL_W, 12);
-          drawText(ctx, '~~  THE WIND IS RISING…  ~~', 84, 16, PALETTE.paper);
+          drawText(ctx, '≋ GUST ROUND — heavies cost +ST, gale bites harder ≋', 16, 16, PALETTE.paper);
+        } else if (nextIsGust && (phase === 'menu' || phase === 'move')) {
+          ctx.fillStyle = 'rgba(80,140,210,0.7)';
+          ctx.fillRect(0, 14, LOGICAL_W, 12);
+          drawText(ctx, '~~ the wind is rising… GUST next round ~~', 40, 16, PALETTE.paper);
         }
       }
 

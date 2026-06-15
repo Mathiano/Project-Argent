@@ -142,19 +142,37 @@ interface Harness {
   tick(n?: number, dt?: number): void;
 }
 
-// Slim harness mirroring main.ts's relevant show/push helpers. Battles
-// use weakFoe() teams so the player win is deterministic; everything
-// else is the real scene + the real wiring.
-function createHarness(start: { map: string; spawnAt: { x: number; y: number; facing: Facing } }): Harness {
+// Slim harness mirroring main.ts's relevant show/push helpers + the
+// BUG-2 loss handling (black-out, boss retry). The WIN path builds
+// weakFoe() teams (deterministic player win); the LOSE path builds
+// 'normal' foes vs a 1-HP player (deterministic player loss).
+function createHarness(
+  start: { map: string; spawnAt: { x: number; y: number; facing: Facing } },
+  opts: { foeMode?: 'weak' | 'normal' } = {},
+): Harness {
+  const foeMode = opts.foeMode ?? 'weak';
+  const makeFoe = (sp: Species): SideState => (foeMode === 'weak' ? weakFoe(sp) : createSide(sp));
   const scenes = new SceneStack();
   const flags = mockFlags();
   const input = mockInput();
   const rng: RNG = mulberry32(0xa9c0);
   const run: { party: SideState[]; badges: string[] } = { party: [], badges: [] };
+  // BUG 2 black-out respawn (mirrors main.ts lastCenterTarget).
+  const lastCenterTarget = 'HEARTHWICK_CENTER:fromHearthwick';
 
   let topKind: TopKind = 'overworld';
   let currentOverworld: OverworldScene | null = null;
   let badgeWasShown = false;
+
+  function healPartyInPlace(): void {
+    run.party = run.party.map((s) => ({ ...s, hp: s.maxHp, st: 100, momentum: 0, exhausted: false, staggered: false }));
+  }
+  function blackout(): void {
+    healPartyInPlace();
+    scenes.pop(); // drop the battle
+    const [map, spawn] = lastCenterTarget.split(':');
+    showOverworld(map!, spawn!);
+  }
 
   function buildPlayerTeam() {
     return createTeam(run.party.map((s) => ({ ...s, exhausted: false, staggered: false })));
@@ -183,7 +201,7 @@ function createHarness(start: { map: string; spawnAt: { x: number; y: number; fa
 
   function pushTrainerFight(spec: string | readonly string[], winFlag: string): void {
     const names = typeof spec === 'string' ? [spec] : spec;
-    const foeTeam = createTeam(names.map((n) => weakFoe(CH1[n]!)));
+    const foeTeam = createTeam(names.map((n) => makeFoe(CH1[n]!)));
     const state = createBattleState(buildPlayerTeam(), foeTeam, { typeChart: TYPECHART });
     topKind = 'battle';
     scenes.push(
@@ -196,7 +214,11 @@ function createHarness(start: { map: string; spawnAt: { x: number; y: number; fa
         canRun: false,
         onResolve: (winner, finalState) => {
           writeback(finalState);
-          if (winner === 'player') flags.set(winFlag);
+          if (winner !== 'player') {
+            blackout(); // BUG 2 — loss does NOT advance; heal + Center
+            return;
+          }
+          flags.set(winFlag);
           scenes.pop();
           topKind = 'overworld';
           currentOverworld?.armPostBattleGrace();
@@ -227,7 +249,7 @@ function createHarness(start: { map: string; spawnAt: { x: number; y: number; fa
       breakBar: 2,
       teamSize: 2,
     };
-    const foeTeam = createTeam([weakFoe(CH1.FLITPECK!), { ...weakFoe(galehawk) }]);
+    const foeTeam = createTeam([makeFoe(CH1.FLITPECK!), makeFoe(galehawk)]);
     const state = createBattleState(buildPlayerTeam(), foeTeam, {
       typeChart: TYPECHART,
       traits: FALKNER_TRAITS,
@@ -253,7 +275,10 @@ function createHarness(start: { map: string; spawnAt: { x: number; y: number; fa
               topKind = 'overworld';
             });
           } else {
-            topKind = 'overworld';
+            // BUG 2 — boss loss heals + instant retry (re-prep), not a
+            // softlock and not a fainted rooftop party.
+            healPartyInPlace();
+            pushFalknerPrep();
           }
         },
       }),
@@ -432,5 +457,72 @@ describe('DEMO-COMPLETE GATE — cold spine intro → Violet → gym → Falkner
     h.tick(2);
     expect(h.top()).toBe('overworld');
     expect(h.run.badges).toEqual(['ZEPHYR']);
+  });
+});
+
+describe('DEMO-COMPLETE GATE — the LOSE path (BUG 2: losing must not advance you)', () => {
+  beforeEach(() => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test('losing the gym trainer blacks out (heal + Center) and does NOT reach Falkner', () => {
+    // Player at 1 HP vs a normal-strength trainer → guaranteed loss.
+    const h = createHarness(
+      { map: 'GYM', spawnAt: { x: 7, y: 13, facing: 'up' } },
+      { foeMode: 'normal' },
+    );
+    h.run.party = [{ ...createSide(CH1.KINDRAKE!), hp: 1 }];
+
+    // Trainer is at (7,12), directly north. Settle a frame + face it.
+    h.tick(2);
+    face(h, 'up');
+    h.press('a'); // interact → trainer dialog
+    h.tick(2);
+    h.press('a'); // advance → start-trainer-battle
+    h.tick(2);
+    expect(h.top()).toBe('battle');
+
+    driveBattleToWin(h); // (drives to resolve — here, a loss)
+
+    // Blacked out: back in the OVERWORLD at the Center, party HEALED,
+    // win flag NOT set — progress did not advance, and we are nowhere
+    // near Falkner.
+    expect(h.top()).toBe('overworld');
+    expect(h.overworld().currentPosition().map).toBe('HEARTHWICK_CENTER');
+    expect(h.flags.has('gym_trainer_beaten')).toBe(false);
+    expect(h.run.party.every((m) => m.hp === m.maxHp)).toBe(true);
+  });
+
+  test('losing Falkner heals + offers an instant retry (re-prep), not a softlock', () => {
+    const h = createHarness(
+      // Stand directly below the leader's throne (6,2).
+      { map: 'GYM', spawnAt: { x: 6, y: 3, facing: 'up' } },
+      { foeMode: 'normal' },
+    );
+    h.run.party = [{ ...createSide(CH1.KINDRAKE!), hp: 1 }];
+    h.flags.set('gym_trainer_beaten');
+
+    h.tick(2);
+    face(h, 'up');
+    h.press('a'); // interact → Falkner dialog
+    h.tick(2);
+    h.press('a'); // advance → start-boss-battle → prep
+    h.tick(2);
+    expect(h.top()).toBe('prep');
+    h.press('a'); // prep → boss battle
+    h.tick(2);
+    expect(h.top()).toBe('battle');
+
+    driveBattleToWin(h); // (a loss)
+
+    // Instant retry: the prep re-opens with a HEALED party; the badge
+    // flag is NOT set and we are not stuck.
+    expect(h.top()).toBe('prep');
+    expect(h.flags.has('falkner_beaten')).toBe(false);
+    expect(h.run.badges).not.toContain('ZEPHYR');
+    expect(h.run.party.every((m) => m.hp === m.maxHp)).toBe(true);
   });
 });

@@ -528,7 +528,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         drawTiles(ctx, map, rows, camX, camY);
       }
       const gustState = drawGustOverlay(ctx, map, camX, camY, tick);
-      drawObjectMarkers(ctx, map, camX, camY, opts.flags);
+      drawObjectMarkers(ctx, map, camX, camY, opts.flags, tick);
       // Walk phase: idle (0) when standing; otherwise the current stride
       // foot lifts for the middle 60% of the move and lands flat at the
       // ends, so steps "land" visually instead of hovering.
@@ -698,19 +698,56 @@ function drawTilePixels(
   }
 }
 
+// A warp tile reads as a bare floor/path tile unless we mark it — a
+// player can't use an exit they can't see (BUG 1). Draw a pulsing
+// directional arrow pointing the way out: down/up/left/right for an
+// edge exit, up (into the doorway) for an interior door.
+function drawWarpMarker(
+  ctx: CanvasRenderingContext2D,
+  map: MapData,
+  obj: Extract<MapObject, { type: 'warp' }>,
+  camX: number,
+  camY: number,
+  tick: number,
+): void {
+  const ts = map.tilesize;
+  const cx = obj.x * ts - camX;
+  const cy = obj.y * ts - camY;
+  // Direction from the tile's position on the map.
+  let glyph = '▴';
+  if (obj.y >= map.height - 2) glyph = '▾';
+  else if (obj.y <= 1) glyph = '▴';
+  else if (obj.x <= 1) glyph = '◂';
+  else if (obj.x >= map.width - 2) glyph = '▸';
+  // Pulse so the eye is drawn to it; never fully off so it stays legible.
+  const pulse = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(tick * 4));
+  ctx.save();
+  ctx.globalAlpha = pulse;
+  ctx.fillStyle = '#fff4c2';
+  ctx.font = '8px monospace';
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'center';
+  ctx.fillText(glyph, cx + ts / 2, cy + ts / 2 - 4);
+  ctx.restore();
+  ctx.textAlign = 'start';
+}
+
 function drawObjectMarkers(
   ctx: CanvasRenderingContext2D,
   map: MapData,
   camX: number,
   camY: number,
   flags: FlagStore,
+  tick: number,
 ): void {
   const ts = map.tilesize;
   for (const obj of map.objects) {
     if (obj.type === 'sign') {
       ctx.fillStyle = '#ffd700';
       ctx.fillRect(obj.x * ts - camX + ts / 2 - 1, obj.y * ts - camY + 2, 2, 4);
-    } else if (obj.type === 'warp' || obj.type === 'encounter_zone') {
+    } else if (obj.type === 'warp') {
+      drawWarpMarker(ctx, map, obj, camX, camY, tick);
+    } else if (obj.type === 'encounter_zone') {
       void obj;
     } else if (obj.type === 'npc') {
       const beaten = obj.blockedUntilFlag ? flags.has(obj.blockedUntilFlag) : false;
