@@ -355,6 +355,56 @@ describe('Phase 5b — money round-trip + back-compat with pre-5b saves', () => 
   });
 });
 
+describe('Demo-complete — badges round-trip + back-compat', () => {
+  test('save → load preserves earned badges', () => {
+    const storage = memoryStorage();
+    const state: SaveState = {
+      version: 1,
+      party: [{ speciesName: 'GRUBLEAF', hp: 54, st: 100, momentum: 0 }],
+      position: { map: 'GYM', x: 7, y: 14, facing: 'up' },
+      flags: ['falkner_beaten'],
+      catchBreathUnlocked: true,
+      rngSeed: 1,
+      badges: ['ZEPHYR'],
+    };
+    saveToStorage(state, storage);
+    expect(loadFromStorage(storage)!.badges).toEqual(['ZEPHYR']);
+  });
+
+  test('pre-badge saves (no badges field) load with badges undefined', () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 1,
+        party: [{ speciesName: 'GRUBLEAF', hp: 54, st: 100, momentum: 0 }],
+        position: { map: 'LAB', x: 6, y: 7, facing: 'down' },
+        flags: [],
+        catchBreathUnlocked: false,
+        rngSeed: 1,
+      }),
+    );
+    expect(loadFromStorage(storage)!.badges).toBeUndefined();
+  });
+
+  test('a non-string badge entry nukes the save (loud-fail)', () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 1,
+        party: [{ speciesName: 'GRUBLEAF', hp: 54, st: 100, momentum: 0 }],
+        position: { map: 'LAB', x: 6, y: 7, facing: 'down' },
+        flags: [],
+        catchBreathUnlocked: false,
+        rngSeed: 1,
+        badges: ['ZEPHYR', 7],
+      }),
+    );
+    expect(loadFromStorage(storage)).toBeNull();
+  });
+});
+
 describe('Phase 2 — New Game wipes the save; Continue restores it', () => {
   test('wipe clears the slot; subsequent load returns null', () => {
     const storage = memoryStorage();

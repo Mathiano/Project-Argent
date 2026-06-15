@@ -161,7 +161,7 @@ describe('overworld cold-start warp round-trip', () => {
     expect(warpTarget).toBe('HEARTHWICK:fromRoute');
   });
 
-  test('GYM:fromRoute spawn loads + the gym door at (7,15) warps back to ROUTE31:fromGym', () => {
+  test('GYM:fromRoute spawn loads + the gym door at (7,15) warps back to VIOLET:fromGym', () => {
     let warpTarget: string | null = null;
     const input = mockInput();
     const scene = createOverworldScene({
@@ -185,7 +185,75 @@ describe('overworld cold-start warp round-trip', () => {
 
     tickStep(scene, 0.4);
 
-    expect(warpTarget).toBe('ROUTE31:fromGym');
+    expect(warpTarget).toBe('VIOLET:fromGym');
+  });
+});
+
+describe('Demo-complete — Violet City hub wires Route 31 → Violet → gym', () => {
+  test('Route 31 south exit (9,13) warps INTO Violet City', () => {
+    let warpTarget: string | null = null;
+    const input = mockInput();
+    const scene = createOverworldScene({
+      map: 'ROUTE31',
+      spawn: 'fromViolet', // (9,12), one tile north of the exit at (9,13)
+      inputState: input,
+      flags: mockFlags(),
+      onWarp: (target) => {
+        warpTarget = target;
+      },
+      onEncounter: () => {},
+      onTrainerBattle: () => {},
+      onBossBattle: () => {},
+      startFaded: true,
+    });
+    tickStep(scene, 0.4);
+    walkOne(scene, input, 'down'); // onto (9,13) → warp
+    tickStep(scene, 0.4);
+    expect(warpTarget).toBe('VIOLET:fromRoute');
+  });
+
+  test('Violet gym door (8,4) warps INTO the gym; south exit (8,13) warps back to Route 31', () => {
+    // Gym door: spawn fromGym (8,5) is one tile below the door at (8,4).
+    let gymWarp: string | null = null;
+    const input = mockInput();
+    const upScene = createOverworldScene({
+      map: 'VIOLET',
+      spawn: 'fromGym',
+      inputState: input,
+      flags: mockFlags(),
+      onWarp: (t) => {
+        gymWarp = t;
+      },
+      onEncounter: () => {},
+      onTrainerBattle: () => {},
+      onBossBattle: () => {},
+      startFaded: true,
+    });
+    tickStep(upScene, 0.4);
+    walkOne(upScene, input, 'up'); // (8,4) → warp
+    tickStep(upScene, 0.4);
+    expect(gymWarp).toBe('GYM:fromRoute');
+
+    // South exit: spawn fromRoute (8,12) is one tile north of the exit (8,13).
+    let routeWarp: string | null = null;
+    const input2 = mockInput();
+    const downScene = createOverworldScene({
+      map: 'VIOLET',
+      spawn: 'fromRoute',
+      inputState: input2,
+      flags: mockFlags(),
+      onWarp: (t) => {
+        routeWarp = t;
+      },
+      onEncounter: () => {},
+      onTrainerBattle: () => {},
+      onBossBattle: () => {},
+      startFaded: true,
+    });
+    tickStep(downScene, 0.4);
+    walkOne(downScene, input2, 'down'); // (8,13) → warp
+    tickStep(downScene, 0.4);
+    expect(routeWarp).toBe('ROUTE31:fromViolet');
   });
 });
 

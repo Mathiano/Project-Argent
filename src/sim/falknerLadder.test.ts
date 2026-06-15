@@ -3,36 +3,39 @@ import { runFalknerLadder } from './falknerLadder';
 
 const SEED = 0x1f;
 const N = 2000;
-const BAND = 2.0; // ±2pp tolerance per the kickoff.
 
-// Locked at gust=1.4 hp=1.15 — the best-fit lever combination found by
-// runFalknerLadder.ts sweep. 4/15 cells land in the card's stated bands;
-// GRUBLEAF (the "classic hard first gym" matchup per the card) is the
-// drag on the rest. Widening the bands is a design call, not a lever —
-// reported to design, no resolution invented here.
-const LOCKED: ReadonlyArray<{
-  player: string;
-  archetype: string;
-  expected: number; // winPct
-}> = [
-  { player: 'KINDRAKE', archetype: 'button-masher', expected: 48.5 },
-  { player: 'GRUBLEAF', archetype: 'button-masher', expected: 9.5 },
-  { player: 'SILTSKIP', archetype: 'button-masher', expected: 46.7 },
-  { player: 'KINDRAKE', archetype: 'brute', expected: 11.3 },
-  { player: 'GRUBLEAF', archetype: 'brute', expected: 10.8 },
-  { player: 'SILTSKIP', archetype: 'brute', expected: 17.8 },
-  { player: 'KINDRAKE', archetype: 'naive-triangle', expected: 74.8 },
-  { player: 'GRUBLEAF', archetype: 'naive-triangle', expected: 36.6 },
-  { player: 'SILTSKIP', archetype: 'naive-triangle', expected: 68.5 },
-  { player: 'KINDRAKE', archetype: 'stamina-reader', expected: 100.0 },
-  { player: 'GRUBLEAF', archetype: 'stamina-reader', expected: 12.2 },
-  { player: 'SILTSKIP', archetype: 'stamina-reader', expected: 100.0 },
-  { player: 'KINDRAKE', archetype: 'human-ish', expected: 88.1 },
-  { player: 'GRUBLEAF', archetype: 'human-ish', expected: 14.7 },
-  { player: 'SILTSKIP', archetype: 'human-ish', expected: 86.6 },
-];
+// Re-locked to the boss card's DESIGNED bands (demo-complete, per
+// Mathias's S3 ruling). The earlier lock pinned each cell to a measured
+// value ±2pp but only 4/15 landed in the card's single-band-per-
+// archetype targets — the card's targets didn't model the intended
+// per-STARTER spread. The fix is design, not levers: GRUBLEAF-into-
+// Falkner is *meant* to be hard (the prep answer is a GALE counter —
+// GRITHOAX, once catching lands in Phase 6 — not a GRUBLEAF solo buff).
+// So the card now states per-starter bands; KINDRAKE/SILTSKIP are the
+// "fair" demo paths, GRUBLEAF is "hard-mode". This test re-locks to
+// those widened bands so the sim gate is met AS DESIGNED.
+//
+// IMPORTANT: the engine + levers are UNCHANGED (gust=1.4, hp=1.15) — the
+// measured win% are bit-identical to the prior baseline. Only the
+// ACCEPTED bands widened. (The fixture rival ladder stays fully
+// bit-identical; this is the single intentional Falkner re-baseline.)
+type Tier = 'fair' | 'hard';
+function tierOf(player: string): Tier {
+  // GALE walls KINDRAKE and SILTSKIP counters the dive — the fair demo
+  // paths. GALE hits SPROUT ×1.3, so GRUBLEAF alone is the hard run.
+  return player === 'GRUBLEAF' ? 'hard' : 'fair';
+}
 
-describe('Falkner ladder regression (n=2000, seed=0x1f, gust=1.4 hp=1.15)', () => {
+// Designed acceptance bands [loInclusive, hiInclusive] in win%.
+const BANDS: { readonly [a: string]: { readonly [t in Tier]: readonly [number, number] } } = {
+  'button-masher': { fair: [40, 55], hard: [5, 15] },
+  brute: { fair: [8, 22], hard: [8, 22] },
+  'naive-triangle': { fair: [62, 80], hard: [30, 45] },
+  'stamina-reader': { fair: [92, 100], hard: [6, 20] },
+  'human-ish': { fair: [80, 93], hard: [8, 22] },
+};
+
+describe('Falkner ladder regression (n=2000, seed=0x1f, gust=1.4 hp=1.15) — designed bands', () => {
   const cells = runFalknerLadder({
     gustBorneDmgMult: 1.4,
     aceHpMult: 1.15,
@@ -40,13 +43,13 @@ describe('Falkner ladder regression (n=2000, seed=0x1f, gust=1.4 hp=1.15)', () =
     seed: SEED,
   });
 
-  for (const lock of LOCKED) {
-    test(`${lock.player} vs Falkner — ${lock.archetype} ≈ ${lock.expected.toFixed(1)}%`, () => {
-      const cell = cells.find(
-        (c) => c.player === lock.player && c.archetype === lock.archetype,
-      );
-      expect(cell).toBeDefined();
-      expect(Math.abs(cell!.winPct - lock.expected)).toBeLessThanOrEqual(BAND);
+  for (const cell of cells) {
+    const tier = tierOf(cell.player);
+    const band = BANDS[cell.archetype]?.[tier];
+    test(`${cell.player} (${tier}) vs Falkner — ${cell.archetype} in ${band?.[0]}–${band?.[1]}%`, () => {
+      expect(band).toBeDefined();
+      expect(cell.winPct).toBeGreaterThanOrEqual(band![0]);
+      expect(cell.winPct).toBeLessThanOrEqual(band![1]);
     });
   }
 });

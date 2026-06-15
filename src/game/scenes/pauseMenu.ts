@@ -17,6 +17,9 @@ export interface PauseMenuOpts {
   readonly onSave: () => void;
   readonly onOptions: () => void;
   readonly onClose: () => void;
+  // Demo-complete: earned badge ids, shown as a trainer-card stand-in
+  // footer ("BADGES ★×N"). Defaults to none when omitted.
+  readonly badges?: readonly string[];
 }
 
 type RowKind = 'pokemon' | 'bag' | 'save' | 'options' | 'box' | 'exit';
@@ -26,7 +29,7 @@ interface Row {
   readonly enabled: boolean;
 }
 
-const PANEL = { x: 200, y: 12, w: 110, h: 150 } as const;
+const PANEL = { x: 200, y: 12, w: 110, h: 164 } as const;
 
 export function createPauseMenuScene(opts: PauseMenuOpts): Scene {
   const rows: Row[] = [
@@ -102,6 +105,19 @@ export function createPauseMenuScene(opts: PauseMenuOpts): Scene {
         const marker = cursor === i && r.enabled ? '>' : ' ';
         drawText(ctx, `${marker} ${r.label}`, PANEL.x + 8, PANEL.y + 22 + i * 14, color);
       });
+
+      // Trainer-card stand-in: badge count footer (demo-complete).
+      const badgeCount = opts.badges?.length ?? 0;
+      const footerY = PANEL.y + 22 + rows.length * 14 + 4;
+      ctx.fillStyle = PALETTE.barEmpty;
+      ctx.fillRect(PANEL.x + 8, footerY - 2, PANEL.w - 16, 1);
+      drawText(
+        ctx,
+        badgeCount > 0 ? `BADGES ${'★'.repeat(badgeCount)}` : 'BADGES —',
+        PANEL.x + 8,
+        footerY + 2,
+        badgeCount > 0 ? PALETTE.star : PALETTE.paperDim,
+      );
 
       if (savedFlashSec > 0) {
         drawPanel(ctx, 80, 80, 160, 28);

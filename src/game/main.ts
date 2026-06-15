@@ -38,6 +38,7 @@ import { createBattleScene } from './scenes/battle';
 import { createEndScene } from './scenes/end';
 import { createBagMenuScene } from './scenes/bagMenu';
 import { createMartMenuScene } from './scenes/martMenu';
+import { createBadgeAwardScene } from './scenes/badgeAward';
 import { createFalknerPrepScene } from './scenes/falknerPrep';
 import { createOverworldScene } from './scenes/overworld';
 import { createPartyMenuScene } from './scenes/partyMenu';
@@ -129,6 +130,9 @@ interface RunState {
   // Phase 5b wallet. Earned from trainer wins, spent at the Mart;
   // persisted via save (additive — pre-5b saves load as STARTING_MONEY).
   money: number;
+  // Demo-complete: earned gym badges (ids). Awarded on a leader win;
+  // persisted via save (additive — pre-badge saves load as []).
+  badges: string[];
   catchBreathUnlocked: boolean;
   rng: RNG;
 }
@@ -137,9 +141,14 @@ const run: RunState = {
   party: [],
   bag: [],
   money: STARTING_MONEY,
+  badges: [],
   catchBreathUnlocked: false,
   rng: mulberry32(RNG_SEED),
 };
+
+// Demo-complete: the one badge the demo ships. Falkner's ZEPHYR BADGE.
+// A registry can come later when gyms 2–8 land; one constant suffices now.
+const ZEPHYR_BADGE = 'ZEPHYR';
 
 function partyTypes(): Set<string> {
   const out = new Set<string>();
@@ -223,6 +232,7 @@ function autosaveNow(): void {
     rngSeed: currentRngSeed,
     bag: run.bag.map((e) => ({ itemId: e.itemId, qty: e.qty })),
     money: run.money,
+    badges: [...run.badges],
   };
   saveToStorage(state);
 }
@@ -255,6 +265,7 @@ function startNewGame(): void {
   run.bag = [];
   bagAdd(run.bag, 'POTION', 3);
   run.money = STARTING_MONEY;
+  run.badges = [];
   run.catchBreathUnlocked = false;
   currentRngSeed = 0xa9c0;
   run.rng = mulberry32(currentRngSeed);
@@ -298,6 +309,7 @@ function pushPauseMenu(): void {
       onSave: () => autosaveNow(),
       onOptions: () => {},
       onClose: () => scenes.pop(),
+      badges: run.badges,
     }),
   );
 }
@@ -365,6 +377,32 @@ function healParty(): void {
   autosaveNow();
 }
 
+// Demo-complete — award a badge (idempotent) + autosave. Returns true
+// if it was newly earned (so the caller can fire the fanfare only once).
+function awardBadge(id: string): boolean {
+  if (run.badges.includes(id)) return false;
+  run.badges.push(id);
+  autosaveNow();
+  return true;
+}
+
+// Demo-complete — push the badge fanfare beat. onContinue is the
+// caller's "where to go after the player dismisses it" (back to the gym
+// in the real path; to the title on the ?skip=falkner standalone).
+function pushBadgeAward(onContinue: () => void): void {
+  scenes.push(
+    createBadgeAwardScene({
+      badgeName: ZEPHYR_BADGE,
+      leaderName: 'FALKNER',
+      lines: [
+        'Proof of the rooftop wind.',
+        'You read the gale and held.',
+      ],
+      onContinue,
+    }),
+  );
+}
+
 // Phase 4 — party menu pushed from the pause menu's POKEMON row. The
 // party array is passed by reference so reorder mutates run.party in
 // place; onReorder fires autosave so the new order persists.
@@ -397,6 +435,8 @@ function applySave(saved: SaveState): void {
   // Phase 5b: money is additive — a pre-5b save with no money field
   // loads as the starting wallet rather than penniless.
   run.money = saved.money ?? STARTING_MONEY;
+  // Demo-complete: badges additive — pre-badge saves load as [].
+  run.badges = saved.badges ? [...saved.badges] : [];
   run.catchBreathUnlocked = saved.catchBreathUnlocked;
   currentRngSeed = saved.rngSeed;
   run.rng = mulberry32(currentRngSeed);
@@ -552,10 +592,20 @@ function showFalknerFight(): void {
 }
 
 function showBadgeAwarded(): void {
+  // ?skip=falkner standalone: award the badge, show the same fanfare
+  // beat the real gym path uses, then fall through to the demo-end
+  // screen → title.
+  awardBadge(ZEPHYR_BADGE);
+  flagStore.set('falkner_beaten');
   scenes.replace(
-    createEndScene({
-      won: true,
-      onRestart: showTitle,
+    createBadgeAwardScene({
+      badgeName: ZEPHYR_BADGE,
+      leaderName: 'FALKNER',
+      lines: [
+        'Proof of the rooftop wind.',
+        'You read the gale and held.',
+      ],
+      onContinue: () => scenes.replace(createEndScene({ won: true, onRestart: showTitle })),
     }),
   );
 }
@@ -816,6 +866,16 @@ else if (skip === 'hearthwick') {
   recomputeSignpostFlags();
   showOverworld('HEARTHWICK', 'fromHouse', false);
 }
+else if (skip === 'violet') {
+  // Demo-complete hook — drop into Violet City (the gym hub) with a
+  // party so the gym → Falkner slice is testable from one click.
+  applyPartyFromUrl();
+  applyBagFromUrl();
+  applyMoneyFromUrl();
+  sessionFlags.add('player_has_starter');
+  recomputeSignpostFlags();
+  showOverworld('VIOLET', 'fromRoute', false);
+}
 else if (skip === 'lab') showOverworld('LAB', 'default', false);
 else if (skip === 'house') showOverworld('HOUSE', 'fromBedroom', false);
 else if (skip === 'falkner') {
@@ -903,6 +963,13 @@ function pushWildEncounter(foeSpeciesName: string): void {
         writebackParty(finalState);
         if (winner === 'player') {
           recomputeSignpostFlags();
+          // Demo-complete S4 (design intent, build in Phase 8 with the
+          // bond system): the first Trainer Call should unlock from an
+          // EARNED BOND MOMENT — the mon reacts to the player / senses
+          // the stakes / shows trust — NOT this win counter, and NOT
+          // gated to the badge. For the demo it stays simply unlocked
+          // (here, on the first wild win) so the bond system doesn't
+          // block the demo. See docs/falkner-boss-card.md + memory.
           run.catchBreathUnlocked = true;
         }
         scenes.pop();
@@ -949,6 +1016,10 @@ function pushTrainerFight(
     createBattleScene({
       state,
       rng: run.rng,
+      // Demo-complete S5 (log): named trainers currently run the generic
+      // wildFoeAI (uniform-random move + stance) — fine for the demo,
+      // but post-demo they should get distinct AI so they fight like
+      // people, not wild mons (a per-trainer policy, like the boss cards).
       chooseFoeAction: (s, r) => wildFoeAI(s, r),
       intro: ['Gym trainer sent out', `${leadName}!`, 'Show your read!'],
       catchBreathUnlocked: run.catchBreathUnlocked,
@@ -1012,12 +1083,21 @@ function pushFalknerBattle(): void {
       canRun: false,
       onResolve: (winner, finalState) => {
         writebackParty(finalState);
+        scenes.pop(); // drop the battle scene first
         if (winner === 'player') {
           flagStore.set('falkner_beaten');
           run.catchBreathUnlocked = true;
+          // Demo-complete S1: award the ZEPHYR badge + a real payoff
+          // beat, then return to the gym. awardBadge autosaves; the
+          // pop after the fanfare lands the player back on the rooftop.
+          awardBadge(ZEPHYR_BADGE);
+          pushBadgeAward(() => {
+            scenes.pop(); // drop the badge scene → back to the gym
+            autosaveNow();
+          });
+        } else {
+          autosaveNow();
         }
-        scenes.pop();
-        autosaveNow();
       },
     }),
   );

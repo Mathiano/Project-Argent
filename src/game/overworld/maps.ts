@@ -12,6 +12,7 @@ import hearthwickData from '../maps/hearthwick.json';
 import hearthwickCenterData from '../maps/hearthwick_center.json';
 import hearthwickMartData from '../maps/hearthwick_mart.json';
 import route31Data from '../maps/route31.json';
+import violetData from '../maps/violet.json';
 import gymData from '../maps/gym.json';
 import route31VioletData from '../maps/route31.violet.json';
 import outdoorVioletTileset from '../../../assets/tilesets/outdoor_violet.tileset.json';
@@ -46,6 +47,7 @@ const REGISTRY: { [name: string]: () => MapData } = {
   HEARTHWICK_MART: () => loadMap(hearthwickMartData as GrayboxMapJson),
   LAB: () => loadMap(labData as GrayboxMapJson),
   ROUTE31: chooseRoute31,
+  VIOLET: () => loadMap(violetData as GrayboxMapJson),
   GYM: () => loadMap(gymData as GrayboxMapJson),
 };
 

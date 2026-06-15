@@ -1,6 +1,8 @@
 # Falkner Boss Card v2 (CANON — supersedes v0.1 entirely)
 
-Gym 1 · Violet rooftop · Reads 0% / 15% · Break bar 2 · Badge gift: first Trainer Call slot
+Gym 1 · Violet rooftop · Reads 0% / 15% · Break bar 2 · Badge: ZEPHYR
+
+> **Call-unlock ruling (Mathias, 2026-06-15):** the first Trainer Call is **NOT** a badge gift. Design intent — the first Call unlocks from an *earned bond moment* (the mon reacts to the player / senses the stakes / shows trust), built with the bond system in Phase 8. It is **not** gated to this badge, and for the demo it is simply available (currently unlocked on the first wild win). See `src/game/main.ts` (`catchBreathUnlocked`) and the project memory note.
 
 The lesson: **the timeline has a rhythm, and you can read it.** Falkner is the metronome boss — every threat he poses is telegraphed by the arena itself.
 
@@ -34,17 +36,21 @@ SPD edge vs all three starters off-gust is his; *on* gusts he outspeeds everythi
 
 GALE hits SPROUT ×1.3 — the GRUBLEAF picker gets the classic hard first gym. TERRA (GRITHOAX, the cave line) hits back ×1.3 — the prep-loop catch. KINDRAKE walls him; SILTSKIP counters the dive.
 
-## Sim targets (CC tunes levers to land these, n≥2000 per cell, vs each starter at band)
+## Sim targets — PER-STARTER bands (demo-complete re-baseline)
 
-| Player archetype | Target win % |
-|---|---|
-| button-masher | 25–35 |
-| brute (heavy spam) | 10–20 |
-| naive-triangle | 55–70 |
-| stamina-reader | 85–92 |
-| human-ish (30% err) | 65–75 |
+> **Design ruling (Mathias, 2026-06-15):** the original single-band-per-archetype targets averaged across starters and never matched reality — the matchup spread between starters is *enormous* and **intended**. KINDRAKE walls GALE and SILTSKIP counters the dive (the **fair** demo paths); GALE hits SPROUT ×1.3, so **GRUBLEAF alone is hard-mode**. The answer to GRUBLEAF-into-Falkner is **prepare — train, or catch a GALE counter (GRITHOAX, the cave line; once Catching 2.0 lands in Phase 6)** — *not* a GRUBLEAF solo buff. Falkner's levers are **not** retuned to flatten this; instead the bands are widened to accept the designed spread, and the ladder is re-locked to them (`src/sim/falknerLadder.test.ts`). Locked at gust=1.4 / ace-HP=1.15.
 
-Tuning levers, in order of preference: GUSTBORNE damage mult (1.3 ±0.1) → DIVE BOMB usage rule strictness → ace HP mult (1.15 ±0.1) → Break bar threshold feel (2 fixed — do not change without design review).
+| Player archetype | Fair path (KINDRAKE / SILTSKIP) | Hard-mode (GRUBLEAF) |
+|---|---|---|
+| button-masher | 40–55 | 5–15 |
+| brute (heavy spam) | 8–22 | 8–22 |
+| naive-triangle | 62–80 | 30–45 |
+| stamina-reader | 92–100 | 6–20 |
+| human-ish (30% err) | 80–93 | 8–22 |
+
+The **fair** columns are the demo's intended difficulty: a reading player on KINDRAKE/SILTSKIP clears the gym; a button-masher on the fair path lands ~50/50 (a real but beatable wall). The **hard-mode** column is GRUBLEAF without prep — survivable for a strong reader (stamina-reader/human-ish still pull it off some of the time) but a deliberate "go catch a counter / train" signal for everyone else.
+
+Tuning levers (frozen for the demo; listed for the post-demo tuning pass only): GUSTBORNE damage mult (1.3 ±0.1) → DIVE BOMB usage rule strictness → ace HP mult (1.15 ±0.1) → Break bar threshold feel (2 fixed — do not change without design review).
 
 ## Engine hooks required (sanctioned additions at the Falkner sprint, sim-gated)
 

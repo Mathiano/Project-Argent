@@ -66,7 +66,7 @@ function expectWarpTargetsValid(mapName: string): void {
 
 describe('Phase 3 intro — map geometry + warp chain', () => {
   test('every Phase 3 map registers and walks to its sibling maps via valid warps', () => {
-    for (const name of ['BEDROOM', 'HOUSE', 'HEARTHWICK', 'LAB', 'ROUTE31', 'GYM']) {
+    for (const name of ['BEDROOM', 'HOUSE', 'HEARTHWICK', 'LAB', 'ROUTE31', 'VIOLET', 'GYM']) {
       expectWarpTargetsValid(name);
     }
   });

@@ -27,7 +27,7 @@
       "type": "warp",
       "x": 11,
       "y": 13,
-      "target": "GYM:fromRoute"
+      "target": "VIOLET:fromRoute"
     },
     {
       "type": "sign",
@@ -98,6 +98,6 @@
     "fromLab": { "x": 4, "y": 5, "facing": "down" },
     "fromHearthwick": { "x": 4, "y": 5, "facing": "down" },
     "fromHouse": { "x": 13, "y": 5, "facing": "down" },
-    "fromGym": { "x": 11, "y": 12, "facing": "up" }
+    "fromViolet": { "x": 11, "y": 12, "facing": "up" }
   }
 }

@@ -1,0 +1,81 @@
+{
+  "name": "VIOLET CITY",
+  "width": 20,
+  "height": 14,
+  "tilesize": 16,
+  "tiles": "TTTTTTTTTTTTTTTTTTTT\nT..................T\nT......GGGG........T\nT......GGGG........T\nT......GDGG........T\nT.......p..........T\nT.......p..........T\nT..HH...p.....HH...T\nT..HH...p.....HH...T\nT.......p..........T\nT.......p..........T\nT.......p..........T\nT.......p..........T\nTTTTTTTTvTTTTTTTTTTT",
+  "_layout": "20x14 Violet City hub. T=tree border, G=gym wall, D=gym door (warp → GYM), p=path (vertical spine from the south exit up to the gym door), H=flavor house wall, v=south exit (warp → ROUTE31). Gym top-center (door at 8,4); player enters from Route 31 via the south exit at (8,13) and walks the path north to the gym. The plain walkable door tile replaces the Route-31 prefab gym whose solid-override made its door unreachable (audit B1).",
+  "tileset": {
+    "T": { "color": "#1d4a26", "solid": true, "label": "tree" },
+    ".": { "color": "#86c06c", "solid": false, "label": "grass" },
+    "G": { "color": "#6a5a86", "solid": true, "label": "gym_wall" },
+    "D": { "color": "#daa520", "solid": false, "label": "gym_door" },
+    "H": { "color": "#7a4e2d", "solid": true, "label": "house_wall" },
+    "p": { "color": "#d8c08a", "solid": false, "label": "path" },
+    "v": { "color": "#d8c08a", "solid": false, "label": "path_exit" }
+  },
+  "objects": [
+    {
+      "type": "warp",
+      "x": 8,
+      "y": 4,
+      "target": "GYM:fromRoute"
+    },
+    {
+      "type": "warp",
+      "x": 8,
+      "y": 13,
+      "target": "ROUTE31:fromViolet"
+    },
+    {
+      "type": "sign",
+      "x": 6,
+      "y": 5,
+      "lines": [
+        "VIOLET CITY",
+        "The rooftop gym looms",
+        "north. Count the wind."
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 10,
+      "y": 5,
+      "color": "#3a7fbe",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "GYM GUIDE: FALKNER took",
+            "the roof for his gym.",
+            "Says the wind's the third",
+            "fighter up there.",
+            "Beat his trainer first —",
+            "they hand out a scout report."
+          ]
+        }
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 3,
+      "y": 8,
+      "color": "#caa148",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "TRAVELLER: Heal up before",
+            "you climb — there's no",
+            "Center on the roof.",
+            "Hearthwick's is south."
+          ]
+        }
+      ]
+    }
+  ],
+  "spawns": {
+    "fromRoute": { "x": 8, "y": 12, "facing": "up" },
+    "fromGym": { "x": 8, "y": 5, "facing": "down" }
+  }
+}

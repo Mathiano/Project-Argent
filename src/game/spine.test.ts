@@ -1,0 +1,436 @@
+// DEMO-COMPLETE GATE — the full spine, walked as ONE continuous run.
+//
+// This is the test the demo-readiness audit said was missing: the cold
+// spine from the playable-overworld start all the way to the badge,
+// composed (not segmented). It drives the REAL scenes — overworld,
+// battle, Falkner prep, badge fanfare — wired the way main.ts wires
+// them, through a slim harness that mirrors main.ts's show/push helpers
+// (same altitude as coldstart.test.ts).
+//
+//   intro end-state (player_has_starter + starter seeded)
+//     → Hearthwick → Route 31 → VIOLET CITY → GYM
+//     → gym trainer fight (win, sets gym_trainer_beaten)
+//     → Falkner prep → Falkner boss (win)
+//     → ZEPHYR badge awarded + the fanfare beat
+//
+// The pre-starter intro internals (bedroom → lab → theft) stay owned by
+// intro.test.ts; this composes from the overworld start, the same line
+// coldstart.test.ts draws. Determinism: foe mons are built at 1 HP and
+// spd 1 so the player always strikes first and KOs (spd 1 also zeroes
+// the A-vs-F dodge), and Math.random is pinned high so the Route 31
+// grass can't roll a wild encounter mid-walk.
+
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import ch1BatchData from '../../docs/ch1-batch.json';
+import movesData from '../../docs/moves.json';
+import typechartData from '../../docs/typechart.json';
+import {
+  activeMon,
+  affordableMoves,
+  createBattleState,
+  createSide,
+  createTeam,
+  falknerBossAI,
+  forcedAction,
+  loadDex,
+  loadMoves,
+  mulberry32,
+  registerMoves,
+} from '../engine';
+import type {
+  Action,
+  ArenaSchedule,
+  BattleState,
+  BossCard,
+  DexEntryJson,
+  MoveJson,
+  RNG,
+  SideState,
+  Species,
+  Stance,
+  TraitTable,
+  TypeChart,
+} from '../engine';
+import { SceneStack } from './scene';
+import type { InputKey } from './scene';
+import type { InputState } from './input';
+import type { Facing } from './overworld/types';
+import type { FlagStore } from './scenes/overworld';
+import { createOverworldScene } from './scenes/overworld';
+import type { OverworldScene } from './scenes/overworld';
+import { createBattleScene } from './scenes/battle';
+import { createFalknerPrepScene } from './scenes/falknerPrep';
+import { createBadgeAwardScene } from './scenes/badgeAward';
+
+registerMoves(loadMoves(movesData as MoveJson[]));
+const CH1 = loadDex(ch1BatchData as DexEntryJson[], 13);
+const TYPECHART = typechartData as TypeChart;
+const ZEPHYR_BADGE = 'ZEPHYR';
+
+const FALKNER_ARENA: ArenaSchedule = {
+  rhythmEveryN: 3,
+  heavyExtraCost: 8,
+  heavyExtraInitWeight: 1.3,
+  telegraphAheadBy: 1,
+};
+const FALKNER_TRAITS: TraitTable = { GUSTBORNE: { dmgMult: 1.4, initMult: 1.25 } };
+
+interface MockInput extends InputState {
+  press(key: InputKey): void;
+  release(key: InputKey): void;
+  releaseAll(): void;
+}
+function mockInput(): MockInput {
+  const held = new Set<InputKey>();
+  return {
+    pressed: (k) => held.has(k),
+    press: (k) => {
+      held.add(k);
+    },
+    release: (k) => {
+      held.delete(k);
+    },
+    releaseAll: () => held.clear(),
+  };
+}
+
+function mockFlags(): FlagStore {
+  const set = new Set<string>();
+  return {
+    has: (f) => set.has(f),
+    set: (f) => {
+      set.add(f);
+    },
+    unset: (f) => {
+      set.delete(f);
+    },
+  };
+}
+
+// Test-weak foe: 1 HP so any landed strike KOs, and spd 1 so the player
+// always wins initiative AND the A-vs-F dodge probability is 0
+// (clamp((spdDef/spdAtk - 1)*2) with spdDef=1 → 0). Makes every fight
+// resolve to a player win in ~one round per foe-mon, deterministically.
+function weakFoe(sp: Species): SideState {
+  const slow: Species = { ...sp, spd: 1 };
+  return { ...createSide(slow), hp: 1 };
+}
+
+// Wild/trainer AI (mirrors main.ts wildFoeAI).
+function wildFoeAI(state: BattleState, rng: RNG): Action {
+  const me = activeMon(state.foe);
+  const forced = forcedAction(me);
+  if (forced) return forced;
+  const aff = affordableMoves(me);
+  const move = aff[Math.floor(rng.next() * aff.length)]!;
+  const r = rng.next();
+  const stance: Stance = r < 0.4 ? 'A' : r < 0.7 ? 'G' : 'F';
+  return { kind: 'move', move, stance };
+}
+
+type TopKind = 'overworld' | 'battle' | 'prep' | 'badge' | 'end';
+
+interface Harness {
+  readonly scenes: SceneStack;
+  readonly flags: FlagStore;
+  readonly input: MockInput;
+  readonly run: { party: SideState[]; badges: string[] };
+  top(): TopKind;
+  overworld(): OverworldScene;
+  badgeShown(): boolean;
+  press(key: InputKey): void;
+  tick(n?: number, dt?: number): void;
+}
+
+// Slim harness mirroring main.ts's relevant show/push helpers. Battles
+// use weakFoe() teams so the player win is deterministic; everything
+// else is the real scene + the real wiring.
+function createHarness(start: { map: string; spawnAt: { x: number; y: number; facing: Facing } }): Harness {
+  const scenes = new SceneStack();
+  const flags = mockFlags();
+  const input = mockInput();
+  const rng: RNG = mulberry32(0xa9c0);
+  const run: { party: SideState[]; badges: string[] } = { party: [], badges: [] };
+
+  let topKind: TopKind = 'overworld';
+  let currentOverworld: OverworldScene | null = null;
+  let badgeWasShown = false;
+
+  function buildPlayerTeam() {
+    return createTeam(run.party.map((s) => ({ ...s, exhausted: false, staggered: false })));
+  }
+  function writeback(finalState: BattleState): void {
+    run.party = finalState.player.members.map((m) => ({ ...m, exhausted: false, staggered: false }));
+  }
+
+  function awardBadge(id: string): boolean {
+    if (run.badges.includes(id)) return false;
+    run.badges.push(id);
+    return true;
+  }
+  function pushBadgeAward(onContinue: () => void): void {
+    badgeWasShown = true;
+    topKind = 'badge';
+    scenes.push(
+      createBadgeAwardScene({
+        badgeName: ZEPHYR_BADGE,
+        leaderName: 'FALKNER',
+        lines: ['Proof of the rooftop wind.'],
+        onContinue,
+      }),
+    );
+  }
+
+  function pushTrainerFight(spec: string | readonly string[], winFlag: string): void {
+    const names = typeof spec === 'string' ? [spec] : spec;
+    const foeTeam = createTeam(names.map((n) => weakFoe(CH1[n]!)));
+    const state = createBattleState(buildPlayerTeam(), foeTeam, { typeChart: TYPECHART });
+    topKind = 'battle';
+    scenes.push(
+      createBattleScene({
+        state,
+        rng,
+        chooseFoeAction: (s, r) => wildFoeAI(s, r),
+        intro: ['Gym trainer!'],
+        catchBreathUnlocked: false,
+        canRun: false,
+        onResolve: (winner, finalState) => {
+          writeback(finalState);
+          if (winner === 'player') flags.set(winFlag);
+          scenes.pop();
+          topKind = 'overworld';
+          currentOverworld?.armPostBattleGrace();
+        },
+      }),
+    );
+  }
+
+  function pushFalknerPrep(): void {
+    topKind = 'prep';
+    scenes.push(
+      createFalknerPrepScene({
+        playerSpecies: run.party[0]!.species,
+        foeSpecies: CH1.GALEHAWK!,
+        onContinue: () => {
+          scenes.pop();
+          pushFalknerBattle();
+        },
+      }),
+    );
+  }
+  function pushFalknerBattle(): void {
+    const galehawk: Species = { ...CH1.GALEHAWK!, trait: 'GUSTBORNE' };
+    const card: BossCard = {
+      species: galehawk,
+      statScale: { hp: 1.15 },
+      arenaSchedule: FALKNER_ARENA,
+      breakBar: 2,
+      teamSize: 2,
+    };
+    const foeTeam = createTeam([weakFoe(CH1.FLITPECK!), { ...weakFoe(galehawk) }]);
+    const state = createBattleState(buildPlayerTeam(), foeTeam, {
+      typeChart: TYPECHART,
+      traits: FALKNER_TRAITS,
+      bossCard: card,
+    });
+    topKind = 'battle';
+    scenes.push(
+      createBattleScene({
+        state,
+        rng,
+        chooseFoeAction: (s, r) => falknerBossAI(s, 'foe', r),
+        intro: ['FALKNER!'],
+        catchBreathUnlocked: true,
+        canRun: false,
+        onResolve: (winner, finalState) => {
+          writeback(finalState);
+          scenes.pop();
+          if (winner === 'player') {
+            flags.set('falkner_beaten');
+            awardBadge(ZEPHYR_BADGE);
+            pushBadgeAward(() => {
+              scenes.pop();
+              topKind = 'overworld';
+            });
+          } else {
+            topKind = 'overworld';
+          }
+        },
+      }),
+    );
+  }
+
+  function showOverworld(map: string, spawn: string, spawnAt?: { x: number; y: number; facing: Facing }): void {
+    const scene = createOverworldScene({
+      map,
+      spawn,
+      inputState: input,
+      flags,
+      ...(spawnAt ? { spawnAt } : {}),
+      onWarp(target) {
+        const colon = target.indexOf(':');
+        const nextMap = colon >= 0 ? target.slice(0, colon) : target;
+        const nextSpawn = colon >= 0 ? target.slice(colon + 1) : 'default';
+        showOverworld(nextMap, nextSpawn);
+      },
+      onEncounter() {
+        /* encounters suppressed in this test (Math.random pinned high) */
+      },
+      onTrainerBattle(foeSpecies, winFlag) {
+        pushTrainerFight(foeSpecies, winFlag);
+      },
+      onBossBattle(bossId) {
+        if (bossId === 'falkner') pushFalknerPrep();
+      },
+    });
+    currentOverworld = scene;
+    topKind = 'overworld';
+    scenes.replace(scene);
+  }
+
+  showOverworld(start.map, 'default', start.spawnAt);
+
+  return {
+    scenes,
+    flags,
+    input,
+    run,
+    top: () => topKind,
+    overworld: () => currentOverworld!,
+    badgeShown: () => badgeWasShown,
+    press: (k) => scenes.input(k),
+    tick: (n = 1, dt = 0.02) => {
+      for (let i = 0; i < n; i += 1) scenes.update(dt);
+    },
+  };
+}
+
+// Walk one tile toward facing `dir`: hold until the tile coordinate
+// changes (or a bound is hit), release, drain MOVE_DURATION.
+function step(h: Harness, dir: Facing): void {
+  const start = h.overworld().currentPosition();
+  h.input.press(dir);
+  for (let i = 0; i < 40; i += 1) {
+    h.tick(1);
+    const p = h.overworld().currentPosition();
+    if (p.x !== start.x || p.y !== start.y) break;
+  }
+  h.input.release(dir);
+  h.tick(14);
+}
+
+// Walk toward a target tile, vertical axis first then horizontal,
+// recomputing each step so a gust push-back (Falkner's rooftop) is just
+// re-attempted. Bails out when reached or the step budget runs out.
+function walkTo(h: Harness, tx: number, ty: number, budget = 160): void {
+  for (let i = 0; i < budget; i += 1) {
+    const p = h.overworld().currentPosition();
+    if (p.x === tx && p.y === ty) return;
+    if (p.y !== ty) step(h, p.y > ty ? 'up' : 'down');
+    else step(h, p.x > tx ? 'left' : 'right');
+  }
+}
+
+// Face `dir` without moving (tap: the turn-hold timer is cancelled on
+// release before it commits to a walk).
+function face(h: Harness, dir: Facing): void {
+  h.input.press(dir);
+  h.tick(1);
+  h.input.release(dir);
+  h.tick(1);
+}
+
+// Pump A + ticks until the battle on top resolves (its onResolve pops
+// it). Detects resolution by the harness leaving the 'battle' top.
+function driveBattleToWin(h: Harness): void {
+  for (let i = 0; i < 300 && h.top() === 'battle'; i += 1) {
+    h.press('a');
+    h.tick(6, 0.2);
+  }
+}
+
+describe('DEMO-COMPLETE GATE — cold spine intro → Violet → gym → Falkner → badge (one continuous run)', () => {
+  beforeEach(() => {
+    // Pin the Route 31 grass: Math.random() ≥ rate → no wild encounter
+    // can interrupt the spine walk.
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test('walks the whole spine and ends with the ZEPHYR badge', () => {
+    // Intro end-state: a starter in the party + player_has_starter set,
+    // exactly what New Game + the lab ceremony establish. KINDRAKE is a
+    // fair-path starter per the boss card.
+    const h = createHarness({
+      map: 'HEARTHWICK',
+      // Drop just north of the south exit (the gatekeeper steps aside
+      // once player_has_starter is set — which it is).
+      spawnAt: { x: 9, y: 11, facing: 'down' },
+    });
+    h.run.party = [createSide(CH1.KINDRAKE!)];
+    h.flags.set('player_has_starter');
+
+    // Intro flags present (the audit's "intro flags" precondition).
+    expect(h.flags.has('player_has_starter')).toBe(true);
+    expect(h.run.party[0]!.species.name).toBe('KINDRAKE');
+    expect(h.top()).toBe('overworld');
+    expect(h.overworld().currentPosition().map).toBe('HEARTHWICK');
+
+    // Hearthwick → Route 31 (south exit at (9,13)).
+    walkTo(h, 9, 13);
+    h.tick(30); // fade + warp + new-scene fade-in
+    expect(h.overworld().currentPosition().map).toBe('ROUTE31');
+
+    // Route 31 → Violet City (south exit at (9,13)).
+    walkTo(h, 9, 13);
+    h.tick(30);
+    expect(h.overworld().currentPosition().map).toBe('VIOLET');
+
+    // Violet City → gym (gym door at (8,4)).
+    walkTo(h, 8, 4);
+    h.tick(30);
+    expect(h.overworld().currentPosition().map).toBe('GYM');
+
+    // Gym trainer: stand at (7,13) facing up, the trainer is at (7,12).
+    walkTo(h, 7, 13);
+    face(h, 'up');
+    h.press('a'); // interact → opens the trainer dialog
+    h.tick(2);
+    h.press('a'); // advance the 1-page dialog → fires start-trainer-battle
+    h.tick(2);
+    expect(h.top()).toBe('battle');
+    driveBattleToWin(h);
+    expect(h.flags.has('gym_trainer_beaten')).toBe(true);
+    expect(h.top()).toBe('overworld');
+
+    // Climb to Falkner: stand at (6,3), the leader is on the throne at
+    // (6,2). walkTo re-attempts through the rooftop gust lanes.
+    walkTo(h, 6, 3);
+    expect(h.overworld().currentPosition()).toMatchObject({ x: 6, y: 3 });
+    face(h, 'up');
+    h.press('a'); // interact → Falkner dialog
+    h.tick(2);
+    h.press('a'); // advance dialog → start-boss-battle → prep scene
+    h.tick(2);
+    expect(h.top()).toBe('prep');
+
+    h.press('a'); // prep → Falkner boss battle
+    h.tick(2);
+    expect(h.top()).toBe('battle');
+    driveBattleToWin(h);
+
+    // Win → badge fanfare beat (the S1 payoff).
+    expect(h.top()).toBe('badge');
+    expect(h.badgeShown()).toBe(true);
+    expect(h.run.badges).toContain('ZEPHYR');
+    expect(h.flags.has('falkner_beaten')).toBe(true);
+
+    // Dismiss the fanfare → back to the gym, badge in hand.
+    h.press('a');
+    h.tick(2);
+    expect(h.top()).toBe('overworld');
+    expect(h.run.badges).toEqual(['ZEPHYR']);
+  });
+});

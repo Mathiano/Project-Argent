@@ -34,17 +34,22 @@
     "TTTTTTTTTTTTTTTTTTTT"
   ],
   "prefabs": [
-    { "name": "house_violet", "x": 4, "y": 4 },
-    { "name": "gym_violet", "x": 11, "y": 13 }
+    { "name": "house_violet", "x": 4, "y": 4 }
   ],
   "objects": [
     { "type": "warp", "x": 4, "y": 4, "target": "HEARTHWICK:fromRoute" },
-    { "type": "warp", "x": 11, "y": 13, "target": "GYM:fromRoute" },
+    { "type": "warp", "x": 9, "y": 13, "target": "VIOLET:fromRoute" },
     {
       "type": "sign",
       "x": 3,
       "y": 8,
       "lines": ["ROUTE 31", "Wild mons in the", "tall grass ahead.", "And rocks rustle", "in the dark hollow."]
+    },
+    {
+      "type": "sign",
+      "x": 7,
+      "y": 12,
+      "lines": ["The path south opens", "onto VIOLET CITY —", "and FALKNER's gym."]
     },
     {
       "type": "encounter_zone",
@@ -151,6 +156,6 @@
     "fromLab": { "x": 4, "y": 5, "facing": "down" },
     "fromHearthwick": { "x": 4, "y": 5, "facing": "down" },
     "fromHouse": { "x": 4, "y": 5, "facing": "down" },
-    "fromGym": { "x": 11, "y": 12, "facing": "up" }
+    "fromViolet": { "x": 9, "y": 12, "facing": "up" }
   }
 }
