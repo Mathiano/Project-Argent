@@ -288,7 +288,7 @@ describe('momentum charging on each read-win', () => {
 });
 
 describe('Catch Breath call', () => {
-  test('spends 1 momentum and restores +35 ST', () => {
+  test('spends 1 momentum and restores 50% of max ST (+50)', () => {
     const state = patchPlayer(makeState(), { momentum: 2, st: 30 });
     const result = resolveRound(
       state,
@@ -297,7 +297,10 @@ describe('Catch Breath call', () => {
       mulberry32(42),
     );
     expect(pl(result.state).momentum).toBe(1);
-    expect(pl(result.state).st).toBe(30 + COMBAT.catchBreathRestore);
+    // Phase 6b — Catch Breath restores 50% of the 100-ST cap (= +50).
+    const restore = Math.round(100 * COMBAT.catchBreathRestorePct);
+    expect(restore).toBe(50);
+    expect(pl(result.state).st).toBe(Math.min(100, 30 + restore));
   });
 
   test('Catch Breath is illegal with 0 momentum', () => {

@@ -224,9 +224,10 @@ describe('Phase 4 — party menu', () => {
     expect(screen).toContain('THORN FLICK');
     expect(screen).toContain('LEAF LASH');
     expect(screen).toContain('HEADBUTT');
-    // Bond placeholder (the forward-hook for the bond system).
+    // Bond stage (Phase 6b — the BOND slot now shows the named stage;
+    // a fresh mon with no tracked bond reads as the first stage, Wary).
     expect(screen).toContain('BOND');
-    expect(screen).toContain('pending');
+    expect(screen).toContain('Wary');
   });
 
   test('reorder swaps the lead with the second mon and fires onReorder', () => {

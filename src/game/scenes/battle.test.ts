@@ -441,7 +441,7 @@ describe('battle menu — CALL paths (Call-menu sprint: submenu + shout + exit)'
     expect(screen).toContain('>Catch Breath');
   });
 
-  test('Catch Breath resolves with a VISIBLE stamina effect (+35) — legibility (S4)', () => {
+  test('Catch Breath resolves with a VISIBLE stamina effect (+50) — legibility (S4)', () => {
     const { scene } = buildScene({
       catchBreathUnlocked: true,
       playerPatch: { momentum: 1, st: 30 },
@@ -460,7 +460,7 @@ describe('battle menu — CALL paths (Call-menu sprint: submenu + shout + exit)'
       ctx.reset();
       scene.draw(ctx);
       const screen = ctx.texts.join('|');
-      if (screen.includes('catches its breath') && screen.includes('35')) found = true;
+      if (screen.includes('catches its breath') && screen.includes('50')) found = true;
       else scene.input?.('a'); // release this hold, continue to the next
     }
     expect(found).toBe(true);

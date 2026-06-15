@@ -110,7 +110,7 @@ The full Call set — the submenu reads this, so adding a Call is **data, not a 
 
 | Call | ★ | Effect | Unlock source | Shout line (`{MON}` = active mon) | Status |
 |---|---|---|---|---|---|
-| **Catch Breath** | 1 | Skip move, +35 stamina | first Call unlock (the earned bond moment — see `bond-track-v2.md` / the Jay robbery) | `{MON}, catch your breath!` | **BUILT** |
+| **Catch Breath** | 1 | Skip move, restore **50% of max ST** (= **+50** on the 100 cap; was +35 flat — Phase 6b) | first Call unlock (the earned bond moment — see `bond-track-v2.md` / the Jay robbery) | `{MON}, catch your breath!` | **BUILT** |
 | **Recover** | 1 | Skip move, heal HP and/or clear a status (the canonical in-battle heal — items heal in the overworld) | Call economy (bond tier) | `{MON}, shake it off!` | designed |
 | **Dodge** | 1 | Guarantee an evade of the incoming attack (the anime "Dodge it!") | Call economy (bond tier) | `{MON}, dodge it!` | designed |
 | **Hang On** | 1 | Survive this action at 1 HP | Call economy (bond tier) | `{MON}, hang on!` | designed |

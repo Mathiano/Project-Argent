@@ -115,6 +115,15 @@ The town loop now earns and spends. `run.money` (₽) is seeded by New Game (`ST
 - Caught/joined mons enter the **party** (or the box if full). **BALL** is in the Mart + the starting bag. A minimal **per-mon bond** is tracked + persisted (read-wins/boss-clears bump it) — the interim the full Phase-8 bond system layers onto.
 - **Engine hook:** a sanctioned `throwBall` Action (turn mechanics only — the thrower forgoes its strike, the foe acts, no stamina change). The catch math is game-side. Sim bots never throw → both ladders bit-identical.
 
+### Phase 6b — Evolution (bond-gated, boss-capped)
+
+`?skip=evolve` seeds a **bond-ready FLITPECK + the ZEPHYR badge** (both evo gates met) and pushes a wild fight — **win it to see FLITPECK evolve into GALEHAWK** at the end-of-fight beat. Open the party menu (START) → **ASK** (a flavored bond/readiness response) or **SUMMARY** (the BOND line shows the named stage + "Ready to evolve!").
+
+- **Two gates (S1):** a mon evolves when its **bond stage** (read from the interim 6a bond value) AND its **gating badge** are BOTH met; whichever is satisfied second triggers it, at the end of the qualifying battle. Blocked when only one gate is met.
+- **CH1 data (S2):** the 3 starter lines, FLITPECK→GALEHAWK, GRITHOAX→CAVELURE→CHASMTRAP. Stage-2→3 evos gate on the Gym 2 (HIVE) badge — correctly **blocked** in the demo (Gym 2 isn't built). `docs/evolution-design.md` is canon; "16/34" is gone.
+- **8-badge uncap (S3):** an evo with no progress gate (post-Gym-8) is bond-only — built and correct.
+- **Catch Breath** now restores **50% of max ST (+50)**, up from +35 flat (Phase 6b balance).
+
 ### Phase 3 — the opening intro
 
 The cold-start `?skip=intro` walks the player through the six beats of `docs/opening-design.md`: bedroom letter → furnished house + parent → Hearthwick town (3 flavor NPCs + "trainers are rare" sign) → lab (Larch's inheritance speech + starter ceremony) → KAMON theft (gated by `player_has_starter`, branched per starter via `if-flag`) → push south → Route 31.

@@ -24,7 +24,10 @@ export const COMBAT = {
   dodgeSlope: 2.0,
   dodgeCap: 0.9,
 
-  catchBreathRestore: 35,
+  // Phase 6b — Catch Breath restores 50% of the 100-ST cap (= +50), a
+  // percentage so it scales with the full bar. Was +35 flat — a weak
+  // trickle that caused catch-breath stalemates.
+  catchBreathRestorePct: 0.5,
   momentumCap: 2,
   staggerInitMult: 0.5,
   restInitiative: -1,

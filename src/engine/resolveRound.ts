@@ -25,6 +25,10 @@ function opposite(side: Side): Side {
   return side === 'player' ? 'foe' : 'player';
 }
 
+// Phase 6b — Catch Breath restore = 50% of the 100-ST cap (a percentage,
+// not a flat trickle). Computed once from config.
+const CATCH_BREATH_RESTORE = Math.round(100 * COMBAT.catchBreathRestorePct);
+
 function snapshot(side: SideState): SideSnapshot {
   return {
     hp: side.hp,
@@ -196,7 +200,7 @@ function paySide(
     };
   }
   if (action.kind === 'catchBreath') {
-    return { ...side, st: Math.min(100, side.st + COMBAT.catchBreathRestore) };
+    return { ...side, st: Math.min(100, side.st + CATCH_BREATH_RESTORE) };
   }
   if (action.kind === 'switch') {
     // Switching is the turn — no stamina change for the side that switched.
@@ -307,11 +311,11 @@ export function resolveRound(
   }
 
   if (playerAction.kind === 'catchBreath') {
-    events.push({ kind: 'catchBreath', side: 'player', restored: COMBAT.catchBreathRestore });
+    events.push({ kind: 'catchBreath', side: 'player', restored: CATCH_BREATH_RESTORE });
     pl = { ...pl, momentum: pl.momentum - 1 };
   }
   if (foeAction.kind === 'catchBreath') {
-    events.push({ kind: 'catchBreath', side: 'foe', restored: COMBAT.catchBreathRestore });
+    events.push({ kind: 'catchBreath', side: 'foe', restored: CATCH_BREATH_RESTORE });
     foe = { ...foe, momentum: foe.momentum - 1 };
   }
 

@@ -172,3 +172,26 @@ export function bumpBond(bond: number, amount: number): number {
 export function bondBonus(bond: number): number {
   return (Math.max(BOND_MIN, Math.min(BOND_MAX, bond)) / BOND_MAX) * 0.15;
 }
+
+// The bond DISPLAY model (bond-track-v2): the hidden 0–100 value is
+// surfaced only as ~7 named STAGES (never the number). Used by the
+// summary's BOND line + the evolution bond-gate.
+export const BOND_STAGES: ReadonlyArray<{ readonly stage: number; readonly max: number; readonly name: string }> = [
+  { stage: 1, max: 15, name: 'Wary' },
+  { stage: 2, max: 30, name: 'Warming' },
+  { stage: 3, max: 45, name: 'Companions' },
+  { stage: 4, max: 62, name: 'In Sync' },
+  { stage: 5, max: 78, name: 'Partners in Kind' },
+  { stage: 6, max: 92, name: 'Kindred' },
+  { stage: 7, max: 100, name: 'Inseparable' },
+];
+
+export function bondStage(value: number): number {
+  const v = Math.max(BOND_MIN, Math.min(BOND_MAX, value));
+  for (const s of BOND_STAGES) if (v <= s.max) return s.stage;
+  return 7;
+}
+
+export function bondStageName(value: number): string {
+  return BOND_STAGES[bondStage(value) - 1]!.name;
+}

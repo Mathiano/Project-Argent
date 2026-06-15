@@ -64,6 +64,8 @@ import {
   willingJoinChance,
 } from './catching';
 import type { CatchWindow } from './catching';
+import { askResponse, evolutionReadiness, evolutionReady } from './evolution';
+import { createEvolutionScene } from './scenes/evolution';
 import {
   fromSavedSide,
   hasSave,
@@ -289,6 +291,53 @@ function addCaughtMon(species: Species): void {
 // Bump the lead mon's bond on a quality win (no participation XP).
 function bumpLeadBond(amount: number): void {
   if (run.partyBond.length > 0) run.partyBond[0] = bumpBond(run.partyBond[0]!, amount);
+}
+
+// ---- Phase 6b — evolution (bond-gated, boss-capped) ----------------------
+// Apply an evolution: swap the species, preserve the HP fraction + ST,
+// keep the bond (it travels with the mon at the same index).
+function applyEvolution(index: number, toSpeciesName: string): void {
+  const old = run.party[index];
+  if (!old) return;
+  const fresh = createSide(resolveSpecies(toSpeciesName));
+  const hpRatio = old.hp / Math.max(1, old.maxHp);
+  run.party[index] = {
+    ...fresh,
+    hp: Math.max(1, Math.round(fresh.maxHp * hpRatio)),
+    st: old.st,
+    momentum: 0,
+  };
+}
+
+// S1 — the end-of-fight evolution check. Finds the first party mon whose
+// bond + badge gates are BOTH met, plays the held beat, applies it, then
+// re-checks (a second mon, or a chain). Calls onComplete when none remain.
+function maybeEvolve(onComplete: () => void): void {
+  for (let i = 0; i < run.party.length; i += 1) {
+    const ready = evolutionReady({
+      speciesName: run.party[i]!.species.name,
+      bondValue: run.partyBond[i] ?? 0,
+      badges: run.badges,
+    });
+    if (ready) {
+      const fromName = run.party[i]!.species.name;
+      const idx = i;
+      scenes.push(
+        createEvolutionScene({
+          fromName,
+          toName: ready.evolvesTo,
+          onDone: () => {
+            applyEvolution(idx, ready.evolvesTo);
+            autosaveNow();
+            scenes.pop(); // drop the evolution scene
+            maybeEvolve(onComplete); // chain / next mon
+          },
+        }),
+      );
+      return;
+    }
+  }
+  onComplete();
 }
 
 // Silent autosave to localStorage. Fires on every overworld scene-
@@ -520,6 +569,20 @@ function pushPartyMenu(): void {
     createPartyMenuScene({
       party: run.party,
       bond: run.partyBond,
+      // 6b — "ask your mon" + the summary readiness line read the interim
+      // bond value + badges through the evolution module.
+      ask: (i) =>
+        askResponse({
+          speciesName: run.party[i]!.species.name,
+          bondValue: run.partyBond[i] ?? 0,
+          badges: run.badges,
+        }),
+      readiness: (i) =>
+        evolutionReadiness({
+          speciesName: run.party[i]!.species.name,
+          bondValue: run.partyBond[i] ?? 0,
+          badges: run.badges,
+        }),
       onReorder: () => autosaveNow(),
       onClose: () => scenes.pop(),
     }),
@@ -957,6 +1020,24 @@ else if (skip === 'catch') {
   showOverworld('ROUTE31', 'default', false);
   pushWildEncounter('FLITPECK');
 }
+else if (skip === 'evolve') {
+  // Phase 6b hook — a bond-ready FLITPECK + the ZEPHYR badge (BOTH evo
+  // gates already met). Win the wild fight to see it evolve at the end-
+  // of-fight beat. Open the party menu (START) → ASK / SUMMARY to see
+  // the readiness line + the "ask your mon" response.
+  run.party = [createSide(CH1_DEX.FLITPECK!)];
+  run.partyBond = [40]; // bond stage 3 (Companions) — bond gate met
+  run.badges = ['ZEPHYR']; // badge gate met → both met → evolves on the next win
+  run.bag = [];
+  bagAdd(run.bag, 'POTION', 3);
+  bagAdd(run.bag, 'BALL', 5);
+  applyBagFromUrl();
+  run.catchBreathUnlocked = true;
+  sessionFlags.add('player_has_starter');
+  recomputeSignpostFlags();
+  showOverworld('ROUTE31', 'default', false);
+  pushWildEncounter('FLITPECK');
+}
 else if (skip === 'center') {
   // Phase 5a hook — drop into the Hearthwick Pokémon Center with a
   // damaged party + a few potions, for fast heal testing.
@@ -1186,6 +1267,7 @@ function pushWildEncounter(foeSpeciesName: string): void {
         // never get trapped in an immediate chain.
         currentOverworldScene?.armPostBattleGrace();
         autosaveNow();
+        maybeEvolve(() => {}); // 6b — a bond bump may cross an evo gate
       },
     }),
   );
@@ -1253,6 +1335,7 @@ function pushTrainerFight(
         // immediately after a trainer victory and getting chained.
         currentOverworldScene?.armPostBattleGrace();
         autosaveNow();
+        maybeEvolve(() => {}); // 6b — a bond bump may cross an evo gate
       },
     }),
   );
@@ -1310,6 +1393,8 @@ function pushFalknerBattle(): void {
           pushBadgeAward(() => {
             scenes.pop(); // drop the badge scene → back to the gym
             autosaveNow();
+            // 6b — earning ZEPHYR may complete a bonded mon's badge gate.
+            maybeEvolve(() => {});
           });
         } else {
           // BUG 2 — a boss loss heals + offers INSTANT RETRY (the

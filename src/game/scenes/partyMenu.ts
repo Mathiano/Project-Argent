@@ -22,6 +22,7 @@
 
 import { TIERS, lookupMove } from '../../engine';
 import type { SideState } from '../../engine';
+import { bondStageName } from '../catching';
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
@@ -35,11 +36,15 @@ export interface PartyMenuOpts {
   // lockstep on reorder so bond follows its mon. Optional (legacy/test
   // callers omit it).
   readonly bond?: number[];
+  // Phase 6b — "ask your mon" (a flavored bond/readiness response) + the
+  // summary's evolution readiness line. Optional.
+  readonly ask?: (index: number) => string;
+  readonly readiness?: (index: number) => string | null;
   readonly onReorder: () => void;
   readonly onClose: () => void;
 }
 
-type Mode = 'list' | 'action' | 'summary' | 'reorder';
+type Mode = 'list' | 'action' | 'summary' | 'reorder' | 'ask';
 
 const LIST_PANEL = { x: 4, y: 4, w: 312, h: 172 } as const;
 const ROW_H = 22;
@@ -47,10 +52,12 @@ const ROW_H = 22;
 export function createPartyMenuScene(opts: PartyMenuOpts): Scene {
   let mode: Mode = 'list';
   let cursor = 0;
-  // Action sub-menu cursor (0=SUMMARY, 1=MOVE, 2=BACK).
+  // Action sub-menu cursor (0=SUMMARY, 1=MOVE, 2=ASK, 3=BACK).
   let actionCursor = 0;
   // Index of the mon currently being shown in summary.
   let summaryIdx = 0;
+  // The "ask your mon" response lines (mode='ask').
+  let askLines: string[] = [];
   // Index of the mon being moved in reorder mode.
   let reorderIdx = 0;
 
@@ -63,7 +70,7 @@ export function createPartyMenuScene(opts: PartyMenuOpts): Scene {
     if (mode === 'list') {
       cursor = (cursor + dir + opts.party.length) % opts.party.length;
     } else if (mode === 'action') {
-      actionCursor = (actionCursor + dir + 3) % 3;
+      actionCursor = (actionCursor + dir + 4) % 4;
     } else if (mode === 'reorder') {
       const next = reorderIdx + dir;
       if (next < 0 || next >= opts.party.length) return;
@@ -101,9 +108,17 @@ export function createPartyMenuScene(opts: PartyMenuOpts): Scene {
           // Solo team — nothing to reorder. Pop back to list.
           mode = 'list';
         }
+      } else if (actionCursor === 2) {
+        // ASK your mon — a flavored bond/readiness response.
+        askLines = wrap(opts.ask ? opts.ask(cursor) : 'It looks at you, quiet.', 40);
+        mode = 'ask';
       } else {
         mode = 'list';
       }
+      return;
+    }
+    if (mode === 'ask') {
+      mode = 'list';
       return;
     }
     if (mode === 'reorder') {
@@ -118,10 +133,28 @@ export function createPartyMenuScene(opts: PartyMenuOpts): Scene {
     if (mode === 'list') opts.onClose();
     else if (mode === 'action') mode = 'list';
     else if (mode === 'summary') mode = 'list';
+    else if (mode === 'ask') mode = 'list';
     else if (mode === 'reorder') {
       opts.onReorder();
       mode = 'list';
     }
+  }
+
+  // Simple word-wrap for the ask response.
+  function wrap(text: string, maxChars: number): string[] {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let cur = '';
+    for (const w of words) {
+      if ((cur + ' ' + w).trim().length > maxChars) {
+        if (cur) lines.push(cur);
+        cur = w;
+      } else {
+        cur = (cur + ' ' + w).trim();
+      }
+    }
+    if (cur) lines.push(cur);
+    return lines;
   }
 
   return {
@@ -136,8 +169,17 @@ export function createPartyMenuScene(opts: PartyMenuOpts): Scene {
       ctx.fillStyle = 'rgba(16, 22, 34, 0.92)';
       ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
       if (mode === 'summary') {
-        drawSummary(ctx, opts.party[summaryIdx]!);
+        drawSummary(ctx, opts.party[summaryIdx]!, summaryIdx);
         drawText(ctx, 'B: back', LIST_PANEL.x + LIST_PANEL.w - 60, LOGICAL_H - 12, PALETTE.paperDim);
+        return;
+      }
+      if (mode === 'ask') {
+        drawPanel(ctx, LIST_PANEL.x, LIST_PANEL.y, LIST_PANEL.w, LIST_PANEL.h);
+        drawText(ctx, `You ask ${opts.party[cursor]!.species.name}…`, LIST_PANEL.x + 12, LIST_PANEL.y + 14, PALETTE.paperShadow);
+        askLines.forEach((line, i) => {
+          drawText(ctx, line, LIST_PANEL.x + 16, LIST_PANEL.y + 40 + i * 13, PALETTE.ink);
+        });
+        drawText(ctx, 'A / B: back', LIST_PANEL.x + LIST_PANEL.w - 76, LOGICAL_H - 12, PALETTE.paperDim);
         return;
       }
       drawList(ctx);
@@ -193,16 +235,16 @@ export function createPartyMenuScene(opts: PartyMenuOpts): Scene {
   function drawActionPopup(ctx: CanvasRenderingContext2D): void {
     const y = LIST_PANEL.y + 22 + cursor * ROW_H - 4;
     const popX = LIST_PANEL.x + 230;
-    const popY = Math.min(y, LOGICAL_H - 56);
-    drawPanel(ctx, popX, popY, 72, 50);
-    const items: readonly string[] = ['SUMMARY', 'MOVE', 'BACK'];
+    const popY = Math.min(y, LOGICAL_H - 68);
+    drawPanel(ctx, popX, popY, 72, 62);
+    const items: readonly string[] = ['SUMMARY', 'MOVE', 'ASK', 'BACK'];
     items.forEach((label, i) => {
       const marker = actionCursor === i ? '>' : ' ';
       drawText(ctx, `${marker} ${label}`, popX + 6, popY + 6 + i * 12);
     });
   }
 
-  function drawSummary(ctx: CanvasRenderingContext2D, mon: SideState): void {
+  function drawSummary(ctx: CanvasRenderingContext2D, mon: SideState, index: number): void {
     drawPanel(ctx, LIST_PANEL.x, LIST_PANEL.y, LIST_PANEL.w, LIST_PANEL.h);
     drawText(ctx, 'SUMMARY', LIST_PANEL.x + 8, LIST_PANEL.y + 6, PALETTE.paperShadow);
 
@@ -270,15 +312,15 @@ export function createPartyMenuScene(opts: PartyMenuOpts): Scene {
       );
     });
 
-    // Bond / trial placeholder — labeled empty slot so the summary
-    // doesn't need a rework when the bond system lands.
+    // Bond stage + evolution readiness (Phase 6b). Reuses the forward-
+    // hook BOND slot: the named stage, plus a readiness line when the mon
+    // is close to evolving.
     drawText(ctx, 'BOND', LIST_PANEL.x + 200, LIST_PANEL.y + 80, PALETTE.paperShadow);
-    drawText(
-      ctx,
-      '★ — (bond system pending)',
-      LIST_PANEL.x + 200,
-      LIST_PANEL.y + 92,
-      PALETTE.paperDim,
-    );
+    const bondVal = opts.bond?.[index] ?? 0;
+    drawText(ctx, `★ ${bondStageName(bondVal)}`, LIST_PANEL.x + 200, LIST_PANEL.y + 92, PALETTE.star);
+    const ready = opts.readiness?.(index) ?? null;
+    if (ready) {
+      drawText(ctx, ready, LIST_PANEL.x + 200, LIST_PANEL.y + 104, PALETTE.hpOk);
+    }
   }
 }
