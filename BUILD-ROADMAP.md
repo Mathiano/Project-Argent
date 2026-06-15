@@ -55,6 +55,7 @@ Prerequisite: Phase 1 (team) + Phase 5 (the loop).
 ## PHASE 7 — Content authoring tools + Chapter 1 content
 Prerequisite: Phases 1–6 (the systems all the content sits on).
 - Real Route 31 + Violet with proper trainers, the rival's first fight (KAMON v2 card — already queued), the first Rocket beat, gym trainers feeding scout reports.
+- **The Violet Academy** — a post-gym teaching/training hub in Violet City (stance-triangle teaching + move-mastery-trial intro + bond context), built on existing dialog/script/flag verbs, gated `falkner_beaten`. Design locked: `docs/violet-academy.md`.
 - **Gate:** Chapter 1 is a complete, authored ~2.5-hour experience. **CHAPTER 1 COMPLETE.**
 
 ## PHASE 8+ — Scale to the full game (chapter by chapter)

@@ -52,3 +52,5 @@ A trial is a **thematic micro-goal** tied to the move's identity — you unlock 
 - **Design: locked now** (this doc), as a selective layer (option C).
 - **Build: with the bond system (P1, after Calls + save/load).** Trials and bond share infrastructure; build them together.
 - Until built: marquee moves fall back to bond-tier or level gating (whichever the move sheet specifies as the interim gate). The trial layer is purely additive — shipping without it costs nothing but the flavor.
+
+**In-world home:** trials are introduced and surfaced to the player at the **Violet Academy** (the post-gym teaching hub) — see `violet-academy.md`. The Academy names the concept and signposts which mon has a trial waiting; the trial itself still completes through play, per this doc.

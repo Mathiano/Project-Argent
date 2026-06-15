@@ -36,3 +36,5 @@ Bond XP accrues from *using* a mon well — read-wins, boss clears, Calls landed
 ## Sequencing
 
 P1, after: (1) team battles exist, (2) the Call system is in-engine (Bugsy slice). Bond is content/tuning on top of Call infrastructure, not new core combat. Until then it stays a design doc — no scaffold, no provisional data.
+
+**In-world context:** bond is framed for the player at the **Violet Academy** (the post-gym teaching hub) — see `violet-academy.md` — which calls back to the demo's first earned-bond moment (the Youngster Jay robbery, where the partner takes a hit for the player). The Academy is lore/exposition only; the mechanic lives on the mon per this doc.
