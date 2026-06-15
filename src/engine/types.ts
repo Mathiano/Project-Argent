@@ -116,7 +116,13 @@ export type Action =
   | { readonly kind: 'move'; readonly move: string; readonly stance: Stance }
   | { readonly kind: 'rest' }
   | { readonly kind: 'catchBreath' }
-  | { readonly kind: 'switch'; readonly toIndex: number };
+  | { readonly kind: 'switch'; readonly toIndex: number }
+  // Phase 6a (Catching 2.0, sanctioned + sim-gated): the player forgoes
+  // their strike to throw a ball. The CATCH MATH lives game-side; the
+  // engine only governs the turn — the thrower does not strike, the foe
+  // acts normally, no stamina change. Sim bots never throw, so the
+  // ladders stay bit-identical (this branch is dead code for them).
+  | { readonly kind: 'throwBall' };
 
 export interface StatScale {
   readonly hp?: number;

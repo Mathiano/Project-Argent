@@ -34,7 +34,7 @@
             "routes? Smart."
           ]
         },
-        { "kind": "open-mart", "stock": ["POTION", "SUPER POTION", "FULL HEAL"] }
+        { "kind": "open-mart", "stock": ["BALL", "POTION", "SUPER POTION", "FULL HEAL"] }
       ]
     },
     {

@@ -137,6 +137,11 @@ export function validateAction(side: SideState, action: Action): void {
     if (side.exhausted) throw new Error('Cannot Catch Breath while exhausted');
     return;
   }
+  if (action.kind === 'throwBall') {
+    // Always legal — the player may throw any turn (out-of-window throws
+    // auto-fail game-side). No engine constraint.
+    return;
+  }
   if (side.exhausted) throw new Error('Cannot move while exhausted');
   if (!side.species.moves.includes(action.move)) {
     throw new Error(`Side cannot use ${action.move}`);

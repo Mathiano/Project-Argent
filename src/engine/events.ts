@@ -3,7 +3,8 @@ import type { Side, Stance } from './types';
 export type CommitDescriptor =
   | { readonly kind: 'move'; readonly move: string; readonly stance: Stance }
   | { readonly kind: 'rest'; readonly reason: 'softlock' | 'exhaustion' }
-  | { readonly kind: 'catchBreath' };
+  | { readonly kind: 'catchBreath' }
+  | { readonly kind: 'throwBall' };
 
 export interface SideSnapshot {
   readonly hp: number;

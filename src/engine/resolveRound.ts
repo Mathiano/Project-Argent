@@ -47,7 +47,13 @@ function stanceOutMult(stance: Stance): number {
 }
 
 function actionStance(action: Action): Stance {
-  return action.kind === 'move' ? action.stance : 'G';
+  if (action.kind === 'move') return action.stance;
+  // Throwing leaves you EXPOSED — treated as Aggressive on defense so the
+  // thrower takes the foe's hit cleanly: no Guard counter, no Fluid dodge
+  // (you didn't guard or dodge, you threw a ball). rest/catchBreath/switch
+  // keep the legacy Guard default.
+  if (action.kind === 'throwBall') return 'A';
+  return 'G';
 }
 
 function actionMove(action: Action): string | null {
@@ -57,6 +63,7 @@ function actionMove(action: Action): string | null {
 function describeAction(action: Action, side: SideState): CommitDescriptor {
   if (action.kind === 'move') return { kind: 'move', move: action.move, stance: action.stance };
   if (action.kind === 'catchBreath') return { kind: 'catchBreath' };
+  if (action.kind === 'throwBall') return { kind: 'throwBall' };
   if (action.kind === 'switch') return { kind: 'rest', reason: 'softlock' };
   return { kind: 'rest', reason: side.exhausted ? 'exhaustion' : 'softlock' };
 }
@@ -193,6 +200,11 @@ function paySide(
   }
   if (action.kind === 'switch') {
     // Switching is the turn — no stamina change for the side that switched.
+    return side;
+  }
+  if (action.kind === 'throwBall') {
+    // Throwing is the turn — the thrower forgoes its strike, no stamina
+    // change (catch resolution is entirely game-side).
     return side;
   }
   const move = lookupMove(action.move);

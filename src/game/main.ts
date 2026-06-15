@@ -46,9 +46,23 @@ import { createPauseMenuScene } from './scenes/pauseMenu';
 import { createPrepScene } from './scenes/prep';
 import { createStarterPickScene } from './scenes/starterPick';
 import { createTitleScene } from './scenes/title';
-import { bagAdd, ITEMS } from './items';
+import { bagAdd, bagByPocket, bagConsume, ITEMS } from './items';
 import type { BagEntry } from './items';
 import { STARTING_MONEY, awardMoney, buyItem, sellItem } from './economy';
+import {
+  BOND_BUMP_BOSS,
+  BOND_BUMP_WIN,
+  BOND_START_CAUGHT,
+  BOND_START_STARTER,
+  bondBonus,
+  bumpBond,
+  catchChance,
+  rollCatch,
+  rollWillingJoin,
+  refusalHint,
+  willingJoinChance,
+} from './catching';
+import type { CatchWindow } from './catching';
 import {
   fromSavedSide,
   hasSave,
@@ -138,6 +152,11 @@ interface RunState {
   // Demo-complete: earned gym badges (ids). Awarded on a leader win;
   // persisted via save (additive — pre-badge saves load as []).
   badges: string[];
+  // Phase 6a — interim per-mon bond, index-aligned with party. Quality-
+  // earned (read-wins/boss-clears); persisted. Full system is Phase 8.
+  partyBond: number[];
+  // Phase 6a — the box (caught mons when the party is full). Minimal.
+  box: SideState[];
   catchBreathUnlocked: boolean;
   rng: RNG;
 }
@@ -147,6 +166,8 @@ const run: RunState = {
   bag: [],
   money: STARTING_MONEY,
   badges: [],
+  partyBond: [],
+  box: [],
   catchBreathUnlocked: false,
   rng: mulberry32(RNG_SEED),
 };
@@ -219,6 +240,52 @@ function writebackParty(finalState: BattleState): void {
   );
 }
 
+// ---- Phase 6a — catching helpers (game-side; math lives in catching.ts) --
+function ballCount(): number {
+  return bagByPocket(run.bag).balls.reduce((n, e) => n + e.qty, 0);
+}
+function medicineCount(): number {
+  return bagByPocket(run.bag).medicine.reduce((n, e) => n + e.qty, 0);
+}
+function consumeBall(): void {
+  const balls = bagByPocket(run.bag).balls;
+  if (balls.length > 0) bagConsume(run.bag, balls[0]!.itemId);
+}
+function consumeMedicine(): void {
+  const meds = bagByPocket(run.bag).medicine;
+  if (meds.length > 0) bagConsume(run.bag, meds[0]!.itemId);
+}
+// Base catch rate for Path 1 (higher = easier). Tuning settled at the
+// kickoff; CH1 wild mons share a common-ish base for now.
+function catchRarity(_species: Species): number {
+  void _species;
+  return 0.45;
+}
+// Rarity-as-DIFFICULTY for Path 2 (higher = harder to win over).
+function monDifficulty(_species: Species): number {
+  void _species;
+  return 0.3;
+}
+function ballMult(): number {
+  const e = ITEMS.BALL!.effect;
+  return e.kind === 'catch-ball' ? e.ballMult : 1;
+}
+// Add a caught/joined mon to the party (or the box if full). Fresh +
+// healthy (the ball/mercy restored it); starts at the caught bond stage.
+function addCaughtMon(species: Species): void {
+  const fresh = createSide(species);
+  if (run.party.length < 6) {
+    run.party.push(fresh);
+    run.partyBond.push(BOND_START_CAUGHT);
+  } else {
+    run.box.push(fresh);
+  }
+}
+// Bump the lead mon's bond on a quality win (no participation XP).
+function bumpLeadBond(amount: number): void {
+  if (run.partyBond.length > 0) run.partyBond[0] = bumpBond(run.partyBond[0]!, amount);
+}
+
 // Silent autosave to localStorage. Fires on every overworld scene-
 // transition (warp completion, battle resolve) AND on browser
 // beforeunload so a tab-close preserves the in-overworld position.
@@ -238,6 +305,8 @@ function autosaveNow(): void {
     bag: run.bag.map((e) => ({ itemId: e.itemId, qty: e.qty })),
     money: run.money,
     badges: [...run.badges],
+    partyBond: [...run.partyBond],
+    box: run.box.map(toSavedSide),
   };
   saveToStorage(state);
 }
@@ -269,8 +338,11 @@ function startNewGame(): void {
   run.party = [];
   run.bag = [];
   bagAdd(run.bag, 'POTION', 3);
+  bagAdd(run.bag, 'BALL', 5); // Phase 6a — starting balls so catching is testable early
   run.money = STARTING_MONEY;
   run.badges = [];
+  run.partyBond = [];
+  run.box = [];
   run.catchBreathUnlocked = false;
   currentRngSeed = 0xa9c0;
   run.rng = mulberry32(currentRngSeed);
@@ -290,6 +362,7 @@ function pushStarterPick(): void {
       starters: STARTERS,
       onPick: (species) => {
         run.party = [createSide(species)];
+        run.partyBond = [BOND_START_STARTER]; // your starter begins a little warmer
         currentRngSeed = partySeed();
         run.rng = mulberry32(currentRngSeed);
         sessionFlags.add('player_has_starter');
@@ -441,6 +514,7 @@ function pushPartyMenu(): void {
   scenes.push(
     createPartyMenuScene({
       party: run.party,
+      bond: run.partyBond,
       onReorder: () => autosaveNow(),
       onClose: () => scenes.pop(),
     }),
@@ -468,6 +542,14 @@ function applySave(saved: SaveState): void {
   run.money = saved.money ?? STARTING_MONEY;
   // Demo-complete: badges additive — pre-badge saves load as [].
   run.badges = saved.badges ? [...saved.badges] : [];
+  // Phase 6a — bond (interim) + box. Both additive. Bond defaults
+  // per-mon for a pre-6a save; box loads via fromSavedSide.
+  run.partyBond = run.party.map((_, i) =>
+    saved.partyBond && typeof saved.partyBond[i] === 'number'
+      ? saved.partyBond[i]!
+      : BOND_START_STARTER,
+  );
+  run.box = saved.box ? saved.box.map((s) => fromSavedSide(s, resolveSpecies)) : [];
   run.catchBreathUnlocked = saved.catchBreathUnlocked;
   currentRngSeed = saved.rngSeed;
   run.rng = mulberry32(currentRngSeed);
@@ -803,9 +885,11 @@ function applyPartyFromUrl(): void {
     }
     if (sides.length === 0) sides.push(createSide(pickStarter()));
     run.party = sides;
+    run.partyBond = sides.map(() => BOND_START_STARTER);
     return;
   }
   run.party = [createSide(pickStarter())];
+  run.partyBond = [BOND_START_STARTER];
 }
 
 if (skip === 'starter') {
@@ -849,6 +933,25 @@ if (skip === 'starter') {
   showRivalBattle();
 } else if (skip === 'end') showEnd(true);
 else if (skip === 'overworld') showOverworld('ROUTE31', 'default', false);
+else if (skip === 'catch') {
+  // Phase 6a hook — drop onto Route 31 and immediately push a catchable
+  // wild encounter, with balls + medicine + a few badges so BOTH paths
+  // are testable fast (Path 1 throw; Path 2 faint → spare). ?party= /
+  // ?bag= / ?money= work; the encounter pops back to the route, where
+  // the tall grass re-rolls more.
+  applyPartyFromUrl();
+  run.partyBond = run.party.map(() => BOND_START_STARTER);
+  bagAdd(run.bag, 'BALL', 10);
+  bagAdd(run.bag, 'POTION', 5);
+  applyBagFromUrl();
+  applyMoneyFromUrl();
+  // Seed 3 badges so the Path-2 willing-join is a real (not near-zero) gamble.
+  run.badges = ['ZEPHYR', 'B2', 'B3'];
+  sessionFlags.add('player_has_starter');
+  recomputeSignpostFlags();
+  showOverworld('ROUTE31', 'default', false);
+  pushWildEncounter('FLITPECK');
+}
 else if (skip === 'center') {
   // Phase 5a hook — drop into the Hearthwick Pokémon Center with a
   // damaged party + a few potions, for fast heal testing.
@@ -996,11 +1099,59 @@ function pushWildEncounter(foeSpeciesName: string): void {
       intro: [`A wild ${foe.name}`, 'appeared!'],
       catchBreathUnlocked: run.catchBreathUnlocked,
       canRun: true,
+      // Phase 6a — Catching 2.0 (wild only). The math lives game-side.
+      canCatch: true,
+      ballCount,
+      medicineCount,
+      // Path 1 — throw a ball: consume one, roll the catch for the
+      // detected window. Out-of-window → chance 0 (auto-fail).
+      onThrowBall: (window: CatchWindow, hpFrac: number) => {
+        consumeBall();
+        const chance = catchChance({
+          rarity: catchRarity(foe),
+          window,
+          ballMult: ballMult(),
+          hpFrac,
+        });
+        return { caught: rollCatch(chance, run.rng) };
+      },
+      // Path 2 — spare a fainted mon with medicine: consume one, roll the
+      // willing join (badges primary, bond bonus, rarity difficulty).
+      onWillingJoin: () => {
+        consumeMedicine();
+        const lead = run.partyBond[0] ?? 0;
+        const bonus = bondBonus(lead);
+        const chance = willingJoinChance({
+          badges: run.badges.length,
+          monRarity: monDifficulty(foe),
+          bondBonus: bonus,
+        });
+        return {
+          joined: rollWillingJoin(chance, run.rng),
+          hint: refusalHint({ badges: run.badges.length, bondBonus: bonus }),
+        };
+      },
+      // Caught (Path 1) or joined (Path 2) → add the wild mon, pop back.
+      onCaught: (finalState) => {
+        writebackParty(finalState);
+        addCaughtMon(foe);
+        recomputeSignpostFlags();
+        scenes.pop();
+        currentOverworldScene?.armPostBattleGrace();
+        autosaveNow();
+      },
       // RUN bug fix — fleeing returns to the SAME tile, no heal, no
       // warp (NOT a black-out, which is loss-only). Writeback preserves
       // any chip damage taken before fleeing; grace stops an instant
-      // re-roll on the tile you land back on.
+      // re-roll on the tile you land back on. The wild mon escaping
+      // (Wariness flee) lands here too — same overworld result.
       onFlee: (finalState) => {
+        writebackParty(finalState);
+        scenes.pop();
+        currentOverworldScene?.armPostBattleGrace();
+        autosaveNow();
+      },
+      onFoeGone: (finalState) => {
         writebackParty(finalState);
         scenes.pop();
         currentOverworldScene?.armPostBattleGrace();
@@ -1014,6 +1165,7 @@ function pushWildEncounter(foeSpeciesName: string): void {
           blackout();
           return;
         }
+        bumpLeadBond(BOND_BUMP_WIN); // Phase 6a — a quality win deepens bond
         recomputeSignpostFlags();
         // Demo-complete S4 (design intent, build in Phase 8 with the
         // bond system): the first Trainer Call should unlock from an
@@ -1086,6 +1238,7 @@ function pushTrainerFight(
           return;
         }
         flagStore.set(winFlag);
+        bumpLeadBond(BOND_BUMP_WIN); // Phase 6a — a real fight deepens bond
         // Phase 5b — trainer payout (game-layer; engine untouched).
         // Wild wins never reach here (trainers-only, anti-grind).
         if (reward && reward > 0) run.money = awardMoney(run.money, reward);
@@ -1144,6 +1297,7 @@ function pushFalknerBattle(): void {
         if (winner === 'player') {
           flagStore.set('falkner_beaten');
           run.catchBreathUnlocked = true;
+          bumpLeadBond(BOND_BUMP_BOSS); // Phase 6a — a boss clear deepens bond most
           // Demo-complete S1: award the ZEPHYR badge + a real payoff
           // beat, then return to the gym. awardBadge autosaves; the
           // pop after the fanfare lands the player back on the rooftop.

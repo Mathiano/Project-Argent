@@ -31,6 +31,10 @@ export interface PartyMenuOpts {
   // Live reference to run.party — the scene reads & MUTATES this on
   // reorder. main.ts's onReorder callback is the autosave nudge.
   readonly party: SideState[];
+  // Phase 6a — interim per-mon bond (index-aligned with party). Kept in
+  // lockstep on reorder so bond follows its mon. Optional (legacy/test
+  // callers omit it).
+  readonly bond?: number[];
   readonly onReorder: () => void;
   readonly onClose: () => void;
 }
@@ -63,11 +67,16 @@ export function createPartyMenuScene(opts: PartyMenuOpts): Scene {
     } else if (mode === 'reorder') {
       const next = reorderIdx + dir;
       if (next < 0 || next >= opts.party.length) return;
-      // Swap.
+      // Swap — party AND its index-aligned bond, so bond follows the mon.
       const a = opts.party[reorderIdx]!;
       const b = opts.party[next]!;
       opts.party[reorderIdx] = b;
       opts.party[next] = a;
+      if (opts.bond) {
+        const ba = opts.bond[reorderIdx]!;
+        opts.bond[reorderIdx] = opts.bond[next]!;
+        opts.bond[next] = ba;
+      }
       reorderIdx = next;
       cursor = next;
     }

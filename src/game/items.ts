@@ -18,7 +18,11 @@ export type ItemEffect =
   // Restores HP to full + clears status flags (exhausted, staggered).
   | { readonly kind: 'heal-hp-full' }
   // Cures status without restoring HP — exhausted/staggered cleared.
-  | { readonly kind: 'cure-status' };
+  | { readonly kind: 'cure-status' }
+  // Phase 6a — a catch ball. Not "used" via applyItemEffect; thrown in
+  // the battle catch flow (consumed by id from the balls pocket). The
+  // effect marker keeps the registry uniform.
+  | { readonly kind: 'catch-ball'; readonly ballMult: number };
 
 export interface Item {
   readonly id: string;
@@ -76,6 +80,16 @@ export const ITEMS: { readonly [id: string]: Item } = {
     effect: { kind: 'heal-hp-full' },
     targetsParty: true,
     price: 600,
+  },
+  BALL: {
+    id: 'BALL',
+    name: 'BALL',
+    category: 'balls',
+    description: 'Thrown to catch a wild mon — during a read window.',
+    effect: { kind: 'catch-ball', ballMult: 1.0 },
+    // Not used on a party mon — thrown in battle (the catch flow).
+    targetsParty: false,
+    price: 200,
   },
 };
 

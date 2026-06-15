@@ -398,6 +398,6 @@ describe('Phase 5b GATE — Poké Mart open-mart verb wires through the CLERK NP
     expect(martStock).toBeNull();
     scene.input?.('a'); // dialog page 2
     scene.input?.('a'); // closes dialog → fires open-mart
-    expect(martStock).toEqual(['POTION', 'SUPER POTION', 'FULL HEAL']);
+    expect(martStock).toEqual(['BALL', 'POTION', 'SUPER POTION', 'FULL HEAL']);
   });
 });

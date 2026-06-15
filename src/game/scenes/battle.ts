@@ -22,6 +22,8 @@ import type {
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
+import { fleeTelegraphed } from '../catching';
+import type { CatchWindow } from '../catching';
 import { drawSpeciesInSlot } from '../sprites';
 import {
   STANCE_NAME,
@@ -71,6 +73,29 @@ export interface BattleSceneOpts {
   // black out. When wired, RUN calls this instead of onResolve('foe');
   // the caller returns the player to the same overworld tile, no heal.
   readonly onFlee?: (finalState: BattleState) => void;
+
+  // ---- Phase 6a — Catching 2.0 (wild encounters only) -------------------
+  // When true, the battle offers catching (the BALL menu row + the
+  // Path-2 spare-offer on a foe faint). The catch MATH lives in the
+  // callbacks below (game-side); the scene only tracks windows/Wariness
+  // and plays the beats.
+  readonly canCatch?: boolean;
+  readonly ballCount?: () => number;
+  readonly medicineCount?: () => number;
+  // Path 1 — throw a ball. The scene passes the window it detected + the
+  // foe HP fraction; the caller consumes a ball, rolls the catch, and
+  // returns whether it caught.
+  readonly onThrowBall?: (window: import('../catching').CatchWindow, foeHpFrac: number) => { readonly caught: boolean };
+  // Caught (Path 1) — the caller adds the wild mon to the party/box.
+  readonly onCaught?: (finalState: BattleState) => void;
+  // Path 2 — spare a FAINTED wild mon with medicine. The caller consumes
+  // medicine, rolls the willing-join, and returns whether it joined (+ a
+  // refusal hint when it didn't).
+  readonly onWillingJoin?: () => { readonly joined: boolean; readonly hint: string };
+  // The wild mon escaped (Wariness flee, or a spare declined/refused with
+  // the foe gone). Returns the player to the overworld, no catch, no
+  // black-out (same shape as onFlee).
+  readonly onFoeGone?: (finalState: BattleState) => void;
 }
 
 // Display carries everything the panel needs about the CURRENTLY-SHOWN
@@ -156,6 +181,7 @@ function describeFoeIntent(action: Action): { stance: Stance | null; tag: string
   if (action.kind === 'rest') return { stance: null, tag: 'RESTING' };
   if (action.kind === 'catchBreath') return { stance: null, tag: 'RECOVERING' };
   if (action.kind === 'switch') return { stance: null, tag: 'SWITCHING' };
+  if (action.kind === 'throwBall') return { stance: null, tag: 'THROWING' };
   return { stance: action.stance, tag: `${TIER_TAG[lookupMove(action.move).tier]} ATTACK` };
 }
 
@@ -236,7 +262,15 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let roundStance: { player: Stance | null; foe: Stance | null } = { player: null, foe: null };
   let calloutLine: string | null = null;
 
-  let phase: 'text' | 'menu' | 'move' | 'call' | 'party' | 'resolve' | 'end' = 'text';
+  let phase: 'text' | 'menu' | 'move' | 'call' | 'spare' | 'party' | 'resolve' | 'end' = 'text';
+  // Phase 6a catch state (wild only). pendingReadWindow = a player
+  // read-win opened a 1-round window last round; wariness rises on
+  // out-of-window throws → flee telegraph; spareCursor drives the
+  // Path-2 spare offer.
+  let wariness = 0;
+  let pendingReadWindow = false;
+  let fleeWarned = false;
+  let spareCursor: 0 | 1 = 0;
   let textQueue: string[] = [...opts.intro];
   let textNext: (() => void) | null = beginTurn;
   // Party-picker mode. 'voluntary' = opened from FIGHT menu's PKMN row
@@ -289,7 +323,30 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     textDismissable = options.dismissable ?? false;
   }
 
+  function foeGone(): void {
+    const cb = opts.onFoeGone ?? opts.onFlee;
+    if (cb) cb(state);
+    else opts.onResolve('foe', state);
+  }
+
   function beginTurn(): void {
+    // Phase 6a — Wariness flee (wild catch only). One telegraph turn,
+    // then the mon escapes — never instant-poof.
+    if (opts.canCatch) {
+      if (fleeWarned) {
+        setText([`The wild ${activeMon(state.foe).species.name} fled!`], foeGone);
+        return;
+      }
+      if (fleeTelegraphed(wariness)) {
+        fleeWarned = true;
+        setText([`The ${activeMon(state.foe).species.name} is looking for an escape!`], beginTurnInner);
+        return;
+      }
+    }
+    beginTurnInner();
+  }
+
+  function beginTurnInner(): void {
     const forced = forcedAction(activeMon(state.player));
     if (forced) {
       foeAction = opts.chooseFoeAction(state, opts.rng);
@@ -305,6 +362,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     log = [];
     roundStance = { player: null, foe: null };
     calloutLine = null;
+    // A read window lasts exactly one round — consumed/lost the moment
+    // the player commits their next action.
+    pendingReadWindow = false;
     const result = resolveRound(state, action, foeAction, opts.rng);
     state = result.state;
     pendingEvents = [...result.events];
@@ -383,6 +443,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       } else if (ev.action.kind === 'catchBreath') {
         const who = ev.side === 'player' ? activeMon(state.player).species.name : activeMon(state.foe).species.name;
         pushLog(`${who}: catch your breath!`);
+      } else if (ev.action.kind === 'throwBall') {
+        pushLog('You hurled a ball!');
       } else {
         const who = ev.side === 'player' ? activeMon(state.player).species.name : `Foe ${activeMon(state.foe).species.name}`;
         pushLog(`${who} used ${ev.action.move}.`);
@@ -399,6 +461,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       animKind = 'clash';
       animSide = ev.winner;
       animT = 0.3;
+      if (ev.winner === 'player') pendingReadWindow = true; // read window
       pushLog(`CLASH! ${ev.winner === 'player' ? activeMon(state.player).species.name : 'Foe'} broke through.`);
       return;
     }
@@ -426,6 +489,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (ev.kind === 'dodge') {
       // S1 — FLUID dodged an Aggressive strike because it was faster.
       const who = ev.side === 'player' ? display.player.species.name : 'Foe ' + display.foe.species.name;
+      if (ev.side === 'player') pendingReadWindow = true; // read window
       calloutLine = stanceCallout({ kind: 'dodge' });
       pushLog(`DODGE! ${who}'s FLUID was faster.`);
       animSide = ev.side;
@@ -437,6 +501,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // S1 — FLUID slipped past a GUARD stance (acts first, no counter).
       const def = opposite(ev.side);
       display[def].hp = Math.max(0, display[def].hp - ev.damage);
+      if (ev.side === 'player') pendingReadWindow = true; // read window (the cleanest catch opener)
       calloutLine = stanceCallout({ kind: 'opening' });
       pushLog('OPENING! FLUID slips past GUARD.');
       animSide = ev.side;
@@ -449,6 +514,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const att = opposite(ev.side);
       display[att].hp = Math.max(0, display[att].hp - ev.damage);
       const who = ev.side === 'player' ? display.player.species.name : 'Foe';
+      if (ev.side === 'player') pendingReadWindow = true; // read window
       calloutLine = stanceCallout({ kind: 'counter' });
       pushLog(`COUNTER! ${who}'s GUARD turns it back.`);
       animSide = ev.side;
@@ -545,7 +611,17 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // Team-wipe is the only end-of-battle condition now. Individual KOs
     // are handled by the engine via forced-switch unless the team is out.
     if (isTeamWiped(state.player)) endingWinner = 'foe';
-    else if (isTeamWiped(state.foe)) endingWinner = 'player';
+    else if (isTeamWiped(state.foe)) {
+      // Phase 6a Path 2 — a fainted wild mon can be SPARED with medicine
+      // (the willing-join). Offer it before declaring victory; otherwise
+      // it's a normal win.
+      if (opts.canCatch && (opts.medicineCount?.() ?? 0) > 0) {
+        phase = 'spare';
+        spareCursor = 0;
+        return;
+      }
+      endingWinner = 'player';
+    }
     if (endingWinner !== null) {
       phase = 'end';
       const msg =
@@ -605,7 +681,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // cursor can rest on this row — disabled rows render greyed and are
   // skipped during up/down navigation. Keeping the row visible (not
   // collapsing it) preserves a stable visual layout as state changes.
-  type MenuKind = 'fight' | 'pkmn' | 'call' | 'run';
+  type MenuKind = 'fight' | 'pkmn' | 'catch' | 'call' | 'run';
   function menuItems(): ReadonlyArray<{ readonly kind: MenuKind; readonly enabled: boolean }> {
     return [
       { kind: 'fight', enabled: true },
@@ -613,11 +689,42 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // mon (so voluntary switching is meaningful). Single-mon teams
       // see this row greyed; the cursor skips it.
       { kind: 'pkmn', enabled: hasBenchSurvivor(state.player) },
+      // BALL (Phase 6a) — wild encounters only, when the player has
+      // balls. Throws at the active foe (Path 1).
+      { kind: 'catch', enabled: !!opts.canCatch && (opts.ballCount?.() ?? 0) > 0 },
       { kind: 'call', enabled: opts.catchBreathUnlocked },
       // RUN row stays enabled even when canRun is false — confirming it
       // surfaces the "No running from a rival!" dialog (intentional UX).
       { kind: 'run', enabled: true },
     ];
+  }
+
+  // Phase 6a — the catch window at the moment of a throw. Exhausted is a
+  // standing window; a read-win opened a 1-round 'read' window last
+  // round; otherwise none (out of window → auto-fail). (A guarding foe
+  // that was never opened stays 'none' — you must expose it first.)
+  function currentWindow(): CatchWindow {
+    if (activeMon(state.foe).exhausted) return 'exhausted';
+    if (pendingReadWindow) return 'read';
+    return 'none';
+  }
+
+  function throwBall(): void {
+    const foe = activeMon(state.foe);
+    const window = currentWindow();
+    const hpFrac = foe.hp / Math.max(1, foe.maxHp);
+    const result = opts.onThrowBall ? opts.onThrowBall(window, hpFrac) : { caught: false };
+    if (result.caught) {
+      setText([`Gotcha! ${foe.species.name} was caught!`], () => opts.onCaught?.(state));
+      return;
+    }
+    if (window === 'none') {
+      // Out-of-window throw — auto-fail + Wariness. Then the foe acts.
+      wariness += 1;
+      setText([`The ${foe.species.name} wasn't exposed — missed!`], () => commit({ kind: 'throwBall' }));
+    } else {
+      setText([`Aww — the ${foe.species.name} broke free!`], () => commit({ kind: 'throwBall' }));
+    }
   }
 
   function stepCursor(start: number, dir: 1 | -1): number {
@@ -646,6 +753,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       partyMode = 'voluntary';
       partyCursor = stepPartyCursor(state.player.active, 1);
       phase = 'party';
+      return;
+    }
+    if (focus.kind === 'catch') {
+      // Phase 6a — throw a ball at the wild foe (Path 1).
+      throwBall();
       return;
     }
     if (focus.kind === 'call') {
@@ -708,6 +820,29 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       if (isPartySelectable(i)) return i;
     }
     return start;
+  }
+
+  // Phase 6a Path 2 — the spare offer (a fainted wild foe + medicine).
+  function endWithWin(): void {
+    setText(['You won the battle!', 'Press A to continue.'], () => opts.onResolve('player', state));
+  }
+  function handleSpareInput(key: InputKey): void {
+    if (key === 'up' || key === 'down') spareCursor = spareCursor === 0 ? 1 : 0;
+    else if (key === 'b') endWithWin(); // decline = claim the normal win
+    else if (key === 'a' || key === 'start') {
+      if (spareCursor === 1) {
+        endWithWin();
+        return;
+      }
+      // YES — show mercy: spend medicine on the fallen foe, roll the join.
+      const foeName = activeMon(state.foe).species.name;
+      const r = opts.onWillingJoin ? opts.onWillingJoin() : { joined: false, hint: '' };
+      if (r.joined) {
+        setText([`You tend the fallen ${foeName} — it chose to join you!`], () => opts.onCaught?.(state));
+      } else {
+        setText([r.hint], endWithWin);
+      }
+    }
   }
 
   function handlePartyInput(key: InputKey): void {
@@ -1083,9 +1218,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function drawBottomMenu(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     const me = activeMon(state.player);
-    const labels: { readonly [K in 'fight' | 'pkmn' | 'call' | 'run']: string } = {
+    const labels: { readonly [K in 'fight' | 'pkmn' | 'catch' | 'call' | 'run']: string } = {
       fight: 'FIGHT',
       pkmn: 'PKMN',
+      catch: opts.canCatch ? `BALL x${opts.ballCount?.() ?? 0}` : 'BALL -',
       call: opts.catchBreathUnlocked ? `CALL ★${me.momentum}` : 'CALL -',
       run: opts.canRun ? 'RUN' : 'STAY',
     };
@@ -1198,6 +1334,27 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     );
   }
 
+  function drawBottomSpare(ctx: CanvasRenderingContext2D): void {
+    drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+    const foeName = display.foe.species.name;
+    drawText(ctx, `The wild ${foeName} fell.`, BOTTOM.x + 8, BOTTOM.y + 6);
+    drawText(ctx, 'Tend it with medicine — show mercy?', BOTTOM.x + 8, BOTTOM.y + 16, PALETTE.paperShadow);
+    drawText(
+      ctx,
+      `${spareCursor === 0 ? '>' : ' '} YES — spare it`,
+      BOTTOM.x + 12,
+      BOTTOM.y + 30,
+      spareCursor === 0 ? PALETTE.ink : PALETTE.paperDim,
+    );
+    drawText(
+      ctx,
+      `${spareCursor === 1 ? '>' : ' '} NO — claim the win`,
+      BOTTOM.x + 160,
+      BOTTOM.y + 30,
+      spareCursor === 1 ? PALETTE.ink : PALETTE.paperDim,
+    );
+  }
+
   function drawBottomLog(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     for (let i = 0; i < log.length; i += 1) {
@@ -1234,6 +1391,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       }
       if (phase === 'call') {
         handleCallInput(key);
+        return;
+      }
+      if (phase === 'spare') {
+        handleSpareInput(key);
         return;
       }
       if (phase === 'party') {
@@ -1318,6 +1479,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       else if (phase === 'menu') drawBottomMenu(ctx);
       else if (phase === 'move') drawBottomMoves(ctx);
       else if (phase === 'call') drawBottomCall(ctx);
+      else if (phase === 'spare') drawBottomSpare(ctx);
       else if (phase === 'party') drawBottomParty(ctx);
       else if (phase === 'resolve' || phase === 'end') drawBottomLog(ctx);
     },

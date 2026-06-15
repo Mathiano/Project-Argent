@@ -38,6 +38,11 @@ export interface SaveState {
   // pre-badge saves load with badges undefined → applySave treats as
   // []. version stays 1.
   readonly badges?: readonly string[];
+  // Phase 6a — interim per-mon bond, index-aligned with `party`.
+  // Additive; missing → defaults per-mon on load.
+  readonly partyBond?: readonly number[];
+  // Phase 6a — the box (caught mons when the party is full). Additive.
+  readonly box?: readonly SavedSide[];
 }
 
 export interface SavedBagEntry {
@@ -184,6 +189,20 @@ function validateSave(value: unknown): SaveState | null {
   // badges optional (pre-badge saves). When present, must be a string[].
   if (v.badges !== undefined) {
     if (!Array.isArray(v.badges) || v.badges.some((b) => typeof b !== 'string')) return null;
+  }
+  // partyBond optional (pre-6a saves). When present, a number[].
+  if (v.partyBond !== undefined) {
+    if (!Array.isArray(v.partyBond) || v.partyBond.some((b) => typeof b !== 'number')) return null;
+  }
+  // box optional (pre-6a saves). When present, validate each saved side.
+  if (v.box !== undefined) {
+    if (!Array.isArray(v.box)) return null;
+    for (const m of v.box) {
+      if (typeof m !== 'object' || m === null) return null;
+      const mm = m as Record<string, unknown>;
+      if (typeof mm.speciesName !== 'string') return null;
+      if (typeof mm.hp !== 'number' || typeof mm.st !== 'number' || typeof mm.momentum !== 'number') return null;
+    }
   }
   return value as SaveState;
 }

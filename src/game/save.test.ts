@@ -405,6 +405,60 @@ describe('Demo-complete — badges round-trip + back-compat', () => {
   });
 });
 
+describe('Phase 6a — bond + box round-trip + back-compat', () => {
+  test('save → load preserves the interim per-mon bond and the box', () => {
+    const storage = memoryStorage();
+    const state: SaveState = {
+      version: 1,
+      party: [{ speciesName: 'GRUBLEAF', hp: 54, st: 100, momentum: 0 }],
+      position: { map: 'ROUTE31', x: 9, y: 7, facing: 'down' },
+      flags: [],
+      catchBreathUnlocked: false,
+      rngSeed: 1,
+      partyBond: [37],
+      box: [{ speciesName: 'FLITPECK', hp: 40, st: 100, momentum: 0 }],
+    };
+    saveToStorage(state, storage);
+    const loaded = loadFromStorage(storage)!;
+    expect(loaded.partyBond).toEqual([37]);
+    expect(loaded.box).toEqual([{ speciesName: 'FLITPECK', hp: 40, st: 100, momentum: 0 }]);
+  });
+
+  test('pre-6a saves (no partyBond/box) load with both undefined', () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 1,
+        party: [{ speciesName: 'GRUBLEAF', hp: 54, st: 100, momentum: 0 }],
+        position: { map: 'LAB', x: 6, y: 7, facing: 'down' },
+        flags: [],
+        catchBreathUnlocked: false,
+        rngSeed: 1,
+      }),
+    );
+    const loaded = loadFromStorage(storage)!;
+    expect(loaded.partyBond).toBeUndefined();
+    expect(loaded.box).toBeUndefined();
+  });
+
+  test('a non-number bond entry / malformed box nukes the save (loud-fail)', () => {
+    const storage = memoryStorage();
+    const base = {
+      version: 1,
+      party: [{ speciesName: 'GRUBLEAF', hp: 54, st: 100, momentum: 0 }],
+      position: { map: 'LAB', x: 6, y: 7, facing: 'down' },
+      flags: [],
+      catchBreathUnlocked: false,
+      rngSeed: 1,
+    };
+    storage.setItem(SAVE_KEY, JSON.stringify({ ...base, partyBond: [10, 'x'] }));
+    expect(loadFromStorage(storage)).toBeNull();
+    storage.setItem(SAVE_KEY, JSON.stringify({ ...base, box: [{ speciesName: 'X' }] }));
+    expect(loadFromStorage(storage)).toBeNull();
+  });
+});
+
 describe('Phase 2 — New Game wipes the save; Continue restores it', () => {
   test('wipe clears the slot; subsequent load returns null', () => {
     const storage = memoryStorage();

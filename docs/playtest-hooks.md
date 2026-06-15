@@ -32,6 +32,7 @@ URL: `http://localhost:5173/?skip=<value>[&starter=<species>]`
 | **`center`**    | **Overworld at HEARTHWICK_CENTER with a 3-mon party pre-damaged to 40% HP + 35 ST** | **Phase 5a hook — exercises the Pokémon Center heal loop AND the bag (3 POTIONs seeded by default; `?bag=` overrides).** Talk to the NURSE → full party heal. Open BAG via START → use a POTION on a damaged mon. `?party=` / `?starter=` work normally. `?money=` seeds the wallet. |
 | **`mart`**      | **Overworld at HEARTHWICK_MART with a ₽5000 wallet + 2 POTIONs**     | **Phase 5b hook — exercises the Poké Mart BUY/SELL loop.** Talk to the CLERK → BUY (stock: POTION / SUPER POTION / FULL HEAL) or SELL (half price). `?money=N` overrides the wallet; `?bag=` overrides the seeded stock; `?party=` / `?starter=` work normally. |
 | **`violet`**    | **Overworld at VIOLET CITY (the gym hub), fromRoute spawn**           | **Demo-complete hook — the gym slice in one click.** Walk the path north to the gym door → `GYM`. `?party=` / `?starter=` / `?bag=` / `?money=` work. Route 31 → Violet → gym is the real cold-start spine. |
+| **`catch`**     | **Route 31 + an immediate catchable wild encounter; 10 balls, 5 potions, 3 badges** | **Phase 6a hook — both catch paths fast.** Path 1: win a read (Guard a foe's Aggression for a COUNTER, or Fluid its Guard for an OPENING) → the BALL row's window opens → throw. Path 2: KO the wild mon → the spare offer → YES tends it with medicine → it joins or refuses. The encounter pops back to the route; the tall grass re-rolls more. `?party=` / `?bag=` / `?money=` work. |
 | `gym`           | Overworld at GYM, fromRoute spawn                                     | Sets the active starter via `?starter` (default GRUBLEAF). The gym door now returns to VIOLET (not ROUTE31). |
 | `wild`          | Wild battle vs FUZZLET (legacy SPECIES)                               | Legacy path; reset via end → showTitle.                               |
 | **`test-battle`** | **Wild battle vs FLITPECK with a CH1 starter; restarts on end** | **Canonical Phase 0 combat-in-isolation hook.** Sets `?starter`.   |
@@ -104,6 +105,15 @@ The town loop now earns and spends. `run.money` (₽) is seeded by New Game (`ST
 - Prices live on the item registry (`items.ts`); the buy/sell/payout math is pure in `economy.ts`. **Engine untouched** — money is a game-layer concern; both ladders stay bit-identical.
 
 **Out of scope for Phase 5b** (deferred): held items, item effects beyond healing, balls / catching (Phase 6), berries' effects, the Game Corner (cut). In-battle item use is **cut by canon** — battle healing is the Recover Call (`combat-2-0-spec.md`).
+
+### Phase 6a — Catching 2.0 (both paths)
+
+`?skip=catch` drops onto Route 31 and pushes a catchable wild encounter immediately (10 BALLs, 5 POTIONs, 3 badges seeded so both paths are a real gamble).
+
+- **Path 1 — the read window.** Winning a read against the wild mon opens a CATCH WINDOW: a **COUNTER** (Guard its Aggression), an **OPENING** (Fluid past its Guard — the cleanest opener), a **dodge**, or a clash-win = a 1-round window; an **EXHAUSTED** foe is a standing window. The battle menu's **BALL** row throws during the window (chance scales read ×1.0 / exhausted ×1.5 / Broken ×2.0 × rarity × ball × mild HP). Throwing **out of window** auto-fails and raises **Wariness**; at Wariness 3 the mon telegraphs ("looking for an escape!") then **flees** — never instant-poof.
+- **Path 2 — the willing join (mercy).** A fainted wild mon can't be ball-caught. KO it and the **spare offer** appears (when you hold medicine): **YES** tends it → a willing-join roll (badges primary, the lead's bond a bonus, rarity the difficulty) → it **joins** or **refuses with a hint** (a lesson). NO claims the normal win.
+- Caught/joined mons enter the **party** (or the box if full). **BALL** is in the Mart + the starting bag. A minimal **per-mon bond** is tracked + persisted (read-wins/boss-clears bump it) — the interim the full Phase-8 bond system layers onto.
+- **Engine hook:** a sanctioned `throwBall` Action (turn mechanics only — the thrower forgoes its strike, the foe acts, no stamina change). The catch math is game-side. Sim bots never throw → both ladders bit-identical.
 
 ### Phase 3 — the opening intro
 
