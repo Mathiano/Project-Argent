@@ -26,12 +26,30 @@ export function windowMultiplier(window: CatchWindow): number {
   }
 }
 
-// Mild HP factor — a hurt foe is a little easier (full HP ×1.0 → near-0
-// HP ×1.5). Deliberately gentle: the window is the real lever, not HP.
+// S2 — QUANTIZED HP catch bonus at 100/75/50/25 remaining HP, each step
+// a progressively better bonus. Window quality stays the MAIN lever (a
+// read is what catches — this protects the anti-"beat it senseless"
+// design); HP is a meaningful SECONDARY ("soften it below half" is a
+// real sub-goal). Exact bonuses:
+//   >75% HP → ×1.0 (none) · ≤75% → ×1.1 · ≤50% → ×1.2 · ≤25% → ×1.3
+// The max HP bonus (1.3) is deliberately BELOW the smallest window-step
+// ratio (broken/exhausted = 1.33), so a better window ALWAYS beats more
+// attrition — HP can never substitute for the read.
+export const HP_BONUS = { full: 1.0, below75: 1.1, below50: 1.2, below25: 1.3 } as const;
+
 export function hpFactor(hpFrac: number): number {
   const f = Math.max(0, Math.min(1, hpFrac));
-  return 1 + (1 - f) * 0.5;
+  if (f <= 0.25) return HP_BONUS.below25;
+  if (f <= 0.5) return HP_BONUS.below50;
+  if (f <= 0.75) return HP_BONUS.below75;
+  return HP_BONUS.full;
 }
+
+// S1 — per-species catch rarity (base rate, 0..1). The curve has TEETH
+// at the rare end: a common is easy with a good window, but a rare
+// resists even with the best window (its low base rate caps the product
+// far below first-try). main.ts maps each species to a tier.
+export const CATCH_RARITY = { common: 0.55, uncommon: 0.3, rare: 0.12 } as const;
 
 export interface CatchChanceInput {
   // Species base catch rate, 0..1 (common ≈ 0.55, rare ≈ 0.2).
@@ -92,16 +110,43 @@ export function rollWillingJoin(chance: number, rng: RNG): boolean {
   return rng.next() < chance;
 }
 
-// The teaching hint on refusal — points at the weakest factor so refusal
-// is a lesson, not just a loss.
-export function refusalHint(input: { badges: number; bondBonus: number }): string {
-  if (input.badges <= 1) {
-    return 'It didn’t yet trust a trainer with so few badges.';
-  }
-  if (input.bondBonus < 0.05) {
-    return 'It sensed your bond with your partner wasn’t deep enough yet.';
-  }
-  return 'It wasn’t ready to follow you — not this time.';
+// S3 — the refusal is a LESSON, not just a loss: it points (evocatively,
+// from the mon's POV) at the weakest factor — without stating the
+// mechanic flatly. `refusalReason` is the testable category; the lines
+// are flavor (a few variants per reason).
+export type RefusalReason = 'badges' | 'bond' | 'rarity';
+
+export function refusalReason(input: {
+  badges: number;
+  bondBonus: number;
+}): RefusalReason {
+  if (input.badges <= 1) return 'badges'; // too green a trainer
+  if (input.bondBonus < 0.05) return 'bond'; // your own bond is too shallow
+  return 'rarity'; // a proud mon that must be won, not given
+}
+
+export const REFUSAL_LINES: { readonly [K in RefusalReason]: readonly string[] } = {
+  badges: [
+    'It holds your gaze a long moment — then turns for the tall grass. You haven’t walked far enough yet to be worth the following.',
+    'It weighs you, the way wild things weigh a stranger, and finds the road behind you still too short. Make a name out there first.',
+  ],
+  bond: [
+    'It glances at the partner already at your side — and something in it isn’t sure you’d ever hold it that close.',
+    'It watches how your mon stands with you, and steps back. Come find me again, it seems to say, when that trust runs deeper.',
+  ],
+  rarity: [
+    'It dips its head — almost respect — and is gone in a breath. This one won’t be given. It has to be won.',
+    'Proud to the last, it slips away unhurried. A mon like this follows only strength it has truly seen.',
+  ],
+};
+
+export function refusalHint(
+  input: { badges: number; bondBonus: number },
+  rng?: RNG,
+): string {
+  const lines = REFUSAL_LINES[refusalReason(input)];
+  const i = rng ? Math.floor(rng.next() * lines.length) : 0;
+  return lines[i] ?? lines[0]!;
 }
 
 // ---- Interim bond (S7) ---------------------------------------------------

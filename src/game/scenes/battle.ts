@@ -392,6 +392,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (ev.kind === 'clash') return true;
     if (ev.kind === 'faint') return true;
     if (ev.kind === 'break') return true;
+    // S4 — hold on Catch Breath so the player reads the restore + sees
+    // the ST bar at its new value (it used to flash past).
+    if (ev.kind === 'catchBreath') return true;
     return false;
   }
 
@@ -452,9 +455,15 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       return;
     }
     if (ev.kind === 'catchBreath') {
+      // S4 — surface the effect: the ST bar visibly jumps (display.st
+      // updates here) AND a held callout names the restore amount, so
+      // the player can SEE what Catch Breath did.
       display[ev.side].st = Math.min(100, display[ev.side].st + ev.restored);
       display[ev.side].momentum = Math.max(0, display[ev.side].momentum - 1);
-      pushLog(`Recovered +${ev.restored} ST.`);
+      const who =
+        ev.side === 'player' ? activeMon(state.player).species.name : `Foe ${activeMon(state.foe).species.name}`;
+      calloutLine = `${who} catches its breath — stamina +${ev.restored}!`;
+      pushLog(`${who} catches its breath — +${ev.restored} ST!`);
       return;
     }
     if (ev.kind === 'clash') {

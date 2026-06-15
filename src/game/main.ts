@@ -54,6 +54,7 @@ import {
   BOND_BUMP_WIN,
   BOND_START_CAUGHT,
   BOND_START_STARTER,
+  CATCH_RARITY,
   bondBonus,
   bumpBond,
   catchChance,
@@ -255,15 +256,19 @@ function consumeMedicine(): void {
   const meds = bagByPocket(run.bag).medicine;
   if (meds.length > 0) bagConsume(run.bag, meds[0]!.itemId);
 }
-// Base catch rate for Path 1 (higher = easier). Tuning settled at the
-// kickoff; CH1 wild mons share a common-ish base for now.
-function catchRarity(_species: Species): number {
-  void _species;
-  return 0.45;
+// Per-species catch rarity (Path 1 base rate; lower = harder). The curve
+// has teeth at the rare end (CATCH_RARITY tiers in catching.ts). Falkner's
+// ace GALEHAWK is the rare exemplar; the cave TERRA line is uncommon;
+// route birds are common. Default common.
+function catchRarity(species: Species): number {
+  if (species.name === 'GALEHAWK') return CATCH_RARITY.rare;
+  if (species.name === 'GRITHOAX' || species.name === 'KILNDRAKE') return CATCH_RARITY.uncommon;
+  return CATCH_RARITY.common;
 }
 // Rarity-as-DIFFICULTY for Path 2 (higher = harder to win over).
-function monDifficulty(_species: Species): number {
-  void _species;
+function monDifficulty(species: Species): number {
+  if (species.name === 'GALEHAWK') return 0.7;
+  if (species.name === 'GRITHOAX' || species.name === 'KILNDRAKE') return 0.45;
   return 0.3;
 }
 function ballMult(): number {
@@ -1128,7 +1133,7 @@ function pushWildEncounter(foeSpeciesName: string): void {
         });
         return {
           joined: rollWillingJoin(chance, run.rng),
-          hint: refusalHint({ badges: run.badges.length, bondBonus: bonus }),
+          hint: refusalHint({ badges: run.badges.length, bondBonus: bonus }, run.rng),
         };
       },
       // Caught (Path 1) or joined (Path 2) → add the wild mon, pop back.

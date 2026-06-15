@@ -6,12 +6,15 @@ import { describe, expect, test } from 'vitest';
 import { mulberry32 } from '../engine';
 import {
   BOND_MAX,
+  CATCH_RARITY,
+  REFUSAL_LINES,
   bondBonus,
   bumpBond,
   catchChance,
   fleeTelegraphed,
   hpFactor,
   refusalHint,
+  refusalReason,
   rollCatch,
   rollWillingJoin,
   WARINESS_FLEE_THRESHOLD,
@@ -45,10 +48,39 @@ describe('Path 1 — windows + catch chance', () => {
     expect(catchChance({ rarity: 1, window: 'broken', ballMult: 2, hpFrac: 0 })).toBeLessThanOrEqual(0.95);
   });
 
-  test('a hurt foe is mildly easier (hpFactor)', () => {
-    expect(hpFactor(1)).toBe(1);
-    expect(hpFactor(0)).toBeCloseTo(1.5, 5);
-    expect(hpFactor(0.5)).toBeCloseTo(1.25, 5);
+  test('S1 — a RARE mon is genuinely hard even with a good window; a common is easy', () => {
+    const common = catchChance({ rarity: CATCH_RARITY.common, window: 'exhausted', ballMult: 1, hpFrac: 1 });
+    const rare = catchChance({ rarity: CATCH_RARITY.rare, window: 'exhausted', ballMult: 1, hpFrac: 1 });
+    expect(common).toBeGreaterThan(0.7); // first-try-able
+    expect(rare).toBeLessThan(0.3); // resists — not a first-try
+    // Even with the BEST window + lowest HP, a rare stays a gamble.
+    expect(catchChance({ rarity: CATCH_RARITY.rare, window: 'broken', ballMult: 1, hpFrac: 0.1 })).toBeLessThan(0.5);
+  });
+
+  test('S2 — HP bonus is quantized at the 100/75/50/25 thresholds', () => {
+    expect(hpFactor(1.0)).toBe(1.0);
+    expect(hpFactor(0.8)).toBe(1.0); // >75%
+    expect(hpFactor(0.75)).toBe(1.1); // ≤75%
+    expect(hpFactor(0.5)).toBe(1.2); // ≤50%
+    expect(hpFactor(0.25)).toBe(1.3); // ≤25%
+    expect(hpFactor(0.1)).toBe(1.3);
+  });
+
+  test('S2 — each HP threshold raises the chance, but a better WINDOW always wins', () => {
+    const b = { rarity: 0.3, ballMult: 1 } as const;
+    const full = catchChance({ ...b, window: 'read', hpFrac: 1.0 });
+    const h75 = catchChance({ ...b, window: 'read', hpFrac: 0.7 });
+    const h50 = catchChance({ ...b, window: 'read', hpFrac: 0.4 });
+    const h25 = catchChance({ ...b, window: 'read', hpFrac: 0.2 });
+    expect(h75).toBeGreaterThan(full);
+    expect(h50).toBeGreaterThan(h75);
+    expect(h25).toBeGreaterThan(h50);
+    // Window dominance: an EXHAUSTED window at full HP beats a READ window
+    // at 25% HP; a BROKEN window at full HP beats an EXHAUSTED at 25%.
+    expect(catchChance({ ...b, window: 'exhausted', hpFrac: 1.0 })).toBeGreaterThan(h25);
+    expect(catchChance({ ...b, window: 'broken', hpFrac: 1.0 })).toBeGreaterThan(
+      catchChance({ ...b, window: 'exhausted', hpFrac: 0.2 }),
+    );
   });
 
   test('rollCatch is a strict threshold on the RNG draw', () => {
@@ -93,9 +125,20 @@ describe('Path 2 — willing join', () => {
     expect(willingJoinChance({ badges: 8, monRarity: 0, bondBonus: 0.15 })).toBeLessThanOrEqual(0.95);
   });
 
-  test('refusal hint points at the weakest factor (a lesson, not just a loss)', () => {
-    expect(refusalHint({ badges: 0, bondBonus: 0.1 })).toContain('badges');
-    expect(refusalHint({ badges: 3, bondBonus: 0 })).toContain('bond');
+  test('S3 — refusal categorises by the weakest factor (badges / bond / rarity)', () => {
+    expect(refusalReason({ badges: 0, bondBonus: 0.1 })).toBe('badges');
+    expect(refusalReason({ badges: 3, bondBonus: 0 })).toBe('bond');
+    expect(refusalReason({ badges: 3, bondBonus: 0.1 })).toBe('rarity');
+  });
+
+  test('S3 — refusalHint returns an evocative line from the right set (not the bare mechanic)', () => {
+    const badgeLine = refusalHint({ badges: 0, bondBonus: 0.1 });
+    expect(REFUSAL_LINES.badges).toContain(badgeLine);
+    const bondLine = refusalHint({ badges: 3, bondBonus: 0 });
+    expect(REFUSAL_LINES.bond).toContain(bondLine);
+    // Evocative, not on-the-nose — never literally names the mechanic.
+    expect(badgeLine.toLowerCase()).not.toContain('badge');
+    expect(bondLine.toLowerCase()).not.toContain('bond');
   });
 
   test('rollWillingJoin thresholds on the RNG draw', () => {

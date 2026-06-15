@@ -440,6 +440,31 @@ describe('battle menu — CALL paths (Call-menu sprint: submenu + shout + exit)'
     // The cursor marker '>' sits on Catch Breath (it's drawn as "> Catch Breath...").
     expect(screen).toContain('>Catch Breath');
   });
+
+  test('Catch Breath resolves with a VISIBLE stamina effect (+35) — legibility (S4)', () => {
+    const { scene } = buildScene({
+      catchBreathUnlocked: true,
+      playerPatch: { momentum: 1, st: 30 },
+    });
+    scene.input?.('down'); // CALL
+    scene.input?.('a'); // submenu
+    scene.input?.('a'); // Catch Breath → shout
+    scene.input?.('a'); // advance shout → commit catchBreath → resolve
+    // The catchBreath event now HOLDS (consequential). Auto-advance via
+    // update() to ENGAGE each hold (an early A would skipResolve past it),
+    // draw/check, then release the hold with A and continue.
+    const ctx = stubCtx();
+    let found = false;
+    for (let i = 0; i < 25 && !found; i += 1) {
+      for (let j = 0; j < 5; j += 1) scene.update?.(0.5); // advance to the next HELD beat
+      ctx.reset();
+      scene.draw(ctx);
+      const screen = ctx.texts.join('|');
+      if (screen.includes('catches its breath') && screen.includes('35')) found = true;
+      else scene.input?.('a'); // release this hold, continue to the next
+    }
+    expect(found).toBe(true);
+  });
 });
 
 describe('battle menu — RUN / STAY paths', () => {

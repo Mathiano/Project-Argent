@@ -11,7 +11,10 @@ Argent's whole argument is **strength/skill vs. bonds/mercy**. Catching now embo
 ### Path 1 — The Read Window (catching as battling)
 The mon is conscious; you catch it by **out-playing** it. (This is the original Catching 2.0 spec.)
 - You can only attempt a catch during a **window you create** by winning a read: a counter, a dodge, an opening, a clash-win → a 1-round window. An **exhausted** foe → a stronger window. A **Broken** foe (rare wilds carry small Break bars) → the best window.
-- Catch chance = species rarity × window quality (read-win ×1.0, exhausted ×1.5, Broken ×2.0) × ball/band type × a mild HP factor.
+- Catch chance = **species rarity × window quality × ball/band × HP-threshold bonus**, clamped ≤ 0.95.
+  - **Window quality (the MAIN lever):** read-win ×1.0, exhausted ×1.5, Broken ×2.0; out-of-window ×0 (auto-fail). The read is what catches.
+  - **Species rarity (the teeth, S1):** per-species base rate — common **0.55**, uncommon **0.30**, rare **0.12**. A common is first-try-able with a good window; a rare resists even with the best window (its low base caps the product — e.g. a rare with a Broken window + <25% HP tops out ≈ 0.38, never a sure thing).
+  - **HP-threshold bonus (the secondary, S2 — quantized at 100/75/50/25):** >75% HP ×1.0 · ≤75% ×1.1 · ≤50% ×1.2 · ≤25% ×1.3. "Soften it below half" is a real sub-goal. The max bonus (×1.3) sits **below** the smallest window-step ratio (broken/exhausted = 1.33), so a better window **always** beats more attrition — HP can never substitute for a read (the anti-"beat it senseless" guarantee).
 - Throwing **outside** a window auto-fails and raises **Wariness**; high Wariness → the mon telegraphs it will flee next round (never instant-poof RNG).
 - This path keeps catching as *the same skill as battling* — you earn the catch by reading the mon, not by beating it senseless.
 
