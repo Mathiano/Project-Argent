@@ -2,7 +2,7 @@
 
 **Status:** design locked. Build is the **status/held-items combat-depth phase (6-8)**, on engine hooks the move-pool already flagged ("effect moves — status/terrain/drain, blocked on engine hooks"). This doc fills that hole. Everything here is deterministic — **no RNG** — honoring the core pillar (*outcomes come from reads, not luck*). It is additive: until built, mons run on damage moves + stances only.
 
-**Naming reconciliation (flag — its own cleanup, BUILD-ROADMAP Phase 6.7-C):** `move-pool.md` + `typechart.json` agree with each other on a 13-type set using `FIELD/VENOM/VOLT/SPIRIT`; this doc uses the newer design set. Three are clean renames — **VENOM→TOXIN, VOLT→SPARK, SPIRIT→UMBRA** (and **TERRA is unchanged in both sets** — it is *not* the target of any rename). ⚠️ **The unresolved conflict:** this doc's 13 introduce **PSI** (psychic) and drop **FIELD** (normal/physical), while the data files have FIELD and lack PSI. So `FIELD ↔ PSI` is a **set mismatch needing a design call**, not a mechanical rename. Reconcile move-pool.md + typechart.json to ONE canonical set; docs win, but settle FIELD/PSI first. The authoritative 13×13 multiplier grid lives in **typechart.json** — this doc does NOT redefine those numbers; it defines per-type *mechanical identity* on top of them (where it names a matchup, reconcile against typechart.json; docs win, flag conflicts).
+**Naming: RESOLVED — 17-type canon (2026-06-15).** The type roster is locked to the canonical 17 (Gen-2 parity, Argent names): **BASIC · FLAME · AQUA · NATURE · SPARK · FROST · BRAWN · VENOM · TERRA · GALE · PSI · INSECT · STONE · SPIRIT · DRAKE · UMBRA · FORGE**. `move-pool.md`, `typechart.json`, `ch1-batch.json`, `mon-manifest.csv` and this doc all use exactly these names (the old `FIELD/VOLT/SPLASH/SPROUT` are gone: FIELD→BASIC, VOLT→SPARK, SPLASH→AQUA, SPROUT→NATURE; PSI/INSECT/STONE/UMBRA are the 4 new types). The authoritative 17×17 multiplier grid lives in **typechart.json** — this doc does NOT redefine those numbers; it defines per-type *mechanical identity* on top of them. (The legacy 3-type sim FIXTURES — `Flame/Sprout/Splash`, mixed case, in `src/engine/data.ts` — are a SEPARATE permanent vocabulary and intentionally unchanged; the rival ladder depends on them.) ⚠️ The 4 new types' **move names** and their **type-chart matchup rows/columns** are PROPOSED (Gen-2-mapped) pending Mathias's approval — see `move-pool.md` and `type-chart.md`.
 
 ---
 
@@ -12,25 +12,29 @@ Classic status is a condition on a body (RNG paralysis, sit-there sleep). Argent
 
 ---
 
-## Part 2 — The 13 type identities
+## Part 2 — The 17 type identities
 
-Each type has a distinct MECHANICAL identity. Crucially, these are **different categories of mechanic** (DoT, sustain, immunity, tank, disruption) — not 13 flavors of "inflict a status." That variety is what keeps a 200-mon roster from feeling samey and prevents a single dominant meta.
+Each type has a distinct MECHANICAL identity (the canonical 17-type roster — see "Naming" above). Crucially, these are **different categories of mechanic** (DoT, sustain, immunity, tank, disruption) — not 17 flavors of "inflict a status." That variety is what keeps a 200-mon roster from feeling samey and prevents a single dominant meta. **SPIRIT (Ghost) and UMBRA (Dark) are SEPARATE types** — SPIRIT = Shrouded (hide your OWN intent), UMBRA = Doubt (attack the BOND). An earlier draft conflated them; they are distinct.
 
 | Type | Identity | Category |
 |---|---|---|
+| **BASIC** | Neutral floor kit — no status (the honest baseline every roster needs) | floor |
 | **FLAME** | Hard hitters + **Burn** (small HP loss over 2-3 rounds) | damage + DoT |
-| **SPROUT** | **Drain** — moves that absorb HP from the foe to the user | sustain (offensive) |
-| **SPLASH** | **Recover** — moves that self-heal a little (recover in water) | sustain (defensive) |
-| **GALE** | **Immune to TERRA/ground attacks**; glass-cannon speed | mobility/immunity |
-| **TERRA** | Inflicts **Stunned** (via heavy impact) | disruption (tempo) |
-| **DRAKE** | Inflicts **Daunt** (foe can't enter Aggressive — cowed by presence) | disruption (prestige) |
+| **AQUA** | **Recover** — moves that self-heal a little | sustain (defensive) |
+| **NATURE** | **Drain** — moves that absorb HP from the foe to the user | sustain (offensive) |
 | **SPARK** | Inflicts **Daze** (foe's intent tell becomes unreliable) | disruption (info) |
-| **PSI** | Inflicts **Inception** (force foe to repeat last stance) | disruption (control) |
 | **FROST** | Inflicts **Frozen** (foe locked in current stance) | disruption (control) |
-| **TOXIN** | Inflicts **Drained** (bleeds STAMINA each round) | disruption (resource) |
-| **BRAWN** | Inflicts **Daze** (also electric-flavored) + **Taunt** (force foe Aggressive next turn) | disruption (aggro) |
+| **BRAWN** | Inflicts **Taunt** (force foe Aggressive next turn, 1 turn) + **Daze** | disruption (aggro) |
+| **VENOM** | Inflicts **Drained** (bleeds STAMINA each round) | disruption (resource) |
+| **TERRA** | Inflicts **Stunned** (via heavy impact — acts last regardless of speed) | disruption (tempo) |
+| **GALE** | **Immune to TERRA/ground attacks**; glass-cannon speed | mobility/immunity |
+| **PSI** | Inflicts **Inception** (force foe to repeat last stance) | disruption (control) |
+| **INSECT** | Inflicts **Sap** (burst STAMINA-drain on a read-win) — *NEW* | disruption (resource) |
+| **STONE** | **Brace** (self-buff — strengthens the user's next Guard) — *NEW* | defense (self-buff) |
+| **SPIRIT** | **Shrouded** (hide the user's OWN intent — the foe commits blind) | disruption (info) |
+| **DRAKE** | Inflicts **Daunt** (foe can't enter Aggressive — cowed by presence) | disruption (prestige) |
+| **UMBRA** | Inflicts **Doubt** (attacks the BOND — Calls cost more ★ / hesitate) | disruption (bond) |
 | **FORGE** | Defensive archetype — innately bulky (high base HP/DFN, low speed/damage) | tank (stat-shape) |
-| **UMBRA** | Inflicts **Doubt** (attacks the bond — the shadow type that severs partnership) | disruption (bond) |
 
 ### The pillar guard on FORGE / GALE (important)
 FORGE and GALE express identity through **stat/rule shape**, not a status. This is fine and desirable — but it MUST honor the no-power-creep pillar:
@@ -39,7 +43,7 @@ FORGE and GALE express identity through **stat/rule shape**, not a status. This 
 Both are *shapes with tradeoffs*, so they can't out-stat anyone — they trade one axis for another.
 
 ### The category meta (why no single type dominates)
-Tanks (FORGE) outlast hitters (FLAME); disruptors (the status types) break tanks; hitters race disruptors before status lands; sustain (SPROUT/SPLASH) grinds attrition. It's rock-paper-scissors at the *category* level, on top of the type-multiplier triangle — a living meta, not a solved one.
+Tanks (FORGE) outlast hitters (FLAME); disruptors (the status types) break tanks; hitters race disruptors before status lands; sustain (NATURE/AQUA) grinds attrition. It's rock-paper-scissors at the *category* level, on top of the type-multiplier triangle — a living meta, not a solved one.
 
 ---
 
@@ -49,7 +53,8 @@ All deterministic. Each has a TYPE trigger, an effect, and sits in the economy (
 
 ### Information layer (attack the read)
 - **Daze** (SPARK / BRAWN) — the afflicted mon's intent tell becomes *unreliable* (scrambled/lying). Replaces classic paralysis. You can't trust what you see.
-- **Shrouded** (self-buff, via certain moves) — hides the USER's own intent from the foe; the foe commits blind. (The defensive/trickster buff; renamed from "Blindside/Masked".)
+- **Shrouded** (SPIRIT — the Ghost type's signature self-buff) — hides the USER's own intent from the foe; the foe commits blind. (The defensive/trickster buff; renamed from "Blindside/Masked". SPIRIT owns Shrouded; UMBRA is the separate bond-attacker, Doubt.)
+- **Brace** (STONE — *NEW*, self-buff) — strengthens the user's **next Guard** (a bigger counter / more mitigation on the following round). The Rock type's defensive set-up: telegraph a wall, punish the read.
 
 ### Control layer (attack the stance choice)
 - **Inception** (PSI) — forces the afflicted mon to *repeat its last stance* for the duration. "Enter their mind." Makes them predictable → exploitable. Renamed from "Mirror".
@@ -58,14 +63,15 @@ All deterministic. Each has a TYPE trigger, an effect, and sits in the economy (
 - **Taunt** (BRAWN) — forces the afflicted mon into **Aggressive for the NEXT TURN ONLY** (1 turn). This is read-MANIPULATION: you now know they're Aggressive → Guard → Counter them. Powerful but self-limiting at 1 turn.
 
 ### Tempo layer (attack rhythm/resource)
-- **Drained** (TOXIN) — bleeds **stamina** each round (not HP — "Pokémon and blood don't match"). Pressures the stamina economy → forces rest. Replaces classic poison.
+- **Drained** (VENOM) — bleeds **stamina** each round (not HP — "Pokémon and blood don't match"). Pressures the stamina economy → forces rest. Replaces classic poison.
+- **Sap** (INSECT — *NEW*) — a **burst** stamina-drain landed on a read-win (a one-shot chunk, vs VENOM's per-round bleed). The Bug type's tempo-spike: out-read them and they're suddenly winded.
 - **Stunned** (TERRA / heavy impact) — the afflicted mon *acts last regardless of speed* for the duration. Loses initiative, eats openings. (Triggered by heavy-impact moves.)
 - **Overheat** (mechanic, not a type) — using the *same move 3 times in a row* causes escalating extra stamina cost on that mon. A self-inflicted anti-repetition tax. Encourages varied play.
 
 ### DoT / sustain (HP economy)
 - **Burn** (FLAME) — small HP loss over 2-3 rounds. The one straightforward DoT (FLAME is the hard-hitter, this is its bonus bite).
-- **Drain** (SPROUT, offensive sustain) — a MOVE property: damages the foe AND heals the user a fraction.
-- **Recover** (SPLASH, defensive sustain) — a MOVE property: the user self-heals a little.
+- **Drain** (NATURE, offensive sustain) — a MOVE property: damages the foe AND heals the user a fraction.
+- **Recover** (AQUA, defensive sustain) — a MOVE property: the user self-heals a little.
 
 ### Bond layer (UNIQUE TO ARGENT — attack/defend the relationship)
 - **Doubt** (UMBRA) — strains the bond: the afflicted mon's Calls cost more ★, and/or it hesitates (reduced effect) until "reached." The foe attacks your PARTNERSHIP. No other monster game has a status that attacks the trainer-mon relationship — this is the most on-thesis mechanic in the game.
@@ -110,11 +116,11 @@ A strongly-bonded mon **starts each battle with 1-2 ★ banked** (scaling with b
 ## Part 6 — Type matchups (advantages/weaknesses)
 
 **Source of truth: `typechart.json` (the locked 13×13).** This doc does NOT override it. Design constraints the chart already satisfies (for reference):
-- **Starter triangle:** FLAME > SPROUT > SPLASH > FLAME.
-- **DRAKE neutral** to SPROUT and SPLASH (both directions).
+- **Starter triangle:** FLAME > NATURE > AQUA > FLAME.
+- **DRAKE neutral** to NATURE and AQUA (both directions).
 - Multipliers **1.3× (advantage) / 0.7× (disadvantage)**, band fixed (gentler than classic 2×/0.5× — this is part of why TTK and "no stat-check" hold).
 - Every gym is **counter-accessible** (a catchable answer exists — e.g. TERRA/GRITHOAX answers Falkner's GALE).
-- Classic-intuitive anchors preserved where they make sense: SPLASH > FLAME, FLAME > SPROUT, SPROUT > SPLASH, TERRA > SPARK, GALE immune to TERRA (the identity above), etc.
+- Classic-intuitive anchors preserved where they make sense: AQUA > FLAME, FLAME > NATURE, NATURE > AQUA, TERRA > SPARK, GALE immune to TERRA (the identity above), etc.
 
 **Action for the build:** when status lands, ensure each type's *status* and its *multiplier* matchups together don't create an unbeatable combo (e.g. a type that both resists you AND status-locks you). Sim-gate the type×status cross-product the way the bond cross-product is gated (≤ the agreed ladder shift). Every type must have both clear advantages AND clear weaknesses — no type is all-upside.
 

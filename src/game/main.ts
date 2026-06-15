@@ -194,7 +194,7 @@ function partyLead(): Species {
 
 function recomputeSignpostFlags(): void {
   const types = partyTypes();
-  const hasSprout = types.has('SPROUT');
+  const hasSprout = types.has('NATURE');
   const hasTerra = types.has('TERRA');
   if (hasSprout && !hasTerra) flagStore.set('need_terra_nudge');
   else flagStore.unset('need_terra_nudge');
@@ -836,13 +836,13 @@ function showTestBattle(): void {
 
 // ?skip=test-battle-2v2 hook — Phase 1 combat-in-isolation that
 // exercises switching as a tactical READ on BOTH sides:
-//   - Player party: GRUBLEAF (SPROUT) lead at FLAME-punished
-//     disadvantage; SILTSKIP (SPLASH) on bench is the answer.
+//   - Player party: GRUBLEAF (NATURE) lead at FLAME-punished
+//     disadvantage; SILTSKIP (AQUA) on bench is the answer.
 //   - Foe team: KILNDRAKE (FLAME) lead → FLITPECK (GALE) as the
 //     forced-switch successor. Once the player swaps to SILTSKIP and
 //     KOs KILNDRAKE, foe-side forced-switch fires and FLITPECK takes
 //     the field — putting the player back at a switching decision
-//     (GALE→SPROUT 1.3 punishes the GRUBLEAF bench).
+//     (GALE→NATURE 1.3 punishes the GRUBLEAF bench).
 // Both sides' switch flow is testable from this one hook.
 function showTestBattle2v2(): void {
   const foeLead = CH1_DEX.KILNDRAKE ?? CH1_DEX.KINDRAKE ?? SPECIES.FUZZLET!;

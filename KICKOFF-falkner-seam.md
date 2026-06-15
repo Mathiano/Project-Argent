@@ -12,7 +12,7 @@ No engine changes (team battles are the NEXT sprint, not this one).
    ?skip=falkner dependency from the acceptance path (keep the flag for
    QA).
 4. Prep-loop signpost (the GRUBLEAF ruling made legible): if the player
-   enters the gym with a SPROUT-type lead and no TERRA mon in party, a
+   enters the gym with a NATURE-type lead and no TERRA mon in party, a
    gym-door NPC or sign nudges toward the Route 31 cave ("Birds hate the
    stones below — a cave-catch might even the odds"). Data-driven via
    the existing dialog/flag system; no hardcoding.

@@ -34,11 +34,11 @@ SPD edge vs all three starters off-gust is his; *on* gusts he outspeeds everythi
 
 ## Matchup texture (typechart canon)
 
-GALE hits SPROUT ×1.3 — the GRUBLEAF picker gets the classic hard first gym. TERRA (GRITHOAX, the cave line) hits back ×1.3 — the prep-loop catch. KINDRAKE walls him; SILTSKIP counters the dive.
+GALE hits NATURE ×1.3 — the GRUBLEAF picker gets the classic hard first gym. TERRA (GRITHOAX, the cave line) hits back ×1.3 — the prep-loop catch. KINDRAKE walls him; SILTSKIP counters the dive.
 
 ## Sim targets — PER-STARTER bands (demo-complete re-baseline)
 
-> **Design ruling (Mathias, 2026-06-15):** the original single-band-per-archetype targets averaged across starters and never matched reality — the matchup spread between starters is *enormous* and **intended**. KINDRAKE walls GALE and SILTSKIP counters the dive (the **fair** demo paths); GALE hits SPROUT ×1.3, so **GRUBLEAF alone is hard-mode**. The answer to GRUBLEAF-into-Falkner is **prepare — train, or catch a GALE counter (GRITHOAX, the cave line; once Catching 2.0 lands in Phase 6)** — *not* a GRUBLEAF solo buff. Falkner's levers are **not** retuned to flatten this; instead the bands are widened to accept the designed spread, and the ladder is re-locked to them (`src/sim/falknerLadder.test.ts`). Locked at gust=1.4 / ace-HP=1.15.
+> **Design ruling (Mathias, 2026-06-15):** the original single-band-per-archetype targets averaged across starters and never matched reality — the matchup spread between starters is *enormous* and **intended**. KINDRAKE walls GALE and SILTSKIP counters the dive (the **fair** demo paths); GALE hits NATURE ×1.3, so **GRUBLEAF alone is hard-mode**. The answer to GRUBLEAF-into-Falkner is **prepare — train, or catch a GALE counter (GRITHOAX, the cave line; once Catching 2.0 lands in Phase 6)** — *not* a GRUBLEAF solo buff. Falkner's levers are **not** retuned to flatten this; instead the bands are widened to accept the designed spread, and the ladder is re-locked to them (`src/sim/falknerLadder.test.ts`). Locked at gust=1.4 / ace-HP=1.15.
 
 | Player archetype | Fair path (KINDRAKE / SILTSKIP) | Hard-mode (GRUBLEAF) |
 |---|---|---|

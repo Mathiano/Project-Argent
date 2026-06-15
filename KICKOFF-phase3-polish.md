@@ -21,7 +21,7 @@ KAMON must SHOW his belief, not just grab and go:
 - (stolen mon hesitates, per 0.85 canon) "...It'll learn."
 
 ### Optional (approved): Larch names the player's starter
-A small `if-flag` branch in the post-theft / post-pick dialog: "That FLAME of yours..." / "That SPROUT of yours..." / "That SPLASH of yours..." — makes it personal.
+A small `if-flag` branch in the post-theft / post-pick dialog: "That FLAME of yours..." / "That NATURE of yours..." / "That AQUA of yours..." — makes it personal.
 
 ## Part 2 — Gating (soft for story, HARD for system-critical)
 

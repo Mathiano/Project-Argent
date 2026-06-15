@@ -48,7 +48,7 @@ export function createFalknerPrepScene(opts: FalknerPrepSceneOpts): Scene {
       );
 
       drawText(ctx, `FALKNER's ${opts.foeSpecies.name}`, 18, 28);
-      drawText(ctx, 'TYPE: GALE — hits SPROUT', 18, 42, PALETTE.hpCrit);
+      drawText(ctx, 'TYPE: GALE — hits NATURE', 18, 42, PALETTE.hpCrit);
 
       drawText(ctx, `SPD ${opts.foeSpecies.spd} (${faster ? 'SLOWER' : 'FASTER off-gust'})`, 18, 56);
       drawText(ctx, 'TRAIT: GUSTBORNE', 18, 70);

@@ -29,7 +29,7 @@ const N = 2000;
 type Tier = 'fair' | 'hard';
 function tierOf(player: string): Tier {
   // GALE walls KINDRAKE and SILTSKIP counters the dive — the fair demo
-  // paths. GALE hits SPROUT ×1.3, so GRUBLEAF alone is the hard run.
+  // paths. GALE hits NATURE ×1.3, so GRUBLEAF alone is the hard run.
   return player === 'GRUBLEAF' ? 'hard' : 'fair';
 }
 

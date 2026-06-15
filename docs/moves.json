@@ -36,47 +36,47 @@
  },
  {
   "name": "THORN FLICK",
-  "type": "SPROUT",
+  "type": "NATURE",
   "tier": "light"
  },
  {
   "name": "LEAF LASH",
-  "type": "SPROUT",
+  "type": "NATURE",
   "tier": "mid"
  },
  {
   "name": "VINE SLAM",
-  "type": "SPROUT",
+  "type": "NATURE",
   "tier": "heavy"
  },
  {
   "name": "RIPPLE CUT",
-  "type": "SPLASH",
+  "type": "AQUA",
   "tier": "light"
  },
  {
   "name": "BUBBLE JET",
-  "type": "SPLASH",
+  "type": "AQUA",
   "tier": "mid"
  },
  {
   "name": "TIDE CRASH",
-  "type": "SPLASH",
+  "type": "AQUA",
   "tier": "heavy"
  },
  {
   "name": "PAW JAB",
-  "type": "FIELD",
+  "type": "BASIC",
   "tier": "light"
  },
  {
   "name": "BODY SLAM",
-  "type": "FIELD",
+  "type": "BASIC",
   "tier": "mid"
  },
  {
   "name": "STAMPEDE",
-  "type": "FIELD",
+  "type": "BASIC",
   "tier": "heavy"
  },
  {
@@ -126,17 +126,17 @@
  },
  {
   "name": "SPARK JAB",
-  "type": "VOLT",
+  "type": "SPARK",
   "tier": "light"
  },
  {
-  "name": "VOLT LASH",
-  "type": "VOLT",
+  "name": "SPARK LASH",
+  "type": "SPARK",
   "tier": "mid"
  },
  {
   "name": "STORM CRASH",
-  "type": "VOLT",
+  "type": "SPARK",
   "tier": "heavy"
  },
  {

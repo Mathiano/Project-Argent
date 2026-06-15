@@ -6,7 +6,7 @@ export type TierName = 'light' | 'mid' | 'heavy' | 'nuke';
 
 // Type identifiers are arbitrary strings now (data-driven).
 // Legacy fixture content uses 'Flame'|'Sprout'|'Splash' (mixed case);
-// CH1+ content from docs/typechart.json uses 'FLAME'|'SPROUT'|... (upper).
+// CH1+ content from docs/typechart.json uses 'FLAME'|'NATURE'|... (upper).
 // Charts and species data within a single battle must use the same casing.
 export type ElementType = string;
 

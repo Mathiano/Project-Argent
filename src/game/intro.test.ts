@@ -274,7 +274,7 @@ describe('Phase 3 polish — dialogue beats land in the data', () => {
     expect(text).toContain("It'll learn");
   });
 
-  test('post-theft Larch names the player\'s starter type (FLAME / SPROUT / SPLASH branch)', () => {
+  test('post-theft Larch names the player\'s starter type (FLAME / NATURE / AQUA branch)', () => {
     const lab = getMap('LAB');
     const theft = lab.objects.find(
       (o) => o.type === 'script' && o.flag === 'kamon_theft_fired',
@@ -282,8 +282,8 @@ describe('Phase 3 polish — dialogue beats land in the data', () => {
     if (!theft || theft.type !== 'script') throw new Error('theft missing');
     const text = JSON.stringify(theft.commands);
     expect(text).toContain('That FLAME of yours');
-    expect(text).toContain('That SPROUT of yours');
-    expect(text).toContain('That SPLASH of yours');
+    expect(text).toContain('That NATURE of yours');
+    expect(text).toContain('That AQUA of yours');
   });
 });
 

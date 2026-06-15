@@ -177,7 +177,7 @@
   "stage": 1,
   "name": "GRUBLEAF",
   "types": [
-   "SPROUT"
+   "NATURE"
   ],
   "stats": {
    "hp": 54,
@@ -226,7 +226,7 @@
   "stage": 2,
   "name": "VINESNAP",
   "types": [
-   "SPROUT"
+   "NATURE"
   ],
   "stats": {
    "hp": 63,
@@ -283,7 +283,7 @@
   "stage": 3,
   "name": "WYRMFERN",
   "types": [
-   "SPROUT"
+   "NATURE"
   ],
   "stats": {
    "hp": 74,
@@ -344,7 +344,7 @@
   "stage": 1,
   "name": "SILTSKIP",
   "types": [
-   "SPLASH"
+   "AQUA"
   ],
   "stats": {
    "hp": 67,
@@ -393,7 +393,7 @@
   "stage": 2,
   "name": "BRACKSLAP",
   "types": [
-   "SPLASH"
+   "AQUA"
   ],
   "stats": {
    "hp": 73,
@@ -450,7 +450,7 @@
   "stage": 3,
   "name": "CRASHMAW",
   "types": [
-   "SPLASH"
+   "AQUA"
   ],
   "stats": {
    "hp": 86,
@@ -784,7 +784,7 @@
   "stage": 1,
   "name": "MARSHMASH",
   "types": [
-   "SPLASH"
+   "AQUA"
   ],
   "stats": {
    "hp": 58,

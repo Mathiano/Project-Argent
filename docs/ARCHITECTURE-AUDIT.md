@@ -50,7 +50,7 @@ docs/        15 design docs + 3 data JSON (typechart, moves, ch1-batch)
 | `maps/lab.json` | Graybox LAB interior (12×9). 1 sign, 1 south-door warp to ROUTE31. |
 | `maps/house.json` | Graybox HOUSE interior (10×8). 1 sign, 1 south-door warp to ROUTE31. |
 | `maps/route31.json` | Outdoor route (20×15). 2 building warps (lab + cave), grass encounter zone (FLITPECK), cave encounter zone (GRITHOAX), 1 sign, 1 one-shot step-on script ("a flutter…"), 1 gym door warp at (11,13). |
-| `maps/gym.json` | Violet gym rooftop (16×16). 2 gust_pulse lanes (opposite phase), 2 NPCs (trainer + Falkner) gated by flags, 1 south-door warp, 1 sign, 1 auto-script firing the SPROUT-without-TERRA nudge via `if-flag`. |
+| `maps/gym.json` | Violet gym rooftop (16×16). 2 gust_pulse lanes (opposite phase), 2 NPCs (trainer + Falkner) gated by flags, 1 south-door warp, 1 sign, 1 auto-script firing the NATURE-without-TERRA nudge via `if-flag`. |
 | `scenes/boot.ts` | Sprite-system smoke scene (shows the 5 species side-by-side). Reachable only as a fallback. |
 | `scenes/title.ts` | Title splash with flanking starter sprites + blinking PRESS START. |
 | `scenes/starterPick.ts` | 3-slot starter picker. Takes `starters: readonly Species[]` (loaded externally). |
@@ -221,7 +221,7 @@ Drift-by-file. **Pinned-by-design** items are intentional and called out separat
 - **`STARTERS` hardcoded list** (line 70): `['KINDRAKE', 'GRUBLEAF', 'SILTSKIP']` as a CH1 dex lookup. Should be a `chapter` config (chapter 1 → these three starters).
 - **Wild AI stance distribution** (line 141 area, `wildFoeAI`): `0.4 / 0.3 / 0.3` for A/G/F. Should be a "wild profile" config; would also reduce duplication with the demo's KAMON 0.55/0.35/0.10.
 - **Stat scales hardcoded** (line 186 rival, line 212 Falkner ace HP×1.15): the `atk: 0.85, dfn: 0.85` and the `Math.round(galehawkBase.hp * 1.15)` should come from data — the `StatScale` type exists for exactly this and is currently unused on `BossCard`.
-- **Signpost rule `'SPROUT' / 'TERRA'` magic strings** (`recomputeSignpostFlags`): the rule "SPROUT lead + no TERRA in party → nudge" is hardcoded in TS. Should be a rule list in a story-progression JSON.
+- **Signpost rule `'NATURE' / 'TERRA'` magic strings** (`recomputeSignpostFlags`): the rule "NATURE lead + no TERRA in party → nudge" is hardcoded in TS. Should be a rule list in a story-progression JSON.
 
 ### `src/sim/archetypes.ts`
 
@@ -236,7 +236,7 @@ Drift-by-file. **Pinned-by-design** items are intentional and called out separat
 
 ### `src/game/scenes/falknerPrep.ts`
 
-- **Strategy text strings** like `'TYPE: GALE — hits SPROUT'`, `'TRAIT: GUSTBORNE'`, `'Gusts every 3rd round'`, `'Break bar 2'` (lines 50-65): hardcoded strings. Should be derived from `boss.species.types`, `boss.species.trait`, `boss.arenaSchedule.rhythmEveryN`, `boss.breakBar`. UI is brittle to future card changes.
+- **Strategy text strings** like `'TYPE: GALE — hits NATURE'`, `'TRAIT: GUSTBORNE'`, `'Gusts every 3rd round'`, `'Break bar 2'` (lines 50-65): hardcoded strings. Should be derived from `boss.species.types`, `boss.species.trait`, `boss.arenaSchedule.rhythmEveryN`, `boss.breakBar`. UI is brittle to future card changes.
 
 ### Pinned-by-design — DO NOT REFACTOR
 
@@ -359,7 +359,7 @@ These files have no direct test coverage. Most are exercised indirectly by `reso
 | `game/canvas.ts`, `palette.ts`, `ui.ts`, `sprite.ts`, `sprites.ts`, `input.ts`, `scene.ts` | **NO TESTS.** Render correctness verified only by headless-Chrome screenshots in the working session. SceneStack push/pop semantics are simple enough to be obvious but a bug would be hard to catch automatically. | Visual only. |
 | `game/scenes/*.ts` | **NO TESTS.** Scene flow has no integration coverage. Falkner fight cold-walk works in screenshots only. | Visual only. |
 | `game/overworld/types.ts` + `maps.ts` + scene | **NO TESTS.** `isWalkable`, `findObjectAt`, `parseTarget`, the gust-pulse pulse math, the if-flag script evaluator — none have unit tests. The session flag store has no test for the unset path. | None. |
-| `game/main.ts` | **NO TESTS.** The entire run-state machine + onResolve callbacks + flag bookkeeping is uncovered. The `recomputeSignpostFlags` rule (SPROUT + no TERRA → nudge) has no test. | None. |
+| `game/main.ts` | **NO TESTS.** The entire run-state machine + onResolve callbacks + flag bookkeeping is uncovered. The `recomputeSignpostFlags` rule (NATURE + no TERRA → nudge) has no test. | None. |
 
 ### Recommended test additions before 6v6
 
