@@ -104,16 +104,20 @@ Top strip shows the next 4–5 actions as face chips. Heavy moves visibly push y
 
 ## Trainer Calls (START, requires ★)
 
-Momentum fills from read-wins, dodges, super-effective hits, clash wins → ★ lights. One charge held at a time.
+Momentum fills from read-wins, dodges, super-effective hits, clash wins → ★ lights. One charge held at a time. **Selecting CALL opens a submenu** (the FIGHT→moves pattern) that reads the set below — never an instant fire; **B** exits it. Locked Calls render greyed + cursor-skipped (a later pass hides them until unlocked). A Call is never silent: committing one fires a **shout line** first (the trainer command), then the effect.
 
-| Call | Effect |
-|---|---|
-| "Hang on!" | Survive this action at 1 HP |
-| "Now — full power!" | Next move +50%, ignores stance modifiers |
-| "Catch your breath!" | Skip move, +35 stamina |
-| **"Recover!"** | **Skip move, heal HP and/or clear a status** |
-| **"Dodge!"** | **Guarantee an evade of the incoming attack (the anime "Dodge it!")** |
-| "Get back!" | Free pivot switch that evades the incoming move |
+The full Call set — the submenu reads this, so adding a Call is **data, not a rewrite**. ★ costs are draft (tuned with the Call economy).
+
+| Call | ★ | Effect | Unlock source | Shout line (`{MON}` = active mon) | Status |
+|---|---|---|---|---|---|
+| **Catch Breath** | 1 | Skip move, +35 stamina | first Call unlock (the earned bond moment — see `bond-track-v2.md` / the Jay robbery) | `{MON}, catch your breath!` | **BUILT** |
+| **Recover** | 1 | Skip move, heal HP and/or clear a status (the canonical in-battle heal — items heal in the overworld) | Call economy (bond tier) | `{MON}, shake it off!` | designed |
+| **Dodge** | 1 | Guarantee an evade of the incoming attack (the anime "Dodge it!") | Call economy (bond tier) | `{MON}, dodge it!` | designed |
+| **Hang On** | 1 | Survive this action at 1 HP | Call economy (bond tier) | `{MON}, hang on!` | designed |
+| **Full Power** | 2 | Next move +50%, ignores stance modifiers | Call economy (bond tier) | `Now — {MON}, full power!` | designed |
+| **Get Back** | 1 | Free pivot switch that evades the incoming move | Call economy (bond tier) | `{MON}, get back!` | designed |
+
+Only **Catch Breath** is built today (commits the engine's `catchBreath` action); the rest are **designed**, built with the Call economy (the Bugsy slice). The in-game `CALL_SET` (`src/game/scenes/battle.ts`) mirrors this table.
 
 Leaders have Calls too — with bark-line tells (*"Miltank, wear them down..."*) that double as readable boss telegraphs.
 

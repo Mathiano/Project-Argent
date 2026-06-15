@@ -350,44 +350,95 @@ function drainResolve(scene: ReturnType<typeof createBattleScene>): void {
   for (let i = 0; i < 5; i += 1) scene.update?.(0.1);
 }
 
-describe('battle menu — CALL paths', () => {
-  test('A on CALL (unlocked, momentum ≥ 1) commits a catchBreath action', () => {
+describe('battle menu — CALL paths (Call-menu sprint: submenu + shout + exit)', () => {
+  test('CALL opens a SUBMENU (does not instant-fire); the full Call set shows', () => {
     const { scene } = buildScene({
       catchBreathUnlocked: true,
       playerPatch: { momentum: 1, st: 30 },
     });
-    // No intro; FIGHT is cursor 0. DOWN once → CALL (cursor 1, enabled).
-    scene.input?.('down');
-    scene.input?.('a');
-    // Drain resolve. CALL commits {kind:'catchBreath'} which the engine
-    // processes (+35 ST, -1 momentum). Then beginTurn fires.
-    drainResolve(scene);
-
+    scene.input?.('down'); // FIGHT → CALL row
+    scene.input?.('a'); // open the Call submenu
     const ctx = stubCtx();
     scene.draw(ctx);
     const screen = ctx.texts.join('|');
-    // Back at the FIGHT menu after the round resolves. No "No ★" dialog.
-    expect(screen).toContain('FIGHT');
-    expect(screen).not.toContain('No ★ yet');
+    // The whole set is visible (what you grow into), with ★ costs.
+    expect(screen).toContain('Catch Breath');
+    expect(screen).toContain('Recover');
+    expect(screen).toContain('Dodge');
+    expect(screen).toContain('★1');
+    // It did NOT instant-fire (no resolve log line like "catch your breath").
+    expect(screen).not.toContain('catch your breath');
   });
 
-  test('A on CALL (unlocked, momentum = 0) surfaces "No ★ yet" dialog — dismissable', () => {
+  test('B in the Call submenu backs out to the battle menu (fixes the misclick trap)', () => {
+    const { scene } = buildScene({ catchBreathUnlocked: true, playerPatch: { momentum: 1 } });
+    scene.input?.('down');
+    scene.input?.('a'); // submenu
+    scene.input?.('b'); // exit
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('FIGHT'); // back at the battle menu
+  });
+
+  test('committing Catch Breath shows a NAMED trainer shout, then applies +ST', () => {
+    const { scene } = buildScene({
+      catchBreathUnlocked: true,
+      playerPatch: { momentum: 1, st: 30 },
+    });
+    scene.input?.('down');
+    scene.input?.('a'); // submenu (cursor on Catch Breath)
+    scene.input?.('a'); // fire → shout line
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const shout = ctx.texts.join('|');
+    // The shout names the mon (GRUBLEAF) and is the trainer command.
+    expect(shout).toContain('GRUBLEAF');
+    expect(shout).toContain('catch your breath');
+
+    // Advance the shout → commit → resolve applies the +ST effect.
+    scene.input?.('a');
+    drainResolve(scene);
+    ctx.reset();
+    scene.draw(ctx);
+    // Back at the FIGHT menu after the round; the Call resolved.
+    expect(ctx.texts.join('|')).toContain('FIGHT');
+  });
+
+  test('an unaffordable Catch Breath (★0) greys + toasts on A — no commit', () => {
     const { scene } = buildScene({
       catchBreathUnlocked: true,
       playerPatch: { momentum: 0 },
     });
     scene.input?.('down');
-    scene.input?.('a');
+    scene.input?.('a'); // submenu — Catch Breath greyed (unaffordable)
+    scene.input?.('a'); // A on it → "not enough ★" toast, NOT a commit
     const ctx = stubCtx();
     scene.draw(ctx);
-    expect(ctx.texts.join('|')).toContain('No ★ yet');
+    const screen = ctx.texts.join('|');
+    expect(screen).toContain('Not enough ★');
+    expect(screen).not.toContain('catch your breath');
 
-    // B dismisses → back to menu.
+    // Dismiss → back in the submenu (not committed).
     scene.input?.('b');
     ctx.reset();
     scene.draw(ctx);
-    expect(ctx.texts.join('|')).toContain('FIGHT');
-    expect(ctx.texts.join('|')).not.toContain('No ★ yet');
+    expect(ctx.texts.join('|')).toContain('Catch Breath');
+  });
+
+  test('design-only Calls render greyed + LOCKED (cursor skips them, stays on Catch Breath)', () => {
+    const { scene } = buildScene({ catchBreathUnlocked: true, playerPatch: { momentum: 1 } });
+    scene.input?.('down');
+    scene.input?.('a'); // submenu
+    // DOWN repeatedly must keep the cursor on the only unlocked Call
+    // (Catch Breath) — the locked ones are skipped.
+    scene.input?.('down');
+    scene.input?.('down');
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    expect(screen).toContain('LOCKED'); // locked Calls labelled
+    // The cursor marker '>' sits on Catch Breath (it's drawn as "> Catch Breath...").
+    expect(screen).toContain('>Catch Breath');
   });
 });
 
@@ -803,22 +854,24 @@ describe('B-on-dialog: dismissable backs out; forced is a no-op', () => {
     expect(ctx.texts.join('|')).not.toContain('FIGHT');
   });
 
-  test('B on the Calls-locked dismissable dialog backs out to menu', () => {
-    // catchBreathUnlocked=true, momentum=0 → A on CALL = "No ★ yet" dialog.
+  test('B on the unaffordable-Call dismissable toast backs out to the Call submenu', () => {
+    // catchBreathUnlocked=true, momentum=0 → CALL → submenu → A on the
+    // greyed Catch Breath = "Not enough ★" dismissable toast.
     const { scene } = buildScene({
       catchBreathUnlocked: true,
       playerPatch: { momentum: 0 },
     });
-    scene.input?.('down');
-    scene.input?.('a');
+    scene.input?.('down'); // CALL row
+    scene.input?.('a'); // open submenu
+    scene.input?.('a'); // A on the unaffordable Catch Breath → toast
     let ctx = stubCtx();
     scene.draw(ctx);
-    expect(ctx.texts.join('|')).toContain('No ★ yet');
+    expect(ctx.texts.join('|')).toContain('Not enough ★');
 
-    scene.input?.('b');
+    scene.input?.('b'); // dismiss → back to the submenu (its prior phase)
     ctx = stubCtx();
     scene.draw(ctx);
-    expect(ctx.texts.join('|')).toContain('FIGHT');
-    expect(ctx.texts.join('|')).not.toContain('No ★ yet');
+    expect(ctx.texts.join('|')).toContain('Catch Breath');
+    expect(ctx.texts.join('|')).not.toContain('Not enough ★');
   });
 });

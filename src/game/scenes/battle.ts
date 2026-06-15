@@ -191,6 +191,31 @@ export function speedLabel(
   return 'SPEED EVEN';
 }
 
+// The Call set the submenu reads (Call-menu sprint). DATA-driven so
+// adding a Call later is data, not a rewrite. Only Catch Breath is
+// BUILT this build (commits {kind:'catchBreath'}); Recover / Dodge / the
+// rest are design-only per combat-2-0-spec.md and render greyed +
+// cursor-skipped (locked). `{MON}` in the shout is the active mon name.
+export interface CallDef {
+  readonly id: string;
+  readonly name: string;
+  readonly starCost: number;
+  readonly built: boolean;
+  readonly shout: string;
+}
+export const CALL_SET: readonly CallDef[] = [
+  { id: 'catch-breath', name: 'Catch Breath', starCost: 1, built: true, shout: '{MON}, catch your breath!' },
+  { id: 'recover', name: 'Recover', starCost: 1, built: false, shout: '{MON}, shake it off!' },
+  { id: 'dodge', name: 'Dodge', starCost: 1, built: false, shout: '{MON}, dodge it!' },
+  { id: 'hang-on', name: 'Hang On', starCost: 1, built: false, shout: '{MON}, hang on!' },
+  { id: 'full-power', name: 'Full Power', starCost: 2, built: false, shout: 'Now — {MON}, full power!' },
+  { id: 'get-back', name: 'Get Back', starCost: 1, built: false, shout: '{MON}, get back!' },
+];
+
+export function callShout(call: CallDef, monName: string): string {
+  return call.shout.replace('{MON}', monName);
+}
+
 export function createBattleScene(opts: BattleSceneOpts): Scene {
   let state: BattleState = opts.state;
   let foeAction: Action = { kind: 'rest' };
@@ -211,7 +236,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let roundStance: { player: Stance | null; foe: Stance | null } = { player: null, foe: null };
   let calloutLine: string | null = null;
 
-  let phase: 'text' | 'menu' | 'move' | 'party' | 'resolve' | 'end' = 'text';
+  let phase: 'text' | 'menu' | 'move' | 'call' | 'party' | 'resolve' | 'end' = 'text';
   let textQueue: string[] = [...opts.intro];
   let textNext: (() => void) | null = beginTurn;
   // Party-picker mode. 'voluntary' = opened from FIGHT menu's PKMN row
@@ -241,6 +266,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let menuCursor = 0;
   let moveCursor = 0;
   let stanceIdx = 0;
+  let callCursor = 0;
   let tick = 0;
 
   let animSide: Side | null = null;
@@ -623,17 +649,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       return;
     }
     if (focus.kind === 'call') {
-      if (activeMon(state.player).momentum < 1) {
-        setText(
-          ['No ★ yet —', 'win reads to charge:', 'counter, dodge, open.'],
-          () => {
-            phase = 'menu';
-          },
-          { dismissable: true },
-        );
-      } else {
-        commit({ kind: 'catchBreath' });
-      }
+      // Call-menu sprint — open the Call SUBMENU (mirror FIGHT → moves),
+      // never instant-fire. Land the cursor on the first unlocked Call.
+      callCursor = firstSelectableCall();
+      phase = 'call';
       return;
     }
     // RUN
@@ -760,6 +779,69 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         return;
       }
       commit({ kind: 'move', move: moveName, stance: STANCES[stanceIdx]! });
+    }
+  }
+
+  // ---- Call submenu (Call-menu sprint) -------------------------------------
+  // A Call is UNLOCKED (cursor can land) when it's built AND unlocked for
+  // this run. Catch Breath is the only built Call; it unlocks via the run
+  // flag. The others are design-only → locked → cursor-skipped + greyed.
+  // NOTE (later pass): make locked Calls invisible-until-unlocked rather
+  // than greyed — for now they're greyed so the player sees the set.
+  function callUnlocked(call: CallDef): boolean {
+    if (!call.built) return false;
+    if (call.id === 'catch-breath') return opts.catchBreathUnlocked;
+    return false;
+  }
+  function callAffordable(call: CallDef): boolean {
+    return activeMon(state.player).momentum >= call.starCost;
+  }
+  function firstSelectableCall(): number {
+    for (let i = 0; i < CALL_SET.length; i += 1) {
+      if (callUnlocked(CALL_SET[i]!)) return i;
+    }
+    return 0;
+  }
+  function stepCallCursor(start: number, dir: 1 | -1): number {
+    let i = start;
+    for (let n = 0; n < CALL_SET.length; n += 1) {
+      i = (i + dir + CALL_SET.length) % CALL_SET.length;
+      if (callUnlocked(CALL_SET[i]!)) return i;
+    }
+    return start;
+  }
+  // Fire a Call: shout FIRST (the trainer command beat — a Call is never
+  // silent), then the effect. Only Catch Breath has an engine effect this
+  // build; design-only Calls are cursor-skipped so never reach here.
+  function fireCall(call: CallDef): void {
+    const monName = activeMon(state.player).species.name;
+    setText([callShout(call, monName)], () => {
+      if (call.id === 'catch-breath') commit({ kind: 'catchBreath' });
+      else phase = 'menu';
+    });
+  }
+  function handleCallInput(key: InputKey): void {
+    if (key === 'up') callCursor = stepCallCursor(callCursor, -1);
+    else if (key === 'down') callCursor = stepCallCursor(callCursor, 1);
+    else if (key === 'b') phase = 'menu'; // exit the submenu (fixes misclick trap)
+    else if (key === 'a' || key === 'start') {
+      const call = CALL_SET[callCursor];
+      if (!call) return;
+      if (!callUnlocked(call)) {
+        // Defensive — the cursor skips locked Calls, so this is only hit
+        // if somehow landed (e.g. nothing unlocked). Small toast, no fire.
+        setText(['That Call is not', 'unlocked yet.'], () => { phase = 'call'; }, { dismissable: true });
+        return;
+      }
+      if (!callAffordable(call)) {
+        setText(
+          [`Not enough ★ for ${call.name}.`, `Needs ★${call.starCost} — win reads to charge.`],
+          () => { phase = 'call'; },
+          { dismissable: true },
+        );
+        return;
+      }
+      fireCall(call);
     }
   }
 
@@ -1089,6 +1171,33 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawText(ctx, 'SEL=stance  B=back', BOTTOM.x + 170, BOTTOM.y + BOTTOM.h - 12, PALETTE.paperDim);
   }
 
+  function drawBottomCall(ctx: CanvasRenderingContext2D): void {
+    drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+    // Two columns (the full set is 6) so the player sees the Calls they
+    // grow into. Locked + unaffordable render greyed; only Catch Breath
+    // is selectable for now.
+    CALL_SET.forEach((call, i) => {
+      const unlocked = callUnlocked(call);
+      const greyed = !unlocked || !callAffordable(call);
+      const color = greyed ? PALETTE.paperDim : PALETTE.ink;
+      const col = i < 3 ? 0 : 1;
+      const row = i % 3;
+      const x = BOTTOM.x + 8 + col * 154;
+      const y = BOTTOM.y + 5 + row * 10;
+      const marker = callCursor === i ? '>' : ' ';
+      const tag = !unlocked ? ' ·LOCKED' : '';
+      drawText(ctx, `${marker}${call.name}${tag}`, x, y, color);
+      drawTextRight(ctx, `★${call.starCost}`, x + 148, y, color);
+    });
+    drawText(
+      ctx,
+      `Your ★${activeMon(state.player).momentum}   A use · B back`,
+      BOTTOM.x + 8,
+      BOTTOM.y + BOTTOM.h - 10,
+      PALETTE.paperDim,
+    );
+  }
+
   function drawBottomLog(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     for (let i = 0; i < log.length; i += 1) {
@@ -1121,6 +1230,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       }
       if (phase === 'move') {
         handleMoveInput(key);
+        return;
+      }
+      if (phase === 'call') {
+        handleCallInput(key);
         return;
       }
       if (phase === 'party') {
@@ -1167,7 +1280,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       if (breakThreshold > 0) drawBossStrip(ctx);
       drawPlayerPanel(ctx);
 
-      if (phase === 'menu' || phase === 'move') drawIntent(ctx);
+      if (phase === 'menu' || phase === 'move' || phase === 'call') drawIntent(ctx);
       // S1 — the triangle callout occupies the intent slot during resolve.
       if (phase === 'resolve') drawCallout(ctx);
 
@@ -1204,6 +1317,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       if (phase === 'text') drawBottomDialog(ctx, textQueue);
       else if (phase === 'menu') drawBottomMenu(ctx);
       else if (phase === 'move') drawBottomMoves(ctx);
+      else if (phase === 'call') drawBottomCall(ctx);
       else if (phase === 'party') drawBottomParty(ctx);
       else if (phase === 'resolve' || phase === 'end') drawBottomLog(ctx);
     },
