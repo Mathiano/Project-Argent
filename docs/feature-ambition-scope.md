@@ -6,6 +6,8 @@ Two filters applied to every candidate: (1) pillar-fit — no grind, respect tim
 
 ## 1. Catching 2.0 — P0 (Sprint 4 needs this anyway)
 
+> **Superseded — the canonical spec is now `docs/catching-2-0.md` (the TWO-PATH system).** This section is the original **single-path** sketch (Path 1, the read window). The locked design keeps everything below as Path 1 and adds **Path 2 — the willing-join mercy path** (heal a fainted wild mon → badge/level/bond-gated acceptance → joins or refuses-with-a-hint), making catching express the strength-vs-bonds thesis. Read `docs/catching-2-0.md` for canon; the notes below remain accurate for Path 1.
+
 Gen 2 catching is ball-spam RNG. Ours is a read: **you can only throw during a window you create.**
 
 - Windows: you win a read (counter / dodge / opening / clash-win) → 1-round window; foe exhausted → strong window; foe Broken (rare wilds carry small Break bars) → best window
