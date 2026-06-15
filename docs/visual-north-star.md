@@ -51,6 +51,7 @@ The shine.
 - **Lighting moments** — a warm glow from the lab window at night, the Center's light, torch-lit caves.
 - **Evolution sequence** — the iconic silhouette-morph-flash, a real ceremony.
 - **★ Custom pixel font (UI-polish — cheap, applies everywhere)** — the dialog/UI font is currently a placeholder bitmap. A crisper custom pixel font (better glyphs, real kerning, maybe a subtle 1px outline for legibility on busy backgrounds) lifts *every* screen — dialog, menus, battle text, the dex entries — for the cost of **one font swap**. It's the cheapest broad-reach polish item here and dead-on brand: Silver's soul at higher fidelity. Surfaced by playtest 2026-06-15. Phase 7+.
+- **Battle HUD layout pass (UI-polish)** — the full-width **GUST ROUND** banner (`battle.ts`, blue bar at y14) overlaps the foe HP panel (y2–38) and clips toward the foe sprite (y2–58). There's no clean full-width strip up top, so the real fix is a layout call, not a blind offset: a non-full-width centered banner, a dedicated reserved HUD strip, or a relocated arena-rhythm cue. Bundle with the broader battle-screen HUD polish. Surfaced by playtest 2026-06-15. Phase 7+.
 - **Verdict:** mostly cheap *individually* (palette + particle tricks), enormously high-impact *collectively*. This is what makes screenshots look special.
 
 ---

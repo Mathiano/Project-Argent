@@ -201,11 +201,13 @@ function stanceIntentVerb(stance: Stance): string {
   return stance === 'A' ? 'attacks aggressively' : stance === 'G' ? 'braces' : 'strikes with agility';
 }
 
-// Past-tense confirmation for the resolution log (the teaching loop — the
-// player learns whether their read was right).
-function stanceConfirmLine(name: string, stance: Stance): string {
-  const verb = stance === 'A' ? 'attacks aggressively!' : stance === 'G' ? 'braced.' : 'struck with agility.';
-  return `${name} ${verb}`;
+// Confirmation for the resolution log (the teaching loop — the player learns
+// whether their read was right). Names BOTH the stance (the read outcome) AND
+// the move (what damage/effect landed), so neither piece of feedback is lost.
+function stanceConfirmLine(name: string, stance: Stance, move: string): string {
+  if (stance === 'A') return `${name} attacks aggressively with ${move}!`;
+  if (stance === 'G') return `${name} braces with ${move}!`;
+  return `${name} strikes with agility using ${move}!`;
 }
 
 // The AMBIGUOUS hints. Each is HONEST: its `pair` of possible stances always
@@ -550,9 +552,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         pushLog('You hurled a ball!');
       } else if (ev.side === 'foe' && ev.action.kind === 'move') {
         // Resolution confirmation (the teaching loop, all tiers): name the
-        // foe's committed STANCE in plain language so the player learns
-        // whether their read was right — even when intent was ambiguous/opaque.
-        pushLog(stanceConfirmLine(display.foe.species.name, ev.action.stance));
+        // foe's committed STANCE *and* MOVE in plain language so the player
+        // learns whether their read was right AND what landed — even when
+        // intent was ambiguous/opaque.
+        pushLog(stanceConfirmLine(display.foe.species.name, ev.action.stance, ev.action.move));
       } else {
         const who = ev.side === 'player' ? activeMon(state.player).species.name : `Foe ${activeMon(state.foe).species.name}`;
         pushLog(`${who} used ${ev.action.move}.`);

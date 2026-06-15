@@ -416,7 +416,8 @@ describe('intent reliability ramp — degradeIntent (honest-partial model)', () 
 function intentScene(
   reliability: 'honest' | 'ambiguous' | 'opaque',
 ): ReturnType<typeof createBattleScene> {
-  // Foe FLITPECK always commits TACKLE in GUARD ('G' → "braces"/"braced.").
+  // Foe FLITPECK always commits TACKLE in GUARD ('G' → intent "braces",
+  // resolution "braces with TACKLE!").
   const state = createBattleState(
     createTeam([createSide(CH1.GRUBLEAF!)]),
     createTeam([createSide(CH1.FLITPECK!)]),
@@ -475,7 +476,7 @@ describe('intent reliability ramp — resolution always confirms the stance (the
   // After the round resolves, the log names the foe's committed stance in plain
   // language at EVERY tier — so the player learns whether their read was right.
   for (const reliability of ['honest', 'ambiguous', 'opaque'] as const) {
-    test(`${reliability}: resolution confirms "FLITPECK braced." after a GUARD commit`, () => {
+    test(`${reliability}: resolution confirms stance AND move ("FLITPECK braces with TACKLE!")`, () => {
       const scene = intentScene(reliability);
       scene.update?.(0.01); // → menu
       scene.input?.('a'); // FIGHT → move list
@@ -490,7 +491,9 @@ describe('intent reliability ramp — resolution always confirms the stance (the
         seen.push(...ctx.texts);
         scene.input?.('a'); // release the hold → auto-play resumes
       }
-      expect(seen.join('|')).toContain('FLITPECK braced.');
+      // The confirmation names the STANCE (the read outcome) AND the MOVE
+      // (what landed) — neither feedback piece is lost.
+      expect(seen.join('|')).toContain('FLITPECK braces with TACKLE!');
     });
   }
 });
@@ -1093,8 +1096,9 @@ describe('resolve cadence — auto-play pauses on consequential lines until A/St
     const screen = ctx.texts.join('|');
     expect(screen).toContain('GRUBLEAF used TACKLE');
     // The foe's commit line is now the plain-language stance confirmation
-    // (honest-partial model) — GUARD → "braced." (was "Foe FLITPECK used TACKLE").
-    expect(screen).toContain('FLITPECK braced.');
+    // (honest-partial model) — GUARD → "braces with <move>!" (names stance AND
+    // move; was "Foe FLITPECK used TACKLE").
+    expect(screen).toContain('FLITPECK braces with TACKLE!');
     // Still in resolve phase: no FIGHT menu, no end-text yet.
     expect(screen).not.toContain('>FIGHT');
     expect(screen).not.toContain('Press A to continue');
