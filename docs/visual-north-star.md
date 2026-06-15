@@ -50,6 +50,7 @@ The shine.
 - **Particle touches** — dust when running, leaves in wind, **the catch click's star-sparkle confirm** (the payoff flash the moment the ball locks — pairs with the Layer-4 catch sequence), embers near fire mon.
 - **Lighting moments** — a warm glow from the lab window at night, the Center's light, torch-lit caves.
 - **Evolution sequence** — the iconic silhouette-morph-flash, a real ceremony.
+- **★ Custom pixel font (UI-polish — cheap, applies everywhere)** — the dialog/UI font is currently a placeholder bitmap. A crisper custom pixel font (better glyphs, real kerning, maybe a subtle 1px outline for legibility on busy backgrounds) lifts *every* screen — dialog, menus, battle text, the dex entries — for the cost of **one font swap**. It's the cheapest broad-reach polish item here and dead-on brand: Silver's soul at higher fidelity. Surfaced by playtest 2026-06-15. Phase 7+.
 - **Verdict:** mostly cheap *individually* (palette + particle tricks), enormously high-impact *collectively*. This is what makes screenshots look special.
 
 ---

@@ -299,9 +299,21 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   let menuCursor = 0;
   let moveCursor = 0;
+  // Move list scroll window — evolved mons carry up to 8 moves, more than
+  // fit the panel; show MOVES_VISIBLE at a time and scroll to keep the
+  // cursor in view (with ▲▼ indicators).
+  const MOVES_VISIBLE = 5;
+  let moveScroll = 0;
   let stanceIdx = 0;
   let callCursor = 0;
   let tick = 0;
+
+  function clampMoveScroll(): void {
+    const n = activeMon(state.player).species.moves.length;
+    if (moveCursor < moveScroll) moveScroll = moveCursor;
+    else if (moveCursor >= moveScroll + MOVES_VISIBLE) moveScroll = moveCursor - MOVES_VISIBLE + 1;
+    moveScroll = Math.max(0, Math.min(moveScroll, Math.max(0, n - MOVES_VISIBLE)));
+  }
 
   let animSide: Side | null = null;
   let animKind: 'strike' | 'dodge' | 'opening' | 'counter' | 'clash' | null = null;
@@ -753,6 +765,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (focus.kind === 'fight') {
       phase = 'move';
       moveCursor = 0;
+      moveScroll = 0;
       return;
     }
     if (focus.kind === 'pkmn') {
@@ -895,9 +908,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function handleMoveInput(key: InputKey): void {
     const moves = activeMon(state.player).species.moves;
-    if (key === 'up') moveCursor = (moveCursor + moves.length - 1) % moves.length;
-    else if (key === 'down') moveCursor = (moveCursor + 1) % moves.length;
-    else if (key === 'select') stanceIdx = (stanceIdx + 1) % 3;
+    if (key === 'up') {
+      moveCursor = (moveCursor + moves.length - 1) % moves.length;
+      clampMoveScroll();
+    } else if (key === 'down') {
+      moveCursor = (moveCursor + 1) % moves.length;
+      clampMoveScroll();
+    } else if (key === 'select') stanceIdx = (stanceIdx + 1) % 3;
     else if (key === 'b') phase = 'menu';
     else if (key === 'a' || key === 'start') {
       const moveName = moves[moveCursor]!;
@@ -1287,16 +1304,25 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function drawBottomMoves(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     const moves = activeMon(state.player).species.moves;
-    moves.forEach((m, i) => {
+    // Window the move list (evolved mons carry up to 8 moves). Show
+    // MOVES_VISIBLE rows starting at moveScroll, with ▲▼ when there's
+    // more above/below — nothing spills past the panel edge.
+    const end = Math.min(moves.length, moveScroll + MOVES_VISIBLE);
+    for (let i = moveScroll; i < end; i += 1) {
+      const m = moves[i]!;
       const move = lookupMove(m);
       const tier = TIERS[move.tier];
       const locked =
         (activeMon(state.player).st <= COMBAT.winded && (move.tier === 'heavy' || move.tier === 'nuke')) ||
         activeMon(state.player).st < tier.cost;
       const color = locked ? PALETTE.paperDim : PALETTE.ink;
-      drawText(ctx, `${moveCursor === i ? '>' : ' '}${m}`, BOTTOM.x + 8, BOTTOM.y + 8 + i * 10, color);
-      drawTextRight(ctx, `ST${tier.cost}`, BOTTOM.x + 152, BOTTOM.y + 8 + i * 10, color);
-    });
+      const y = BOTTOM.y + 6 + (i - moveScroll) * 8;
+      drawText(ctx, `${moveCursor === i ? '>' : ' '}${m}`, BOTTOM.x + 8, y, color);
+      drawTextRight(ctx, `ST${tier.cost}`, BOTTOM.x + 150, y, color);
+    }
+    // Scroll indicators (only when there's more off-window).
+    if (moveScroll > 0) drawText(ctx, '▲', BOTTOM.x + 158, BOTTOM.y + 4, PALETTE.paperDim);
+    if (end < moves.length) drawText(ctx, '▼', BOTTOM.x + 158, BOTTOM.y + BOTTOM.h - 12, PALETTE.paperDim);
 
     const stance = STANCES[stanceIdx]!;
     drawStanceBadge(ctx, BOTTOM.x + 170, BOTTOM.y + 8, stance);

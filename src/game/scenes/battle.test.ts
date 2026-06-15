@@ -294,6 +294,53 @@ describe('battle move menu — A commits the highlighted move; SELECT cycles sta
   });
 });
 
+describe('battle move menu — fits a FULL moveset (no spill off the panel)', () => {
+  // Evolved mons carry up to 8 moves; GALEHAWK has 6. Build a scene with
+  // a custom moveset and assert the renderer shows them all (window + scroll).
+  function sceneWithMoves(moves: readonly string[]): ReturnType<typeof createBattleScene> {
+    const player = { ...CH1.GALEHAWK!, moves };
+    const state = createBattleState(
+      createTeam([createSide(player)]),
+      createTeam([createSide(CH1.FLITPECK!)]),
+    );
+    return createBattleScene({
+      state,
+      rng: mulberry32(1),
+      chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'G' }),
+      intro: [],
+      catchBreathUnlocked: false,
+      canRun: true,
+      onResolve: () => {},
+    });
+  }
+
+  test('a 5-move mon renders ALL FIVE moves on one screen (the bug: 5th was sliced)', () => {
+    const moves = ['TACKLE', 'GUST RAKE', 'WING CUT', 'HEADBUTT', 'DIVE BOMB'];
+    const scene = sceneWithMoves(moves);
+    scene.input?.('a'); // FIGHT → move list
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    for (const m of moves) expect(screen).toContain(m);
+  });
+
+  test('a 6-move mon windows the list + scrolls to reveal the rest (no spill)', () => {
+    const moves = ['TACKLE', 'GUST RAKE', 'WING CUT', 'HEADBUTT', 'DIVE BOMB', 'SCRATCH'];
+    const scene = sceneWithMoves(moves);
+    scene.input?.('a'); // FIGHT → move list
+    let ctx = stubCtx();
+    scene.draw(ctx);
+    // The 6th is off-window initially (window of 5) + a ▼ indicator shows.
+    expect(ctx.texts.join('|')).not.toContain('SCRATCH');
+    expect(ctx.texts.join('|')).toContain('▼');
+    // Scroll down past the window to reveal the 6th.
+    for (let i = 0; i < 5; i += 1) scene.input?.('down');
+    ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('SCRATCH');
+  });
+});
+
 // ---- Phase 0 gap coverage ---------------------------------------------------
 // One complete pass over the battle-input layer. Every gap surfaced in the
 // kickoff is pinned here: CALL paths, RUN/STAY paths, move cursor wrap,

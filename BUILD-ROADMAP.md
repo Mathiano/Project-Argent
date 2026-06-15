@@ -54,6 +54,13 @@ Prerequisite: Phase 1 (team) + Phase 5 (the loop).
 - **Build order (ruled 2026-06-15): CATCHING FIRST, as its own focused sprint, THEN evolution.** Catching is what the playtest is actively asking for (the GRUBLEAF→Falkner prep path is a dead-end without it), it's the bigger/more novel design, and it earns a focused sprint; evolution (the bond-gated/boss-capped model, `docs/evolution-design.md`) is the cleaner follow-on.
 - **Gate:** starters evolve; catching is the designed mini-game.
 
+## PHASE 6.5 (NEAR-TERM) — Box + Pokédex (mon-record UIs)
+Prerequisite: Phase 6 (catching makes both necessary). Surfaced by playtest 2026-06-15.
+- **Box (PC storage):** the full storage UI (the pause menu's greyed `BOX` row). Catching 2.0 already does a *minimal* box-add when the party is full; this is the real deposit/withdraw/organize screen.
+- **Pokédex:** the game currently has **no Pokédex** — a real gap. A seen/caught registry + per-species entries (the dex-as-journal vision: entries that grow field notes from your history, per `feature-ambition-scope.md`).
+- **Why bundled:** both are mon-record UIs, both made necessary by catching, both lean on the same party/box/species data. **Scope as one box+dex sprint soon.**
+- **Gate:** deposit/withdraw a caught mon; the dex registers seen/caught with viewable entries.
+
 ## PHASE 7 — Content authoring tools + Chapter 1 content
 Prerequisite: Phases 1–6 (the systems all the content sits on).
 - Real Route 31 + Violet with proper trainers, the rival's first fight (KAMON v2 card — already queued), the first Rocket beat, gym trainers feeding scout reports.
