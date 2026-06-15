@@ -5,6 +5,16 @@ export const COMBAT = {
   damageVarianceMin: 0.9,
   damageVarianceSpan: 0.1,
 
+  // TTK tuning (sim-gated, 2026-06-15). A GLOBAL HP:damage-ratio knob — every
+  // mon's maxHp is scaled by this at battle creation, lengthening fights so the
+  // tactical layer (reads, comebacks, future status) has room to matter. It is
+  // a LENGTH lever, not power: it applies broadly to all mons (never per-mon
+  // bulk), so type/read relationships are preserved — only TTK changes. At 1.30
+  // a typical even matchup runs ~6-7 rounds and an advantaged one ~5 (was ~4-5
+  // / ~3-4). Damage stays "crisp" (dmgScale unchanged) per the kickoff. See
+  // KICKOFF-ttk-tuning.md; both ladders re-baselined to this value.
+  hpScale: 1.3,
+
   regen: 8,
   guardRegen: 6,
   fluidCost: 12,

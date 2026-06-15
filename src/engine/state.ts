@@ -25,10 +25,14 @@ export function createSide(species: Species, scale?: StatScale): SideState {
         spd: Math.round(species.spd * (scale.spd ?? 1)),
       }
     : species;
+  // Global TTK knob: scale effective HP at battle creation (the HP:damage
+  // ratio lever — broad, never per-mon). Species data stays static; per-mon
+  // `scale.hp` already composed into sp.hp above, so this multiplies on top.
+  const maxHp = Math.round(sp.hp * COMBAT.hpScale);
   return {
     species: sp,
-    hp: sp.hp,
-    maxHp: sp.hp,
+    hp: maxHp,
+    maxHp,
     st: 100,
     exhausted: false,
     staggered: false,

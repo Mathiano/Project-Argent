@@ -4,21 +4,28 @@ import { runFalknerLadder } from './falknerLadder';
 const SEED = 0x1f;
 const N = 2000;
 
-// Re-locked to the boss card's DESIGNED bands (demo-complete, per
-// Mathias's S3 ruling). The earlier lock pinned each cell to a measured
-// value ±2pp but only 4/15 landed in the card's single-band-per-
-// archetype targets — the card's targets didn't model the intended
-// per-STARTER spread. The fix is design, not levers: GRUBLEAF-into-
-// Falkner is *meant* to be hard (the prep answer is a GALE counter —
-// GRITHOAX, once catching lands in Phase 6 — not a GRUBLEAF solo buff).
-// So the card now states per-starter bands; KINDRAKE/SILTSKIP are the
-// "fair" demo paths, GRUBLEAF is "hard-mode". This test re-locks to
-// those widened bands so the sim gate is met AS DESIGNED.
+// Per-starter designed bands: KINDRAKE/SILTSKIP are the "fair" demo paths,
+// GRUBLEAF is "hard-mode" (the prep answer is a GALE counter via catching, not
+// a GRUBLEAF solo buff). The fair-vs-hard separation is the design contract.
 //
-// IMPORTANT: the engine + levers are UNCHANGED (gust=1.4, hp=1.15) — the
-// measured win% are bit-identical to the prior baseline. Only the
-// ACCEPTED bands widened. (The fixture rival ladder stays fully
-// bit-identical; this is the single intentional Falkner re-baseline.)
+// ── INTENTIONAL TTK RE-BASELINE (2026-06-15) ─────────────────────────────
+// Global `COMBAT.hpScale` 1.0 → 1.30 (KICKOFF-ttk-tuning.md): every mon's
+// maxHp scaled to lengthen fights. Falkner's GUSTBORNE/ace levers are
+// UNCHANGED (gust=1.4, hp=1.15); only the HP ratio moved, so all cells
+// shifted and the bands are re-locked to the new measured win%. The
+// FAIR-vs-HARD design is PRESERVED for every reading archetype — fair paths
+// still win big, the hard path still loses (naive 81-86% fair vs 18% hard;
+// stamina-reader 100% fair vs 3% hard; human-ish 87-89% fair vs 7% hard).
+// The fair demo paths now breathe at ~5-7 rounds (was ~4-5) → more room for
+// the 2-read Break/phase play; the hard GRUBLEAF path stays a ~3-round
+// blowout BY DESIGN (it's meant to be lost without a GALE counter).
+//
+// ⚠️ FLAGGED DISTORTION: the `brute` archetype (pure-mash, ZERO reads — the
+// pathological control, not a real player) INVERTS under longer TTK:
+// GRUBLEAF-hard 34.8% now exceeds KINDRAKE-fair 8.3%. This is confined to the
+// no-read archetype (its absolute numbers are low-signal/chaotic); every
+// READ-based archetype preserves fair >> hard. Locked as measured + flagged,
+// rather than bending the TTK knob around a non-player archetype.
 type Tier = 'fair' | 'hard';
 function tierOf(player: string): Tier {
   // GALE walls KINDRAKE and SILTSKIP counters the dive — the fair demo
@@ -26,13 +33,15 @@ function tierOf(player: string): Tier {
   return player === 'GRUBLEAF' ? 'hard' : 'fair';
 }
 
-// Designed acceptance bands [loInclusive, hiInclusive] in win%.
+// Acceptance bands [loInclusive, hiInclusive] in win%, re-locked to the
+// TTK-1.30 measured values (each comfortably contains its exact, deterministic
+// seed=0x1f result).
 const BANDS: { readonly [a: string]: { readonly [t in Tier]: readonly [number, number] } } = {
-  'button-masher': { fair: [40, 55], hard: [5, 15] },
-  brute: { fair: [8, 22], hard: [8, 22] },
-  'naive-triangle': { fair: [62, 80], hard: [30, 45] },
-  'stamina-reader': { fair: [92, 100], hard: [6, 20] },
-  'human-ish': { fair: [80, 93], hard: [8, 22] },
+  'button-masher': { fair: [42, 58], hard: [3, 13] }, // 50.7/51.6 fair · 6.8 hard
+  brute: { fair: [4, 18], hard: [27, 43] }, // 8.3/11.9 fair · 34.8 hard (inverted — see note)
+  'naive-triangle': { fair: [74, 92], hard: [10, 28] }, // 86.1/81.0 fair · 18.2 hard
+  'stamina-reader': { fair: [94, 100], hard: [0, 12] }, // 100/100 fair · 3.2 hard
+  'human-ish': { fair: [80, 95], hard: [2, 16] }, // 87.5/89.2 fair · 7.2 hard
 };
 
 describe('Falkner ladder regression (n=2000, seed=0x1f, gust=1.4 hp=1.15) — designed bands', () => {

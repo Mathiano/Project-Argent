@@ -76,7 +76,7 @@ describe('save.ts — toSavedSide / fromSavedSide round-trip', () => {
     expect(restored.hp).toBe(30);
     expect(restored.st).toBe(45);
     expect(restored.momentum).toBe(1);
-    expect(restored.maxHp).toBe(CH1.GRUBLEAF!.hp); // recomputed
+    expect(restored.maxHp).toBe(createSide(CH1.GRUBLEAF!).maxHp); // recomputed (incl. hpScale)
     expect(restored.exhausted).toBe(false); // round-local — reset
     expect(restored.staggered).toBe(false); // round-local — reset
   });

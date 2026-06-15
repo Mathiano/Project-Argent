@@ -108,10 +108,11 @@ describe('applyItemEffect', () => {
   });
 
   test('POTION on a near-full mon clamps the heal to maxHp (no over-fill)', () => {
-    const grub = createSide(CH1.GRUBLEAF!); // maxHp 54
-    const lightlyWounded = { ...grub, hp: 50 };
+    const grub = createSide(CH1.GRUBLEAF!);
+    // 4 below max — POTION heals 20 but only 4 are missing (robust to hpScale).
+    const lightlyWounded = { ...grub, hp: grub.maxHp - 4 };
     const { result, delta } = applyItemEffect(lightlyWounded, ITEMS.POTION!);
-    expect(result.hp).toBe(54);
+    expect(result.hp).toBe(grub.maxHp);
     expect(delta.hp).toBe(4);
   });
 
