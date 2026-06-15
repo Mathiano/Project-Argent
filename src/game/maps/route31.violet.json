@@ -30,15 +30,15 @@
     "T.....ppGGGGGGpp...T",
     "T.....ppGGGGGGpp...T",
     "T.....pppppppppp...T",
-    "T.........p.p......T",
-    "TTTTTTTTTTTTTTTTTTTT"
+    "T.........p........T",
+    "TTTTTTTTTpTTTTTTTTTT"
   ],
   "prefabs": [
     { "name": "house_violet", "x": 4, "y": 4 }
   ],
   "objects": [
     { "type": "warp", "x": 4, "y": 4, "target": "HEARTHWICK:fromRoute" },
-    { "type": "warp", "x": 9, "y": 13, "target": "VIOLET:fromRoute" },
+    { "type": "warp", "x": 9, "y": 14, "target": "VIOLET:fromRoute" },
     {
       "type": "sign",
       "x": 3,
@@ -110,9 +110,11 @@
         {
           "kind": "dialog",
           "lines": [
-            "YOUNGSTER JAY: You walk",
-            "the routes? Then read",
-            "this!"
+            "JAY: That's a sharp little",
+            "partner you've got.",
+            "JAY: Out here, what's yours",
+            "is mine. Hand it over —",
+            "JAY: — or I'll just TAKE it!"
           ]
         },
         {
@@ -126,9 +128,11 @@
         {
           "kind": "dialog",
           "lines": [
-            "YOUNGSTER JAY: Good read.",
-            "Spend that at the Mart",
-            "back in town."
+            "JAY: ...It stepped in front",
+            "of you. Took the hit FOR",
+            "you.",
+            "JAY: You two really do watch",
+            "each other's backs. ...Keep it."
           ]
         }
       ]
@@ -156,6 +160,6 @@
     "fromLab": { "x": 4, "y": 5, "facing": "down" },
     "fromHearthwick": { "x": 4, "y": 5, "facing": "down" },
     "fromHouse": { "x": 4, "y": 5, "facing": "down" },
-    "fromViolet": { "x": 9, "y": 12, "facing": "up" }
+    "fromViolet": { "x": 9, "y": 13, "facing": "up" }
   }
 }

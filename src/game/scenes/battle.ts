@@ -67,6 +67,10 @@ export interface BattleSceneOpts {
   // hp/st/momentum forward (the Phase 2 writeback). 1v1 callers can
   // ignore `finalState`; team callers extract state.player.members.
   readonly onResolve: (winner: 'player' | 'foe', finalState: BattleState) => void;
+  // Fleeing (RUN, wild only) is distinct from a loss — it must NOT
+  // black out. When wired, RUN calls this instead of onResolve('foe');
+  // the caller returns the player to the same overworld tile, no heal.
+  readonly onFlee?: (finalState: BattleState) => void;
 }
 
 // Display carries everything the panel needs about the CURRENTLY-SHOWN
@@ -578,9 +582,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
     // RUN
     if (opts.canRun) {
-      // Forced — leaves the battle, no take-backs.
+      // Forced — leaves the battle, no take-backs. Fleeing is NOT a
+      // loss: a dedicated onFlee returns the player to the SAME tile,
+      // no heal/black-out. Falls back to onResolve('foe') only if a
+      // caller didn't wire onFlee (legacy/test paths).
       setText(['Got away safely!'], () => {
-        opts.onResolve('foe', state);
+        if (opts.onFlee) opts.onFlee(state);
+        else opts.onResolve('foe', state);
       });
     } else {
       setText(

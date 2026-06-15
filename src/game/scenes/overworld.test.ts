@@ -190,12 +190,12 @@ describe('overworld cold-start warp round-trip', () => {
 });
 
 describe('Demo-complete — Violet City hub wires Route 31 → Violet → gym', () => {
-  test('Route 31 south exit (9,13) warps INTO Violet City', () => {
+  test('Route 31 south exit — a gap in the tree line at (9,14) — warps INTO Violet City', () => {
     let warpTarget: string | null = null;
     const input = mockInput();
     const scene = createOverworldScene({
       map: 'ROUTE31',
-      spawn: 'fromViolet', // (9,12), one tile north of the exit at (9,13)
+      spawn: 'fromViolet', // (9,13), one tile north of the bottom-edge gap
       inputState: input,
       flags: mockFlags(),
       onWarp: (target) => {
@@ -207,7 +207,7 @@ describe('Demo-complete — Violet City hub wires Route 31 → Violet → gym', 
       startFaded: true,
     });
     tickStep(scene, 0.4);
-    walkOne(scene, input, 'down'); // onto (9,13) → warp
+    walkOne(scene, input, 'down'); // onto the gap at (9,14) → warp
     tickStep(scene, 0.4);
     expect(warpTarget).toBe('VIOLET:fromRoute');
   });

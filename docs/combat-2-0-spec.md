@@ -112,6 +112,7 @@ Momentum fills from read-wins, dodges, super-effective hits, clash wins → ★ 
 | "Now — full power!" | Next move +50%, ignores stance modifiers |
 | "Catch your breath!" | Skip move, +35 stamina |
 | **"Recover!"** | **Skip move, heal HP and/or clear a status** |
+| **"Dodge!"** | **Guarantee an evade of the incoming attack (the anime "Dodge it!")** |
 | "Get back!" | Free pivot switch that evades the incoming move |
 
 Leaders have Calls too — with bark-line tells (*"Miltank, wear them down..."*) that double as readable boss telegraphs.

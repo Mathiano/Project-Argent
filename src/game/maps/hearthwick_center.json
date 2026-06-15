@@ -59,6 +59,7 @@
     }
   ],
   "spawns": {
-    "fromHearthwick": { "x": 4, "y": 6, "facing": "up" }
+    "fromHearthwick": { "x": 4, "y": 6, "facing": "up" },
+    "wake": { "x": 2, "y": 3, "facing": "up" }
   }
 }

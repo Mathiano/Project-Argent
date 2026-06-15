@@ -138,6 +138,7 @@ interface Harness {
   top(): TopKind;
   overworld(): OverworldScene;
   badgeShown(): boolean;
+  pushWild(species: string): void;
   press(key: InputKey): void;
   tick(n?: number, dt?: number): void;
 }
@@ -157,8 +158,9 @@ function createHarness(
   const input = mockInput();
   const rng: RNG = mulberry32(0xa9c0);
   const run: { party: SideState[]; badges: string[] } = { party: [], badges: [] };
-  // BUG 2 black-out respawn (mirrors main.ts lastCenterTarget).
-  const lastCenterTarget = 'HEARTHWICK_CENTER:fromHearthwick';
+  // BUG 2 black-out respawn (mirrors main.ts lastCenterTarget — the
+  // Center 'wake' spot in front of the counter, not the door tile).
+  const lastCenterTarget = 'HEARTHWICK_CENTER:wake';
 
   let topKind: TopKind = 'overworld';
   let currentOverworld: OverworldScene | null = null;
@@ -219,6 +221,39 @@ function createHarness(
             return;
           }
           flags.set(winFlag);
+          scenes.pop();
+          topKind = 'overworld';
+          currentOverworld?.armPostBattleGrace();
+        },
+      }),
+    );
+  }
+
+  // Wild encounter mirroring main.ts: win pops, loss blacks out, and
+  // RUN (onFlee) returns to the SAME tile with no heal/warp.
+  function pushWildEncounter(species: string): void {
+    const state = createBattleState(buildPlayerTeam(), createSide(CH1[species]!), { typeChart: TYPECHART });
+    topKind = 'battle';
+    scenes.push(
+      createBattleScene({
+        state,
+        rng,
+        chooseFoeAction: (s, r) => wildFoeAI(s, r),
+        intro: ['A wild one!'],
+        catchBreathUnlocked: false,
+        canRun: true,
+        onFlee: (finalState) => {
+          writeback(finalState);
+          scenes.pop();
+          topKind = 'overworld';
+          currentOverworld?.armPostBattleGrace();
+        },
+        onResolve: (winner, finalState) => {
+          writeback(finalState);
+          if (winner !== 'player') {
+            blackout();
+            return;
+          }
           scenes.pop();
           topKind = 'overworld';
           currentOverworld?.armPostBattleGrace();
@@ -298,8 +333,8 @@ function createHarness(
         const nextSpawn = colon >= 0 ? target.slice(colon + 1) : 'default';
         showOverworld(nextMap, nextSpawn);
       },
-      onEncounter() {
-        /* encounters suppressed in this test (Math.random pinned high) */
+      onEncounter(species) {
+        pushWildEncounter(species);
       },
       onTrainerBattle(foeSpecies, winFlag) {
         pushTrainerFight(foeSpecies, winFlag);
@@ -323,6 +358,7 @@ function createHarness(
     top: () => topKind,
     overworld: () => currentOverworld!,
     badgeShown: () => badgeWasShown,
+    pushWild: (species) => pushWildEncounter(species),
     press: (k) => scenes.input(k),
     tick: (n = 1, dt = 0.02) => {
       for (let i = 0; i < n; i += 1) scenes.update(dt);
@@ -408,8 +444,10 @@ describe('DEMO-COMPLETE GATE — cold spine intro → Violet → gym → Falkner
     h.tick(30); // fade + warp + new-scene fade-in
     expect(h.overworld().currentPosition().map).toBe('ROUTE31');
 
-    // Route 31 → Violet City (south exit at (9,13)).
+    // Route 31 → Violet City: walk to the path stub (9,13), then one
+    // more step south onto the gap in the tree line at (9,14) → warp.
     walkTo(h, 9, 13);
+    step(h, 'down');
     h.tick(30);
     expect(h.overworld().currentPosition().map).toBe('VIOLET');
 
@@ -524,5 +562,41 @@ describe('DEMO-COMPLETE GATE — the LOSE path (BUG 2: losing must not advance y
     expect(h.flags.has('falkner_beaten')).toBe(false);
     expect(h.run.badges).not.toContain('ZEPHYR');
     expect(h.run.party.every((m) => m.hp === m.maxHp)).toBe(true);
+  });
+});
+
+describe('RUN bug — fleeing a wild fight returns to the same tile, no heal, no warp', () => {
+  beforeEach(() => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test('RUN from a wild battle returns to the SAME overworld position with the party unchanged (not the Center, not healed)', () => {
+    const h = createHarness({ map: 'ROUTE31', spawnAt: { x: 9, y: 7, facing: 'down' } });
+    // Damaged party so a black-out (the bug) would visibly HEAL it —
+    // a clean flee must preserve the 10 HP.
+    h.run.party = [{ ...createSide(CH1.KINDRAKE!), hp: 10 }];
+    h.tick(2);
+    const before = h.overworld().currentPosition();
+
+    h.pushWild('FLITPECK'); // step into a wild encounter
+    expect(h.top()).toBe('battle');
+
+    // Flee: clear the 1-line intro → menu, cursor FIGHT → (skips the
+    // disabled PKMN/CALL rows) → RUN, confirm, advance "Got away safely!".
+    h.press('a'); // intro → menu
+    h.press('down'); // FIGHT → RUN
+    h.press('a'); // confirm RUN → "Got away safely!"
+    h.press('a'); // advance → onFlee
+    h.tick(2);
+
+    // Back on the SAME tile (Route 31), party untouched — NOT blacked
+    // out to the Center, NOT healed.
+    expect(h.top()).toBe('overworld');
+    expect(h.overworld().currentPosition().map).toBe('ROUTE31');
+    expect(h.overworld().currentPosition()).toEqual(before);
+    expect(h.run.party[0]!.hp).toBe(10);
   });
 });

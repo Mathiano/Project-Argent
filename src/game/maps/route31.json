@@ -3,7 +3,7 @@
   "width": 20,
   "height": 15,
   "tilesize": 16,
-  "tiles": "TTTTTTTTTTTTTTTTTTTT\nT..............MMM.T\nT..BBBB.......McM..T\nT..BBBB.......McM..T\nT..BDBB............T\nT..................T\nT..................T\nT.....pppppppppp...T\nT..S..pppppppppp...T\nT.....ppGGGGGGpp...T\nT.....ppGGGGGGpp...T\nT.....ppGGGGGGpp...T\nT.....pppppppppp...T\nT.........pXp......T\nTTTTTTTTTTTTTTTTTTTT",
+  "tiles": "TTTTTTTTTTTTTTTTTTTT\nT..............MMM.T\nT..BBBB.......McM..T\nT..BBBB.......McM..T\nT..BDBB............T\nT..................T\nT..................T\nT.....pppppppppp...T\nT..S..pppppppppp...T\nT.....ppGGGGGGpp...T\nT.....ppGGGGGGpp...T\nT.....ppGGGGGGpp...T\nT.....pppppppppp...T\nT.........p........T\nTTTTTTTTTpTTTTTTTTTT",
   "tileset": {
     "T": { "color": "#1d4a26", "solid": true, "label": "tree" },
     ".": { "color": "#86c06c", "solid": false, "label": "grass" },
@@ -25,8 +25,8 @@
     },
     {
       "type": "warp",
-      "x": 11,
-      "y": 13,
+      "x": 9,
+      "y": 14,
       "target": "VIOLET:fromRoute"
     },
     {
@@ -76,7 +76,7 @@
       "interact": [
         {
           "kind": "dialog",
-          "lines": ["YOUNGSTER JAY: You walk", "the routes? Then read", "this!"]
+          "lines": ["JAY: That's a sharp little", "partner you've got.", "JAY: Hand it over — or I'll", "just TAKE it!"]
         },
         {
           "kind": "start-trainer-battle",
@@ -88,7 +88,7 @@
       "interactAfterFlag": [
         {
           "kind": "dialog",
-          "lines": ["YOUNGSTER JAY: Good read.", "Spend that at the Mart", "back in town."]
+          "lines": ["JAY: It stepped in front of", "you — took the hit FOR you.", "JAY: You two watch each", "other's backs. ...Keep it."]
         }
       ]
     }
@@ -98,6 +98,6 @@
     "fromLab": { "x": 4, "y": 5, "facing": "down" },
     "fromHearthwick": { "x": 4, "y": 5, "facing": "down" },
     "fromHouse": { "x": 13, "y": 5, "facing": "down" },
-    "fromViolet": { "x": 11, "y": 12, "facing": "up" }
+    "fromViolet": { "x": 9, "y": 13, "facing": "up" }
   }
 }

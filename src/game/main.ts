@@ -118,9 +118,10 @@ let currentOverworldScene: import('./scenes/overworld').OverworldScene | null = 
 // Stable seed for the current run. Persisted as part of the save.
 let currentRngSeed: number = 0;
 // Black-out respawn: the last Pokémon Center the player healed at. A
-// wild/trainer loss warps here, healed (classic black-out). The demo
-// has one Center; updated in healParty so it extends to later Centers.
-let lastCenterTarget = 'HEARTHWICK_CENTER:fromHearthwick';
+// wild/trainer loss warps here, healed (classic black-out). Uses the
+// Center's `wake` spawn (in front of the counter/nurse), NOT the door
+// tile. The demo has one Center; updated in healParty for later ones.
+let lastCenterTarget = 'HEARTHWICK_CENTER:wake';
 
 interface RunState {
   // Phase 1: party is a list of rich SideStates — hp/st/momentum
@@ -387,9 +388,8 @@ function healParty(): void {
   healPartyInPlace();
   const here = currentOverworldScene?.currentPosition().map;
   if (here && here.endsWith('_CENTER')) {
-    // The demo's Center entrance spawn is 'fromHearthwick'; later Centers
-    // can register their own respawn spawn the same way.
-    lastCenterTarget = `${here}:fromHearthwick`;
+    // Black out to the counter (`wake` spawn), not the door tile.
+    lastCenterTarget = `${here}:wake`;
   }
   autosaveNow();
 }
@@ -996,6 +996,16 @@ function pushWildEncounter(foeSpeciesName: string): void {
       intro: [`A wild ${foe.name}`, 'appeared!'],
       catchBreathUnlocked: run.catchBreathUnlocked,
       canRun: true,
+      // RUN bug fix — fleeing returns to the SAME tile, no heal, no
+      // warp (NOT a black-out, which is loss-only). Writeback preserves
+      // any chip damage taken before fleeing; grace stops an instant
+      // re-roll on the tile you land back on.
+      onFlee: (finalState) => {
+        writebackParty(finalState);
+        scenes.pop();
+        currentOverworldScene?.armPostBattleGrace();
+        autosaveNow();
+      },
       onResolve: (winner, finalState) => {
         writebackParty(finalState);
         // BUG 2 — a wild loss blacks out (heal + warp to the Center)
