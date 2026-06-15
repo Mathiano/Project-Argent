@@ -756,6 +756,9 @@ function showFalknerFight(): void {
       state,
       rng: run.rng,
       chooseFoeAction: (s, r) => falknerBossAI(s, 'foe', r),
+      // Phase 6.7-A — a gym leader reads AMBIGUOUS: his stance intent can't
+      // be blind-countered. Engine still commits the true stance.
+      intentReliability: 'ambiguous',
       intro: [
         'FALKNER: Welcome to my',
         'rooftop. Read the wind!',
@@ -1372,6 +1375,8 @@ function pushFalknerBattle(): void {
       state,
       rng: run.rng,
       chooseFoeAction: (s, r) => falknerBossAI(s, 'foe', r),
+      // Phase 6.7-A — gym leader reads AMBIGUOUS (the ?skip=falkner path).
+      intentReliability: 'ambiguous',
       intro: [
         'FALKNER: Welcome to my',
         'rooftop. Read the wind!',

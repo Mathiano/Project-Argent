@@ -28,7 +28,7 @@ import type {
 } from '../../engine';
 import ch1BatchData from '../../../docs/ch1-batch.json';
 import movesData from '../../../docs/moves.json';
-import { createBattleScene, speedLabel, stanceCallout } from './battle';
+import { createBattleScene, degradeIntent, speedLabel, stanceCallout } from './battle';
 
 // Stub CanvasRenderingContext2D — records every fillText so tests can
 // assert what's on screen. Everything else is a no-op; we don't render
@@ -338,6 +338,150 @@ describe('battle move menu — fits a FULL moveset (no spill off the panel)', ()
     ctx = stubCtx();
     scene.draw(ctx);
     expect(ctx.texts.join('|')).toContain('SCRATCH');
+  });
+});
+
+describe('intent reliability ramp (Phase 6.7-A) — degradeIntent', () => {
+  test('HONEST tier shows the truth, untouched', () => {
+    const out = degradeIntent({ stance: 'A', tag: 'MD ATTACK' }, 'honest', mulberry32(1));
+    expect(out).toEqual({ stance: 'A', tag: 'MD ATTACK', reliable: true, masked: false });
+  });
+
+  test('a non-stance intent (RESTING) stays truthful even when ambiguous', () => {
+    // Only the STANCE is ever hidden — a foe with no stance has nothing to feint.
+    const out = degradeIntent({ stance: null, tag: 'RESTING' }, 'ambiguous', mulberry32(1));
+    expect(out).toEqual({ stance: null, tag: 'RESTING', reliable: true, masked: false });
+  });
+
+  test('OPAQUE tier hides the stance and flags itself unreliable', () => {
+    const out = degradeIntent({ stance: 'G', tag: 'HV ATTACK' }, 'opaque', mulberry32(1));
+    expect(out.masked).toBe(true);
+    expect(out.stance).toBeNull();
+    expect(out.reliable).toBe(false);
+  });
+
+  test('AMBIGUOUS tier never presents a certain stance, but stays a best-guess (sometimes a feint)', () => {
+    const rng = mulberry32(7);
+    let feints = 0;
+    let matches = 0;
+    for (let i = 0; i < 400; i += 1) {
+      const out = degradeIntent({ stance: 'A', tag: 'MD ATTACK' }, 'ambiguous', rng);
+      expect(out.reliable).toBe(false); // never shown as certain → not blind-counterable
+      expect(out.masked).toBe(false); // a stance IS shown (a probability, not a blank)
+      expect(out.stance).not.toBeNull();
+      if (out.stance === 'A') matches += 1;
+      else feints += 1;
+    }
+    expect(feints).toBeGreaterThan(0); // it sometimes hides the true stance...
+    expect(matches).toBeGreaterThan(0); // ...but usually shows the best guess
+    expect(feints).toBeLessThan(matches); // feint rate < 0.5 — still a read, not noise
+  });
+
+  test('degradeIntent is pure — it never mutates the truth it is handed', () => {
+    const truth = { stance: 'A' as const, tag: 'MD ATTACK' };
+    degradeIntent(truth, 'ambiguous', mulberry32(3));
+    expect(truth).toEqual({ stance: 'A', tag: 'MD ATTACK' });
+  });
+});
+
+describe('intent reliability ramp — the FOE INTENT bar degrades + signals uncertainty', () => {
+  function intentScene(
+    reliability: 'honest' | 'ambiguous' | 'opaque',
+  ): ReturnType<typeof createBattleScene> {
+    const state = createBattleState(
+      createTeam([createSide(CH1.GRUBLEAF!)]),
+      createTeam([createSide(CH1.FLITPECK!)]),
+    );
+    return createBattleScene({
+      state,
+      rng: mulberry32(1),
+      chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'G' }),
+      intro: [],
+      catchBreathUnlocked: false,
+      canRun: true,
+      intentReliability: reliability,
+      onResolve: () => {},
+    });
+  }
+
+  test('HONEST: the intent bar renders with NO uncertainty signal', () => {
+    const scene = intentScene('honest');
+    scene.update?.(0.01); // → menu, foeAction committed, shownIntent computed
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    expect(screen).toContain('FOE INTENT:');
+    expect(screen).not.toContain('HARD TO READ');
+  });
+
+  test('AMBIGUOUS: the bar signals "HARD TO READ" so it reads as design, not a glitch', () => {
+    const scene = intentScene('ambiguous');
+    scene.update?.(0.01);
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('HARD TO READ');
+  });
+
+  test('OPAQUE: the stance is hidden (???) and flagged hard to read', () => {
+    const scene = intentScene('opaque');
+    scene.update?.(0.01);
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    expect(screen).toContain('???');
+    expect(screen).toContain('HARD TO READ');
+  });
+});
+
+describe('intent reliability ramp — engine integrity (the display NEVER touches resolution)', () => {
+  // A foe AI that CONSUMES the engine rng each turn: if the display feint
+  // leaked into opts.rng, the ambiguous run's foe stances would diverge and
+  // damage would differ. Identical final state ⇒ the engine stream is intact.
+  function rngFoe(): (s: BattleState, rng: RNG) => Action {
+    return (_s, rng): Action => ({
+      kind: 'move',
+      move: 'TACKLE',
+      stance: rng.next() < 0.5 ? 'A' : 'G',
+    });
+  }
+
+  function runBattle(reliability: 'honest' | 'ambiguous'): BattleState | null {
+    let final: BattleState | null = null;
+    const state = createBattleState(
+      createTeam([createSide(CH1.GRUBLEAF!)]),
+      createTeam([createSide(CH1.FLITPECK!)]),
+    );
+    const scene = createBattleScene({
+      state,
+      rng: mulberry32(99),
+      chooseFoeAction: rngFoe(),
+      intro: [],
+      catchBreathUnlocked: false,
+      canRun: false,
+      intentReliability: reliability,
+      onResolve: (_w, fs) => {
+        final = fs;
+      },
+    });
+    scene.update?.(0.01);
+    for (let i = 0; i < 80 && final === null; i += 1) {
+      scene.input?.('a'); // FIGHT → move list
+      scene.input?.('a'); // commit first move
+      drainResolve(scene);
+    }
+    return final;
+  }
+
+  test('HONEST and AMBIGUOUS resolve to a byte-identical final state', () => {
+    const honest = runBattle('honest');
+    const ambiguous = runBattle('ambiguous');
+    expect(honest).not.toBeNull();
+    expect(ambiguous).not.toBeNull();
+    const vitals = (s: BattleState): unknown =>
+      (['player', 'foe'] as const).map((side) =>
+        s[side].members.map((m) => ({ hp: m.hp, st: m.st, momentum: m.momentum })),
+      );
+    expect(vitals(ambiguous!)).toEqual(vitals(honest!));
   });
 });
 

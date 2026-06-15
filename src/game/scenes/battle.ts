@@ -6,6 +6,7 @@ import {
   hasBenchSurvivor,
   isTeamWiped,
   lookupMove,
+  mulberry32,
   resolveRound,
 } from '../../engine';
 import type {
@@ -43,6 +44,10 @@ import {
 // breaks) then HOLD the playback until A/Start.
 const STEP_SEC = 0.9;
 const STANCES: readonly Stance[] = ['A', 'G', 'F'];
+// Fixed seed for the intent-display feint RNG (Phase 6.7-A). Deliberately
+// constant + independent of the engine RNG so degrading the FOE INTENT
+// display never touches combat resolution (ladders stay bit-identical).
+const INTENT_DISPLAY_SEED = 0x1a7e11;
 
 const FOE_PANEL = { x: 2, y: 2, w: 170, h: 36 } as const;
 const FOE_SLOT = { x: 222, y: 2 } as const;
@@ -65,6 +70,11 @@ export interface BattleSceneOpts {
   readonly intro: readonly string[];
   readonly catchBreathUnlocked: boolean;
   readonly canRun: boolean;
+  // Intent reliability ramp (Phase 6.7-A) — how truthfully the FOE INTENT
+  // bar shows the foe's STANCE. Defaults HONEST (wild mons + every legacy
+  // caller). Trainers/leaders are AMBIGUOUS; late bosses OPAQUE. This is
+  // PRESENTATION only — the engine always commits the true stance.
+  readonly intentReliability?: IntentReliability;
   // Final BattleState is handed back so the caller can write party
   // hp/st/momentum forward (the Phase 2 writeback). 1v1 callers can
   // ignore `finalState`; team callers extract state.player.members.
@@ -185,6 +195,54 @@ function describeFoeIntent(action: Action): { stance: Stance | null; tag: string
   return { stance: action.stance, tag: `${TIER_TAG[lookupMove(action.move).tier]} ATTACK` };
 }
 
+// ---- Intent reliability ramp (Phase 6.7-A) ----------------------------------
+// The foe ALWAYS commits a real stance (foeAction → resolveRound, untouched).
+// degradeIntent decides only what the player is SHOWN: honest = the truth;
+// ambiguous = a best-guess stance that's sometimes a feint and never marked
+// certain; opaque = the stance hidden. Pure + rng-injected so it's testable
+// and so the feint roll never touches the engine RNG stream.
+export type IntentReliability = 'honest' | 'ambiguous' | 'opaque';
+
+export interface ShownIntent {
+  readonly stance: Stance | null;
+  readonly tag: string;
+  // false → the renderer adds the "hard to read" uncertainty signal.
+  readonly reliable: boolean;
+  // true → the stance is hidden entirely (opaque); the renderer shows "???".
+  readonly masked: boolean;
+}
+
+// How often an AMBIGUOUS foe shows a stance it won't commit to. Tuned so the
+// player is usually right but can't blind-counter — Phase 8 may ramp this per
+// boss. Kept < 0.5 so the shown stance stays the best *guess*, not noise.
+const AMBIGUOUS_FEINT_CHANCE = 0.35;
+
+export function degradeIntent(
+  truth: { stance: Stance | null; tag: string },
+  reliability: IntentReliability,
+  rng: RNG,
+): ShownIntent {
+  // Honest tier, or a non-stance intent (RESTING/SWITCHING/THROWING — nothing
+  // to hide): show the truth. Only the STANCE is ever obscured.
+  if (reliability === 'honest' || truth.stance === null) {
+    return { stance: truth.stance, tag: truth.tag, reliable: true, masked: false };
+  }
+  if (reliability === 'opaque') {
+    // Hook + basic version — hide the stance. Koga-tier consistent per-pattern
+    // lying is Phase 8 late-game tuning; the field + render path exist now.
+    return { stance: null, tag: truth.tag, reliable: false, masked: true };
+  }
+  // Ambiguous — a best-guess stance that's SOMETIMES a feint and is NEVER
+  // shown as certain (the renderer adds the signal). Probabilities, not certs.
+  let stance: Stance = truth.stance;
+  if (rng.next() < AMBIGUOUS_FEINT_CHANCE) {
+    const others = STANCES.filter((s) => s !== truth.stance);
+    const pick = others[Math.floor(rng.next() * others.length)];
+    if (pick) stance = pick;
+  }
+  return { stance, tag: truth.tag, reliable: false, masked: false };
+}
+
 // Combat legibility (S1) — the explanatory callout for a resolved
 // triangle interaction. Names the RULE, not just the event, so the
 // player learns the triangle by playing. Returns null when the event
@@ -245,6 +303,14 @@ export function callShout(call: CallDef, monName: string): string {
 export function createBattleScene(opts: BattleSceneOpts): Scene {
   let state: BattleState = opts.state;
   let foeAction: Action = { kind: 'rest' };
+  // Intent reliability ramp (Phase 6.7-A). `shownIntent` is the (possibly
+  // degraded) display recomputed once per turn from the TRUE foeAction; the
+  // renderer reads it, never foeAction directly. The feint roll runs on a
+  // scene-local RNG seeded independently of opts.rng, so degrading the
+  // display cannot perturb the engine stream → ladders stay bit-identical.
+  const reliability: IntentReliability = opts.intentReliability ?? 'honest';
+  const intentRng: RNG = mulberry32(INTENT_DISPLAY_SEED);
+  let shownIntent: ShownIntent = degradeIntent(describeFoeIntent(foeAction), reliability, intentRng);
   let display: Display = {
     player: snapshot(activeMon(state.player)),
     foe: snapshot(activeMon(state.foe)),
@@ -359,13 +425,16 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   }
 
   function beginTurnInner(): void {
+    // Commit the foe's TRUE action first, then snapshot the (possibly
+    // degraded) display for this turn. forcedAction draws no RNG, so moving
+    // the choose ahead of the forced check leaves the engine stream intact.
+    foeAction = opts.chooseFoeAction(state, opts.rng);
+    shownIntent = degradeIntent(describeFoeIntent(foeAction), reliability, intentRng);
     const forced = forcedAction(activeMon(state.player));
     if (forced) {
-      foeAction = opts.chooseFoeAction(state, opts.rng);
       commit(forced);
       return;
     }
-    foeAction = opts.chooseFoeAction(state, opts.rng);
     phase = 'menu';
     menuCursor = 0;
   }
@@ -1195,10 +1264,17 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     ctx.fillStyle = 'rgba(32,32,44,0.92)';
     ctx.fillRect(INTENT.x, INTENT.y, INTENT.w, INTENT.h);
     drawText(ctx, 'FOE INTENT:', INTENT.x + 4, INTENT.y + 2, PALETTE.paper);
-    const intent = describeFoeIntent(foeAction);
-    if (intent.stance) {
+    // The display is degraded per the reliability ramp; the SPD readout below
+    // stays honest (speed isn't hidden — the foe's STANCE intent is).
+    const intent = shownIntent;
+    const signal = '  - HARD TO READ';
+    if (intent.masked) {
+      // Opaque — the stance is hidden; the player only knows it's attacking.
+      drawText(ctx, `??? ${intent.tag}${signal}`, INTENT.x + 64, INTENT.y + 2, PALETTE.paper);
+    } else if (intent.stance) {
       drawStanceBadge(ctx, INTENT.x + 64, INTENT.y + 1, intent.stance);
-      drawText(ctx, intent.tag, INTENT.x + 76, INTENT.y + 2, PALETTE.paper);
+      const tag = intent.reliable ? intent.tag : `${intent.tag}${signal}`;
+      drawText(ctx, tag, INTENT.x + 76, INTENT.y + 2, PALETTE.paper);
     } else {
       drawText(ctx, intent.tag, INTENT.x + 64, INTENT.y + 2, PALETTE.paper);
     }
