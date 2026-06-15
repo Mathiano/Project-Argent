@@ -341,96 +341,158 @@ describe('battle move menu — fits a FULL moveset (no spill off the panel)', ()
   });
 });
 
-describe('intent reliability ramp (Phase 6.7-A) — degradeIntent', () => {
-  test('HONEST tier shows the truth, untouched', () => {
-    const out = degradeIntent({ stance: 'A', tag: 'MD ATTACK' }, 'honest', mulberry32(1));
-    expect(out).toEqual({ stance: 'A', tag: 'MD ATTACK', reliable: true, masked: false });
+describe('intent reliability ramp — degradeIntent (honest-partial model)', () => {
+  const mv = (stance: 'A' | 'G' | 'F'): Action => ({ kind: 'move', move: 'TACKLE', stance });
+
+  test('HONEST shows the EXACT stance in plain language', () => {
+    expect(degradeIntent(mv('A'), 'GALEHAWK', 'honest', mulberry32(1)).line).toBe(
+      'GALEHAWK attacks aggressively',
+    );
+    expect(degradeIntent(mv('G'), 'GALEHAWK', 'honest', mulberry32(1)).line).toBe('GALEHAWK braces');
+    expect(degradeIntent(mv('F'), 'GALEHAWK', 'honest', mulberry32(1)).line).toBe(
+      'GALEHAWK strikes with agility',
+    );
   });
 
-  test('a non-stance intent (RESTING) stays truthful even when ambiguous', () => {
-    // Only the STANCE is ever hidden — a foe with no stance has nothing to feint.
-    const out = degradeIntent({ stance: null, tag: 'RESTING' }, 'ambiguous', mulberry32(1));
-    expect(out).toEqual({ stance: null, tag: 'RESTING', reliable: true, masked: false });
+  test('a non-stance action (resting) reads plainly at every tier except opaque', () => {
+    const rest: Action = { kind: 'rest' };
+    expect(degradeIntent(rest, 'FLITPECK', 'honest', mulberry32(1)).line).toBe('FLITPECK is resting');
+    expect(degradeIntent(rest, 'FLITPECK', 'ambiguous', mulberry32(1)).line).toBe(
+      'FLITPECK is resting',
+    );
+    expect(degradeIntent(rest, 'FLITPECK', 'opaque', mulberry32(1)).line).toBeNull();
   });
 
-  test('OPAQUE tier hides the stance and flags itself unreliable', () => {
-    const out = degradeIntent({ stance: 'G', tag: 'HV ATTACK' }, 'opaque', mulberry32(1));
-    expect(out.masked).toBe(true);
-    expect(out.stance).toBeNull();
-    expect(out.reliable).toBe(false);
+  test('OPAQUE shows nothing — a blank line (pure cold read)', () => {
+    expect(degradeIntent(mv('G'), 'FALKNER', 'opaque', mulberry32(1)).line).toBeNull();
   });
 
-  test('AMBIGUOUS tier never presents a certain stance, but stays a best-guess (sometimes a feint)', () => {
+  test('AMBIGUOUS narrows to a hint that ALWAYS contains the true stance (never lies)', () => {
+    const allows: Record<string, ReadonlyArray<'A' | 'G' | 'F'>> = {
+      'intends to attack': ['A', 'F'],
+      'looks focused': ['G', 'F'],
+      'is hard to read': ['A', 'G'],
+    };
     const rng = mulberry32(7);
-    let feints = 0;
-    let matches = 0;
-    for (let i = 0; i < 400; i += 1) {
-      const out = degradeIntent({ stance: 'A', tag: 'MD ATTACK' }, 'ambiguous', rng);
-      expect(out.reliable).toBe(false); // never shown as certain → not blind-counterable
-      expect(out.masked).toBe(false); // a stance IS shown (a probability, not a blank)
-      expect(out.stance).not.toBeNull();
-      if (out.stance === 'A') matches += 1;
-      else feints += 1;
+    for (const truth of ['A', 'G', 'F'] as const) {
+      const seen = new Set<string>();
+      for (let i = 0; i < 300; i += 1) {
+        const hint = degradeIntent(mv(truth), 'X', 'ambiguous', rng).line!.replace('X ', '');
+        expect(allows[hint]).toBeDefined(); // it's one of the three honest hints
+        expect(allows[hint]).toContain(truth); // and it NEVER excludes the true stance
+        seen.add(hint);
+      }
+      // Each true stance is reachable by exactly TWO hints — both must appear,
+      // so no hint collapses back into a perfect (1:1) tell.
+      expect(seen.size).toBe(2);
     }
-    expect(feints).toBeGreaterThan(0); // it sometimes hides the true stance...
-    expect(matches).toBeGreaterThan(0); // ...but usually shows the best guess
-    expect(feints).toBeLessThan(matches); // feint rate < 0.5 — still a read, not noise
   });
 
-  test('degradeIntent is pure — it never mutates the truth it is handed', () => {
-    const truth = { stance: 'A' as const, tag: 'MD ATTACK' };
-    degradeIntent(truth, 'ambiguous', mulberry32(3));
-    expect(truth).toEqual({ stance: 'A', tag: 'MD ATTACK' });
+  test('AMBIGUOUS hints are genuinely 50/50 — each hint comes from BOTH stances in its pair', () => {
+    const rng = mulberry32(11);
+    const sources: Record<string, Set<string>> = {
+      'intends to attack': new Set(),
+      'looks focused': new Set(),
+      'is hard to read': new Set(),
+    };
+    for (const truth of ['A', 'G', 'F'] as const) {
+      for (let i = 0; i < 300; i += 1) {
+        const hint = degradeIntent(mv(truth), 'X', 'ambiguous', rng).line!.replace('X ', '');
+        sources[hint]!.add(truth);
+      }
+    }
+    expect(sources['intends to attack']).toEqual(new Set(['A', 'F']));
+    expect(sources['looks focused']).toEqual(new Set(['G', 'F']));
+    expect(sources['is hard to read']).toEqual(new Set(['A', 'G']));
+  });
+
+  test('degradeIntent never mutates the action it is handed', () => {
+    const action = mv('A');
+    degradeIntent(action, 'X', 'ambiguous', mulberry32(3));
+    expect(action).toEqual({ kind: 'move', move: 'TACKLE', stance: 'A' });
   });
 });
 
-describe('intent reliability ramp — the FOE INTENT bar degrades + signals uncertainty', () => {
-  function intentScene(
-    reliability: 'honest' | 'ambiguous' | 'opaque',
-  ): ReturnType<typeof createBattleScene> {
-    const state = createBattleState(
-      createTeam([createSide(CH1.GRUBLEAF!)]),
-      createTeam([createSide(CH1.FLITPECK!)]),
-    );
-    return createBattleScene({
-      state,
-      rng: mulberry32(1),
-      chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'G' }),
-      intro: [],
-      catchBreathUnlocked: false,
-      canRun: true,
-      intentReliability: reliability,
-      onResolve: () => {},
-    });
-  }
+function intentScene(
+  reliability: 'honest' | 'ambiguous' | 'opaque',
+): ReturnType<typeof createBattleScene> {
+  // Foe FLITPECK always commits TACKLE in GUARD ('G' → "braces"/"braced.").
+  const state = createBattleState(
+    createTeam([createSide(CH1.GRUBLEAF!)]),
+    createTeam([createSide(CH1.FLITPECK!)]),
+  );
+  return createBattleScene({
+    state,
+    rng: mulberry32(1),
+    chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'G' }),
+    intro: [],
+    catchBreathUnlocked: false,
+    canRun: true,
+    intentReliability: reliability,
+    onResolve: () => {},
+  });
+}
 
-  test('HONEST: the intent bar renders with NO uncertainty signal', () => {
+describe('intent reliability ramp — the FOE INTENT bar (plain language, precision degraded)', () => {
+  test('HONEST: the bar shows the EXACT stance in plain language', () => {
     const scene = intentScene('honest');
     scene.update?.(0.01); // → menu, foeAction committed, shownIntent computed
     const ctx = stubCtx();
     scene.draw(ctx);
     const screen = ctx.texts.join('|');
     expect(screen).toContain('FOE INTENT:');
-    expect(screen).not.toContain('HARD TO READ');
+    expect(screen).toContain('FLITPECK braces'); // exact stance, full clarity
   });
 
-  test('AMBIGUOUS: the bar signals "HARD TO READ" so it reads as design, not a glitch', () => {
+  test('AMBIGUOUS: the bar shows an honest narrow-to-2 hint, NOT the exact stance', () => {
     const scene = intentScene('ambiguous');
     scene.update?.(0.01);
     const ctx = stubCtx();
     scene.draw(ctx);
-    expect(ctx.texts.join('|')).toContain('HARD TO READ');
+    const screen = ctx.texts.join('|');
+    // The hint for a GUARD foe is one of the two whose pair contains G.
+    expect(screen).toMatch(/looks focused|is hard to read/);
+    expect(screen).not.toContain('FLITPECK braces'); // the exact stance is NOT revealed
   });
 
-  test('OPAQUE: the stance is hidden (???) and flagged hard to read', () => {
+  test('OPAQUE: the bar shows a blank dash — no read at all', () => {
     const scene = intentScene('opaque');
     scene.update?.(0.01);
     const ctx = stubCtx();
     scene.draw(ctx);
     const screen = ctx.texts.join('|');
-    expect(screen).toContain('???');
-    expect(screen).toContain('HARD TO READ');
+    expect(screen).toContain('FOE INTENT:');
+    expect(screen).toContain('———'); // blank indicator — no read at all
+    // No intent phrasing leaks (the foe's NAME still shows on its HP panel,
+    // so we assert on the stance/hint vocabulary, not the species name).
+    expect(screen).not.toMatch(
+      /braces|attacks aggressively|strikes with agility|looks focused|hard to read|intends to attack/,
+    );
   });
+});
+
+describe('intent reliability ramp — resolution always confirms the stance (the teaching loop)', () => {
+  // After the round resolves, the log names the foe's committed stance in plain
+  // language at EVERY tier — so the player learns whether their read was right.
+  for (const reliability of ['honest', 'ambiguous', 'opaque'] as const) {
+    test(`${reliability}: resolution confirms "FLITPECK braced." after a GUARD commit`, () => {
+      const scene = intentScene(reliability);
+      scene.update?.(0.01); // → menu
+      scene.input?.('a'); // FIGHT → move list
+      scene.input?.('a'); // commit first move → resolve
+      const seen: string[] = [];
+      // Engage each held beat with a FULL update BEFORE releasing — a short
+      // tick leaves the beat un-held, so an early A would skipResolve past it.
+      for (let i = 0; i < 12; i += 1) {
+        scene.update?.(1.0); // advance to / hold the next consequential beat
+        const ctx = stubCtx();
+        scene.draw(ctx);
+        seen.push(...ctx.texts);
+        scene.input?.('a'); // release the hold → auto-play resumes
+      }
+      expect(seen.join('|')).toContain('FLITPECK braced.');
+    });
+  }
 });
 
 describe('intent reliability ramp — engine integrity (the display NEVER touches resolution)', () => {
@@ -1030,7 +1092,9 @@ describe('resolve cadence — auto-play pauses on consequential lines until A/St
     // on screen, but NOT yet finished (resolve hasn't called beginTurn).
     const screen = ctx.texts.join('|');
     expect(screen).toContain('GRUBLEAF used TACKLE');
-    expect(screen).toContain('Foe FLITPECK used TACKLE');
+    // The foe's commit line is now the plain-language stance confirmation
+    // (honest-partial model) — GUARD → "braced." (was "Foe FLITPECK used TACKLE").
+    expect(screen).toContain('FLITPECK braced.');
     // Still in resolve phase: no FIGHT menu, no end-text yet.
     expect(screen).not.toContain('>FIGHT');
     expect(screen).not.toContain('Press A to continue');

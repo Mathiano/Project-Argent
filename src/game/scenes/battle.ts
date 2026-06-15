@@ -56,12 +56,6 @@ const PL_SLOT = { x: 30, y: 74 } as const;
 const PL_PANEL = { x: 144, y: 82, w: 172, h: 36 } as const;
 const BOTTOM = { x: 2, y: 132, w: 316, h: 46 } as const;
 
-const TIER_TAG: { readonly [k: string]: string } = {
-  light: 'LT',
-  mid: 'MD',
-  heavy: 'HV',
-  nuke: 'NK',
-};
 
 export interface BattleSceneOpts {
   readonly state: BattleState;
@@ -187,60 +181,75 @@ function actionMove(action: Action): string | null {
   return action.kind === 'move' ? action.move : null;
 }
 
-function describeFoeIntent(action: Action): { stance: Stance | null; tag: string } {
-  if (action.kind === 'rest') return { stance: null, tag: 'RESTING' };
-  if (action.kind === 'catchBreath') return { stance: null, tag: 'RECOVERING' };
-  if (action.kind === 'switch') return { stance: null, tag: 'SWITCHING' };
-  if (action.kind === 'throwBall') return { stance: null, tag: 'THROWING' };
-  return { stance: action.stance, tag: `${TIER_TAG[lookupMove(action.move).tier]} ATTACK` };
-}
-
-// ---- Intent reliability ramp (Phase 6.7-A) ----------------------------------
+// ---- Intent reliability ramp (Phase 6.7-A; honest-partial model 6.7-A') ------
 // The foe ALWAYS commits a real stance (foeAction → resolveRound, untouched).
-// degradeIntent decides only what the player is SHOWN: honest = the truth;
-// ambiguous = a best-guess stance that's sometimes a feint and never marked
-// certain; opaque = the stance hidden. Pure + rng-injected so it's testable
-// and so the feint roll never touches the engine RNG stream.
+// Intent is shown in PLAIN LANGUAGE and is always HONEST — reliability only
+// controls how PRECISE it is: honest = the exact stance; ambiguous = an honest
+// hint that narrows the guess to two stances (always one of which is the true
+// one — never a lie); opaque = nothing at all (a pure cold read). The narrow
+// pick is rng-injected so it's testable and never touches the engine stream.
 export type IntentReliability = 'honest' | 'ambiguous' | 'opaque';
 
 export interface ShownIntent {
-  readonly stance: Stance | null;
-  readonly tag: string;
-  // false → the renderer adds the "hard to read" uncertainty signal.
-  readonly reliable: boolean;
-  // true → the stance is hidden entirely (opaque); the renderer shows "???".
-  readonly masked: boolean;
+  // The plain-language intent line to show after "FOE INTENT:", or null for
+  // OPAQUE (the renderer shows a blank dash — no read).
+  readonly line: string | null;
 }
 
-// How often an AMBIGUOUS foe shows a stance it won't commit to. Tuned so the
-// player is usually right but can't blind-counter — Phase 8 may ramp this per
-// boss. Kept < 0.5 so the shown stance stays the best *guess*, not noise.
-const AMBIGUOUS_FEINT_CHANCE = 0.35;
+// Present-tense stance phrasing for the live intent bar.
+function stanceIntentVerb(stance: Stance): string {
+  return stance === 'A' ? 'attacks aggressively' : stance === 'G' ? 'braces' : 'strikes with agility';
+}
+
+// Past-tense confirmation for the resolution log (the teaching loop — the
+// player learns whether their read was right).
+function stanceConfirmLine(name: string, stance: Stance): string {
+  const verb = stance === 'A' ? 'attacks aggressively!' : stance === 'G' ? 'braced.' : 'struck with agility.';
+  return `${name} ${verb}`;
+}
+
+// The AMBIGUOUS hints. Each is HONEST: its `pair` of possible stances always
+// CONTAINS the foe's true stance, so the hint halves the guess (a real 50/50)
+// without ever deceiving the player.
+const NARROW_HINTS: readonly { readonly text: string; readonly pair: readonly Stance[] }[] = [
+  { text: 'intends to attack', pair: ['A', 'F'] }, // rules out Guard
+  { text: 'looks focused', pair: ['G', 'F'] }, // rules out Aggressive
+  { text: 'is hard to read', pair: ['A', 'G'] }, // rules out Fluid
+];
+
+// Honest, full-clarity plain-language line for any foe action.
+//
+// SEAM (forward design, do not build): an "intent" is "an action being
+// telegraphed" — STANCE is just the first kind. This dispatches on action.kind
+// already, so a future ENEMY CALL ("the leader reaches for something…",
+// narrowed/hidden by the same reliability tier) flows through here as another
+// case + its own narrow-hint set — no rewrite of degradeIntent or the renderer.
+// See docs/intent-tells-design-note.md ("Call-intent" seam).
+function foeActionLine(action: Action, name: string): { stance: Stance | null; line: string } {
+  if (action.kind === 'rest') return { stance: null, line: `${name} is resting` };
+  if (action.kind === 'catchBreath') return { stance: null, line: `${name} is recovering` };
+  if (action.kind === 'switch') return { stance: null, line: `${name} is switching` };
+  if (action.kind === 'throwBall') return { stance: null, line: `${name} readies a ball` };
+  return { stance: action.stance, line: `${name} ${stanceIntentVerb(action.stance)}` };
+}
 
 export function degradeIntent(
-  truth: { stance: Stance | null; tag: string },
+  action: Action,
+  name: string,
   reliability: IntentReliability,
   rng: RNG,
 ): ShownIntent {
-  // Honest tier, or a non-stance intent (RESTING/SWITCHING/THROWING — nothing
-  // to hide): show the truth. Only the STANCE is ever obscured.
-  if (reliability === 'honest' || truth.stance === null) {
-    return { stance: truth.stance, tag: truth.tag, reliable: true, masked: false };
-  }
-  if (reliability === 'opaque') {
-    // Hook + basic version — hide the stance. Koga-tier consistent per-pattern
-    // lying is Phase 8 late-game tuning; the field + render path exist now.
-    return { stance: null, tag: truth.tag, reliable: false, masked: true };
-  }
-  // Ambiguous — a best-guess stance that's SOMETIMES a feint and is NEVER
-  // shown as certain (the renderer adds the signal). Probabilities, not certs.
-  let stance: Stance = truth.stance;
-  if (rng.next() < AMBIGUOUS_FEINT_CHANCE) {
-    const others = STANCES.filter((s) => s !== truth.stance);
-    const pick = others[Math.floor(rng.next() * others.length)];
-    if (pick) stance = pick;
-  }
-  return { stance, tag: truth.tag, reliable: false, masked: false };
+  // OPAQUE (Elite Four / Champion) — no indicator at all. Pure cold read.
+  if (reliability === 'opaque') return { line: null };
+  const honest = foeActionLine(action, name);
+  // HONEST tier, or a stance-less action (nothing to narrow): full clarity.
+  if (reliability === 'honest' || honest.stance === null) return { line: honest.line };
+  // AMBIGUOUS — an honest narrow-to-2 hint. Pick uniformly among the hints
+  // whose pair contains the true stance so EVERY hint stays a genuine 50/50
+  // (a fixed per-stance mapping would collapse one hint into a perfect tell).
+  const valid = NARROW_HINTS.filter((h) => h.pair.includes(honest.stance!));
+  const hint = valid[Math.floor(rng.next() * valid.length)] ?? valid[0]!;
+  return { line: `${name} ${hint.text}` };
 }
 
 // Combat legibility (S1) — the explanatory callout for a resolved
@@ -310,7 +319,12 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // display cannot perturb the engine stream → ladders stay bit-identical.
   const reliability: IntentReliability = opts.intentReliability ?? 'honest';
   const intentRng: RNG = mulberry32(INTENT_DISPLAY_SEED);
-  let shownIntent: ShownIntent = degradeIntent(describeFoeIntent(foeAction), reliability, intentRng);
+  let shownIntent: ShownIntent = degradeIntent(
+    foeAction,
+    activeMon(state.foe).species.name,
+    reliability,
+    intentRng,
+  );
   let display: Display = {
     player: snapshot(activeMon(state.player)),
     foe: snapshot(activeMon(state.foe)),
@@ -429,7 +443,12 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // degraded) display for this turn. forcedAction draws no RNG, so moving
     // the choose ahead of the forced check leaves the engine stream intact.
     foeAction = opts.chooseFoeAction(state, opts.rng);
-    shownIntent = degradeIntent(describeFoeIntent(foeAction), reliability, intentRng);
+    shownIntent = degradeIntent(
+      foeAction,
+      activeMon(state.foe).species.name,
+      reliability,
+      intentRng,
+    );
     const forced = forcedAction(activeMon(state.player));
     if (forced) {
       commit(forced);
@@ -529,6 +548,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         pushLog(`${who}: catch your breath!`);
       } else if (ev.action.kind === 'throwBall') {
         pushLog('You hurled a ball!');
+      } else if (ev.side === 'foe' && ev.action.kind === 'move') {
+        // Resolution confirmation (the teaching loop, all tiers): name the
+        // foe's committed STANCE in plain language so the player learns
+        // whether their read was right — even when intent was ambiguous/opaque.
+        pushLog(stanceConfirmLine(display.foe.species.name, ev.action.stance));
       } else {
         const who = ev.side === 'player' ? activeMon(state.player).species.name : `Foe ${activeMon(state.foe).species.name}`;
         pushLog(`${who} used ${ev.action.move}.`);
@@ -1264,20 +1288,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     ctx.fillStyle = 'rgba(32,32,44,0.92)';
     ctx.fillRect(INTENT.x, INTENT.y, INTENT.w, INTENT.h);
     drawText(ctx, 'FOE INTENT:', INTENT.x + 4, INTENT.y + 2, PALETTE.paper);
-    // The display is degraded per the reliability ramp; the SPD readout below
-    // stays honest (speed isn't hidden — the foe's STANCE intent is).
-    const intent = shownIntent;
-    const signal = '  - HARD TO READ';
-    if (intent.masked) {
-      // Opaque — the stance is hidden; the player only knows it's attacking.
-      drawText(ctx, `??? ${intent.tag}${signal}`, INTENT.x + 64, INTENT.y + 2, PALETTE.paper);
-    } else if (intent.stance) {
-      drawStanceBadge(ctx, INTENT.x + 64, INTENT.y + 1, intent.stance);
-      const tag = intent.reliable ? intent.tag : `${intent.tag}${signal}`;
-      drawText(ctx, tag, INTENT.x + 76, INTENT.y + 2, PALETTE.paper);
-    } else {
-      drawText(ctx, intent.tag, INTENT.x + 64, INTENT.y + 2, PALETTE.paper);
-    }
+    // Plain-language intent (honest, precision degraded per the reliability
+    // ramp). A null line = OPAQUE: show a blank dash, no read. The SPD readout
+    // below stays honest — speed isn't hidden, the foe's STANCE intent is.
+    drawText(ctx, shownIntent.line ?? '———', INTENT.x + 60, INTENT.y + 2, PALETTE.paper);
     // S2 — speed relationship (decides dodges AND turn order), the
     // hidden variable. Persistent on the intent bar while choosing.
     const sl = speedLabel(activeMon(state.player).species.spd, activeMon(state.foe).species.spd);

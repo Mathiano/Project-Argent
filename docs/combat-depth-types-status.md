@@ -138,3 +138,21 @@ A strongly-bonded mon **starts each battle with 1-2 ★ banked** (scaling with b
 - **Build: Phase 6-8 combat-depth phase**, on the effect-move engine hooks the move pool flagged.
 - **Near-term, separately:** intent-ramp enforcement (Issue A) + TTK tuning (Issue B) — both load-bearing for combat feel now, both their own focused sprints.
 - Until built: damage + stances only (the current, working combat).
+
+---
+
+## DESIGN RADAR — Foe AI competence (assess later, do NOT build now)
+
+**Why this is first-class:** in a read-war, the **AI *is* the difficulty** — not stats. So there must be an **AI-COMPETENCE RAMP that scales WITH the intent-reliability ramp**: wild = simple play + honest intent; gym leaders = sharper + ambiguous intent; Champion/Red = masterful + opaque intent. **The two ramps together define the difficulty curve** (one hides info, the other uses it well). A dumb AI with hidden intent is just noise; a smart AI with honest intent is solvable — the curve needs both rising in lockstep.
+
+**Questions it must answer (capture now, answer later):**
+- **Stance reading** — does the foe read + counter the player's *patterns* (not just react)? At which tiers does pattern-reading switch on, and how deep (last move? rolling history? stamina-state-conditioned)?
+- **STATUS intelligence** — does it apply status *smartly* (Inception vs a predictable player, Drained vs a stamina-stressed one, Daunt to shut down an aggressive player) or randomly? **Smart status use is where bosses feel cunning** — it's the difference between "the boss has status moves" and "the boss read me."
+- **Call timing** — once foe trainers can Call: *when* do they Resolve / Distract / heal? (Reactive panic-heal reads as dumb; a Call that pre-empts the player's plan reads as masterful.)
+- **Resource / stamina play** — does it bait the player into wasting stamina or committing bad reads (e.g. feign an opening, punish the over-commit)?
+- **Per-tier definition** — gym-leader vs E4 vs Champion vs Red, defined in **BEHAVIOR terms** (what each tier does/doesn't do), mapped to the **read-rate ramp** in `content-progression-scope.md`.
+- **★ THE FAIRNESS LINE (load-bearing):** a read-war AI must **NEVER see the player's committed move before choosing its own.** It reads patterns/tells/stamina like the player does — symmetric information. The moment it peeks at the committed action it stops being a fair read and becomes **the computer cheating**. It must feel like it **OUT-READ you, not PEEKED.** (The current engine already commits the foe action *before* the player chooses — so this line is honored today; any future "smarter" AI must preserve it. The boss card / archetype must derive its choice only from pre-commit state.)
+
+**Assess when:** (a) status exists for the AI to use, AND (b) foe trainers can Call — **both later.** This is a radar note, not a task.
+
+**Cross-refs:** `content-progression-scope.md` (the read-rate ramp this AI ramp parallels), `intent-tells-design-note.md` (the info-hiding ramp the competence ramp scales alongside), `sim-archetypes.md` (where the bot/archetype behaviors live), Part 4's Resolve/Doubt + the bond Call economy (what the AI gets to use).
