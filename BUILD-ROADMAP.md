@@ -61,6 +61,12 @@ Prerequisite: Phase 6 (catching makes both necessary). Surfaced by playtest 2026
 - **Why bundled:** both are mon-record UIs, both made necessary by catching, both lean on the same party/box/species data. **Scope as one box+dex sprint soon.**
 - **Gate:** deposit/withdraw a caught mon; the dex registers seen/caught with viewable entries.
 
+## PHASE 6.7 (NEAR-TERM) — Combat-depth groundwork (NOT the status build)
+Three items surfaced by the combat-depth design pass (`docs/combat-depth-types-status.md`). The full status/type-identity **build** is Phase 6-8 (see Phase 8); these are the load-bearing-now slivers that ship as their own small sprints first.
+- **(A) Enforce the intent-reliability ramp** *(load-bearing — found in playtest)*. Intent is fully honest *everywhere* today, including Falkner — so "read tell → hard-counter → always win" solves the triangle. Fix: trainers/gym leaders get **AMBIGUOUS** intent (probabilities, not certainties), late bosses opaque/lying. This is *enforcing what's already designed* in `docs/intent-tells-design-note.md`, not new design. Sim-gate the shift.
+- **(B) TTK tuning pass** *(found in playtest)*. Type-advantaged fights end in ~3 turns — before status/Calls/comebacks can matter. Sim-test modestly bigger HP + moderate damage so meaningful fights run ~5-8 exchanges. Sim-and-playtest tuned (touches the whole damage formula), its own focused sprint.
+- **(C) Type-name reconciliation** *(consistency cleanup — its own small pass, do NOT rename mid-other-work)*. `typechart.json` + `move-pool.md` agree with each other on `FIELD/VENOM/VOLT/SPIRIT`, but `combat-depth-types-status.md` (newer design) uses `TOXIN/SPARK/UMBRA` for VENOM/VOLT/SPIRIT and introduces **PSI**. Clean renames: **VENOM→TOXIN, VOLT→SPARK, SPIRIT→UMBRA**. ⚠️ **CONFLICT to resolve, not assume:** `FIELD` (the normal/physical type, PAW JAB/BODY SLAM/STAMPEDE) has **no** clean target — `TERRA` already exists unchanged in BOTH sets, and the design doc's fourth new name is **PSI** (psychic), which is *not* FIELD's identity. So the data files are missing PSI and the design doc is missing FIELD: this is a 13-vs-13 set mismatch (`FIELD` ↔ `PSI`), not a pure rename. Reconcile to ONE canonical 13-type set; **docs win, but flag this one for a design call** before touching `typechart.json`/`move-pool.md`/`ch1-batch.json`.
+
 ## PHASE 7 — Content authoring tools + Chapter 1 content
 Prerequisite: Phases 1–6 (the systems all the content sits on).
 - Real Route 31 + Violet with proper trainers, the rival's first fight (KAMON v2 card — already queued), the first Rocket beat, gym trainers feeding scout reports.
@@ -69,7 +75,7 @@ Prerequisite: Phases 1–6 (the systems all the content sits on).
 
 ## PHASE 8+ — Scale to the full game (chapter by chapter)
 Prerequisite: Phase 7 (the chapter template proven once).
-- Gyms 2–8 (boss cards on the Whitney template), the Rocket arc, E4, Kanto, Mt. Silver, status conditions, held items, day/night, Phone 2.0, the bond track, the Gauntlet.
+- Gyms 2–8 (boss cards on the Whitney template), the Rocket arc, E4, Kanto, Mt. Silver, **status conditions + the 13 type identities** (design locked: `docs/combat-depth-types-status.md` — deterministic status that attacks the read/rhythm/triangle/bond, the status economy, Doubt/Resolve, bond-baseline-★), held items, day/night, Phone 2.0, the bond track, the Gauntlet.
 - Each chapter reuses the Phase 7 template. Features interleave per the parity checklist order.
 
 ---

@@ -64,6 +64,7 @@ Bond is a **HIDDEN 1–100 value**. The player **never sees the number**; it is 
 - Temperaments stack on bond; the combined solo shift must stay ≤3% (test the cross-product).
 - Marked mons may start one bond tier up (minor, sim-gated).
 - **Bond XP source = QUALITY ONLY** (ruling): read-wins, boss clears, Calls landed. No participation/time XP. This is the anti-grind firewall — keep it strict.
+- **Bond powers status-defense (see `combat-depth-types-status.md`).** Two bond payoffs extend this track when the combat-depth phase lands: (1) **Resolve** — a bond-gated Call that clears a status + grants brief immunity, *unlocks at Stage 4, strengthens at Stage 6-7*; weaker-bond mons must eat the status for its duration → **the bond IS the status-defense**. (2) **Bond-baseline-★** — a strongly-bonded mon starts each battle with 1-2 ★ banked (scaling with stage), so it can Resolve/Call from turn one. Both are additive on the existing Call economy; the foe attacks the partnership (UMBRA's **Doubt**) and the partnership breaks free (Resolve).
 
 ## Sequencing (revised — pulled forward)
 

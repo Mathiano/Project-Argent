@@ -37,7 +37,8 @@ Tier canon (already engine law): light 12 ST / w0.85 · mid 22 / w1.0 · heavy 3
 ## Reserved tiers
 
 - **Nukes (55 ST)**: never pool moves. Reserved for stage-3 starter signatures, boss aces, and legendaries — authored individually on boss cards / batch sheets. (DIVE BOMB stays heavy; GALEHAWK's gym-fight identity comes from GUSTBORNE + the gust rhythm, per the Falkner card.)
-- **Effect moves (status/terrain/drain, 8 ST class)**: P1, blocked on engine hooks (status states, terrain flags, stamina-attack). Two per type are budgeted in the ~96-move final pool; Drainer/Trickster archetypes run on template stats until then.
+- **Effect moves (status/terrain/drain, 8 ST class)**: P1, blocked on engine hooks (status states, terrain flags, stamina-attack). Two per type are budgeted in the ~96-move final pool; Drainer/Trickster archetypes run on template stats until then. **The status/effect design that fills this hole is now locked: `docs/combat-depth-types-status.md`** (per-type mechanical identity + the deterministic status economy; build Phase 6-8).
+- ⚠️ **Type-name drift (reconcile — its own cleanup, BUILD-ROADMAP Phase 6.7-C):** this table + `typechart.json` use `FIELD/VENOM/VOLT/SPIRIT`; the newer `combat-depth-types-status.md` uses `TOXIN/SPARK/UMBRA` (for VENOM/VOLT/SPIRIT) and adds **PSI**. Clean renames: VENOM→TOXIN, VOLT→SPARK, SPIRIT→UMBRA. **Unresolved:** `FIELD` ↔ `PSI` is a set mismatch, not a rename (TERRA is unchanged in both). Don't rename mid-other-work; docs win but flag the FIELD/PSI call first.
 
 ## Learnset derivation template (per slot — batch sheets apply this mechanically)
 

@@ -93,7 +93,8 @@ Per `BUILD-ROADMAP.md`: **Phase 8** (information-hiding tier, scale-to-full-game
 ## Cross-references
 
 - `combat-2-0-spec.md` — the read pillar (what tells *are*).
-- `BUILD-ROADMAP.md` Phase 8 — when this ships.
+- `combat-depth-types-status.md` Part 5, Issue A — playtest found this ramp is **NOT enforced** (intent is fully honest everywhere, including Falkner, so "read → hard-counter → always win" solves the triangle). Enforcing the ramp designed here is pulled to **near-term** (BUILD-ROADMAP Phase 6.7-A), ahead of the Phase 8 info-hiding sprint. Also: the **Daze** status (SPARK/BRAWN) makes a tell actively unreliable — a per-battle expression of this note's reliability knob.
+- `BUILD-ROADMAP.md` Phase 8 — when the full info-hiding tiers ship (Phase 6.7-A enforces the trainer/leader AMBIGUOUS tier sooner).
 - `project-argent-scope.md` — Champion-tier read curriculum.
 - `WORKING-AGREEMENT.md` — the feel gate; tells are a feel surface, not a correctness one.
 
