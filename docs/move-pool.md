@@ -33,12 +33,12 @@ Tier canon (already engine law): light 12 ST / w0.85 · mid 22 / w1.0 · heavy 3
 | BRAWN | QUICK JAB | ROUNDHOUSE | MOUNTAIN FIST |
 | FORGE | IRON FLICK | STEEL BASH | ANVIL DROP |
 | DRAKE | FANG RAKE | DRAKE CLAW | WYRM FURY |
-| **PSI** ⚠ | MIND JAB | PSY PULSE | MIND CRUSH |
-| **INSECT** ⚠ | STING | BUG BITE | SWARM RUSH |
-| **STONE** ⚠ | SHARD FLICK | STONE EDGE | BOULDER CRASH |
-| **UMBRA** ⚠ | SHADE NIP | DARK LASH | NIGHT CRUSH |
+| PSI | MIND JAB | PSY PULSE | MIND CRUSH |
+| INSECT | STING | BUG BITE | SWARM RUSH |
+| STONE | SHARD FLICK | STONE EDGE | BOULDER CRASH |
+| UMBRA | SHADE NIP | DARK LASH | NIGHT CRUSH |
 
-⚠ **The 4 new types' (PSI/INSECT/STONE/UMBRA) trio names are PROPOSED — pending Mathias's pick.** Alternatives offered for approval (see KICKOFF-type-system-canon.md / audit): PSI = MIND JAB/PSY PULSE/MIND CRUSH **or** KINESIS/MIND WARP/PSYBURST · INSECT = STING/BUG BITE/SWARM RUSH **or** SKITTER/PINCER/SWARM CRUSH · STONE = SHARD FLICK/STONE EDGE/BOULDER CRASH **or** PEBBLE SPIT/CRAG SMASH/ROCKFALL (must stay distinct from TERRA's PEBBLE SHOT/ROCK MAUL/QUAKE STOMP) · UMBRA = SHADE NIP/DARK LASH/NIGHT CRUSH **or** SPITE/FERAL BITE/NIGHTMAW. These are doc-only; no moves.json entries until a mon carries the type.
+✅ **The 4 new types' trio names are APPROVED (Mathias, 2026-06-15)** — the canonical kits above. Still doc-only; no `moves.json` entries until a mon carries the type (content authoring, deferred). STONE kept distinct from TERRA's PEBBLE SHOT/ROCK MAUL/QUAKE STOMP (Rock vs Ground).
 
 ## Reserved tiers
 

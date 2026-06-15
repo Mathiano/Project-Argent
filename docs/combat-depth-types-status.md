@@ -27,7 +27,7 @@ Each type has a distinct MECHANICAL identity (the canonical 17-type roster — s
 | **BRAWN** | Inflicts **Taunt** (force foe Aggressive next turn, 1 turn) + **Daze** | disruption (aggro) |
 | **VENOM** | Inflicts **Drained** (bleeds STAMINA each round) | disruption (resource) |
 | **TERRA** | Inflicts **Stunned** (via heavy impact — acts last regardless of speed) | disruption (tempo) |
-| **GALE** | **Immune to TERRA/ground attacks**; glass-cannon speed | mobility/immunity |
+| **GALE** | Glass-cannon speed; a defensive edge vs Ground — **resist, NOT immune** (no hard immunities in Argent). ⚠ exact TERRA↔GALE value pending — see note below | mobility |
 | **PSI** | Inflicts **Inception** (force foe to repeat last stance) | disruption (control) |
 | **INSECT** | Inflicts **Sap** (burst STAMINA-drain on a read-win) — *NEW* | disruption (resource) |
 | **STONE** | **Brace** (self-buff — strengthens the user's next Guard) — *NEW* | defense (self-buff) |
@@ -39,8 +39,10 @@ Each type has a distinct MECHANICAL identity (the canonical 17-type roster — s
 ### The pillar guard on FORGE / GALE (important)
 FORGE and GALE express identity through **stat/rule shape**, not a status. This is fine and desirable — but it MUST honor the no-power-creep pillar:
 - **FORGE = a species ARCHETYPE tradeoff** (bulky-but-slow-and-weak-hitting), NOT a stat bonus. A FORGE mon is *designed* tanky with a real cost (low speed/damage). It is never "FORGE mons get +stats."
-- **GALE = fast-but-fragile** + the TERRA immunity (a rule, not a stat). Glass cannon with a movement advantage.
+- **GALE = fast-but-fragile** + a TERRA *resistance* — a rule, not a stat, and **NOT a hard immunity** (per the no-immunities ruling 2026-06-15: nothing in Argent is 0×). Glass cannon with a movement advantage.
 Both are *shapes with tradeoffs*, so they can't out-stat anyone — they trade one axis for another.
+
+> ⚠️ **TERRA↔GALE — OPEN CONFLICT (do not lock until resolved).** The GALE-resists-Ground ruling wants **TERRA→GALE = 0.7**. But the chart currently reads **TERRA→GALE = 1.3** because that is the *load-bearing Falkner prep-loop*: "catch a cave TERRA mon (GRITHOAX/CAVELURE/CHASMTRAP) to counter the GALE gym" (`falkner-boss-card.md` "TERRA hits back ×1.3 — the prep-loop catch"; `type-chart.md` ruling #3 + gym-1-counter = TERRA). Flipping it to 0.7 **inverts the prep loop** (the cave line stops countering Falkner) and orphans the GRITHOAX design. This is a genuine design fork, not a mechanical fix — flagged for Mathias's call (see audit). The chart cell is UNCHANGED pending that decision.
 
 ### The category meta (why no single type dominates)
 Tanks (FORGE) outlast hitters (FLAME); disruptors (the status types) break tanks; hitters race disruptors before status lands; sustain (NATURE/AQUA) grinds attrition. It's rock-paper-scissors at the *category* level, on top of the type-multiplier triangle — a living meta, not a solved one.
