@@ -30,7 +30,7 @@ The ★ Momentum / Trainer Call system deepens with bond — pure read-economy, 
 
 Bond is a **HIDDEN 1–100 value**. The player **never sees the number**; it is surfaced only as **~7 named, visible STAGES**. The stage *is* the UI — so bond reads as a **deepening relationship, not a grind-bar.**
 
-| Stage | Hidden range | Name (draft — Mathias may wordsmith) |
+| Stage | Hidden range | Name (approved 2026-06-15) |
 |---|---|---|
 | 1 | 1–15 | Wary |
 | 2 | 16–30 | Warming |
