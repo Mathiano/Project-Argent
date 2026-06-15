@@ -50,14 +50,16 @@ Ties to `bond-track-v2.md` — the place that explains *why* training a mon matt
 ## Build constraints (when this lands — Phase 7)
 
 - Pure content: a Violet City building + interior, NPCs, scripted dialog/teaching sequences, a scripted practice fight, flag-gated so the post-gym trigger fires once.
-- The stance-triangle teaching needs the combat-legibility presentation (the stance legend + contextual Counter/Opening/Dodge labels) to exist as the thing it's teaching — that dependency is now **satisfied** (the legibility pass landed; see below).
+- The stance-triangle teaching needs the combat-legibility presentation (contextual Counter/Opening/Dodge callouts + the speed readout) to exist as the thing it's teaching — that dependency is **in progress (the combat-legibility sprint)**, not yet fully landed; see below.
 - Move-trial introduction needs the trial system (builds with bond, Phase 8) — until then the Academy can teach mechanics + bond context, and the trial-tutor room lights up when trials are built.
 
 ## Relationship to the combat-legibility pass (near-term)
 
-The Academy is the *deferred, diegetic* teaching layer (Phase 7). But the player needs *some* legibility NOW (the current demo combat feels random). So there are two complementary pieces:
-1. **Near-term (LANDED):** the in-battle stance legend + contextual labels (Counter / Opening / Dodge callouts, the NEXT turn-order hint, foe-intent readout) and the boss-layer legibility (the GUST ROUND banner, the labelled BREAK meter, the PHASE indicator) — so combat reads as deterministic in the demo, before the Academy exists. Shipped across the feel-first and demo-fix sprints.
-2. **Phase 7 (this doc):** the Academy wraps that now-visible legibility in a *place and a story* — teaching it explicitly, hosting trials, framing preparation.
+The Academy is the *deferred, diegetic* teaching layer (Phase 7). But the player needs *some* legibility NOW (the current demo combat feels random). The near-term legibility is itself arriving in two waves:
+
+1. **Shipped (earlier sprints):** the boss-mechanic legibility (the GUST ROUND banner, the labelled BREAK meter, the PHASE indicator) + the basic in-battle stance labels (the stance badge + the NEXT turn-order hint + the foe-intent readout). Landed across the feel-first and demo-fix sprints.
+2. **In progress — the combat-legibility sprint (`KICKOFF-combat-legibility.md`):** the **explanatory** stance callouts that name the *rule* ("COUNTER! GUARD turns AGGRESSION back", "DODGE! it was faster", "Couldn't evade — too slow!"), the persistent **speed indicator** (FASTER / SLOWER), and the bedroom **magazine**. Built and committed; **landed once that sprint is signed off**. Until then this dependency is *in progress*, not LANDED.
+3. **Phase 7 (this doc):** the Academy wraps that now-visible legibility in a *place and a story* — teaching it explicitly, hosting trials, framing preparation.
 
 The near-term legibility is the *mechanic being visible*; the Academy is the *world teaching you to read it.*
 
@@ -65,7 +67,7 @@ The near-term legibility is the *mechanic being visible*; the Academy is the *wo
 
 The Academy is the *end* of a three-beat arc, not a standalone tutorial:
 
-1. **The magazine (bedroom teaser, LANDED).** "The Art of Combat," a glossy from the Violet Academy, sits on the desk beside Larch's letter in the starting bedroom. It teaches only the **very basics** — your partner fights three ways (Aggressive / Guard / Fluid), and what the *foe* picks matters too. A hook, not the triangle. (Shipped in the combat-legibility pass; see `KICKOFF-combat-legibility.md`.)
+1. **The magazine (bedroom teaser — in progress, the combat-legibility sprint).** "The Art of Combat," a glossy from the Violet Academy, sits on the desk beside Larch's letter in the starting bedroom. It teaches only the **very basics** — your partner fights three ways (Aggressive / Guard / Fluid), and what the *foe* picks matters too. A hook, not the triangle. (Built in the combat-legibility sprint, `KICKOFF-combat-legibility.md`; landed once that sprint is signed off.)
 2. **The semi-blind first gym.** The player faces Falkner knowing *that* stances exist (from the magazine + the in-battle callouts) but not yet the full triangle/speed system — the struggle is the hook.
 3. **The Academy (this doc, Phase 7).** The full lesson, in a place, after the gym.
 
