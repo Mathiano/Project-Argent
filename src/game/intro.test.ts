@@ -79,6 +79,20 @@ describe('Phase 3 intro — map geometry + warp chain', () => {
     expect(letterSign).toBeDefined();
   });
 
+  test('BEDROOM contains "The Art of Combat" magazine (combat-legibility story seed)', () => {
+    const bedroom = getMap('BEDROOM');
+    const mag = bedroom.objects.find(
+      (o) => o.type === 'sign' && o.lines.join(' ').includes('ART OF COMBAT'),
+    );
+    expect(mag).toBeDefined();
+    // It teaches the basics teaser — the three stances + that the foe matters.
+    const text = mag && mag.type === 'sign' ? mag.lines.join(' ') : '';
+    expect(text).toContain('AGGRESSIVE');
+    expect(text).toContain('GUARD');
+    expect(text).toContain('FLUID');
+    expect(text).toContain('FOE');
+  });
+
   test('HOUSE contains a parent NPC with goodbye dialog (Beat 2)', () => {
     const house = getMap('HOUSE');
     const parent = house.objects.find(

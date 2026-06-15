@@ -28,7 +28,7 @@ import type {
 } from '../../engine';
 import ch1BatchData from '../../../docs/ch1-batch.json';
 import movesData from '../../../docs/moves.json';
-import { createBattleScene } from './battle';
+import { createBattleScene, speedLabel, stanceCallout } from './battle';
 
 // Stub CanvasRenderingContext2D — records every fillText so tests can
 // assert what's on screen. Everything else is a no-op; we don't render
@@ -623,10 +623,10 @@ describe('resolve cadence + stance labels — legibility pass', () => {
     return logContains(scene, target);
   }
 
-  test('stance label on counter: "GUARD counters!" appears in the log when G defends vs A', () => {
+  test('explanatory callout on counter: "COUNTER! ... GUARD turns ..." when G defends vs A', () => {
     const scene = driveStanceScenario('G', 'A', SPECIES.EMBERCUB!, SPECIES.AQUAFIN!, 42);
     pickStance(scene, 'G');
-    expect(advanceUntilLog(scene, 'GUARD counters', 12)).toBe(true);
+    expect(advanceUntilLog(scene, 'COUNTER', 12)).toBe(true);
   });
 
   test('stance label on opening: "FLUID slips past GUARD" when F attacks G', () => {
@@ -657,7 +657,65 @@ describe('resolve cadence + stance labels — legibility pass', () => {
       onResolve: () => {},
     });
     pickStance(scene, 'A');
-    expect(advanceUntilLog(scene, 'FLUID dodged', 12)).toBe(true);
+    expect(advanceUntilLog(scene, 'DODGE', 12)).toBe(true);
+  });
+
+  test('explanatory callout when an Aggressive strike LANDS on Fluid (no dodge): "too slow to evade"', () => {
+    // A-vs-F where the dodge roll FAILS (forced high) → the strike lands
+    // and the callout names the rule: the attacker was faster.
+    const scene = createBattleScene({
+      state: createBattleState(
+        createTeam([createSide(SPECIES.AQUAFIN!)]),
+        createTeam([createSide(SPECIES.EMBERCUB!)]),
+      ),
+      // [variance, dodge-roll] repeating — dodge roll 0.99 > p ⇒ no dodge.
+      rng: {
+        next: (() => {
+          const seq = [0.5, 0.99, 0.5, 0.99, 0.5, 0.99, 0.5, 0.99];
+          let i = 0;
+          return () => seq[i++ % seq.length]!;
+        })(),
+      },
+      chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'F' }),
+      intro: [],
+      catchBreathUnlocked: false,
+      canRun: true,
+      onResolve: () => {},
+    });
+    pickStance(scene, 'A');
+    expect(advanceUntilLog(scene, 'evade', 12)).toBe(true);
+  });
+});
+
+describe('combat legibility (S1/S2) — pure callout + speed helpers', () => {
+  test('stanceCallout names the rule for each triangle interaction', () => {
+    expect(stanceCallout({ kind: 'counter' })).toContain('COUNTER');
+    expect(stanceCallout({ kind: 'counter' })).toContain('GUARD');
+    expect(stanceCallout({ kind: 'opening' })).toContain('OPENING');
+    expect(stanceCallout({ kind: 'opening' })).toContain('FLUID');
+    expect(stanceCallout({ kind: 'dodge' })).toContain('DODGE');
+    expect(stanceCallout({ kind: 'dodge' })).toContain('faster');
+    // Aggressive strike that LANDED on Fluid = failed dodge = "too slow".
+    expect(stanceCallout({ kind: 'strike', attackerStance: 'A', defenderStance: 'F' })).toContain('too slow');
+    // A normal strike (not A-vs-F) is not a triangle teaching moment.
+    expect(stanceCallout({ kind: 'strike', attackerStance: 'A', defenderStance: 'G' })).toBeNull();
+    expect(stanceCallout({ kind: 'strike' })).toBeNull();
+  });
+
+  test('speedLabel reflects the player-vs-foe speed matchup', () => {
+    expect(speedLabel(120, 80)).toBe('YOU FASTER');
+    expect(speedLabel(80, 120)).toBe('YOU SLOWER');
+    expect(speedLabel(100, 100)).toBe('SPEED EVEN');
+  });
+
+  test('the speed indicator is drawn on the intent bar while choosing', () => {
+    // GRUBLEAF vs FLITPECK — buildScene starts at the FIGHT menu, where
+    // the intent bar (and the speed readout) render.
+    const { scene } = buildScene();
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    expect(/YOU FASTER|YOU SLOWER|SPEED EVEN/.test(screen)).toBe(true);
   });
 });
 

@@ -34,6 +34,22 @@
     },
     {
       "type": "sign",
+      "x": 5,
+      "y": 1,
+      "lines": [
+        "THE ART OF COMBAT",
+        "(a glossy magazine from",
+        "the VIOLET ACADEMY)",
+        "Your partner can fight 3",
+        "ways: AGGRESSIVE, GUARD,",
+        "or FLUID.",
+        "And what the FOE picks",
+        "matters as much as your",
+        "move. ...Read the wind!"
+      ]
+    },
+    {
+      "type": "sign",
       "x": 1,
       "y": 1,
       "lines": ["Your bed.", "Already cooling."]

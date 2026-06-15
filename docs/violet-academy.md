@@ -61,6 +61,16 @@ The Academy is the *deferred, diegetic* teaching layer (Phase 7). But the player
 
 The near-term legibility is the *mechanic being visible*; the Academy is the *world teaching you to read it.*
 
+## The teaching arc (magazine → semi-blind gym → Academy)
+
+The Academy is the *end* of a three-beat arc, not a standalone tutorial:
+
+1. **The magazine (bedroom teaser, LANDED).** "The Art of Combat," a glossy from the Violet Academy, sits on the desk beside Larch's letter in the starting bedroom. It teaches only the **very basics** — your partner fights three ways (Aggressive / Guard / Fluid), and what the *foe* picks matters too. A hook, not the triangle. (Shipped in the combat-legibility pass; see `KICKOFF-combat-legibility.md`.)
+2. **The semi-blind first gym.** The player faces Falkner knowing *that* stances exist (from the magazine + the in-battle callouts) but not yet the full triangle/speed system — the struggle is the hook.
+3. **The Academy (this doc, Phase 7).** The full lesson, in a place, after the gym.
+
+The magazine's **origin is the Academy** — it's how the institution reaches a kid in the sticks before they ever arrive. That thread is the payoff when the player finally walks in: "oh — *this* is where that magazine came from."
+
 ## Sequencing
 
 - **Design: locked now** (this doc).

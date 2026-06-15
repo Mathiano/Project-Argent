@@ -159,6 +159,38 @@ function describeFoeIntent(action: Action): { stance: Stance | null; tag: string
   return { stance: action.stance, tag: `${TIER_TAG[lookupMove(action.move).tier]} ATTACK` };
 }
 
+// Combat legibility (S1) — the explanatory callout for a resolved
+// triangle interaction. Names the RULE, not just the event, so the
+// player learns the triangle by playing. Returns null when the event
+// isn't a triangle teaching moment.
+export function stanceCallout(args: {
+  readonly kind: 'counter' | 'opening' | 'dodge' | 'strike';
+  readonly attackerStance?: Stance | undefined;
+  readonly defenderStance?: Stance | undefined;
+}): string | null {
+  if (args.kind === 'counter') return 'COUNTER! GUARD turns AGGRESSION back';
+  if (args.kind === 'opening') return 'OPENING! FLUID slips past GUARD';
+  if (args.kind === 'dodge') return 'DODGE! FLUID evaded — it was faster';
+  // A landed strike where the attacker went Aggressive into a Fluid
+  // defender means the dodge check FAILED — the attacker was faster.
+  if (args.kind === 'strike' && args.attackerStance === 'A' && args.defenderStance === 'F') {
+    return "Couldn't evade — too slow!";
+  }
+  return null;
+}
+
+// Combat legibility (S2) — the player-vs-foe SPEED relationship. Speed
+// decides dodges AND turn order; it's the hidden variable that makes
+// combat feel random. Surfaced as a persistent readout.
+export function speedLabel(
+  playerSpd: number,
+  foeSpd: number,
+): 'YOU FASTER' | 'YOU SLOWER' | 'SPEED EVEN' {
+  if (playerSpd > foeSpd) return 'YOU FASTER';
+  if (playerSpd < foeSpd) return 'YOU SLOWER';
+  return 'SPEED EVEN';
+}
+
 export function createBattleScene(opts: BattleSceneOpts): Scene {
   let state: BattleState = opts.state;
   let foeAction: Action = { kind: 'rest' };
@@ -173,6 +205,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // when the break meter ticks up, so the metronome boss READS like one.
   let displayPhase = state.phase ?? 1;
   let breakPipFlashT = 0;
+  // Combat legibility (S1) — the current round's committed stances (so a
+  // landed strike can tell an A-vs-F "couldn't evade" from a normal hit)
+  // + the explanatory callout banner shown during resolve.
+  let roundStance: { player: Stance | null; foe: Stance | null } = { player: null, foe: null };
+  let calloutLine: string | null = null;
 
   let phase: 'text' | 'menu' | 'move' | 'party' | 'resolve' | 'end' = 'text';
   let textQueue: string[] = [...opts.intro];
@@ -240,6 +277,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function commit(action: Action): void {
     log = [];
+    roundStance = { player: null, foe: null };
+    calloutLine = null;
     const result = resolveRound(state, action, foeAction, opts.rng);
     state = result.state;
     pendingEvents = [...result.events];
@@ -308,6 +347,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       return;
     }
     if (ev.kind === 'commit') {
+      // Remember each side's committed stance so a landed strike can be
+      // labelled (A-vs-F that DIDN'T dodge = "too slow").
+      if (ev.action.kind === 'move') roundStance[ev.side] = ev.action.stance;
       if (ev.action.kind === 'rest') {
         const who = ev.side === 'player' ? activeMon(state.player).species.name : activeMon(state.foe).species.name;
         const note = ev.action.reason === 'exhaustion' ? 'is spent — resting.' : 'has no moves — resting.';
@@ -342,33 +384,47 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       animT = 0.25;
       if (ev.effectiveness > 1) pushLog('It hit hard!');
       else if (ev.effectiveness < 1) pushLog('Not very effective…');
+      // S1 — an Aggressive strike that LANDED on a Fluid defender means
+      // the dodge check failed: the attacker was faster. Name the rule.
+      const c = stanceCallout({
+        kind: 'strike',
+        attackerStance: roundStance[ev.side] ?? undefined,
+        defenderStance: roundStance[def] ?? undefined,
+      });
+      if (c) {
+        calloutLine = c;
+        pushLog('Too slow to evade!');
+      }
       return;
     }
     if (ev.kind === 'dodge') {
-      // Stance label teaches WHY: FLUID dodged an Aggressive strike.
+      // S1 — FLUID dodged an Aggressive strike because it was faster.
       const who = ev.side === 'player' ? display.player.species.name : 'Foe ' + display.foe.species.name;
-      pushLog(`${who}'s FLUID dodged it!`);
+      calloutLine = stanceCallout({ kind: 'dodge' });
+      pushLog(`DODGE! ${who}'s FLUID was faster.`);
       animSide = ev.side;
       animKind = 'dodge';
       animT = 0.25;
       return;
     }
     if (ev.kind === 'opening') {
-      // Stance label teaches WHY: FLUID slipped past a GUARD stance.
+      // S1 — FLUID slipped past a GUARD stance (acts first, no counter).
       const def = opposite(ev.side);
       display[def].hp = Math.max(0, display[def].hp - ev.damage);
-      pushLog('FLUID slips past GUARD — opening!');
+      calloutLine = stanceCallout({ kind: 'opening' });
+      pushLog('OPENING! FLUID slips past GUARD.');
       animSide = ev.side;
       animKind = 'opening';
       animT = 0.25;
       return;
     }
     if (ev.kind === 'counter') {
-      // Stance label teaches WHY: GUARD countered an Aggressive strike.
+      // S1 — GUARD turned an Aggressive strike back (reflect + stagger).
       const att = opposite(ev.side);
       display[att].hp = Math.max(0, display[att].hp - ev.damage);
       const who = ev.side === 'player' ? display.player.species.name : 'Foe';
-      pushLog(`${who}'s GUARD counters!`);
+      calloutLine = stanceCallout({ kind: 'counter' });
+      pushLog(`COUNTER! ${who}'s GUARD turns it back.`);
       animSide = ev.side;
       animKind = 'counter';
       animT = 0.25;
@@ -903,6 +959,33 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     } else {
       drawText(ctx, intent.tag, INTENT.x + 64, INTENT.y + 2, PALETTE.paper);
     }
+    // S2 — speed relationship (decides dodges AND turn order), the
+    // hidden variable. Persistent on the intent bar while choosing.
+    const sl = speedLabel(activeMon(state.player).species.spd, activeMon(state.foe).species.spd);
+    const slColor =
+      sl === 'YOU FASTER' ? PALETTE.hpOk : sl === 'YOU SLOWER' ? PALETTE.hpCrit : PALETTE.paperShadow;
+    drawTextRight(ctx, `SPD: ${sl}`, INTENT.x + INTENT.w - 4, INTENT.y + 2, slColor);
+  }
+
+  // S1 — the explanatory callout banner. Shown during resolve (the intent
+  // bar's slot is free then), naming the rule behind what just happened.
+  function drawCallout(ctx: CanvasRenderingContext2D): void {
+    if (!calloutLine) return;
+    const w = 300;
+    const h = 14;
+    const x = (LOGICAL_W - w) / 2;
+    const y = INTENT.y;
+    ctx.fillStyle = 'rgba(255, 215, 90, 0.94)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = PALETTE.ink;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.font = '8px monospace';
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillText(calloutLine, LOGICAL_W / 2, y + 3);
+    ctx.textAlign = 'start';
   }
 
   function drawBottomDialog(ctx: CanvasRenderingContext2D, lines: readonly string[]): void {
@@ -1085,6 +1168,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       drawPlayerPanel(ctx);
 
       if (phase === 'menu' || phase === 'move') drawIntent(ctx);
+      // S1 — the triangle callout occupies the intent slot during resolve.
+      if (phase === 'resolve') drawCallout(ctx);
 
       // BUG 3 — gust legibility. Two distinct states:
       //  • ACTIVE: the round in play IS a gust round (this is what the
