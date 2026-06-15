@@ -53,8 +53,8 @@ Rule: Argent = Silver's whole structure, minus the tedium we explicitly cut (HMs
 | Trainer battles | 🟡 | single-mon only until 6v6 |
 | Gym leaders / bosses | 🟡 | Falkner only; boss-card system proven |
 | Wild encounters | ✅ | |
-| EXP / leveling | 🟡 | level gates movesets (ruling); curve = "gentle" (B), unbuilt as stat growth |
-| Evolution | ❌ | 16/34 design locked; **not implemented** — high priority, identity-critical |
+| EXP / leveling | 🟡 | **no player-facing levels** — an internal developmental band gates base movesets; no stat growth, no XP number shown |
+| Evolution | ❌ | **bond-gated + boss-capped** design locked (`evolution-design.md`) — supersedes "16/34"; **not implemented**, high priority, identity-critical |
 
 ## 4. Progression & story
 
@@ -89,7 +89,7 @@ Argent has the **hardest** part (a novel combat engine, sim-gated and proven) an
 ## Proposed foundation sprint order (slot between feature sprints)
 
 1. **6v6 team battles** — unblocks switching, real trainer fights, every boss, bond track. The keystone refactor.
-2. **Evolution** — 16/34 trigger; identity-critical, players expect it, currently absent.
+2. **Evolution** — bond-gated + boss-capped (NOT 16/34; `evolution-design.md`); identity-critical, players expect it, currently absent.
 3. **Save/load** — can't playtest a 42-hour game without it.
 4. **Party + Box + Bag menus** — the core management loop; box-access-anywhere is the P0 promise.
 5. **Healing + economy** (Center, Mart, money, rewards) — the route→town→heal→shop rhythm that *is* Pokémon.

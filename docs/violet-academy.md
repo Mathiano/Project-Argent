@@ -2,7 +2,7 @@
 
 **Status:** design locked, build deferred to Phase 7 (content authoring — it's a location with NPCs + scripted teaching, built on existing dialog/script/flag verbs, no new engine systems). Placed in **Violet City**, entered/triggered **after the first gym (Falkner)**. This is Argent's tutorial — but diegetic, optional-feeling, and thematically load-bearing: it converts "the player faced the first gym under-informed" from a flaw into the *intended* arc.
 
-**Cross-references:** `BUILD-ROADMAP.md` (Phase 7 — where this is built) · `move-mastery-trials.md` (the trial system this hub introduces + surfaces) · `bond-track.md` / `bond-track-v2.md` (the bond context this hub frames) · `combat-2-0-spec.md` (the stance triangle it teaches).
+**Cross-references:** `BUILD-ROADMAP.md` (Phase 7 — where this is built) · `move-mastery-trials.md` (the trial system this hub introduces + surfaces) · `bond-track.md` / `bond-track-v2.md` (the bond context this hub frames) · `evolution-design.md` (evolution readiness the Academy assesses) · `combat-2-0-spec.md` (the stance triangle it teaches).
 
 ## The core idea
 
@@ -30,7 +30,7 @@ Per `move-mastery-trials.md`: this is where a mon's marquee-move trials are **in
 The Academy is where the player LEARNS a trial exists and what its goal is; the trial itself completes through play (per the trials doc). The "trial in progress" UI lives on the party-menu summary screen.
 
 ### 3. Training / bond context
-Ties to `bond-track-v2.md` — the place that explains *why* training a mon matters (bond unlocks moves + Call economy, not raw stats). It frames the "preparation is gameplay" pillar explicitly: you don't grind levels, you build partnership and understanding.
+Ties to `bond-track-v2.md` — the place that explains *why* training a mon matters (bond unlocks moves + Call economy, not raw stats). It frames the "preparation is gameplay" pillar explicitly: you don't grind levels, you build partnership and understanding. **Evolution readiness** lives here too: the Academy instructor *assesses* a mon and tells the player why it hasn't evolved ("nearly ready — it just needs to see you earn the next badge"), the diegetic surface for the bond-gated/boss-capped evolution model (`evolution-design.md`).
 
 ## Placement & gating (the ruling)
 

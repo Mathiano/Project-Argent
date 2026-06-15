@@ -49,9 +49,9 @@ Prerequisite: Phase 4 (bag/items exist to buy and use).
 
 ## PHASE 6 — Evolution + Catching 2.0
 Prerequisite: Phase 1 (team) + Phase 5 (the loop).
-- Evolution at 16/34 (identity-critical, currently absent). Catching 2.0 (replace the placeholder catch with the read-based spec).
+- Evolution (identity-critical, currently absent) — the **bond-gated, boss-capped** model (NOT level 16/34; Argent has no player-facing levels). Two gates — bond stage + the gating badge, whichever is satisfied second triggers evo; the badge-gate is the anti-power-creep cap, lifted after 8 Johto badges (Kanto = bond-only). Design locked: `docs/evolution-design.md`. Catching 2.0 (replace the placeholder catch with the read-based spec).
 - **Catching 2.0 is now the TWO-PATH system** — Path 1 (read-created windows, catching as skill) + Path 2 (the willing-join mercy path: heal a fainted wild mon → badge/level/bond-gated acceptance roll → joins or refuses-with-a-hint). Balls stay (mons are happy in them). Design locked: `docs/catching-2-0.md` (the Path-2 acceptance formula is settled at this phase's kickoff).
-- **Build order (ruled 2026-06-15): CATCHING FIRST, as its own focused sprint, THEN evolution.** Catching is what the playtest is actively asking for (the GRUBLEAF→Falkner prep path is a dead-end without it), it's the bigger/more novel design, and it earns a focused sprint; evolution (16/34, already specced) is the cleaner follow-on.
+- **Build order (ruled 2026-06-15): CATCHING FIRST, as its own focused sprint, THEN evolution.** Catching is what the playtest is actively asking for (the GRUBLEAF→Falkner prep path is a dead-end without it), it's the bigger/more novel design, and it earns a focused sprint; evolution (the bond-gated/boss-capped model, `docs/evolution-design.md`) is the cleaner follow-on.
 - **Gate:** starters evolve; catching is the designed mini-game.
 
 ## PHASE 7 — Content authoring tools + Chapter 1 content

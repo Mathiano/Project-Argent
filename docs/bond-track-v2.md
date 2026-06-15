@@ -60,7 +60,7 @@ Bond is a **HIDDEN 1–100 value**. The player **never sees the number**; it is 
 
 ## Interactions / constraints
 
-- **Levels still gate the BASE moveset + evolution (16/34).** Bond gates signature/coverage moves + Call economy. The two are complementary, not redundant — base kit from levels, mastery from bond.
+- **The base moveset is developmental-band-gated** (see move-pool); **evolution is bond-gated + boss-capped** (NOT level 16/34 — see `evolution-design.md`). Bond gates signature/coverage moves + Call economy + the evolution bond-gate. The tracks are complementary: base kit from the developmental band, mastery + evolution from bond. (Argent has no player-facing levels.)
 - Temperaments stack on bond; the combined solo shift must stay ≤3% (test the cross-product).
 - Marked mons may start one bond tier up (minor, sim-gated).
 - **Bond XP source = QUALITY ONLY** (ruling): read-wins, boss clears, Calls landed. No participation/time XP. This is the anti-grind firewall — keep it strict.

@@ -2,6 +2,8 @@
 
 Tier canon (already engine law): light 12 ST / w0.85 · mid 22 / w1.0 · heavy 35 / w1.15 · nuke 55 / w1.30. Type multiplier from `typechart.json` applies after stance modifiers. Machine-readable: `moves.json`.
 
+> **"Level" / "level band" below = the INTERNAL developmental band, not a player-facing level** (Argent shows no level number). It paces base-moveset unlocks only. **Evolution is bond-gated + boss-capped — NOT level 16/34** (see `evolution-design.md`); signature/coverage moves are bond-gated (see `bond-track-v2.md`).
+
 ## Naming law
 1–2 words, ALL CAPS, element + strike-verb pattern (EMBER SNAP, DIVE BOMB). Demo-era names are grandfathered in where listed.
 

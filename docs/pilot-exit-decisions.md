@@ -34,6 +34,8 @@ The demo's berry-pink GBC shell retires to the museum. The pixel style, panel la
 
 `id, name, types[], stats{hp,atk,dfn,spd}, archetype, learnset[{move,level}], evoLine{stage,evolvesTo,at}, dexEntry (2 lines), habitatTags[], encounterRarity, spriteRef`
 
+> **Schema note (superseded by `evolution-design.md`):** `learnset[].level` is the **internal developmental band**, not a player-facing level (Argent shows no level number). `evoLine.at` is **NOT a level (16/34)** — replace it with the bond-gated/boss-capped pair **`{bondStage, progressGate}`** (whichever is satisfied second triggers the evo; cap lifts after 8 Johto badges). Update this schema when the dex slice is next touched.
+
 ### Archetype grid — design 151 by filling a matrix, not one-by-one
 
 Stats come from archetype templates ± variance, so balance holds in bulk:
