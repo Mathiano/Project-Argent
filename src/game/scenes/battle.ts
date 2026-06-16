@@ -153,7 +153,13 @@ function computeInit(side: SideState, moveName: string | null, stance: Stance): 
   return stag;
 }
 
-function orderHint(
+// The TRUE turn-order verdict, mirroring the engine's resolveRound order
+// logic: Fluid-vs-Guard acts first regardless of speed, else by initiative
+// (speed ÷ move weight, stagger-halved). This is what the move-menu NEXT
+// preview shows — the honest answer to "who acts first" (NOT raw speed,
+// which is only the dodge lever + initiative numerator). Exported so a
+// test can pin it against the engine's actual `first`.
+export function orderHint(
   pl: SideState,
   foe: SideState,
   plMove: string | null,
@@ -1297,12 +1303,15 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // ramp). A null line = OPAQUE: show a blank dash, no read. The SPD readout
     // below stays honest — speed isn't hidden, the foe's STANCE intent is.
     drawText(ctx, shownIntent.line ?? '———', INTENT.x + 60, INTENT.y + 2, PALETTE.paper);
-    // S2 — speed relationship (decides dodges AND turn order), the
-    // hidden variable. Persistent on the intent bar while choosing.
+    // Base-SPEED relationship: the dodge lever + the initiative NUMERATOR.
+    // It is NOT the turn-order verdict — order = speed ÷ move weight, with
+    // the Fluid override, shown move-by-move as "NEXT:" in the move menu.
+    // (turn-order-fix: the old label implied it decided turn order, so a
+    // raw-slower mon acting first via a lighter move / Fluid read as a bug.)
     const sl = speedLabel(activeMon(state.player).species.spd, activeMon(state.foe).species.spd);
     const slColor =
       sl === 'YOU FASTER' ? PALETTE.hpOk : sl === 'YOU SLOWER' ? PALETTE.hpCrit : PALETTE.paperShadow;
-    drawTextRight(ctx, `SPD: ${sl}`, INTENT.x + INTENT.w - 4, INTENT.y + 2, slColor);
+    drawTextRight(ctx, `BASE SPD: ${sl}`, INTENT.x + INTENT.w - 4, INTENT.y + 2, slColor);
   }
 
   // S1 — the explanatory callout banner. Shown during resolve (the intent
@@ -1426,17 +1435,31 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawStanceBadge(ctx, BOTTOM.x + 170, BOTTOM.y + 8, stance);
     drawText(ctx, STANCE_NAME[stance], BOTTOM.x + 182, BOTTOM.y + 8);
 
-    // Order preview
+    // Turn-order preview — the HONEST "who acts first" for THIS move
+    // (initiative = speed ÷ move weight, with the Fluid-vs-Guard override).
+    // This is the truth the persistent SPD readout can't show (it's raw
+    // speed); a raw-slower mon legitimately acts first with a lighter move
+    // or via Fluid, and the player sees it HERE.
     const previewMove = moves[moveCursor]!;
+    const foeSt = actionStance(foeAction);
     const order = orderHint(
       activeMon(state.player),
       activeMon(state.foe),
       previewMove,
       stance,
       actionMove(foeAction),
-      actionStance(foeAction),
+      foeSt,
     );
-    drawText(ctx, `NEXT: ${order}`, BOTTOM.x + 170, BOTTOM.y + 22, PALETTE.paperShadow);
+    // Surface the Fluid exception explicitly — "I'm slower but I go first
+    // because FLUID" must be visible, not a mystery.
+    const fluidFirst = (stance === 'F' && foeSt === 'G') || (foeSt === 'F' && stance === 'G');
+    drawText(
+      ctx,
+      `NEXT: ${order}${fluidFirst ? ' ·FLUID' : ''}`,
+      BOTTOM.x + 170,
+      BOTTOM.y + 22,
+      fluidFirst ? PALETTE.stanceF : PALETTE.paperShadow,
+    );
     drawText(ctx, 'SEL=stance  B=back', BOTTOM.x + 170, BOTTOM.y + BOTTOM.h - 12, PALETTE.paperDim);
   }
 

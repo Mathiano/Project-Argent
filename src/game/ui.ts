@@ -34,7 +34,13 @@ export function drawBar(
   // pre-switch) can never overflow the bar past the panel border.
   // The real fix is keeping value + max in sync (see battle.ts display
   // contract); this is belt-and-suspenders.
-  const filled = Math.max(0, Math.min(w, Math.round((w * value) / Math.max(1, max))));
+  let filled = Math.max(0, Math.min(w, Math.round((w * value) / Math.max(1, max))));
+  // Legibility (turn-order-fix): a STILL-ALIVE mon must never render a
+  // fully empty bar — a foe surviving a near-lethal hit at <1px otherwise
+  // looks dead, so its Guard counter / follow-up reads as a "fainted mon
+  // hit back" (the false mutual-KO the player reported). A living mon
+  // always shows ≥1px; only true 0 (KO'd) renders empty.
+  if (value > 0 && filled === 0) filled = 1;
   ctx.fillStyle = color;
   ctx.fillRect(x, y, filled, 4);
   ctx.strokeStyle = PALETTE.ink;
