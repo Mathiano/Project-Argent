@@ -6,6 +6,8 @@ The spine. This replaces ad-hoc sprint picking. Each phase depends only on what'
 
 **Foundation → Content → Polish, in dependency order.** A sprint may only start when its prerequisites are green. Features are fun to build out of order; that is exactly how the project breaks. When tempted to jump ahead, log the idea in the backlog and stay on the critical path.
 
+> **Risks & gaps companion:** `docs/design-risks-and-gaps.md` is the watch-list — 4 design risks (with build-guidance mitigations) + 7 uncovered gaps (biggest: **audio**, with zero plan anywhere). Re-read the relevant risk before building a risky system (notably: build **status incrementally + be willing to cut**; consider building **bond earlier than Phase 8** since so much leans on it). It adds no features — it's there to catch problems early.
+
 ## Three scope tiers (what "done" means)
 
 - **DEMO (the vertical slice):** New Bark → Route → Violet City → Falkner, playable start to finish with intro, save, party, healing, one real gym. This is the proof the game works. **Everything before "Phase 6" below is the demo.**
