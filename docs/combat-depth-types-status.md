@@ -100,6 +100,46 @@ A strongly-bonded mon **starts each battle with 1-2 ★ banked** (scaling with b
 
 ---
 
+## Part 4B — Status DISPLAY (the legibility layer) — LOCKED
+
+Status only teaches if the player can *read* it. Display is **dual-layer, exactly like stances**: a terse machine-readable **TAG** on the mon's status bar for at-a-glance state, plus the **full plain-language sentence in the battle log** for the teaching loop. The tag is the glanceable reminder; the log sentence is where the player *learns* what it means (same pattern as the stance-resolution lines).
+
+### The two layers
+- **Bar TAG** — a small 3-letter box on the afflicted mon's status bar. Glanceable, persistent while the status lingers.
+- **Battle-log sentence** — full plain-language on application (and on notable ticks/expiry): *"GRUBLEAF is doubtful!"* · *"KINDRAKE is frozen — locked in stance!"* · *"FLITPECK is drained — its stamina is bleeding!"* Same teaching-loop voice as stance resolutions.
+
+### Lingering-only rule (what gets a tag)
+**Only LINGERING statuses get a bar tag.** INSTANT effects (NATURE **Drain**, AQUA **Recover** — they resolve the moment the move lands) **just narrate in the log** — no persistent tag, because there's no ongoing state to remind the player of. A tag means "this condition is still on me."
+
+### The tags + colors
+Color reads **BOTH valence AND source**: negatives take their **inflicting type's flavor color** (so the bar hints *what hit you*); positives are **GREEN** (so green always = good for me). Two signals in one swatch.
+
+| Status | Tag | Valence | Bar color (source) |
+|---|---|---|---|
+| Burn (FLAME) | **BRN** | negative | fire-red |
+| Frozen (FROST) | **FRZ** | negative | ice-blue |
+| Daze (SPARK/BRAWN) | **DAZ** | negative | electric-yellow |
+| Drained — stamina bleed (VENOM) | **DRN** | negative | venom green/purple |
+| Stunned (TERRA) | **STN** | negative | earth-brown |
+| Inception (PSI) | **INC** | negative | psychic-magenta |
+| Sap (INSECT) | **SAP** | negative | bug-olive |
+| Daunt (DRAKE) | **DNT** | negative | drake-violet |
+| Doubt (UMBRA) | **DBT** | negative | shadow-purple |
+| Taunt (BRAWN) | **TNT** | negative | fighting-orange |
+| Overheat (mechanic) | **OVR** | negative (self-tax) | hot-orange |
+| Brace (STONE) | **BRC** | **positive** | GREEN |
+| Shrouded (SPIRIT) | **SHR** | **positive** | GREEN |
+| Resolve (bond) | **RSV** | **positive** | GREEN |
+
+### Rules
+- **Small boxes**: tag boxes are sized so **3 stack on a status bar without overflow**.
+- **The negative CAP = 3.** A mon carries at most **3 negative statuses** at once; applying a 4th **drops the oldest**. This bounds the worst case and keeps the bar legible.
+- **Positives are tracked SEPARATELY** (Brace / Shrouded / Resolve) and **do NOT count toward the negative cap** — a mon can carry its own positive buff *and* up to 3 negatives.
+- **Stacking 3 stays RARE/earned.** The status economy (Part 4) gates it: each application is a read-win + significant stamina + diminishing returns. Three-at-once is a hard-won blowout, not a baseline — the cap is a ceiling the economy rarely lets you reach.
+- **Log sentences are full plain-language** (Part 3's effects, voiced for a player): the tag is the shorthand, the sentence is the lesson. Never show a tag without having taught it in the log first.
+
+---
+
 ## Part 5 — The two near-term combat issues this raises (separate from the status build)
 
 ### Issue A — Intent reliability ramp NOT enforced (load-bearing)
@@ -126,6 +166,32 @@ A strongly-bonded mon **starts each battle with 1-2 ★ banked** (scaling with b
 
 ---
 
+## Part 7 — In-battle Dex lookup (SCAN the foe) — LOCKED (build later, schema reserved now)
+
+A battle-menu option to **SCAN** the current foe surfaces its dex entry **mid-fight** — turning the Dex from a passive journal into a live combat tool. Crucially, **what SCAN reveals is GATED BY YOUR DEX KNOWLEDGE of that species**:
+
+| Your dex status | SCAN reveals |
+|---|---|
+| **CAUGHT** | **FULL scan** — type(s), combat **ROLE** (tanky / striker / disruptor), and **STATUS TENDENCIES** (what it tends to inflict). |
+| **SEEN, not caught** | **PARTIAL** — type only (or *"combat style unknown"*). |
+| **NEW / unseen** | **Little-to-nothing** — *"No data — never encountered."* |
+
+### Why this is on-thesis
+- **Catching literally improves your combat knowledge** — knowledge = power. Catching a species isn't just collection; it *unlocks intel* you can read mid-fight forever after. A concrete, mechanical reason to catch.
+- **First encounters stay scary.** You can't scan the unknown — a brand-new foe is a genuine question mark, exactly as it should feel.
+- **It pairs with the intent ramp into a two-tier info game:** **dex = what the SPECIES tends to do** (its role + status tendencies, learned by catching); **intent = what THIS individual is about to do** (its tell, reliability-ramped per Part 5 Issue A). Species-knowledge and individual-read are two different axes of information — SCAN feeds the first, the intent system the second.
+
+### Schema impact — these dex fields become LOAD-BEARING (reserve now, populate later)
+SCAN makes four dex fields *mechanically* meaningful (not just flavor), so the **schema slots are RESERVED NOW** to avoid retrofitting ~200 mons later. Population happens later (statusTendencies depends on the status system existing; habitat/description fill in per-chapter as the world is built):
+- **`role`** — combat archetype tag (tanky / striker / disruptor), tied to the type identities (Part 2). The FULL-scan headline.
+- **`statusTendencies`** — which statuses this species tends to inflict; **derivable later** from its type identity + movepool, but reserved as an explicit field so SCAN reads one place.
+- **`habitat`** — location / where-to-find. **DISPLAY GATED BY DISCOVERY** — only shown for species the player has encountered (you don't get a free atlas of unmet mons). Populated as routes are built. *(Distinct from the existing generation-side `habitatTags`; `habitat` is the player-facing, discovery-gated display string.)*
+- **`description`** — flavor prose. **Already served by the existing `dexEntry` field** — no new slot needed; authored per-chapter, placeholder until then. (Listed here so the four-field set is explicit; `dexEntry` IS the description.)
+
+**Build dependency:** SCAN's FULL tier depends on the status system (for `statusTendencies`) → build alongside / after the status phase. The TYPE and SEEN/UNSEEN gating tiers could ship earlier (they need only type + dex status, both of which exist today) — a possible early sliver if desired.
+
+---
+
 ## Build scope (Phase 6-8)
 
 **Core:**
@@ -133,7 +199,9 @@ A strongly-bonded mon **starts each battle with 1-2 ★ banked** (scaling with b
 - The 13 type identities (Burn/Drain/Recover/immunity/tank-shape + the disruption statuses).
 - Resolve as a bond-gated Call; Doubt as UMBRA's signature; bond-baseline-★.
 - Effect moves (the 2-per-type the move pool budgeted) authored with their status.
+- **Status DISPLAY (Part 4B):** the dual-layer bar TAG + battle-log sentence; lingering-only tagging; 3-negative cap with positives tracked separately; thematic tag colors.
 - Sim-gate the type×status cross-product.
+- **In-battle SCAN (Part 7):** the dex-knowledge-gated foe lookup. FULL tier depends on `statusTendencies` (so build with/after status); the type-only / unseen tiers could ship earlier. **Schema slots (`role`, `statusTendencies`, `habitat`) reserved now** in `src/engine/dexLoader.ts` so content isn't retrofitted.
 
 **Separate near-term sprints (Part 5):** intent-ramp enforcement; TTK tuning.
 

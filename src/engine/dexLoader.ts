@@ -29,6 +29,23 @@ export interface DexEntryJson {
   readonly spriteRef?: string;
   readonly facing?: 'left' | 'right';
   readonly trait?: string;
+  // ---- RESERVED for the in-battle SCAN (combat-depth-types-status.md
+  // Part 7). These are LOAD-BEARING once SCAN ships — reserved now,
+  // optional, populated later (per-chapter / with the status system) so
+  // ~200 mons aren't retrofitted. SCAN reveals them gated by dex status:
+  // CAUGHT → full, SEEN → type only, unseen → nothing.
+  //   `description` is NOT re-declared — the existing `dexEntry` above IS
+  //   the flavor description field.
+  // Combat archetype tag (e.g. 'tanky' | 'striker' | 'disruptor'), tied
+  // to the type identities. The FULL-scan headline. Free-form for now.
+  readonly role?: string;
+  // Statuses this species tends to inflict (e.g. ['Burn']). Derivable
+  // later from type identity + movepool; reserved so SCAN reads one place.
+  readonly statusTendencies?: readonly string[];
+  // Player-facing, DISCOVERY-GATED location string ("where to find it") —
+  // shown only for encountered species. Distinct from the generation-side
+  // `habitatTags` above (those are authoring tags, not display).
+  readonly habitat?: string;
 }
 
 export interface MoveJson {

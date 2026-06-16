@@ -60,6 +60,8 @@ Prerequisite: Phase 6 (catching makes both necessary). Surfaced by playtest 2026
 - **Pokédex:** the game currently has **no Pokédex** — a real gap. A seen/caught registry + per-species entries (the dex-as-journal vision: entries that grow field notes from your history, per `feature-ambition-scope.md`).
 - **Why bundled:** both are mon-record UIs, both made necessary by catching, both lean on the same party/box/species data. **Scope as one box+dex sprint soon.**
 - **Gate:** deposit/withdraw a caught mon; the dex registers seen/caught with viewable entries.
+- ✅ **SHIPPED (2026-06-16)** — `KICKOFF-phase6.5-box-dex.md`. Center PC deposit/withdraw (party keeps ≥1, bond travels), seen/caught registry + status-gated dex UI (caught full / seen partial / unseen `???`), starter marks caught, CH1 entries, all persisted. Engine/ladders bit-identical. **Follow-up shipped:** trainer/boss foes now mark **SEEN** too (dex isn't wild-only — `markSeenAll`).
+- **Forward hook → in-battle SCAN:** the dex becomes a *live combat tool* later — a battle-menu SCAN of the foe, **gated by dex knowledge** (caught → full role + status tendencies; seen → type only; unseen → nothing). Design LOCKED in `combat-depth-types-status.md` **Part 7**; its schema slots (`role`, `statusTendencies`, `habitat`) are **already reserved** in `src/engine/dexLoader.ts` so content isn't retrofitted. Build lands with the status phase (depends on `statusTendencies`).
 
 ## PHASE 6.7 (NEAR-TERM) — Combat-depth groundwork (NOT the status build)
 Three items surfaced by the combat-depth design pass (`docs/combat-depth-types-status.md`). The full status/type-identity **build** is Phase 6-8 (see Phase 8); these are the load-bearing-now slivers that ship as their own small sprints first.
@@ -75,7 +77,9 @@ Prerequisite: Phases 1–6 (the systems all the content sits on).
 
 ## PHASE 8+ — Scale to the full game (chapter by chapter)
 Prerequisite: Phase 7 (the chapter template proven once).
-- Gyms 2–8 (boss cards on the Whitney template), the Rocket arc, E4, Kanto, Mt. Silver, **status conditions + the 13 type identities** (design locked: `docs/combat-depth-types-status.md` — deterministic status that attacks the read/rhythm/triangle/bond, the status economy, Doubt/Resolve, bond-baseline-★), held items, day/night, Phone 2.0, the bond track, the Gauntlet.
+- Gyms 2–8 (boss cards on the Whitney template), the Rocket arc, E4, Kanto, Mt. Silver, **status conditions + the 17 type identities** (design locked: `docs/combat-depth-types-status.md` — deterministic status that attacks the read/rhythm/triangle/bond, the status economy, Doubt/Resolve, bond-baseline-★), held items, day/night, Phone 2.0, the bond track, the Gauntlet.
+  - **Status DISPLAY (Part 4B, LOCKED):** dual-layer like stances — a 3-letter bar TAG (BRN/FRZ/DAZ/… thematically colored: negatives by inflicting-type flavor, positives GREEN) + the full plain-language battle-log sentence. Lingering-only tagging; 3-negative cap with positives (Brace/Shrouded/Resolve) tracked separately. Build with the status system.
+  - **In-battle SCAN (Part 7, LOCKED):** dex-knowledge-gated foe lookup (see Phase 6.5 forward hook). Pairs with the intent ramp — dex = species tendencies, intent = this individual. Schema reserved in `dexLoader.ts`.
 - Each chapter reuses the Phase 7 template. Features interleave per the parity checklist order.
 
 ---
