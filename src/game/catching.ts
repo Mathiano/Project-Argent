@@ -12,6 +12,11 @@ import type { RNG } from '../engine';
 // it yet). 'read' = Path 1 window catch · 'mercy' = Path 2 willing-join ·
 // 'starter' = the lab gift · 'gift' = any other grant / provenance not
 // recorded (legacy saves, dev hooks). See docs/living-world.md.
+// FORWARD-NOTE (docs/the-concord.md, build mid-game — NOT now): this enum
+// gains a `'rescued'` value when the Concord faction builds (a mon freed
+// from bond-severance). Cheap because the FIELD already exists + persists
+// — adding the value later is one literal here + one row in the save
+// validator. Do NOT add it until the faction is built.
 export type CatchOrigin = 'read' | 'mercy' | 'starter' | 'gift';
 
 export const CATCH_ORIGINS: readonly CatchOrigin[] = ['read', 'mercy', 'starter', 'gift'];
