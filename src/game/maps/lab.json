@@ -208,7 +208,7 @@
             {
               "kind": "dialog",
               "lines": [
-                "LARCH: That FLAME of yours —",
+                "LARCH: That FLAME-type of yours —",
                 "give it time.",
                 "Fire trusts slowly."
               ]
@@ -222,7 +222,7 @@
             {
               "kind": "dialog",
               "lines": [
-                "LARCH: That NATURE of yours —",
+                "LARCH: That NATURE-type of yours —",
                 "give it time.",
                 "Roots grow patient."
               ]
@@ -236,7 +236,7 @@
             {
               "kind": "dialog",
               "lines": [
-                "LARCH: That AQUA of yours —",
+                "LARCH: That AQUA-type of yours —",
                 "give it time.",
                 "Water remembers."
               ]

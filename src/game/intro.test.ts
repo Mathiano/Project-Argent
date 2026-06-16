@@ -281,9 +281,9 @@ describe('Phase 3 polish — dialogue beats land in the data', () => {
     );
     if (!theft || theft.type !== 'script') throw new Error('theft missing');
     const text = JSON.stringify(theft.commands);
-    expect(text).toContain('That FLAME of yours');
-    expect(text).toContain('That NATURE of yours');
-    expect(text).toContain('That AQUA of yours');
+    expect(text).toContain('That FLAME-type of yours');
+    expect(text).toContain('That NATURE-type of yours');
+    expect(text).toContain('That AQUA-type of yours');
   });
 });
 

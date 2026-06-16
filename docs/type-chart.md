@@ -29,21 +29,21 @@ FORGE        r    ·    r    ·    S    ·    r    r    S    ·    ·    ·    �
 DRAKE        ·    ·    ·    ·    ·    ·    ·    ·    ·    ·    ·    r    S
 ```
 
-## Immunity reclassification (Gen-2 zeros → 0.7 or 1.0) — ⚠ PENDING YOUR GLANCE
+## Immunity reclassification (Gen-2 zeros → 0.7 or 1.0) — ✅ LOCKED (2026-06-16)
 
-Ruling 2026-06-15: **NO hard immunities (0×) in Argent.** Each Gen-2 zero-matchup resolves flavor-justified → **0.7** (a real reason one can't meaningfully hit the other) or arbitrary-convention → **1.0**. All 7 Gen-2 zeros, classified; **5 already match the chart, 2 need a change, 1 is a CONFLICT.** Nothing written until you veto/approve.
+Ruling: **NO hard immunities (0×) in Argent.** Each Gen-2 zero-matchup resolves flavor-justified → **0.7** (a real reason one can't meaningfully hit the other) or arbitrary-convention → **1.0**. All 7 classified and locked; 5 already matched, **2 flipped to 1.0** (applied), and TERRA→GALE **kept at 1.3** (the prep loop — see below).
 
-| Gen-2 zero (0×) | Argent cell | Class | → value | current | action |
+| Gen-2 zero (0×) | Argent cell | Class | value | was | status |
 |---|---|---|---|---|---|
-| Normal→Ghost | BASIC→SPIRIT | arbitrary *(your example)* | 1.0 | 1.0 | none |
-| Ghost→Normal | SPIRIT→BASIC | arbitrary *(your example, both ways)* | 1.0 | 0.7 | **set 1.0** |
-| Fighting→Ghost | BRAWN→SPIRIT | arbitrary *(same incorporeal logic as Normal→Ghost)* | 1.0 | 0.7 | **set 1.0** *(judgment — veto?)* |
-| Ground→Flying | TERRA→GALE | flavor *(bird hard to hit with earth)* | 0.7 | **1.3** | ⚠ **CONFLICT — see below** |
-| Electric→Ground | SPARK→TERRA | flavor *(earth grounds electricity)* | 0.7 | 0.7 | none |
-| Poison→Steel | VENOM→FORGE | flavor *(can't poison metal)* | 0.7 | 0.7 | none |
-| Psychic→Dark | PSI→UMBRA | flavor *(closed/cunning mind resists psychic)* | 0.7 | 0.7 | none |
+| Normal→Ghost | BASIC→SPIRIT | arbitrary | 1.0 | 1.0 | matched |
+| Ghost→Normal | SPIRIT→BASIC | arbitrary *(Ghost↔Normal neutral both ways)* | 1.0 | 0.7 | ✅ flipped |
+| Fighting→Ghost | BRAWN→SPIRIT | arbitrary *(same incorporeal logic as Normal→Ghost)* | 1.0 | 0.7 | ✅ flipped |
+| Ground→Flying | TERRA→GALE | **kept (prep loop)** | **1.3** | 1.3 | ✅ kept |
+| Electric→Ground | SPARK→TERRA | flavor *(earth grounds electricity)* | 0.7 | 0.7 | matched |
+| Poison→Steel | VENOM→FORGE | flavor *(can't poison metal)* | 0.7 | 0.7 | matched |
+| Psychic→Dark | PSI→UMBRA | flavor *(closed/cunning mind resists psychic)* | 0.7 | 0.7 | matched |
 
-⚠️ **TERRA→GALE conflict:** the flavor rule wants 0.7 (GALE resists Ground), but the chart reads **1.3** as the *load-bearing Falkner prep-loop* ("catch a TERRA cave mon to counter the GALE gym" — `falkner-boss-card.md`, ruling #3 below, gym-1 counter = TERRA, and the GRITHOAX/CAVELURE/CHASMTRAP cave line is built as that counter). Flipping to 0.7 **inverts the prep loop**. Two ways to resolve — your call: **(a)** keep TERRA→GALE = **1.3** (prep loop intact; GALE's "resist Ground" identity then applies to OTHER Ground threats, not the Falkner cheese — and "GALE resists Ground" becomes aspirational/partial); or **(b)** set **0.7** (clean no-immunity identity) and **re-home the Falkner counter** to SPARK/FROST/STONE (all hit GALE 1.3), re-typing or replacing the cave line. (a) is the smaller change; (b) is cleaner-but-cascades.
+**TERRA→GALE = 1.3 (resolved KEEP).** The "no immunity" goal is honored trivially — 1.3 is the *opposite* of an immunity. The earlier "GALE resists Ground" framing was **backwards**: GALE is **WEAK to TERRA/Ground (×1.3)**, and *that vulnerability is the counter* — the load-bearing Falkner prep-loop ("catch a TERRA cave mon — GRITHOAX/CAVELURE/CHASMTRAP — to hit the GALE gym ×1.3", `falkner-boss-card.md`, ruling #3 below, gym-1 counter = TERRA). GALE's identity in `combat-depth-types-status.md` now reads "weak to Ground," not "resists/immune."
 
 ## Proposed new-type matchups (PSI / INSECT / STONE / UMBRA) — ⚠ PENDING APPROVAL
 
