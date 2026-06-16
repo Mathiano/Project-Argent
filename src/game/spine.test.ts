@@ -511,8 +511,9 @@ describe('DEMO-COMPLETE GATE — cold spine intro → Violet → gym → Falkner
     h.tick(30);
     expect(h.overworld().currentPosition().map).toBe('VIOLET');
 
-    // Violet City → gym (the rooftop gym door at the top of the city).
-    walkTo(h, 9, 3);
+    // Violet City → gym: enter from the north (S3) and walk south down
+    // the city lane to the gym door at the south end.
+    walkTo(h, 9, 12);
     h.tick(30);
     expect(h.overworld().currentPosition().map).toBe('GYM');
 

@@ -212,13 +212,15 @@ describe('Demo-complete — Violet City hub wires Route 31 → Violet → gym', 
     expect(warpTarget).toBe('VIOLET:fromRoute');
   });
 
-  test('Violet gym door warps INTO the gym; south exit warps back to Route 31', () => {
-    // Gym door: spawn fromGym is one tile below the gym door (Phase 7 city).
+  test('Violet (S3 re-orient): gym door entered walking DOWN; route exit is the NORTH edge', () => {
+    // Phase 7 firstroad-fixes S3: the player walks Route 31 south and
+    // emerges at Violet's TOP. The gym is at the south end (entered walking
+    // DOWN onto its door); the route exit is the NORTH-edge gap (walk UP).
     let gymWarp: string | null = null;
     const input = mockInput();
-    const upScene = createOverworldScene({
+    const gymScene = createOverworldScene({
       map: 'VIOLET',
-      spawn: 'fromGym',
+      spawn: 'fromGym', // (9,11), one tile above the gym door at (9,12)
       inputState: input,
       flags: mockFlags(),
       onWarp: (t) => {
@@ -229,15 +231,16 @@ describe('Demo-complete — Violet City hub wires Route 31 → Violet → gym', 
       onBossBattle: () => {},
       startFaded: true,
     });
-    tickStep(upScene, 0.4);
-    walkOne(upScene, input, 'up'); // (8,4) → warp
-    tickStep(upScene, 0.4);
+    tickStep(gymScene, 0.4);
+    walkOne(gymScene, input, 'down'); // onto the gym door (9,12) → warp
+    tickStep(gymScene, 0.4);
     expect(gymWarp).toBe('GYM:fromRoute');
 
-    // South exit: spawn fromRoute is one tile north of the bottom-edge exit.
+    // Route exit: spawn fromRoute (the north entrance at (9,1)); walking
+    // UP onto the north-edge gap (9,0) warps back to Route 31.
     let routeWarp: string | null = null;
     const input2 = mockInput();
-    const downScene = createOverworldScene({
+    const exitScene = createOverworldScene({
       map: 'VIOLET',
       spawn: 'fromRoute',
       inputState: input2,
@@ -250,9 +253,9 @@ describe('Demo-complete — Violet City hub wires Route 31 → Violet → gym', 
       onBossBattle: () => {},
       startFaded: true,
     });
-    tickStep(downScene, 0.4);
-    walkOne(downScene, input2, 'down'); // onto the bottom-edge exit → warp
-    tickStep(downScene, 0.4);
+    tickStep(exitScene, 0.4);
+    walkOne(exitScene, input2, 'up'); // onto the north-edge exit → warp
+    tickStep(exitScene, 0.4);
     expect(routeWarp).toBe('ROUTE31:fromViolet');
   });
 });
