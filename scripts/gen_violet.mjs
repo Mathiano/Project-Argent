@@ -16,26 +16,27 @@ const tileMap = {
 };
 const SOLID = new Set(['tree', 'plaster', 'gym_facade_m']); // doors + path + grass walkable
 
-// 20x18. South edge = route exit. Gym top-center (plaster city around it).
+// 20x17. NORTH edge = the route entrance (S3: the player walks Route 31
+// southward, so they emerge at Violet's TOP and head DOWN into the city —
+// shops in the upper-mid, the gym at the south end).
 const rows = [
-  'TTTTTTTTTTTTTTTTTTTT', //  0
-  'T..................T', //  1
-  'T......ggggg.......T', //  2  GYM facade
-  'T......ggGgg.......T', //  3  gym door (9,3) -> GYM interior
-  'T........p.........T', //  4
-  'T........p.........T', //  5
-  'T..BBB...p....BBB..T', //  6  Center (3-5) + Mart (14-16)
-  'T..BDB...p....BDB..T', //  7  Center door (4,7), Mart door (15,7)
-  'T...p....p.....p...T', //  8
-  'T...pppppppppppp...T', //  9  connector links doors + spine
+  'TTTTTTTTTpTTTTTTTTTT', //  0  route warp (9,0) north edge -> ROUTE31
+  'T........p.........T', //  1  fromRoute spawn (9,1), facing DOWN
+  'T........p.........T', //  2
+  'T..BBB...p....BBB..T', //  3  Center (3-5) + Mart (14-16)
+  'T..BDB...p....BDB..T', //  4  Center door (4,4), Mart door (15,4)
+  'T...p....p.....p...T', //  5
+  'T...pppppppppppp...T', //  6  connector links doors + spine
+  'T........p.........T', //  7
+  'T..BBB...p....BBB..T', //  8  flavor plaster houses (closed)
+  'T..BBB...p....BBB..T', //  9
   'T........p.........T', // 10
-  'T..BBB...p....BBB..T', // 11  flavor plaster houses (closed)
-  'T..BBB...p....BBB..T', // 12
-  'T........p.........T', // 13
-  'T........p.........T', // 14
-  'T........p.........T', // 15
-  'T........p.........T', // 16  fromRoute spawn (9,16)
-  'TTTTTTTTTpTTTTTTTTTT', // 17  south exit (9,17) -> ROUTE31
+  'T........p.........T', // 11
+  'T......ggGgg.......T', // 12  GYM: door (9,12) at the facade top…
+  'T......ggggg.......T', // 13  …body below; entered walking DOWN
+  'T..................T', // 14
+  'T..................T', // 15
+  'TTTTTTTTTTTTTTTTTTTT', // 16  south wall (no exit; the route is north)
 ];
 const H = rows.length;
 rows.forEach((r, y) => { if (r.length !== W) throw new Error(`row ${y} width ${r.length}: "${r}"`); });
@@ -60,12 +61,12 @@ function reachable(from) {
   }
   return seen;
 }
-const seen = reachable({ x: 9, y: 16 }); // fromRoute
+const seen = reachable({ x: 9, y: 1 }); // fromRoute (top entrance)
 const mustReach = {
-  'gym door (9,3)': [9, 3],
-  'center door (4,7)': [4, 7],
-  'mart door (15,7)': [15, 7],
-  'south exit (9,17)': [9, 17],
+  'route warp (9,0)': [9, 0],
+  'center door (4,4)': [4, 4],
+  'mart door (15,4)': [15, 4],
+  'gym door (9,12)': [9, 12],
 };
 const fails = [];
 for (const [label, [x, y]] of Object.entries(mustReach)) {
@@ -76,27 +77,27 @@ if (fails.length) { console.error('FAILED:\n' + fails.join('\n')); process.exit(
 console.log(`OK — ${seen.size} reachable tiles from the route arrival.`);
 
 const objects = [
-  { type: 'warp', x: 9, y: 3, target: 'GYM:fromRoute' },
-  { type: 'warp', x: 4, y: 7, target: 'VIOLET_CENTER:fromViolet' },
-  { type: 'warp', x: 15, y: 7, target: 'VIOLET_MART:fromViolet' },
-  { type: 'warp', x: 9, y: 17, target: 'ROUTE31:fromViolet' },
-  { type: 'sign', x: 8, y: 5, lines: ['VIOLET CITY', "FALKNER's gym crowns", 'the rooftop. Count the wind.'] },
-  { type: 'sign', x: 5, y: 6, lines: ['POKÉMON CENTER', 'Rest your team —', 'free for trainers.'] },
-  { type: 'sign', x: 16, y: 6, lines: ['POKÉ MART', 'Supplies for the climb.'] },
+  { type: 'warp', x: 9, y: 0, target: 'ROUTE31:fromViolet' },
+  { type: 'warp', x: 4, y: 4, target: 'VIOLET_CENTER:fromViolet' },
+  { type: 'warp', x: 15, y: 4, target: 'VIOLET_MART:fromViolet' },
+  { type: 'warp', x: 9, y: 12, target: 'GYM:fromRoute' },
+  { type: 'sign', x: 8, y: 2, lines: ['VIOLET CITY', 'Welcome from the north road.', "FALKNER's gym stands south."] },
+  { type: 'sign', x: 5, y: 3, lines: ['POKÉMON CENTER', 'Rest your team —', 'free for trainers.'] },
+  { type: 'sign', x: 16, y: 3, lines: ['POKÉ MART', 'Supplies for the climb.'] },
   {
-    type: 'npc', x: 11, y: 5, color: '#3a7fbe',
-    interact: [{ kind: 'dialog', lines: ['GYM GUIDE: FALKNER took the', 'roof for his gym. Says the', 'wind is the third fighter.', 'Beat his trainer first —', 'they hand out a scout report.'] }],
+    type: 'npc', x: 11, y: 2, color: '#3a7fbe',
+    interact: [{ kind: 'dialog', lines: ['GYM GUIDE: Down the lane is', "FALKNER's gym. Says the wind", 'is the third fighter up there.', 'Beat his trainer first —', 'they hand out a scout report.'] }],
   },
   {
-    type: 'npc', x: 6, y: 10, color: '#caa148',
+    type: 'npc', x: 6, y: 7, color: '#caa148',
     interact: [{ kind: 'dialog', lines: ['TRAVELLER: Heal before you', 'climb — no Center on the roof.', 'The one here is just west.'] }],
   },
   {
-    type: 'npc', x: 13, y: 13, color: '#7c4fa8',
+    type: 'npc', x: 13, y: 10, color: '#7c4fa8',
     interact: [{ kind: 'dialog', lines: ['CITIZEN: The plasterwork here', 'is older than the gym.', 'Whole city the colour of', 'morning, my gran used to say.'] }],
   },
   {
-    type: 'npc', x: 5, y: 14, color: '#b14e9c',
+    type: 'npc', x: 5, y: 11, color: '#b14e9c',
     interact: [{ kind: 'dialog', lines: ['KID: One day the pond on the', 'route will have a bridge,', 'my dad says. Then we can', 'reach the far bank!'] }],
   },
 ];
@@ -110,7 +111,7 @@ for (const o of objects) {
 
 const map = {
   name: 'VIOLET CITY',
-  _note: 'Phase 7 Sprint 1 — data-driven Violet with the city PLASTER material identity. Generated by scripts/gen_violet.mjs. Gym (rooftop interior), Center + Mart enterable; full population deferred.',
+  _note: 'Phase 7 Sprint 1 (+firstroad-fixes S3) — data-driven Violet, PLASTER material identity, entered from the NORTH (player walks south down Route 31 into the city). Gym south end, Center + Mart enterable; full population deferred.',
   tilesetRef: 'outdoor_violet',
   width: W,
   height: H,
@@ -120,10 +121,12 @@ const map = {
   cells: rows,
   objects,
   spawns: {
-    fromRoute: { x: 9, y: 16, facing: 'up' },
-    fromGym: { x: 9, y: 4, facing: 'down' },
-    fromCenter: { x: 4, y: 8, facing: 'down' },
-    fromMart: { x: 15, y: 8, facing: 'down' },
+    // S3: arrive from the route at the NORTH entrance, facing DOWN into
+    // the city (the player was walking south down Route 31).
+    fromRoute: { x: 9, y: 1, facing: 'down' },
+    fromGym: { x: 9, y: 11, facing: 'up' }, // exit the gym just above its door
+    fromCenter: { x: 4, y: 5, facing: 'down' },
+    fromMart: { x: 15, y: 5, facing: 'down' },
   },
 };
 writeFileSync('src/game/maps/violet.json', JSON.stringify(map, null, 2) + '\n');
