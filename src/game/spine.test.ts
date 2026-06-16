@@ -54,7 +54,9 @@ import type {
 import { SceneStack } from './scene';
 import type { InputKey } from './scene';
 import type { InputState } from './input';
-import type { Facing } from './overworld/types';
+import type { Facing, MapData, MapObject } from './overworld/types';
+import { isWalkable } from './overworld/types';
+import { getMap } from './overworld/maps';
 import type { FlagStore } from './scenes/overworld';
 import { createOverworldScene } from './scenes/overworld';
 import type { OverworldScene } from './scenes/overworld';
@@ -380,15 +382,69 @@ function step(h: Harness, dir: Facing): void {
   h.tick(14);
 }
 
-// Walk toward a target tile, vertical axis first then horizontal,
-// recomputing each step so a gust push-back (Falkner's rooftop) is just
-// re-attempted. Bails out when reached or the step budget runs out.
-function walkTo(h: Harness, tx: number, ty: number, budget = 160): void {
+// Tiles the player cannot enter for pathing: blocking NPCs (respecting
+// blockedUntilFlag, exactly like npcBlocksAt) + every warp tile except
+// the destination (so a route never accidentally warps mid-walk).
+function pathBlocked(map: MapData, flags: { has(f: string): boolean }, tx: number, ty: number): Set<string> {
+  const blocked = new Set<string>();
+  for (const o of map.objects as readonly MapObject[]) {
+    if (o.type === 'npc') {
+      const blocks = !o.blockedUntilFlag || !flags.has(o.blockedUntilFlag);
+      if (blocks) blocked.add(`${o.x},${o.y}`);
+    } else if (o.type === 'warp' && !(o.x === tx && o.y === ty)) {
+      blocked.add(`${o.x},${o.y}`);
+    }
+  }
+  return blocked;
+}
+
+// BFS the next step toward (tx,ty) over walkable, non-blocked tiles.
+function bfsNext(
+  map: MapData,
+  flags: { has(f: string): boolean },
+  sx: number, sy: number, tx: number, ty: number,
+): Facing | null {
+  if (sx === tx && sy === ty) return null;
+  const blocked = pathBlocked(map, flags, tx, ty);
+  const start = `${sx},${sy}`;
+  const prev = new Map<string, string | null>([[start, null]]);
+  const q: Array<[number, number]> = [[sx, sy]];
+  while (q.length) {
+    const [x, y] = q.shift()!;
+    if (x === tx && y === ty) break;
+    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]] as const) {
+      const nx = x + dx, ny = y + dy, k = `${nx},${ny}`;
+      if (prev.has(k)) continue;
+      if (!isWalkable(map, nx, ny)) continue;
+      if (blocked.has(k) && !(nx === tx && ny === ty)) continue;
+      prev.set(k, `${x},${y}`);
+      q.push([nx, ny]);
+    }
+  }
+  if (!prev.has(`${tx},${ty}`)) return null; // unreachable
+  let cur = `${tx},${ty}`;
+  while (prev.get(cur) !== start) {
+    const p = prev.get(cur);
+    if (p == null) return null;
+    cur = p;
+  }
+  const [cx, cy] = cur.split(',').map(Number) as [number, number];
+  if (cy > sy) return 'down';
+  if (cy < sy) return 'up';
+  if (cx > sx) return 'right';
+  return 'left';
+}
+
+// Walk toward a target tile via BFS, recomputing each step so a gust
+// push-back (Falkner's rooftop) is just re-attempted. Robust to map
+// geometry (winding paths, water, forest). Bails if unreachable.
+function walkTo(h: Harness, tx: number, ty: number, budget = 400): void {
   for (let i = 0; i < budget; i += 1) {
     const p = h.overworld().currentPosition();
     if (p.x === tx && p.y === ty) return;
-    if (p.y !== ty) step(h, p.y > ty ? 'up' : 'down');
-    else step(h, p.x > tx ? 'left' : 'right');
+    const dir = bfsNext(getMap(p.map), h.flags, p.x, p.y, tx, ty);
+    if (dir === null) return;
+    step(h, dir);
   }
 }
 
@@ -432,6 +488,11 @@ describe('DEMO-COMPLETE GATE — cold spine intro → Violet → gym → Falkner
     });
     h.run.party = [createSide(CH1.KINDRAKE!)];
     h.flags.set('player_has_starter');
+    // Pre-mark Route 31's step-on flavor (the warning + the two hidden
+    // ground items) as already triggered, so their one-shot dialogs don't
+    // interrupt the spine walk. This gate tests TRAVERSAL; route content
+    // (events, items, the lost-mon vignette) is covered by firstRoad.test.ts.
+    for (const f of ['route31_warning', 'route31_item_forest', 'route31_item_pond']) h.flags.set(f);
 
     // Intro flags present (the audit's "intro flags" precondition).
     expect(h.flags.has('player_has_starter')).toBe(true);
@@ -444,15 +505,14 @@ describe('DEMO-COMPLETE GATE — cold spine intro → Violet → gym → Falkner
     h.tick(30); // fade + warp + new-scene fade-in
     expect(h.overworld().currentPosition().map).toBe('ROUTE31');
 
-    // Route 31 → Violet City: walk to the path stub (9,13), then one
-    // more step south onto the gap in the tree line at (9,14) → warp.
-    walkTo(h, 9, 13);
-    step(h, 'down');
+    // Route 31 → Violet City: the BFS walker winds the whole multi-screen
+    // route (grass, forest, around the pond) to the south-edge exit gap.
+    walkTo(h, 10, 29);
     h.tick(30);
     expect(h.overworld().currentPosition().map).toBe('VIOLET');
 
-    // Violet City → gym (gym door at (8,4)).
-    walkTo(h, 8, 4);
+    // Violet City → gym (the rooftop gym door at the top of the city).
+    walkTo(h, 9, 3);
     h.tick(30);
     expect(h.overworld().currentPosition().map).toBe('GYM');
 

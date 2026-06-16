@@ -190,12 +190,12 @@ describe('overworld cold-start warp round-trip', () => {
 });
 
 describe('Demo-complete — Violet City hub wires Route 31 → Violet → gym', () => {
-  test('Route 31 south exit — a gap in the tree line at (9,14) — warps INTO Violet City', () => {
+  test('Route 31 south exit — a gap in the tree line — warps INTO Violet City', () => {
     let warpTarget: string | null = null;
     const input = mockInput();
     const scene = createOverworldScene({
       map: 'ROUTE31',
-      spawn: 'fromViolet', // (9,13), one tile north of the bottom-edge gap
+      spawn: 'fromViolet', // one tile north of the bottom-edge gap (Phase 7 route)
       inputState: input,
       flags: mockFlags(),
       onWarp: (target) => {
@@ -212,8 +212,8 @@ describe('Demo-complete — Violet City hub wires Route 31 → Violet → gym', 
     expect(warpTarget).toBe('VIOLET:fromRoute');
   });
 
-  test('Violet gym door (8,4) warps INTO the gym; south exit (8,13) warps back to Route 31', () => {
-    // Gym door: spawn fromGym (8,5) is one tile below the door at (8,4).
+  test('Violet gym door warps INTO the gym; south exit warps back to Route 31', () => {
+    // Gym door: spawn fromGym is one tile below the gym door (Phase 7 city).
     let gymWarp: string | null = null;
     const input = mockInput();
     const upScene = createOverworldScene({
@@ -234,7 +234,7 @@ describe('Demo-complete — Violet City hub wires Route 31 → Violet → gym', 
     tickStep(upScene, 0.4);
     expect(gymWarp).toBe('GYM:fromRoute');
 
-    // South exit: spawn fromRoute (8,12) is one tile north of the exit (8,13).
+    // South exit: spawn fromRoute is one tile north of the bottom-edge exit.
     let routeWarp: string | null = null;
     const input2 = mockInput();
     const downScene = createOverworldScene({
@@ -251,7 +251,7 @@ describe('Demo-complete — Violet City hub wires Route 31 → Violet → gym', 
       startFaded: true,
     });
     tickStep(downScene, 0.4);
-    walkOne(downScene, input2, 'down'); // (8,13) → warp
+    walkOne(downScene, input2, 'down'); // onto the bottom-edge exit → warp
     tickStep(downScene, 0.4);
     expect(routeWarp).toBe('ROUTE31:fromViolet');
   });
@@ -428,9 +428,10 @@ describe('Phase 5a fix — encounter rolls only on real moves + post-battle grac
     const input = mockInput();
     const scene = createOverworldScene({
       map: 'ROUTE31',
-      // Drop the player onto a tall-grass tile directly via spawnAt.
+      // Drop the player onto a tall-grass encounter tile directly (the
+      // left grass column, encounter_zone cols 2-3 rows 5-9).
       spawn: 'default',
-      spawnAt: { x: 9, y: 10, facing: 'down' },
+      spawnAt: { x: 2, y: 6, facing: 'down' },
       inputState: input,
       flags: mockFlags(),
       onWarp: () => {},
@@ -457,9 +458,10 @@ describe('Phase 5a fix — encounter rolls only on real moves + post-battle grac
     const input = mockInput();
     const scene = createOverworldScene({
       map: 'ROUTE31',
-      // Start ABOVE the tall grass and walk DOWN into it twice.
+      // Start ABOVE the left grass column (encounter_zone cols 2-3 rows
+      // 5-9) and walk DOWN into it twice.
       spawn: 'default',
-      spawnAt: { x: 9, y: 8, facing: 'down' },
+      spawnAt: { x: 2, y: 4, facing: 'down' },
       inputState: input,
       flags: mockFlags(),
       onWarp: () => {},
@@ -476,11 +478,11 @@ describe('Phase 5a fix — encounter rolls only on real moves + post-battle grac
 
     // First step onto grass — grace consumed, no encounter despite
     // Math.random() = 0.
-    walkOne(scene, input, 'down'); // → (9, 9), tall grass
+    walkOne(scene, input, 'down'); // → (2, 5), in the encounter zone
     expect(encounters).toBe(0);
 
     // Second step — grace already spent, encounter fires.
-    walkOne(scene, input, 'down'); // → (9, 10), still tall grass
+    walkOne(scene, input, 'down'); // → (2, 6), still in the zone
     expect(encounters).toBe(1);
   });
 });
