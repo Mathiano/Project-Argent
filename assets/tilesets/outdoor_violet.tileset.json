@@ -53,6 +53,7 @@
       "label": "tall grass",
       "solid": false,
       "encounter": "primary",
+      "fps": 3,
       "rows": [
         "3232323232323232",
         "2323232323232323",
@@ -70,6 +71,26 @@
         "2323232323232323",
         "3232323232323232",
         "2323232323232323"
+      ],
+      "frames": [
+        [
+          "2323232323232323",
+          "3232323232323232",
+          "2323232323232323",
+          "3232323232323232",
+          "2323232323232323",
+          "3232323232323232",
+          "2323232323232323",
+          "3232323232323232",
+          "2323232323232323",
+          "3232323232323232",
+          "2323232323232323",
+          "3232323232323232",
+          "2323232323232323",
+          "3232323232323232",
+          "2323232323232323",
+          "3232323232323232"
+        ]
       ]
     },
     "path": {
@@ -356,6 +377,93 @@
         "a99jjjjjjjjjj99a",
         "a999jjjjjjjj999a",
         "aaaaaaaaaaaaaaaa"
+      ]
+    },
+    "water": {
+      "label": "water (impassable scenery)",
+      "solid": true,
+      "fps": 2,
+      "rows": [
+        "dddddddddddddddd",
+        "ddeeddeeddeeddee",
+        "dddddddddddddddd",
+        "dddddddddddddddd",
+        "eeddeeddeeddeedd",
+        "dddddddddddddddd",
+        "dddddddddddddddd",
+        "ddeeddeeddeeddee",
+        "dddddddddddddddd",
+        "dddddddddddddddd",
+        "eeddeeddeeddeedd",
+        "dddddddddddddddd",
+        "dddddddddddddddd",
+        "ddeeddeeddeeddee",
+        "dddddddddddddddd",
+        "cccccccccccccccc"
+      ],
+      "frames": [
+        [
+          "dddddddddddddddd",
+          "eeddeeddeeddeedd",
+          "dddddddddddddddd",
+          "dddddddddddddddd",
+          "ddeeddeeddeeddee",
+          "dddddddddddddddd",
+          "dddddddddddddddd",
+          "eeddeeddeeddeedd",
+          "dddddddddddddddd",
+          "dddddddddddddddd",
+          "ddeeddeeddeeddee",
+          "dddddddddddddddd",
+          "dddddddddddddddd",
+          "eeddeeddeeddeedd",
+          "dddddddddddddddd",
+          "cccccccccccccccc"
+        ]
+      ]
+    },
+    "forest_floor": {
+      "label": "forest floor (shaded)",
+      "solid": false,
+      "rows": [
+        "1212121212121212",
+        "2121212121212121",
+        "1210121012101210",
+        "2121212121212121",
+        "1212121212121212",
+        "2121012101210121",
+        "1212121212121212",
+        "2121212121212121",
+        "1012101210121012",
+        "2121212121212121",
+        "1212121212121212",
+        "2120212021202120",
+        "1212121212121212",
+        "2121212121212121",
+        "1212012101210121",
+        "2121212121212121"
+      ]
+    },
+    "plaster": {
+      "label": "plaster wall (Violet material)",
+      "solid": true,
+      "rows": [
+        "llllllllllllllll",
+        "llllllllllllllll",
+        "lllllllllllllllb",
+        "llllllllllllllll",
+        "bbbbbbbbbbbbbbbb",
+        "llllllllllllllll",
+        "llllllllllllllll",
+        "lllllllllllllllb",
+        "llllllllllllllll",
+        "bbbbbbbbbbbbbbbb",
+        "llllllllllllllll",
+        "llllllllllllllll",
+        "lllllllllllllllb",
+        "llllllllllllllll",
+        "bbbbbbbbbbbbbbbb",
+        "iiiiiiiiiiiiiiii"
       ]
     },
     "sign_post": {
