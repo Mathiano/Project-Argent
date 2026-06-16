@@ -1357,7 +1357,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         ctx,
         `${menuCursor === i ? '>' : ' '} ${labels[it.kind]}`,
         BOTTOM.x + 10,
-        BOTTOM.y + 8 + i * 10,
+        // 5 rows (FIGHT/PKMN/BALL/CALL/RUN) at 8px pitch fit the 46px
+        // panel (last row at y≈169, +8px text < 180 screen edge). The old
+        // 10px pitch pushed RUN to y180, clipping it off-screen.
+        BOTTOM.y + 5 + i * 8,
         dim ? PALETTE.paperDim : PALETTE.ink,
       );
     });
