@@ -1,0 +1,78 @@
+{
+  "name": "VIOLET_CENTER",
+  "width": 10,
+  "height": 8,
+  "tilesize": 16,
+  "tiles": "WWWWWWWWWW\nW........W\nW.CCCC...W\nW........W\nW........W\nW........W\nW........W\nWWWWdWWWWW",
+  "_layout": "10x8 Pokémon Center interior (Violet City). Mirrors HEARTHWICK_CENTER: nurse behind the counter (heal-party), a PC terminal (blue NPC at (8,2), open-box) back-right, door (d) south back to Violet. Its name ends _CENTER so blackout respawns here once the player has healed in Violet.",
+  "tileset": {
+    "W": { "color": "#9c8a78", "solid": true, "label": "wall" },
+    ".": { "color": "#cec3a0", "solid": false, "label": "floor" },
+    "C": { "color": "#caa148", "solid": true, "label": "counter" },
+    "d": { "color": "#daa520", "solid": false, "label": "door" }
+  },
+  "objects": [
+    { "type": "warp", "x": 4, "y": 7, "target": "VIOLET:fromCenter" },
+    {
+      "type": "npc",
+      "x": 2,
+      "y": 2,
+      "color": "#e23a1e",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "NURSE: Welcome to the",
+            "Violet City Center.",
+            "",
+            "Rest your team before",
+            "you climb to the roof?"
+          ]
+        },
+        { "kind": "heal-party" },
+        {
+          "kind": "dialog",
+          "lines": [
+            "(The machine hums.)",
+            "(A soft chime.)",
+            "",
+            "NURSE: All restored.",
+            "FALKNER won't go easy."
+          ]
+        }
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 8,
+      "y": 2,
+      "color": "#3a6ea5",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "The PC hums to life.",
+            "",
+            "STORAGE SYSTEM ready.",
+            "Deposit or withdraw a mon."
+          ]
+        },
+        { "kind": "open-box" }
+      ]
+    },
+    {
+      "type": "sign",
+      "x": 7,
+      "y": 2,
+      "lines": [
+        "A noticeboard.",
+        "VIOLET GYM — rooftop.",
+        "Heal before you ascend."
+      ]
+    }
+  ],
+  "spawns": {
+    "fromViolet": { "x": 4, "y": 6, "facing": "up" },
+    "wake": { "x": 2, "y": 3, "facing": "up" }
+  }
+}

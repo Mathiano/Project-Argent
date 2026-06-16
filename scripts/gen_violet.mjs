@@ -1,0 +1,130 @@
+// Throwaway generator for VIOLET CITY (violet.json), data-driven on the
+// outdoor_violet tileset with the city's PLASTER material identity. Builds
+// the cell grid, validates row widths, BFS-checks that the route arrival
+// reaches every building door + the exit, then emits JSON.
+// Run: node scripts/gen_violet.mjs
+import { writeFileSync } from 'node:fs';
+
+const W = 20;
+const tileMap = {
+  p: 'path',
+  T: 'tree',
+  B: 'plaster', // Violet's per-city material identity (S9)
+  D: 'wall_door',
+  g: 'gym_facade_m',
+  G: 'gym_door',
+};
+const SOLID = new Set(['tree', 'plaster', 'gym_facade_m']); // doors + path + grass walkable
+
+// 20x18. South edge = route exit. Gym top-center (plaster city around it).
+const rows = [
+  'TTTTTTTTTTTTTTTTTTTT', //  0
+  'T..................T', //  1
+  'T......ggggg.......T', //  2  GYM facade
+  'T......ggGgg.......T', //  3  gym door (9,3) -> GYM interior
+  'T........p.........T', //  4
+  'T........p.........T', //  5
+  'T..BBB...p....BBB..T', //  6  Center (3-5) + Mart (14-16)
+  'T..BDB...p....BDB..T', //  7  Center door (4,7), Mart door (15,7)
+  'T...p....p.....p...T', //  8
+  'T...pppppppppppp...T', //  9  connector links doors + spine
+  'T........p.........T', // 10
+  'T..BBB...p....BBB..T', // 11  flavor plaster houses (closed)
+  'T..BBB...p....BBB..T', // 12
+  'T........p.........T', // 13
+  'T........p.........T', // 14
+  'T........p.........T', // 15
+  'T........p.........T', // 16  fromRoute spawn (9,16)
+  'TTTTTTTTTpTTTTTTTTTT', // 17  south exit (9,17) -> ROUTE31
+];
+const H = rows.length;
+rows.forEach((r, y) => { if (r.length !== W) throw new Error(`row ${y} width ${r.length}: "${r}"`); });
+
+const idAt = (x, y) => { const ch = rows[y][x]; return ch === '.' ? 'grass' : tileMap[ch] ?? null; };
+const walkable = (x, y) => {
+  if (x < 0 || y < 0 || x >= W || y >= H) return false;
+  const id = idAt(x, y);
+  if (id === null) throw new Error(`unknown char "${rows[y][x]}" at (${x},${y})`);
+  return !SOLID.has(id);
+};
+function reachable(from) {
+  const seen = new Set([`${from.x},${from.y}`]);
+  const q = [from];
+  while (q.length) {
+    const { x, y } = q.shift();
+    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      const nx = x + dx, ny = y + dy, k = `${nx},${ny}`;
+      if (seen.has(k) || !walkable(nx, ny)) continue;
+      seen.add(k); q.push({ x: nx, y: ny });
+    }
+  }
+  return seen;
+}
+const seen = reachable({ x: 9, y: 16 }); // fromRoute
+const mustReach = {
+  'gym door (9,3)': [9, 3],
+  'center door (4,7)': [4, 7],
+  'mart door (15,7)': [15, 7],
+  'south exit (9,17)': [9, 17],
+};
+const fails = [];
+for (const [label, [x, y]] of Object.entries(mustReach)) {
+  if (!seen.has(`${x},${y}`)) fails.push(`UNREACHABLE: ${label}`);
+  if (SOLID.has(idAt(x, y))) fails.push(`NOT WALKABLE: ${label} -> ${idAt(x, y)}`);
+}
+if (fails.length) { console.error('FAILED:\n' + fails.join('\n')); process.exit(1); }
+console.log(`OK — ${seen.size} reachable tiles from the route arrival.`);
+
+const objects = [
+  { type: 'warp', x: 9, y: 3, target: 'GYM:fromRoute' },
+  { type: 'warp', x: 4, y: 7, target: 'VIOLET_CENTER:fromViolet' },
+  { type: 'warp', x: 15, y: 7, target: 'VIOLET_MART:fromViolet' },
+  { type: 'warp', x: 9, y: 17, target: 'ROUTE31:fromViolet' },
+  { type: 'sign', x: 8, y: 5, lines: ['VIOLET CITY', "FALKNER's gym crowns", 'the rooftop. Count the wind.'] },
+  { type: 'sign', x: 5, y: 6, lines: ['POKÉMON CENTER', 'Rest your team —', 'free for trainers.'] },
+  { type: 'sign', x: 16, y: 6, lines: ['POKÉ MART', 'Supplies for the climb.'] },
+  {
+    type: 'npc', x: 11, y: 5, color: '#3a7fbe',
+    interact: [{ kind: 'dialog', lines: ['GYM GUIDE: FALKNER took the', 'roof for his gym. Says the', 'wind is the third fighter.', 'Beat his trainer first —', 'they hand out a scout report.'] }],
+  },
+  {
+    type: 'npc', x: 6, y: 10, color: '#caa148',
+    interact: [{ kind: 'dialog', lines: ['TRAVELLER: Heal before you', 'climb — no Center on the roof.', 'The one here is just west.'] }],
+  },
+  {
+    type: 'npc', x: 13, y: 13, color: '#7c4fa8',
+    interact: [{ kind: 'dialog', lines: ['CITIZEN: The plasterwork here', 'is older than the gym.', 'Whole city the colour of', 'morning, my gran used to say.'] }],
+  },
+  {
+    type: 'npc', x: 5, y: 14, color: '#b14e9c',
+    interact: [{ kind: 'dialog', lines: ['KID: One day the pond on the', 'route will have a bridge,', 'my dad says. Then we can', 'reach the far bank!'] }],
+  },
+];
+for (const o of objects) {
+  if (o.type === 'warp' || o.type === 'sign') {
+    // signs are read by facing them, so they may sit on solid tiles; warps must be walkable.
+    if (o.type === 'warp' && (SOLID.has(idAt(o.x, o.y)) || !seen.has(`${o.x},${o.y}`)))
+      throw new Error(`warp on bad tile (${o.x},${o.y})`);
+  }
+}
+
+const map = {
+  name: 'VIOLET CITY',
+  _note: 'Phase 7 Sprint 1 — data-driven Violet with the city PLASTER material identity. Generated by scripts/gen_violet.mjs. Gym (rooftop interior), Center + Mart enterable; full population deferred.',
+  tilesetRef: 'outdoor_violet',
+  width: W,
+  height: H,
+  tilesize: 16,
+  baseTile: 'grass',
+  tileMap,
+  cells: rows,
+  objects,
+  spawns: {
+    fromRoute: { x: 9, y: 16, facing: 'up' },
+    fromGym: { x: 9, y: 4, facing: 'down' },
+    fromCenter: { x: 4, y: 8, facing: 'down' },
+    fromMart: { x: 15, y: 8, facing: 'down' },
+  },
+};
+writeFileSync('src/game/maps/violet.json', JSON.stringify(map, null, 2) + '\n');
+console.log('Wrote src/game/maps/violet.json');

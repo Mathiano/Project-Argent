@@ -1,0 +1,49 @@
+{
+  "name": "VIOLET_MART",
+  "width": 10,
+  "height": 8,
+  "tilesize": 16,
+  "tiles": "WWWWWWWWWW\nW........W\nW.CCCC...W\nW........W\nW........W\nW........W\nW........W\nWWWWdWWWWW",
+  "_layout": "10x8 Poké Mart interior (Violet City). Mirrors HEARTHWICK_MART: CLERK behind the counter (open-mart), door (d) south back to Violet.",
+  "tileset": {
+    "W": { "color": "#3a4a6a", "solid": true, "label": "wall" },
+    ".": { "color": "#c3c8d6", "solid": false, "label": "floor" },
+    "C": { "color": "#5a78b0", "solid": true, "label": "counter" },
+    "d": { "color": "#daa520", "solid": false, "label": "door" }
+  },
+  "objects": [
+    { "type": "warp", "x": 4, "y": 7, "target": "VIOLET:fromMart" },
+    {
+      "type": "npc",
+      "x": 2,
+      "y": 2,
+      "color": "#3a6ea5",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "CLERK: Welcome to the",
+            "VIOLET POKÉ MART.",
+            "",
+            "Stocking up for the",
+            "gym climb?"
+          ]
+        },
+        { "kind": "open-mart", "stock": ["BALL", "POTION", "SUPER POTION", "FULL HEAL"] }
+      ]
+    },
+    {
+      "type": "sign",
+      "x": 7,
+      "y": 2,
+      "lines": [
+        "Shelves of supplies.",
+        "A few SUPER POTIONs",
+        "for the harder road."
+      ]
+    }
+  ],
+  "spawns": {
+    "fromViolet": { "x": 4, "y": 6, "facing": "up" }
+  }
+}
