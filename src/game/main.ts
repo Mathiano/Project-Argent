@@ -67,6 +67,18 @@ import type { CatchWindow } from './catching';
 import { askResponse, evolutionReadiness, evolutionReady } from './evolution';
 import { createEvolutionScene } from './scenes/evolution';
 import {
+  createDex,
+  dexStatus,
+  fromSavedDex,
+  markCaught,
+  markSeen,
+  toSavedDex,
+} from './dex';
+import type { DexRecord } from './dex';
+import { createBoxMenuScene } from './scenes/boxMenu';
+import { createDexMenuScene } from './scenes/dexMenu';
+import type { DexUiEntry } from './scenes/dexMenu';
+import {
   fromSavedSide,
   hasSave,
   loadFromStorage,
@@ -106,6 +118,33 @@ const TYPECHART_CH1 = typechartData as TypeChart;
 const STARTERS: readonly Species[] = ['KINDRAKE', 'GRUBLEAF', 'SILTSKIP'].map(
   (n) => CH1_DEX[n]!,
 );
+
+// Phase 6.5 — static dex-entry data for every CH1 species (the UI's
+// right-hand record). Built once from the manifest, sorted by dex number.
+// The seen/caught STATUS is dynamic (run.dex); this is the fixed info.
+function evoHintFor(e: DexEntryJson): string {
+  if (e.evoLine && e.evoLine.evolvesTo) {
+    return `Evolves into ${e.evoLine.evolvesTo} with a deep bond.`;
+  }
+  if (e.stage > 1) return 'A grown, evolved form.';
+  return 'No known evolution.';
+}
+const DEX_UI_ENTRIES: readonly DexUiEntry[] = (ch1BatchData as DexEntryJson[])
+  .slice()
+  .sort((a, b) => a.id - b.id)
+  .map((e) => ({
+    num: e.id,
+    name: e.name,
+    types: e.types,
+    flavor:
+      e.dexEntry && e.dexEntry.trim().length > 0
+        ? e.dexEntry
+        : 'No further field notes recorded yet.',
+    evoHint: evoHintFor(e),
+  }));
+function dexStatusOf(name: string): ReturnType<typeof dexStatus> {
+  return dexStatus(run.dex, name);
+}
 
 const FALKNER_ARENA: ArenaSchedule = {
   rhythmEveryN: 3,
@@ -160,6 +199,11 @@ interface RunState {
   partyBond: number[];
   // Phase 6a — the box (caught mons when the party is full). Minimal.
   box: SideState[];
+  // Phase 6.5 — bond for boxed mons, index-aligned with `box`. Travels
+  // with the mon on deposit/withdraw (box.ts moves both together).
+  boxBond: number[];
+  // Phase 6.5 — the seen/caught registry (distinct from the species DB).
+  dex: DexRecord;
   catchBreathUnlocked: boolean;
   rng: RNG;
 }
@@ -171,6 +215,8 @@ const run: RunState = {
   badges: [],
   partyBond: [],
   box: [],
+  boxBond: [],
+  dex: createDex(),
   catchBreathUnlocked: false,
   rng: mulberry32(RNG_SEED),
 };
@@ -285,8 +331,11 @@ function addCaughtMon(species: Species): void {
     run.party.push(fresh);
     run.partyBond.push(BOND_START_CAUGHT);
   } else {
+    // Party full → the box (Phase 6.5: bond now travels into the box too).
     run.box.push(fresh);
+    run.boxBond.push(BOND_START_CAUGHT);
   }
+  markCaught(run.dex, species.name); // Phase 6.5 — dex CAUGHT on add
 }
 // Bump the lead mon's bond on a quality win (no participation XP).
 function bumpLeadBond(amount: number): void {
@@ -361,6 +410,8 @@ function autosaveNow(): void {
     badges: [...run.badges],
     partyBond: [...run.partyBond],
     box: run.box.map(toSavedSide),
+    boxBond: [...run.boxBond],
+    dex: toSavedDex(run.dex),
   };
   saveToStorage(state);
 }
@@ -397,6 +448,8 @@ function startNewGame(): void {
   run.badges = [];
   run.partyBond = [];
   run.box = [];
+  run.boxBond = [];
+  run.dex = createDex();
   run.catchBreathUnlocked = false;
   currentRngSeed = 0xa9c0;
   run.rng = mulberry32(currentRngSeed);
@@ -417,6 +470,7 @@ function pushStarterPick(): void {
       onPick: (species) => {
         run.party = [createSide(species)];
         run.partyBond = [BOND_START_STARTER]; // your starter begins a little warmer
+        markCaught(run.dex, species.name); // Phase 6.5 — starter marks CAUGHT
         currentRngSeed = partySeed();
         run.rng = mulberry32(currentRngSeed);
         sessionFlags.add('player_has_starter');
@@ -438,6 +492,7 @@ function pushPauseMenu(): void {
     createPauseMenuScene({
       onPokemon: () => pushPartyMenu(),
       onBag: () => pushBagMenu(),
+      onDex: () => pushDexMenu(),
       onSave: () => autosaveNow(),
       onOptions: () => {},
       onClose: () => scenes.pop(),
@@ -456,6 +511,35 @@ function pushBagMenu(): void {
       party: run.party,
       money: run.money,
       onChange: () => autosaveNow(),
+      onClose: () => scenes.pop(),
+    }),
+  );
+}
+
+// Phase 6.5 — the PC Box, pushed from the Center PC (open-box verb).
+// run.party/partyBond/box/boxBond are passed by reference; the scene's
+// deposit/withdraw ops (box.ts) mutate them in place and onChange fires
+// autosave so the persisted state stays the single source of truth.
+function pushBoxMenu(): void {
+  scenes.push(
+    createBoxMenuScene({
+      party: run.party,
+      partyBond: run.partyBond,
+      box: run.box,
+      boxBond: run.boxBond,
+      onChange: () => autosaveNow(),
+      onClose: () => scenes.pop(),
+    }),
+  );
+}
+
+// Phase 6.5 — the Dex, pushed from the pause menu's DEX row. Reads the
+// seen/caught status off run.dex (live) and the static CH1 entry data.
+function pushDexMenu(): void {
+  scenes.push(
+    createDexMenuScene({
+      entries: DEX_UI_ENTRIES,
+      status: (name) => dexStatusOf(name),
       onClose: () => scenes.pop(),
     }),
   );
@@ -618,6 +702,12 @@ function applySave(saved: SaveState): void {
       : BOND_START_STARTER,
   );
   run.box = saved.box ? saved.box.map((s) => fromSavedSide(s, resolveSpecies)) : [];
+  // Phase 6.5 — boxBond + dex, both additive. boxBond defaults per boxed
+  // mon for a pre-6.5 save; dex loads empty when absent.
+  run.boxBond = run.box.map((_, i) =>
+    saved.boxBond && typeof saved.boxBond[i] === 'number' ? saved.boxBond[i]! : BOND_START_CAUGHT,
+  );
+  run.dex = fromSavedDex(saved.dex);
   run.catchBreathUnlocked = saved.catchBreathUnlocked;
   currentRngSeed = saved.rngSeed;
   run.rng = mulberry32(currentRngSeed);
@@ -1147,6 +1237,9 @@ function showOverworld(
     onOpenMart(stock: readonly string[]) {
       pushMartMenu(stock);
     },
+    onOpenBox() {
+      pushBoxMenu();
+    },
     onStarterPick() {
       pushStarterPick();
     },
@@ -1177,6 +1270,7 @@ function pushWildEncounter(foeSpeciesName: string): void {
     console.warn(`Argent: encounter species not found: ${foeSpeciesName}`);
     return;
   }
+  markSeen(run.dex, foe.name); // Phase 6.5 — a wild encounter marks SEEN
   const state = createBattleState(buildPlayerTeam(), createSide(foe), {
     typeChart: TYPECHART_CH1,
   });

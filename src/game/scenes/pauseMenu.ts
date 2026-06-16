@@ -14,6 +14,8 @@ import { drawPanel, drawText } from '../ui';
 export interface PauseMenuOpts {
   readonly onPokemon: () => void;
   readonly onBag: () => void;
+  // Phase 6.5 — the seen/caught registry (DEX row).
+  readonly onDex: () => void;
   readonly onSave: () => void;
   readonly onOptions: () => void;
   readonly onClose: () => void;
@@ -22,7 +24,7 @@ export interface PauseMenuOpts {
   readonly badges?: readonly string[];
 }
 
-type RowKind = 'pokemon' | 'bag' | 'save' | 'options' | 'box' | 'exit';
+type RowKind = 'pokemon' | 'bag' | 'dex' | 'save' | 'options' | 'box' | 'exit';
 interface Row {
   readonly kind: RowKind;
   readonly label: string;
@@ -35,10 +37,14 @@ export function createPauseMenuScene(opts: PauseMenuOpts): Scene {
   const rows: Row[] = [
     { kind: 'pokemon', label: 'POKEMON', enabled: true },
     { kind: 'bag', label: 'BAG', enabled: true },
+    // Phase 6.5 — DEX (seen/caught registry) is reachable from anywhere.
+    { kind: 'dex', label: 'DEX', enabled: true },
     { kind: 'save', label: 'SAVE', enabled: true },
     { kind: 'options', label: 'OPTIONS', enabled: true },
-    // BOX (PC storage) ships with catching/release in Phase 6.
-    { kind: 'box', label: 'BOX (Phase 6)', enabled: false },
+    // BOX (PC storage) lives at a Pokémon Center this phase — the row is
+    // a signpost so the player learns where storage is (access-flexibility
+    // is a forward note per the 6.5 kickoff).
+    { kind: 'box', label: 'BOX — at a PC', enabled: false },
     { kind: 'exit', label: 'EXIT', enabled: true },
   ];
   let cursor = 0;
@@ -63,6 +69,7 @@ export function createPauseMenuScene(opts: PauseMenuOpts): Scene {
     if (!row || !row.enabled) return;
     if (row.kind === 'pokemon') opts.onPokemon();
     else if (row.kind === 'bag') opts.onBag();
+    else if (row.kind === 'dex') opts.onDex();
     else if (row.kind === 'save') {
       opts.onSave();
       savedFlashSec = 1.0;

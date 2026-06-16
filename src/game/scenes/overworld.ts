@@ -58,6 +58,10 @@ export interface OverworldSceneOpts {
   // fires this with the shop's stock so main.ts can push the Mart
   // scene. No callback = no shop (maps without a Mart don't need it).
   readonly onOpenMart?: (stock: readonly string[]) => void;
+  // Phase 6.5 — opt-in. open-box script verb (the Center PC) fires this
+  // so main.ts can push the box scene. No callback = no PC (maps without
+  // a PC don't need it).
+  readonly onOpenBox?: () => void;
 }
 
 // Richer Scene the autosave reads — currentPosition() lets main.ts
@@ -204,6 +208,13 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         // push the shop scene (same delegation as show-starter-pick).
         // Maps without an onOpenMart wiring no-op silently.
         opts.onOpenMart?.(cmd.stock);
+        return;
+      }
+      if (cmd.kind === 'open-box') {
+        // Phase 6.5 PC. Terminal — hand control to main.ts to push the
+        // box scene (same delegation as open-mart). Maps without an
+        // onOpenBox wiring no-op silently.
+        opts.onOpenBox?.();
         return;
       }
     }

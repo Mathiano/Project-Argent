@@ -52,15 +52,18 @@ function stubCtx(): RecordingCtx {
 describe('Phase 4 — pause menu', () => {
   function buildPause(): {
     scene: ReturnType<typeof createPauseMenuScene>;
-    calls: Record<'pokemon' | 'bag' | 'save' | 'options' | 'close', number>;
+    calls: Record<'pokemon' | 'bag' | 'dex' | 'save' | 'options' | 'close', number>;
   } {
-    const calls = { pokemon: 0, bag: 0, save: 0, options: 0, close: 0 };
+    const calls = { pokemon: 0, bag: 0, dex: 0, save: 0, options: 0, close: 0 };
     const scene = createPauseMenuScene({
       onPokemon: () => {
         calls.pokemon += 1;
       },
       onBag: () => {
         calls.bag += 1;
+      },
+      onDex: () => {
+        calls.dex += 1;
       },
       onSave: () => {
         calls.save += 1;
@@ -75,21 +78,29 @@ describe('Phase 4 — pause menu', () => {
     return { scene, calls };
   }
 
-  test('renders POKEMON / BAG / SAVE / OPTIONS / BOX (greyed) / EXIT rows', () => {
+  test('renders POKEMON / BAG / DEX / SAVE / OPTIONS / BOX (greyed) / EXIT rows', () => {
     const { scene } = buildPause();
     const ctx = stubCtx();
     scene.draw(ctx);
     const screen = ctx.texts.join('|');
     expect(screen).toContain('POKEMON');
     expect(screen).toContain('BAG');
+    expect(screen).toContain('DEX'); // Phase 6.5 — seen/caught registry
     expect(screen).toContain('SAVE');
     expect(screen).toContain('OPTIONS');
-    expect(screen).toContain('BOX');
     expect(screen).toContain('EXIT');
-    // Phase 5a: BAG is no longer greyed. BOX still labelled with the
-    // phase it ships in (Phase 6 catching).
-    expect(screen).toContain('BOX (Phase 6)');
-    expect(screen).not.toContain('BAG (Phase 5)');
+    // Phase 6.5: BOX now lives at a PC (the row is a greyed signpost).
+    expect(screen).toContain('BOX — at a PC');
+    expect(screen).not.toContain('BOX (Phase 6)');
+  });
+
+  test('A on DEX invokes onDex (Phase 6.5 — seen/caught registry)', () => {
+    const { scene, calls } = buildPause();
+    // POKEMON (0) → BAG (1) → DEX (2)
+    scene.input?.('down');
+    scene.input?.('down');
+    scene.input?.('a');
+    expect(calls.dex).toBe(1);
   });
 
   test('A on POKEMON invokes onPokemon (push party menu)', () => {
@@ -110,8 +121,9 @@ describe('Phase 4 — pause menu', () => {
 
   test('cursor skips greyed BOX row on DOWN', () => {
     const { scene, calls } = buildPause();
-    // POKEMON (0) → BAG (1) → SAVE (2) → OPTIONS (3) → (skip BOX 4) → EXIT (5)
+    // POKEMON(0) → BAG(1) → DEX(2) → SAVE(3) → OPTIONS(4) → (skip BOX 5) → EXIT(6)
     scene.input?.('down'); // BAG
+    scene.input?.('down'); // DEX
     scene.input?.('down'); // SAVE
     scene.input?.('down'); // OPTIONS
     scene.input?.('down'); // skip BOX → EXIT
@@ -121,7 +133,8 @@ describe('Phase 4 — pause menu', () => {
 
   test('A on SAVE invokes onSave and flashes a "Saved." confirmation', () => {
     const { scene, calls } = buildPause();
-    // POKEMON → BAG → SAVE
+    // POKEMON → BAG → DEX → SAVE
+    scene.input?.('down');
     scene.input?.('down');
     scene.input?.('down');
     scene.input?.('a');

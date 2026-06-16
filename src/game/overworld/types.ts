@@ -59,7 +59,11 @@ export type ScriptCommand =
   // ids for sale). Terminal in the script, same shape as
   // show-starter-pick — the shop scene owns closing back to the
   // overworld. main.ts wires onOpenMart; maps without it no-op.
-  | { readonly kind: 'open-mart'; readonly stock: readonly string[] };
+  | { readonly kind: 'open-mart'; readonly stock: readonly string[] }
+  // Phase 6.5: the PC Box. Launches the box scene (deposit/withdraw).
+  // Terminal, same delegation shape as open-mart — the box scene owns
+  // closing back to the overworld. main.ts wires onOpenBox.
+  | { readonly kind: 'open-box' };
 
 export type MapObject =
   | { readonly type: 'warp'; readonly x: number; readonly y: number; readonly target: string }
