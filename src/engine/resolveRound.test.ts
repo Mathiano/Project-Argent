@@ -79,6 +79,110 @@ describe('KO mid-exchange', () => {
   });
 });
 
+describe('turn order — initiative (speed ÷ move weight) + the Fluid exception', () => {
+  const firstActor = (events: ReadonlyArray<{ kind: string }>): string | null => {
+    const ev = events.find((e) => e.kind === 'initiative') as { first?: string | null } | undefined;
+    return ev?.first ?? null;
+  };
+  const firstStrike = (events: ReadonlyArray<{ kind: string; side?: string }>): string | null =>
+    events.find((e) => e.kind === 'strike')?.side ?? null;
+
+  test('the faster mon acts first (same move weight)', () => {
+    // EMBERCUB spd 108 vs AQUAFIN spd 72, both TACKLE/Guard (non-clash).
+    const r = resolveRound(
+      makeState('EMBERCUB', 'AQUAFIN'),
+      { kind: 'move', move: 'TACKLE', stance: 'G' },
+      { kind: 'move', move: 'TACKLE', stance: 'G' },
+      mulberry32(7),
+    );
+    expect(firstActor(r.events)).toBe('player');
+    expect(firstStrike(r.events)).toBe('player');
+  });
+
+  test('SYMPTOM 1: a raw-SLOWER mon acts first with a LIGHTER move (init = spd ÷ weight)', () => {
+    // SPROUTLE spd 84 + TACKLE (light, w0.85) → init 98.8.
+    // EMBERCUB spd 108 + FLAME RUSH (heavy, w1.15) → init 93.9.
+    // The slower-by-raw-speed SPROUTLE out-initiatives → acts FIRST. This
+    // is CORRECT by the spec (Initiative: speed / move weight) — the
+    // "SLOWER acted first" the player saw is the design, not a bug.
+    const r = resolveRound(
+      makeState('SPROUTLE', 'EMBERCUB'),
+      { kind: 'move', move: 'TACKLE', stance: 'G' },
+      { kind: 'move', move: 'FLAME RUSH', stance: 'G' },
+      mulberry32(7),
+    );
+    expect(pl(makeState('SPROUTLE', 'EMBERCUB')).species.spd).toBeLessThan(
+      fo(makeState('SPROUTLE', 'EMBERCUB')).species.spd,
+    ); // raw-slower…
+    expect(firstActor(r.events)).toBe('player'); // …yet acts first (lighter move)
+    expect(firstStrike(r.events)).toBe('player');
+  });
+
+  test('FLUID exception: a raw-slower Fluid mon acts first vs a faster Guard mon', () => {
+    // AQUAFIN spd 72 (Fluid) vs EMBERCUB spd 108 (Guard) — F-vs-G overrides
+    // initiative entirely. The slower Fluid mon acts first, by design.
+    const r = resolveRound(
+      makeState('AQUAFIN', 'EMBERCUB'),
+      { kind: 'move', move: 'TACKLE', stance: 'F' },
+      { kind: 'move', move: 'TACKLE', stance: 'G' },
+      mulberry32(7),
+    );
+    expect(firstActor(r.events)).toBe('player');
+    // The Fluid-vs-Guard first action is an OPENING (slips past guard).
+    expect(r.events.some((e) => e.kind === 'opening' && e.side === 'player')).toBe(true);
+  });
+
+  test('a rest (no move) always acts last (initiative < 0)', () => {
+    const exhausted = patchPlayer(makeState('EMBERCUB', 'AQUAFIN'), { st: 0, exhausted: true });
+    const r = resolveRound(
+      exhausted,
+      { kind: 'rest' },
+      { kind: 'move', move: 'TACKLE', stance: 'G' },
+      mulberry32(7),
+    );
+    expect(firstActor(r.events)).toBe('foe'); // the acting mon goes first
+  });
+});
+
+describe('no mutual KO / no posthumous attack (the ruling, locked across seeds)', () => {
+  // Both actives at low HP, every stance pairing, many seeds: a round must
+  // NEVER leave both mons at 0 (no mutual KO), and the side that was KO'd
+  // must never strike after its own ko event (no posthumous attack).
+  const stances = ['A', 'G', 'F'] as const;
+  test('one lethal exchange never produces two faints or a posthumous strike', () => {
+    for (let seed = 1; seed <= 60; seed += 1) {
+      for (const ps of stances) {
+        for (const fs of stances) {
+          let state = makeState('EMBERCUB', 'AQUAFIN');
+          state = patchPlayer(state, { hp: 2 });
+          state = patchFoe(state, { hp: 2 });
+          const r = resolveRound(
+            state,
+            { kind: 'move', move: 'TACKLE', stance: ps },
+            { kind: 'move', move: 'TACKLE', stance: fs },
+            mulberry32(seed),
+          );
+          // No mutual KO.
+          expect(pl(r.state).hp <= 0 && fo(r.state).hp <= 0).toBe(false);
+          // No posthumous strike: once a side is KO'd, it never strikes after.
+          let plKO = false;
+          let foeKO = false;
+          for (const ev of r.events) {
+            if (ev.kind === 'ko') {
+              if (ev.side === 'player') plKO = true;
+              else foeKO = true;
+            }
+            if (ev.kind === 'strike') {
+              if (ev.side === 'player') expect(plKO).toBe(false);
+              if (ev.side === 'foe') expect(foeKO).toBe(false);
+            }
+          }
+        }
+      }
+    }
+  });
+});
+
 describe('exhaustion', () => {
   test('exhausted side is forced to rest', () => {
     const exhausted: SideState = { ...createSide(SPECIES.EMBERCUB!), st: 0, exhausted: true };
