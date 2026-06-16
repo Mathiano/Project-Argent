@@ -34,8 +34,8 @@ L017,1,,2,POSTGAME,lost region teasers,VENOM,,Wall,common,16,
 L017,2,,2,POSTGAME,lost region teasers,VENOM,,Wall,common,,
 L018,1,,2,CH8,dragon den,NATURE,,Counter-tank,common,16,
 L018,2,,2,CH8,dragon den,NATURE,,Counter-tank,common,,
-L019,1,,2,CH7,lake of rage,TERRA,,Brawler,common,16,
-L019,2,,2,CH7,lake of rage,TERRA,,Brawler,common,,
+L019,1,CRAGOX,2,CH7,lake of rage,TERRA,,Brawler,common,16,
+L019,2,BOULDRONT,2,CH7,lake of rage,TERRA,,Brawler,common,,
 L020,1,,3,CH7,mountain pass,SPARK,,Glass nuke,uncommon,16,
 L020,2,,3,CH7,mountain pass,SPARK,,Glass nuke,uncommon,34,
 L020,3,,3,CH7,mountain pass,SPARK,,Glass nuke,uncommon,,
@@ -47,9 +47,9 @@ L023,2,CAVELURE,3,CH1,route grass,TERRA,,Trickster,common,34,
 L023,3,CHASMTRAP,3,CH1,route grass,TERRA,,Trickster,common,,
 L024,1,,2,CH4,burned tower,VENOM,,Dodger,uncommon,16,
 L024,2,,2,CH4,burned tower,VENOM,,Dodger,uncommon,,
-L025,1,,3,MT_SILVER,summit,DRAKE,,Wall,uncommon,16,
-L025,2,,3,MT_SILVER,summit,DRAKE,,Wall,uncommon,34,
-L025,3,,3,MT_SILVER,summit,DRAKE,,Wall,uncommon,,
+L025,1,WYRMLET,3,MT_SILVER,summit,DRAKE,,Wall,uncommon,16,
+L025,2,DRAKESPINE,3,MT_SILVER,summit,DRAKE,,Wall,uncommon,34,
+L025,3,RIDGEWYRM,3,MT_SILVER,summit,DRAKE,,Wall,uncommon,,
 L026,1,,2,MT_SILVER,summit,GALE,,Counter-tank,common,16,
 L026,2,,2,MT_SILVER,summit,GALE,,Counter-tank,common,,
 L027,1,MARSHMASH,1,CH1,route grass,AQUA,,Brawler,common,,
@@ -199,3 +199,24 @@ L104,2,,3,KANTO,safari preserve,TERRA,,Dodger,uncommon,34,
 L104,3,,3,KANTO,safari preserve,TERRA,,Dodger,uncommon,,
 L105,1,,2,KANTO,kanto routes,SPIRIT,,Wall,uncommon,16,
 L105,2,,2,KANTO,kanto routes,SPIRIT,,Wall,uncommon,,
+L106,1,NIPVOLE,2,CH1,route grass,BASIC,,Dodger,common,16,approved Batch 1
+L106,2,BURROWDROVE,2,CH1,route grass,BASIC,,Dodger,common,,approved Batch 1
+L107,1,DRISKIT,2,CH1,route grass,BASIC,GALE,Glass nuke,common,16,approved Batch 1
+L107,2,DRISKADE,2,CH1,route grass,BASIC,GALE,Glass nuke,common,,approved Batch 1
+L108,1,CHITTERLING,3,CH1,route grass,INSECT,,Drainer,common,16,approved Batch 1
+L108,2,MITESWARM,3,CH1,route grass,INSECT,,Drainer,common,34,approved Batch 1
+L108,3,HIVEMAW,3,CH1,route grass,INSECT,,Drainer,common,,approved Batch 1
+L109,1,THISTLEKIT,1,CH1,forest edge,NATURE,,Trickster,common,,approved Batch 1
+L110,1,GLIMMERFLY,2,CH1,dusk routes,INSECT,SPIRIT,Pacer,uncommon,16,approved Batch 1
+L110,2,DUSKMOTH,2,CH1,dusk routes,INSECT,SPIRIT,Pacer,uncommon,,approved Batch 1
+L111,1,GROTTLE,2,TBD,cave,STONE,,Wall,common,16,approved Batch 2 - chapter TBD
+L111,2,STALAGNAW,2,TBD,cave,STONE,,Wall,common,,approved Batch 2 - chapter TBD
+L112,1,DRILLNOUT,2,TBD,cave,STONE,INSECT,Glass nuke,uncommon,16,approved Batch 2 - chapter TBD
+L112,2,BORESCARAB,2,TBD,cave,STONE,INSECT,Glass nuke,uncommon,,approved Batch 2 - chapter TBD
+L113,1,RUBBLEPUP,3,TBD,rocky slopes,TERRA,,Brawler,uncommon,16,approved Batch 2 - chapter TBD
+L113,2,SCREEHOUND,3,TBD,rocky slopes,TERRA,,Brawler,uncommon,34,approved Batch 2 - chapter TBD
+L113,3,TALUSFANG,3,TBD,rocky slopes,TERRA,,Brawler,uncommon,,approved Batch 2 - chapter TBD
+L114,1,OREWING,2,TBD,mountain pass,STONE,GALE,Pacer,uncommon,16,approved Batch 2 - chapter TBD
+L114,2,IRONROC,2,TBD,mountain pass,STONE,GALE,Pacer,uncommon,,approved Batch 2 - chapter TBD
+L115,1,PUMICETTE,2,TBD,volcanic cave,FLAME,STONE,Wall,uncommon,16,approved Batch 2 - chapter TBD
+L115,2,MAGMACRAG,2,TBD,volcanic cave,FLAME,STONE,Wall,uncommon,,approved Batch 2 - chapter TBD
