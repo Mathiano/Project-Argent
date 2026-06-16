@@ -72,6 +72,7 @@ import {
   fromSavedDex,
   markCaught,
   markSeen,
+  markSeenAll,
   toSavedDex,
 } from './dex';
 import type { DexRecord } from './dex';
@@ -827,6 +828,8 @@ function buildFalknerTeam(): { team: ReturnType<typeof createTeam>; card: BossCa
     createSide(flitpeck),
     createSide(galehawk, card.statScale),
   ]);
+  // Phase 6.5 — facing the boss's mons registers them as SEEN too.
+  markSeenAll(run.dex, [flitpeck.name, galehawk.name]);
   return { team, card };
 }
 
@@ -1385,6 +1388,9 @@ function buildTrainerTeam(spec: string | readonly string[]): ReturnType<typeof c
     sides.push(createSide(sp));
   }
   if (sides.length === 0) return null;
+  // Phase 6.5 — seeing a trainer's mon registers it as SEEN, same as a
+  // wild encounter (matches real Pokémon; dex isn't wild-only).
+  markSeenAll(run.dex, sides.map((s) => s.species.name));
   return createTeam(sides);
 }
 

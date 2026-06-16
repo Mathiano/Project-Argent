@@ -44,6 +44,13 @@ export function markCaught(dex: DexRecord, name: string): boolean {
   return true;
 }
 
+// Mark a whole roster encountered in one call — used when a trainer or
+// boss sends out a team (every foe mon you face registers as SEEN, the
+// same as a wild encounter). Idempotent per name.
+export function markSeenAll(dex: DexRecord, names: Iterable<string>): void {
+  for (const n of names) markSeen(dex, n);
+}
+
 export function dexStatus(dex: DexRecord, name: string): DexStatus {
   if (dex.caught.has(name)) return 'caught';
   if (dex.seen.has(name)) return 'seen';
