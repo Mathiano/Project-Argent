@@ -17,8 +17,10 @@ function store(partyNames: string[], boxNames: string[]): MonStore {
   return {
     party: partyNames.map((n) => createSide(sp(n))),
     partyBond: partyNames.map((_, i) => 10 + i), // distinct bonds to trace
+    partyOrigin: partyNames.map((_, i) => (i === 0 ? 'starter' : 'read')),
     box: boxNames.map((n) => createSide(sp(n))),
     boxBond: boxNames.map((_, i) => 50 + i),
+    boxOrigin: boxNames.map(() => 'mercy'),
   };
 }
 
@@ -31,11 +33,14 @@ describe('box deposit/withdraw', () => {
     expect(s.box.map((m) => m.species.name)).toEqual(['GRUBLEAF']);
     expect(s.boxBond).toEqual([11]); // bond travelled
 
+    expect(s.boxOrigin).toEqual(['read']); // origin travelled too (idx 1 = 'read')
+
     const wd = withdraw(s, 0); // bring GRUBLEAF back
     expect(wd.ok).toBe(true);
     expect(s.party.map((m) => m.species.name)).toEqual(['KINDRAKE', 'GRUBLEAF']);
     expect(s.box).toEqual([]);
     expect(s.partyBond).toEqual([10, 11]); // bond came back with it
+    expect(s.partyOrigin).toEqual(['starter', 'read']); // origin came back too
   });
 
   test('cannot deposit the last party mon', () => {

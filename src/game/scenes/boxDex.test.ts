@@ -47,15 +47,19 @@ describe('Phase 6.5 — Box UI', () => {
   function build(partyNames: string[], boxNames: string[]) {
     const party: SideState[] = partyNames.map((n) => createSide(sp(n)));
     const partyBond = partyNames.map((_, i) => 10 + i);
+    const partyOrigin = partyNames.map(() => 'read' as const);
     const box: SideState[] = boxNames.map((n) => createSide(sp(n)));
     const boxBond = boxNames.map(() => 5);
+    const boxOrigin = boxNames.map(() => 'mercy' as const);
     let changes = 0;
     let closed = 0;
     const scene = createBoxMenuScene({
       party,
       partyBond,
+      partyOrigin,
       box,
       boxBond,
+      boxOrigin,
       onChange: () => {
         changes += 1;
       },

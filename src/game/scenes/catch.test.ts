@@ -39,6 +39,8 @@ interface Recorder {
   willingCalls: number;
   foeGone: number;
   resolved: ('player' | 'foe')[];
+  // Feature 3 — the catch origin onCaught was called with ('read'|'mercy').
+  origins: string[];
 }
 
 function makeScene(opts: {
@@ -53,7 +55,7 @@ function makeScene(opts: {
   const player = createSide(SPECIES.EMBERCUB!);
   const foe = opts.foe ?? createSide(SPECIES.AQUAFIN!);
   const state: BattleState = createBattleState(createTeam([player]), createTeam([foe]));
-  const rec: Recorder = { windows: [], caught: 0, joined: 0, willingCalls: 0, foeGone: 0, resolved: [] };
+  const rec: Recorder = { windows: [], caught: 0, joined: 0, willingCalls: 0, foeGone: 0, resolved: [], origins: [] };
   let balls = opts.balls ?? 5;
   let medicine = opts.medicine ?? 2;
   const scene = createBattleScene({
@@ -78,8 +80,9 @@ function makeScene(opts: {
       if (joined) rec.joined += 1;
       return { joined, hint: 'It wasn’t ready.' };
     },
-    onCaught: () => {
+    onCaught: (_state, origin) => {
       rec.caught += 1;
+      rec.origins.push(origin);
     },
     onFoeGone: () => {
       rec.foeGone += 1;
@@ -153,6 +156,8 @@ describe('Phase 6a — caught + Wariness flee', () => {
     throwBall(scene); // down, a → caught → 1-line "Gotcha" text
     scene.input?.('a'); // advance the 1-line beat → onCaught
     expect(rec.caught).toBe(1);
+    // Feature 3 — a ball-caught (Path 1) mon records origin 'read'.
+    expect(rec.origins).toEqual(['read']);
   });
 
   test('repeated out-of-window throws raise Wariness → the foe flees (onFoeGone)', () => {
@@ -184,6 +189,8 @@ describe('Phase 6a — Path 2 (spare a fainted wild mon)', () => {
     scene.input?.('a'); // advance the 1-line "joined!" beat → onCaught
     expect(rec.joined).toBe(1);
     expect(rec.caught).toBe(1);
+    // Feature 3 — a willing-join (Path 2) mon records origin 'mercy'.
+    expect(rec.origins).toEqual(['mercy']);
   });
 
   test('YES + a refusal ends as a normal win (no mon)', () => {

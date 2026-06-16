@@ -15,6 +15,8 @@
 import type { Facing } from './overworld/types';
 import { createSide } from '../engine';
 import type { SideState, Species } from '../engine';
+import { isCatchOrigin } from './catching';
+import type { CatchOrigin } from './catching';
 
 export interface SaveState {
   readonly version: 1;
@@ -48,6 +50,11 @@ export interface SaveState {
   readonly boxBond?: readonly number[];
   // Phase 6.5 — the seen/caught registry. Additive; missing → empty dex.
   readonly dex?: SavedDex;
+  // living-world.md Feature 3 — HOW each mon was caught, index-aligned
+  // with `party` / `box`. Additive; impossible to backfill (set at catch
+  // time). Missing → best-effort default on load. Nothing reads it yet.
+  readonly partyOrigin?: readonly CatchOrigin[];
+  readonly boxOrigin?: readonly CatchOrigin[];
 }
 
 // Phase 6.5 — the dex save shape (seen/caught species names). Mirrors
@@ -226,6 +233,14 @@ function validateSave(value: unknown): SaveState | null {
     const d = v.dex as Record<string, unknown>;
     if (!Array.isArray(d.seen) || d.seen.some((s) => typeof s !== 'string')) return null;
     if (!Array.isArray(d.caught) || d.caught.some((s) => typeof s !== 'string')) return null;
+  }
+  // partyOrigin / boxOrigin optional (pre-Feature-3 saves). When present,
+  // each entry must be a valid CatchOrigin — a bad row nukes the save.
+  if (v.partyOrigin !== undefined) {
+    if (!Array.isArray(v.partyOrigin) || v.partyOrigin.some((o) => !isCatchOrigin(o))) return null;
+  }
+  if (v.boxOrigin !== undefined) {
+    if (!Array.isArray(v.boxOrigin) || v.boxOrigin.some((o) => !isCatchOrigin(o))) return null;
   }
   return value as SaveState;
 }

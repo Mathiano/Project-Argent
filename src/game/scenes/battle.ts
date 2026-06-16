@@ -90,8 +90,10 @@ export interface BattleSceneOpts {
   // foe HP fraction; the caller consumes a ball, rolls the catch, and
   // returns whether it caught.
   readonly onThrowBall?: (window: import('../catching').CatchWindow, foeHpFrac: number) => { readonly caught: boolean };
-  // Caught (Path 1) — the caller adds the wild mon to the party/box.
-  readonly onCaught?: (finalState: BattleState) => void;
+  // Caught — the caller adds the wild mon to the party/box. `origin`
+  // records HOW it was caught (Path 1 = 'read', Path 2 = 'mercy') so the
+  // caller can persist provenance (living-world.md Feature 3).
+  readonly onCaught?: (finalState: BattleState, origin: import('../catching').CatchOrigin) => void;
   // Path 2 — spare a FAINTED wild mon with medicine. The caller consumes
   // medicine, rolls the willing-join, and returns whether it joined (+ a
   // refusal hint when it didn't).
@@ -832,7 +834,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     const hpFrac = foe.hp / Math.max(1, foe.maxHp);
     const result = opts.onThrowBall ? opts.onThrowBall(window, hpFrac) : { caught: false };
     if (result.caught) {
-      setText([`Gotcha! ${foe.species.name} was caught!`], () => opts.onCaught?.(state));
+      setText([`Gotcha! ${foe.species.name} was caught!`], () => opts.onCaught?.(state, 'read'));
       return;
     }
     if (window === 'none') {
@@ -956,7 +958,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const foeName = activeMon(state.foe).species.name;
       const r = opts.onWillingJoin ? opts.onWillingJoin() : { joined: false, hint: '' };
       if (r.joined) {
-        setText([`You tend the fallen ${foeName} — it chose to join you!`], () => opts.onCaught?.(state));
+        setText([`You tend the fallen ${foeName} — it chose to join you!`], () => opts.onCaught?.(state, 'mercy'));
       } else {
         setText([r.hint], endWithWin);
       }

@@ -16,6 +16,7 @@ import type { SideState } from '../../engine';
 import { bondStageName } from '../catching';
 import { canDeposit, canWithdraw, deposit, withdraw } from '../box';
 import type { MonStore } from '../box';
+import type { CatchOrigin } from '../catching';
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
@@ -25,8 +26,10 @@ export interface BoxMenuOpts {
   // Live references to run state — the scene MUTATES these via box.ts.
   readonly party: SideState[];
   readonly partyBond: number[];
+  readonly partyOrigin: CatchOrigin[];
   readonly box: SideState[];
   readonly boxBond: number[];
+  readonly boxOrigin: CatchOrigin[];
   // Autosave nudge after any deposit/withdraw (and on close is fine too).
   readonly onChange: () => void;
   readonly onClose: () => void;
@@ -46,8 +49,10 @@ export function createBoxMenuScene(opts: BoxMenuOpts): Scene {
   const store: MonStore = {
     party: opts.party,
     partyBond: opts.partyBond,
+    partyOrigin: opts.partyOrigin,
     box: opts.box,
     boxBond: opts.boxBond,
+    boxOrigin: opts.boxOrigin,
   };
 
   let column: Column = 'party';

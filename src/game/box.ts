@@ -7,6 +7,7 @@
 // with the mon, mirroring the party-menu reorder swap.
 
 import type { SideState } from '../engine';
+import type { CatchOrigin } from './catching';
 
 // A full party is six mons (matches addCaughtMon's `< 6` rule in main.ts).
 export const MAX_PARTY = 6;
@@ -14,8 +15,12 @@ export const MAX_PARTY = 6;
 export interface MonStore {
   readonly party: SideState[];
   readonly partyBond: number[];
+  // living-world.md Feature 3 — provenance, index-aligned with `party`.
+  // Travels with the mon on deposit/withdraw, same as bond.
+  readonly partyOrigin: CatchOrigin[];
   readonly box: SideState[];
   readonly boxBond: number[];
+  readonly boxOrigin: CatchOrigin[];
 }
 
 export type BoxOpResult =
@@ -43,8 +48,10 @@ export function deposit(store: MonStore, index: number): BoxOpResult {
   }
   const [mon] = store.party.splice(index, 1);
   const [bond] = store.partyBond.splice(index, 1);
+  const [origin] = store.partyOrigin.splice(index, 1);
   store.box.push(mon!);
   store.boxBond.push(bond ?? 0);
+  store.boxOrigin.push(origin ?? 'gift');
   return { ok: true };
 }
 
@@ -58,7 +65,9 @@ export function withdraw(store: MonStore, index: number): BoxOpResult {
   }
   const [mon] = store.box.splice(index, 1);
   const [bond] = store.boxBond.splice(index, 1);
+  const [origin] = store.boxOrigin.splice(index, 1);
   store.party.push(mon!);
   store.partyBond.push(bond ?? 0);
+  store.partyOrigin.push(origin ?? 'gift');
   return { ok: true };
 }

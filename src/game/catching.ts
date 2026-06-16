@@ -5,6 +5,21 @@
 
 import type { RNG } from '../engine';
 
+// ---- Catch origin (living-world.md Feature 3 reservation) ---------------
+
+// HOW a mon entered the party — recorded at catch/grant time, persisted,
+// and impossible to backfill (so it's set NOW even though nothing reads
+// it yet). 'read' = Path 1 window catch · 'mercy' = Path 2 willing-join ·
+// 'starter' = the lab gift · 'gift' = any other grant / provenance not
+// recorded (legacy saves, dev hooks). See docs/living-world.md.
+export type CatchOrigin = 'read' | 'mercy' | 'starter' | 'gift';
+
+export const CATCH_ORIGINS: readonly CatchOrigin[] = ['read', 'mercy', 'starter', 'gift'];
+
+export function isCatchOrigin(value: unknown): value is CatchOrigin {
+  return typeof value === 'string' && (CATCH_ORIGINS as readonly string[]).includes(value);
+}
+
 // ---- Path 1: the read window --------------------------------------------
 
 // Window quality at the moment of a throw. `none` = out of window

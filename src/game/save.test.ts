@@ -128,9 +128,29 @@ describe('save.ts — storage adapter round-trip', () => {
       ],
       boxBond: [11, 5],
       dex: { seen: ['FLITPECK', 'CAVELURE', 'KINDRAKE'], caught: ['KINDRAKE'] },
+      // Feature 3 — all four catch origins round-trip (read/mercy/starter/gift).
+      partyOrigin: ['starter'],
+      boxOrigin: ['read', 'mercy'],
     };
     saveToStorage(state, storage);
     expect(loadFromStorage(storage)).toEqual(state);
+  });
+
+  test('Feature 3 — a malformed catchOrigin (unknown value) nukes the save', () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 1,
+        party: [{ speciesName: 'KINDRAKE', hp: 40, st: 100, momentum: 0 }],
+        position: { map: 'X', x: 0, y: 0, facing: 'down' },
+        flags: [],
+        catchBreathUnlocked: false,
+        rngSeed: 0,
+        partyOrigin: ['bred'], // not a CatchOrigin
+      }),
+    );
+    expect(loadFromStorage(storage)).toBeNull();
   });
 
   test('Phase 6.5 — a malformed dex (non-string caught entry) nukes the save', () => {

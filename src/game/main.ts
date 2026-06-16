@@ -63,7 +63,7 @@ import {
   refusalHint,
   willingJoinChance,
 } from './catching';
-import type { CatchWindow } from './catching';
+import type { CatchWindow, CatchOrigin } from './catching';
 import { askResponse, evolutionReadiness, evolutionReady } from './evolution';
 import { createEvolutionScene } from './scenes/evolution';
 import {
@@ -203,6 +203,11 @@ interface RunState {
   // Phase 6.5 — bond for boxed mons, index-aligned with `box`. Travels
   // with the mon on deposit/withdraw (box.ts moves both together).
   boxBond: number[];
+  // living-world.md Feature 3 — catch provenance, index-aligned with
+  // party / box. Set at catch/grant time, persisted, impossible to
+  // backfill. Nothing reads it yet; travels with the mon like bond.
+  partyOrigin: CatchOrigin[];
+  boxOrigin: CatchOrigin[];
   // Phase 6.5 — the seen/caught registry (distinct from the species DB).
   dex: DexRecord;
   catchBreathUnlocked: boolean;
@@ -217,6 +222,8 @@ const run: RunState = {
   partyBond: [],
   box: [],
   boxBond: [],
+  partyOrigin: [],
+  boxOrigin: [],
   dex: createDex(),
   catchBreathUnlocked: false,
   rng: mulberry32(RNG_SEED),
@@ -326,15 +333,17 @@ function ballMult(): number {
 }
 // Add a caught/joined mon to the party (or the box if full). Fresh +
 // healthy (the ball/mercy restored it); starts at the caught bond stage.
-function addCaughtMon(species: Species): void {
+function addCaughtMon(species: Species, origin: CatchOrigin): void {
   const fresh = createSide(species);
   if (run.party.length < 6) {
     run.party.push(fresh);
     run.partyBond.push(BOND_START_CAUGHT);
+    run.partyOrigin.push(origin); // Feature 3 — record HOW it was caught
   } else {
-    // Party full → the box (Phase 6.5: bond now travels into the box too).
+    // Party full → the box (Phase 6.5: bond + origin travel into the box).
     run.box.push(fresh);
     run.boxBond.push(BOND_START_CAUGHT);
+    run.boxOrigin.push(origin);
   }
   markCaught(run.dex, species.name); // Phase 6.5 — dex CAUGHT on add
 }
@@ -413,6 +422,8 @@ function autosaveNow(): void {
     box: run.box.map(toSavedSide),
     boxBond: [...run.boxBond],
     dex: toSavedDex(run.dex),
+    partyOrigin: [...run.partyOrigin],
+    boxOrigin: [...run.boxOrigin],
   };
   saveToStorage(state);
 }
@@ -450,6 +461,8 @@ function startNewGame(): void {
   run.partyBond = [];
   run.box = [];
   run.boxBond = [];
+  run.partyOrigin = [];
+  run.boxOrigin = [];
   run.dex = createDex();
   run.catchBreathUnlocked = false;
   currentRngSeed = 0xa9c0;
@@ -471,6 +484,7 @@ function pushStarterPick(): void {
       onPick: (species) => {
         run.party = [createSide(species)];
         run.partyBond = [BOND_START_STARTER]; // your starter begins a little warmer
+        run.partyOrigin = ['starter']; // Feature 3 — the lab gift
         markCaught(run.dex, species.name); // Phase 6.5 — starter marks CAUGHT
         currentRngSeed = partySeed();
         run.rng = mulberry32(currentRngSeed);
@@ -526,8 +540,10 @@ function pushBoxMenu(): void {
     createBoxMenuScene({
       party: run.party,
       partyBond: run.partyBond,
+      partyOrigin: run.partyOrigin,
       box: run.box,
       boxBond: run.boxBond,
+      boxOrigin: run.boxOrigin,
       onChange: () => autosaveNow(),
       onClose: () => scenes.pop(),
     }),
@@ -707,6 +723,16 @@ function applySave(saved: SaveState): void {
   // mon for a pre-6.5 save; dex loads empty when absent.
   run.boxBond = run.box.map((_, i) =>
     saved.boxBond && typeof saved.boxBond[i] === 'number' ? saved.boxBond[i]! : BOND_START_CAUGHT,
+  );
+  // Feature 3 — catch provenance. Pre-Feature-3 saves can't know it (it's
+  // impossible to backfill), so the lead defaults to 'starter' and the
+  // rest to 'gift' — a best-effort guess for legacy saves only; every new
+  // catch records the truth at catch time.
+  run.partyOrigin = run.party.map((_, i) =>
+    saved.partyOrigin && saved.partyOrigin[i] ? saved.partyOrigin[i]! : i === 0 ? 'starter' : 'gift',
+  );
+  run.boxOrigin = run.box.map((_, i) =>
+    saved.boxOrigin && saved.boxOrigin[i] ? saved.boxOrigin[i]! : 'gift',
   );
   run.dex = fromSavedDex(saved.dex);
   run.catchBreathUnlocked = saved.catchBreathUnlocked;
@@ -1050,10 +1076,12 @@ function applyPartyFromUrl(): void {
     if (sides.length === 0) sides.push(createSide(pickStarter()));
     run.party = sides;
     run.partyBond = sides.map(() => BOND_START_STARTER);
+    run.partyOrigin = sides.map((_, i) => (i === 0 ? 'starter' : 'gift')); // dev hook
     return;
   }
   run.party = [createSide(pickStarter())];
   run.partyBond = [BOND_START_STARTER];
+  run.partyOrigin = ['starter'];
 }
 
 if (skip === 'starter') {
@@ -1123,6 +1151,7 @@ else if (skip === 'evolve') {
   // the readiness line + the "ask your mon" response.
   run.party = [createSide(CH1_DEX.FLITPECK!)];
   run.partyBond = [40]; // bond stage 3 (Companions) — bond gate met
+  run.partyOrigin = ['starter']; // dev hook
   run.badges = ['ZEPHYR']; // badge gate met → both met → evolves on the next win
   run.bag = [];
   bagAdd(run.bag, 'POTION', 3);
@@ -1318,9 +1347,9 @@ function pushWildEncounter(foeSpeciesName: string): void {
         };
       },
       // Caught (Path 1) or joined (Path 2) → add the wild mon, pop back.
-      onCaught: (finalState) => {
+      onCaught: (finalState, origin) => {
         writebackParty(finalState);
-        addCaughtMon(foe);
+        addCaughtMon(foe, origin); // 'read' (Path 1) | 'mercy' (Path 2)
         recomputeSignpostFlags();
         scenes.pop();
         currentOverworldScene?.armPostBattleGrace();
