@@ -63,7 +63,12 @@ export type ScriptCommand =
   // Phase 6.5: the PC Box. Launches the box scene (deposit/withdraw).
   // Terminal, same delegation shape as open-mart — the box scene owns
   // closing back to the overworld. main.ts wires onOpenBox.
-  | { readonly kind: 'open-box' };
+  | { readonly kind: 'open-box' }
+  // Phase 7: grant an item to the bag (hidden ground items, event
+  // rewards). NON-terminal — the script continues (so a "Found X!" dialog
+  // can follow). main.ts wires onGiveItem → bagAdd + autosave. Gate one-
+  // time pickups with the script's own `once`+`flag`.
+  | { readonly kind: 'give-item'; readonly itemId: string; readonly qty: number };
 
 export type MapObject =
   | { readonly type: 'warp'; readonly x: number; readonly y: number; readonly target: string }

@@ -62,6 +62,10 @@ export interface OverworldSceneOpts {
   // so main.ts can push the box scene. No callback = no PC (maps without
   // a PC don't need it).
   readonly onOpenBox?: () => void;
+  // Phase 7 — opt-in. give-item script verb (hidden items, event rewards)
+  // fires this so main.ts can add to the bag + autosave. No callback =
+  // no-op (maps without item grants don't need it).
+  readonly onGiveItem?: (itemId: string, qty: number) => void;
 }
 
 // Richer Scene the autosave reads — currentPosition() lets main.ts
@@ -216,6 +220,13 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         // onOpenBox wiring no-op silently.
         opts.onOpenBox?.();
         return;
+      }
+      if (cmd.kind === 'give-item') {
+        // Phase 7. Non-terminal — grant the item (main.ts mutates the bag
+        // + autosaves), then continue the script so a follow-up dialog can
+        // announce the pickup. Maps without onGiveItem no-op silently.
+        opts.onGiveItem?.(cmd.itemId, cmd.qty);
+        continue;
       }
     }
   }
@@ -534,7 +545,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
       ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
 
       if (map.cells !== undefined && tileset !== null) {
-        drawTilesetCells(ctx, map, tileset, tileCache, camX, camY);
+        drawTilesetCells(ctx, map, tileset, tileCache, camX, camY, tick);
       } else {
         drawTiles(ctx, map, rows, camX, camY);
       }
@@ -632,42 +643,58 @@ function drawTiles(
 // map) and stutter immediately. Falls back gracefully — if neither
 // OffscreenCanvas nor document is available (tests), returns null and
 // drawTilesetCells per-pixel-fills instead.
+// Bake every tile's every FRAME to a canvas. Cache value is the array of
+// frame canvases (length 1 for a static tile); drawTilesetCells indexes
+// it by the animated frame number. Returns null (per-pixel fallback) when
+// no canvas backend exists (tests).
 function bakeTileCache(
   tileset: Tileset,
-): Map<string, HTMLCanvasElement | OffscreenCanvas> | null {
+): Map<string, (HTMLCanvasElement | OffscreenCanvas)[]> | null {
   const hasDom = typeof document !== 'undefined' || typeof OffscreenCanvas !== 'undefined';
   if (!hasDom) return null;
-  const cache = new Map<string, HTMLCanvasElement | OffscreenCanvas>();
+  const cache = new Map<string, (HTMLCanvasElement | OffscreenCanvas)[]>();
   const ts = tileset.tilesize;
   for (const id of Object.keys(tileset.tiles)) {
     const tile = tileset.tiles[id]!;
-    const c: HTMLCanvasElement | OffscreenCanvas =
-      typeof OffscreenCanvas !== 'undefined'
-        ? new OffscreenCanvas(ts, ts)
-        : Object.assign(document.createElement('canvas'), { width: ts, height: ts });
-    const cctx = (c as HTMLCanvasElement).getContext('2d') as CanvasRenderingContext2D | null;
-    if (!cctx) continue;
-    cctx.imageSmoothingEnabled = false;
-    for (let py = 0; py < ts; py += 1) {
-      for (let px = 0; px < ts; px += 1) {
-        const color = tile.pixels[py * ts + px];
-        if (color === null || color === undefined) continue;
-        cctx.fillStyle = color;
-        cctx.fillRect(px, py, 1, 1);
+    const baked: (HTMLCanvasElement | OffscreenCanvas)[] = [];
+    for (const frame of tile.frames) {
+      const c: HTMLCanvasElement | OffscreenCanvas =
+        typeof OffscreenCanvas !== 'undefined'
+          ? new OffscreenCanvas(ts, ts)
+          : Object.assign(document.createElement('canvas'), { width: ts, height: ts });
+      const cctx = (c as HTMLCanvasElement).getContext('2d') as CanvasRenderingContext2D | null;
+      if (!cctx) continue;
+      cctx.imageSmoothingEnabled = false;
+      for (let py = 0; py < ts; py += 1) {
+        for (let px = 0; px < ts; px += 1) {
+          const color = frame[py * ts + px];
+          if (color === null || color === undefined) continue;
+          cctx.fillStyle = color;
+          cctx.fillRect(px, py, 1, 1);
+        }
       }
+      baked.push(c);
     }
-    cache.set(id, c);
+    cache.set(id, baked);
   }
   return cache;
+}
+
+// Which frame of an animated tile is showing at time `tick`.
+function frameIndex(tile: Tile, tick: number): number {
+  const n = tile.frames.length;
+  if (n <= 1) return 0;
+  return Math.floor(tick * tile.fps) % n;
 }
 
 function drawTilesetCells(
   ctx: CanvasRenderingContext2D,
   map: MapData,
   tileset: Tileset,
-  cache: Map<string, HTMLCanvasElement | OffscreenCanvas> | null,
+  cache: Map<string, (HTMLCanvasElement | OffscreenCanvas)[]> | null,
   camX: number,
   camY: number,
+  tick: number,
 ): void {
   const ts = map.tilesize;
   const minX = Math.max(0, Math.floor(camX / ts));
@@ -682,11 +709,12 @@ function drawTilesetCells(
       if (id === undefined) continue;
       const tile = tileset.tiles[id];
       if (!tile) continue;
+      const f = frameIndex(tile, tick);
       const baked = cache?.get(id);
-      if (baked) {
-        ctx.drawImage(baked as CanvasImageSource, x * ts - camX, y * ts - camY);
+      if (baked && baked.length > 0) {
+        ctx.drawImage((baked[f] ?? baked[0]) as CanvasImageSource, x * ts - camX, y * ts - camY);
       } else {
-        drawTilePixels(ctx, tile, x * ts - camX, y * ts - camY, ts);
+        drawTilePixels(ctx, tile.frames[f] ?? tile.pixels, x * ts - camX, y * ts - camY, ts);
       }
     }
   }
@@ -694,14 +722,14 @@ function drawTilesetCells(
 
 function drawTilePixels(
   ctx: CanvasRenderingContext2D,
-  tile: Tile,
+  pixels: ReadonlyArray<string | null>,
   ox: number,
   oy: number,
   ts: number,
 ): void {
   for (let py = 0; py < ts; py += 1) {
     for (let px = 0; px < ts; px += 1) {
-      const color = tile.pixels[py * ts + px];
+      const color = pixels[py * ts + px];
       if (color === null || color === undefined) continue;
       ctx.fillStyle = color;
       ctx.fillRect(ox + px, oy + py, 1, 1);

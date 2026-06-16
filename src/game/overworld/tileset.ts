@@ -43,6 +43,13 @@ export interface TileJson {
   readonly encounter?: string | null;
   readonly animated?: boolean;
   readonly label?: string;
+  // Phase 7 animation: extra frames beyond the base (pixels/rows = frame
+  // 0). Each entry is a `rows`-style grid (tilesize strings of tilesize
+  // chars). When present (≥1 extra frame), the tile cycles base→frames at
+  // `fps` (default 2). Cheap "the world breathes" — water ripple, grass
+  // sway. Static tiles omit both and render exactly as before.
+  readonly frames?: readonly (readonly string[])[];
+  readonly fps?: number;
 }
 
 export interface PrefabJson {
@@ -74,12 +81,16 @@ export interface Tileset {
 export interface Tile {
   readonly id: string;
   // Decoded pixel grid: row-major, `tilesize * tilesize` entries.
-  // null = transparent pixel.
+  // null = transparent pixel. Equals frames[0] (the base frame).
   readonly pixels: ReadonlyArray<string | null>;
   readonly solid: boolean;
   readonly encounter: string | null;
   readonly animated: boolean;
   readonly label: string;
+  // Phase 7: all frames (base + extras), decoded. Length 1 for a static
+  // tile. Renderer cycles by tick when length > 1.
+  readonly frames: ReadonlyArray<ReadonlyArray<string | null>>;
+  readonly fps: number;
 }
 
 export interface Prefab {
@@ -101,31 +112,41 @@ export interface PrefabCell {
 export function loadTileset(json: TilesetJson): Tileset {
   const tiles: { [id: string]: Tile } = {};
   const expectLen = json.tilesize * json.tilesize;
-  for (const id of Object.keys(json.tiles)) {
-    const t = json.tiles[id]!;
-    const flat = flattenPixels(json.name, id, t, json.tilesize, expectLen);
-    const pixels: (string | null)[] = new Array(expectLen);
+  // Decode one flat palette-char string into a pixel grid (null = transparent).
+  const decode = (flat: string): (string | null)[] => {
+    const out: (string | null)[] = new Array(expectLen);
     for (let i = 0; i < expectLen; i += 1) {
       const ch = flat[i]!;
       if (ch === ' ' || ch === '.') {
-        pixels[i] = null;
+        out[i] = null;
         continue;
       }
       const idx = PALETTE_KEYS.indexOf(ch);
       if (idx === -1 || idx >= json.palette.length) {
-        throw new Error(
-          `Tileset "${json.name}" tile "${id}" pixel ${i}: char "${ch}" not in palette`,
-        );
+        throw new Error(`Tileset "${json.name}" tile "${id}" pixel ${i}: char "${ch}" not in palette`);
       }
-      pixels[i] = json.palette[idx]!;
+      out[i] = json.palette[idx]!;
+    }
+    return out;
+  };
+  let id = '';
+  for (id of Object.keys(json.tiles)) {
+    const t = json.tiles[id]!;
+    const base = decode(flattenPixels(json.name, id, t, json.tilesize, expectLen));
+    // Phase 7: optional extra animation frames (each a rows-style grid).
+    const frames: (string | null)[][] = [base];
+    for (const frameRows of t.frames ?? []) {
+      frames.push(decode(flattenFrameRows(json.name, id, frameRows, json.tilesize)));
     }
     tiles[id] = {
       id,
-      pixels,
+      pixels: base,
       solid: t.solid ?? false,
       encounter: t.encounter ?? null,
-      animated: t.animated ?? false,
+      animated: (t.animated ?? false) || frames.length > 1,
       label: t.label ?? id,
+      frames,
+      fps: t.fps ?? 2,
     };
   }
   return {
@@ -167,6 +188,25 @@ function flattenPixels(
     );
   }
   return t.pixels;
+}
+
+// Validate + flatten one animation frame (rows-style grid). Same row/size
+// checks as flattenPixels' rows branch.
+function flattenFrameRows(
+  tilesetName: string,
+  tileId: string,
+  rows: readonly string[],
+  tilesize: number,
+): string {
+  if (rows.length !== tilesize) {
+    throw new Error(`Tileset "${tilesetName}" tile "${tileId}" frame: rows=${rows.length} != tilesize=${tilesize}`);
+  }
+  for (let y = 0; y < tilesize; y += 1) {
+    if (rows[y]!.length !== tilesize) {
+      throw new Error(`Tileset "${tilesetName}" tile "${tileId}" frame row ${y}: length=${rows[y]!.length} != ${tilesize}`);
+    }
+  }
+  return rows.join('');
 }
 
 export function loadPrefab(json: PrefabJson): Prefab {

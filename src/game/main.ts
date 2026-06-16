@@ -1272,6 +1272,16 @@ function showOverworld(
     onOpenBox() {
       pushBoxMenu();
     },
+    onGiveItem(itemId: string, qty: number) {
+      // Phase 7 — hidden items + event rewards. Skip unknown ids loudly
+      // (a map typo shouldn't crash); otherwise add to the bag + autosave.
+      if (!ITEMS[itemId]) {
+        console.warn(`Argent give-item: unknown item "${itemId}" — ignored`);
+        return;
+      }
+      bagAdd(run.bag, itemId, qty);
+      autosaveNow();
+    },
     onStarterPick() {
       pushStarterPick();
     },
