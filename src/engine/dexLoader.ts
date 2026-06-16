@@ -46,7 +46,38 @@ export interface DexEntryJson {
   // shown only for encountered species. Distinct from the generation-side
   // `habitatTags` above (those are authoring tags, not display).
   readonly habitat?: string;
+  // ---- RESERVED for mon CHARACTER (docs/mon-character.md, Phase 8+).
+  // Forward-compat substrate read later by world-reactions + KAMON
+  // (living-world.md), "ask your mon" (evolution-design.md), and
+  // catch-origin flavor (catching-2-0.md). Reserved now, optional,
+  // populated per-chapter so ~200 mons aren't retrofitted. Type-only —
+  // no behavior built yet.
+  // Temperament archetype — the lens all reactions/dialogue filter
+  // through. Reaction = `personality` × bond stage (the two-axis model;
+  // bond is bond-track-v2.md). Enum LOCKED at 8.
+  readonly personality?: Personality;
+  // Emotional affinities (NOT the spawn-table `habitatTags`) — a mon
+  // loves / dislikes these environments. Feeds world-reactions + a
+  // possible light bond nudge later.
+  readonly preferredEnvironment?: readonly string[];
+  readonly dislikedEnvironment?: readonly string[];
+  // One small unique behavioral tic — the individual touch beyond the
+  // species archetype. Light reservation (a flavor string), authored later.
+  readonly quirk?: string;
 }
+
+// The locked 8-archetype personality set (docs/mon-character.md Property
+// 1). Imperious is the legendary/prestige slot (reacts from superiority,
+// never fear). Reserved now; populated per-chapter.
+export type Personality =
+  | 'Timid'
+  | 'Bold'
+  | 'Gentle'
+  | 'Proud'
+  | 'Loyal'
+  | 'Wild'
+  | 'Serene'
+  | 'Imperious';
 
 export interface MoveJson {
   readonly name: string;

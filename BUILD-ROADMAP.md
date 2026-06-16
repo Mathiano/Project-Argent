@@ -81,6 +81,10 @@ Prerequisite: Phase 7 (the chapter template proven once).
   - **Status DISPLAY (Part 4B, LOCKED):** dual-layer like stances — a 3-letter bar TAG (BRN/FRZ/DAZ/… thematically colored: negatives by inflicting-type flavor, positives GREEN) + the full plain-language battle-log sentence. Lingering-only tagging; 3-negative cap with positives (Brace/Shrouded/Resolve) tracked separately. Build with the status system.
   - **In-battle SCAN (Part 7, LOCKED):** dex-knowledge-gated foe lookup (see Phase 6.5 forward hook). Pairs with the intent ramp — dex = species tendencies, intent = this individual. Schema reserved in `dexLoader.ts`.
 - Each chapter reuses the Phase 7 template. Features interleave per the parity checklist order.
+- **The "living world" / mon-character layer** (`docs/living-world.md`, `docs/mon-character.md`) — world-reactions, recurring stateful KAMON, the mon-remembers-its-origin flavor, personality/preference/quirk-driven character. Build on a finished chapter. **Forward-compat seams already reserved** (cheap-now, impossible/painful to retrofit):
+  - **`catchOrigin`** (`'read'|'mercy'|'starter'|'gift'`) — **SHIPPED**: set at catch/grant time + persisted (`save.ts`), travels with the mon through the box. Feeds Feature 3 (the mon remembers how it was caught). Impossible to backfill, so set now.
+  - **Mon-character schema slots** — reserved in `src/engine/dexLoader.ts` (type-only, optional, populate per-chapter): `personality` (the locked 8-archetype enum), `preferredEnvironment`/`dislikedEnvironment` (emotional affinities, distinct from spawn `habitatTags`), `quirk` (individual tic). Read later by world-reactions, KAMON's coldness, "ask your mon," catch-origin flavor. The two-axis model: reaction = personality × bond stage.
+  - Other honored seams (not foreclosed by Phase 7): overworld can read the lead mon's bond+species; tiles/events can carry reaction triggers; the actor system doesn't block a follower-mon; KAMON modeled as recurring/stateful; NPC mons can carry a bond-characterization.
 
 ---
 
