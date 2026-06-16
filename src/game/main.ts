@@ -46,6 +46,7 @@ import { createPauseMenuScene } from './scenes/pauseMenu';
 import { createPrepScene } from './scenes/prep';
 import { createStarterPickScene } from './scenes/starterPick';
 import { createTitleScene } from './scenes/title';
+import { freshBattleSide } from './battlePrep';
 import { bagAdd, bagByPocket, bagConsume, ITEMS } from './items';
 import type { BagEntry } from './items';
 import { STARTING_MONEY, awardMoney, buyItem, sellItem } from './economy';
@@ -271,10 +272,11 @@ function partySeed(): number {
 // battles per the KO-stamina canon — Phase 2 writeback wires this).
 function buildPlayerTeam(): ReturnType<typeof createTeam> {
   if (run.party.length === 0) return createTeam([createSide(STARTERS[0]!)]);
-  // Clone the SideStates so a battle's exhausted/staggered flags
-  // (round-local) don't bleed into run.party between battles.
-  // hp/st/momentum carry through — that's the writeback.
-  const fresh = run.party.map((side) => ({ ...side, exhausted: false, staggered: false }));
+  // Clone the SideStates so a battle's round-local flags don't bleed into
+  // run.party between battles. HP carries through (the persistent resource
+  // — healed at Centers/potions); STAMINA resets to full at battle start
+  // (firstroad-fixes S1). freshBattleSide owns that contract (tested).
+  const fresh = run.party.map(freshBattleSide);
   return createTeam(fresh);
 }
 
