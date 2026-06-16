@@ -151,26 +151,31 @@ const objects = [
     type: 'script', x: 12, y: 24, trigger: 'step-on', flag: 'route31_item_pond', once: true,
     commands: [{ kind: 'give-item', itemId: 'BALL', qty: 2 }, { kind: 'dialog', lines: ['Half-buried by the bank —', 'you found 2 BALLs!'] }],
   },
-  // --- The seed event (S6): the lost mon ---
-  // The frightened mon (off the path, by the pond). First talk calms it +
-  // sets lost_mon_found; afterwards it waits.
+  // --- The seed event (S6): the lost mon. S4: PIP renders as a visible
+  // FLITPECK sprite (placeholder) in the reeds so the player can SEE it.
+  // S5: a little character — PIP is a specific bird with a specific tic.
+  // First talk calms PIP + sets lost_mon_found; afterwards it waits.
   {
-    type: 'npc', x: 16, y: 21, color: '#9aaecf', blockedUntilFlag: 'route31_lost_mon_found',
+    type: 'npc', x: 16, y: 21, color: '#9aaecf', sprite: 'FLITPECK', spriteType: 'GALE',
+    blockedUntilFlag: 'route31_lost_mon_found',
     interact: [
-      { kind: 'dialog', lines: ['A small FLITPECK is wedged', 'in the reeds, trembling.', 'You crouch low and still —', 'and it lets you near.'] },
+      { kind: 'dialog', lines: ['A scruffy little FLITPECK is', 'wedged in the reeds, one wing', 'tucked wrong, peeping the same', 'three notes over and over.'] },
+      { kind: 'dialog', lines: ['You crouch, go still, and hum', 'the three notes back at it.', 'It blinks. Peeps once more —', 'and hops onto your boot.'] },
       { kind: 'set-flag', flag: 'route31_lost_mon_found' },
-      { kind: 'dialog', lines: ['It hops free and chirps,', 'looking up the path,', 'as if waiting to be led home.'] },
+      { kind: 'dialog', lines: ['It shakes out the bad wing,', 'looks up the path, and waits —', 'plainly wanting to be led home.'] },
     ],
-    interactAfterFlag: [{ kind: 'dialog', lines: ['The little FLITPECK pads', 'after you, calmer now.'] }],
+    interactAfterFlag: [{ kind: 'dialog', lines: ['PIP pads after you, peeping', 'its little three-note song,', 'much braver now.'] }],
   },
   // The worried owner (a kid up the path). Pleads before; thanks after.
   {
     type: 'npc', x: 11, y: 24, color: '#caa148', blockedUntilFlag: 'route31_lost_mon_found',
     interact: [
-      { kind: 'dialog', lines: ["KID: Have you seen a little", 'FLITPECK?! It bolted into', 'the reeds by the pond and', "I— I can't reach it!"] },
+      { kind: 'dialog', lines: ["KID: You haven't seen a little", 'FLITPECK, have you? Answers to', "PIP — sings three notes, can't", 'hold a fourth to save itself.'] },
+      { kind: 'dialog', lines: ['KID: It chased a leaf into the', 'reeds by the pond and just…', "didn't come back. I'm not", 'allowed near the water alone.'] },
     ],
     interactAfterFlag: [
-      { kind: 'dialog', lines: ['KID: You found PIP! It came', 'right back to me — thank you,', 'thank you!!'] },
+      { kind: 'dialog', lines: ['KID: PIP! You — you found PIP!', '(It launches off your shoulder', 'straight into the kid’s arms,', 'peeping its whole song at once.)'] },
+      { kind: 'dialog', lines: ['KID: You even hummed it back?', "That's our song. Nobody knows", "that but me. ...You're alright.", "I won't forget this."] },
     ],
   },
   // The reunion reward: a one-time step-on in front of the kid, gated on
@@ -179,7 +184,7 @@ const objects = [
     type: 'script', x: 11, y: 25, trigger: 'step-on',
     requiresFlag: 'route31_lost_mon_found', once: true, flag: 'route31_lost_mon_reunited',
     commands: [
-      { kind: 'dialog', lines: ['KID: Here — Mum said to give', 'this to whoever helped.', 'Take good care out there!'] },
+      { kind: 'dialog', lines: ['KID: Here — Mum keeps these for', 'the rough days. You gave PIP', 'back one of its. Take it.'] },
       { kind: 'give-item', itemId: 'SUPER POTION', qty: 1 },
     ],
   },

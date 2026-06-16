@@ -104,6 +104,13 @@ export type MapObject =
       readonly blockedUntilFlag?: string;
       readonly interact: readonly ScriptCommand[];
       readonly interactAfterFlag?: readonly ScriptCommand[];
+      // Phase 7: render this NPC as a species OVERWORLD SPRITE (the
+      // type-tinted placeholder when no art is registered) instead of a
+      // flat colour square — e.g. a lost mon in the grass the player must
+      // SEE to find. `sprite` = species name; `spriteType` tints the
+      // placeholder (the element type). Art never blocks gameplay.
+      readonly sprite?: string;
+      readonly spriteType?: string;
     }
   | {
       readonly type: 'gust_pulse';

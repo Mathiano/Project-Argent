@@ -8,6 +8,8 @@ import { findObjectAt, isWalkable } from '../overworld/types';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
 import { drawPanel, drawText } from '../ui';
+import { drawSpeciesInSlot } from '../sprites';
+import type { ElementType } from '../../engine';
 
 const MOVE_DURATION = 0.18;
 const FADE_DURATION = 0.25;
@@ -789,6 +791,18 @@ function drawObjectMarkers(
     } else if (obj.type === 'encounter_zone') {
       void obj;
     } else if (obj.type === 'npc') {
+      if (obj.sprite) {
+        // Phase 7: render as a species overworld sprite (placeholder when
+        // no art) so the player can SEE it — e.g. a lost mon in the grass.
+        drawSpeciesInSlot(
+          ctx,
+          { name: obj.sprite, type: (obj.spriteType ?? null) as ElementType | null },
+          obj.x * ts - camX,
+          obj.y * ts - camY,
+          { slotSize: ts },
+        );
+        continue;
+      }
       const beaten = obj.blockedUntilFlag ? flags.has(obj.blockedUntilFlag) : false;
       const color = beaten ? '#777' : obj.color ?? '#d22f2f';
       const px = obj.x * ts - camX + 3;

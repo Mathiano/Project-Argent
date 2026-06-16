@@ -247,15 +247,26 @@
       "x": 16,
       "y": 21,
       "color": "#9aaecf",
+      "sprite": "FLITPECK",
+      "spriteType": "GALE",
       "blockedUntilFlag": "route31_lost_mon_found",
       "interact": [
         {
           "kind": "dialog",
           "lines": [
-            "A small FLITPECK is wedged",
-            "in the reeds, trembling.",
-            "You crouch low and still —",
-            "and it lets you near."
+            "A scruffy little FLITPECK is",
+            "wedged in the reeds, one wing",
+            "tucked wrong, peeping the same",
+            "three notes over and over."
+          ]
+        },
+        {
+          "kind": "dialog",
+          "lines": [
+            "You crouch, go still, and hum",
+            "the three notes back at it.",
+            "It blinks. Peeps once more —",
+            "and hops onto your boot."
           ]
         },
         {
@@ -265,9 +276,9 @@
         {
           "kind": "dialog",
           "lines": [
-            "It hops free and chirps,",
-            "looking up the path,",
-            "as if waiting to be led home."
+            "It shakes out the bad wing,",
+            "looks up the path, and waits —",
+            "plainly wanting to be led home."
           ]
         }
       ],
@@ -275,8 +286,9 @@
         {
           "kind": "dialog",
           "lines": [
-            "The little FLITPECK pads",
-            "after you, calmer now."
+            "PIP pads after you, peeping",
+            "its little three-note song,",
+            "much braver now."
           ]
         }
       ]
@@ -291,10 +303,19 @@
         {
           "kind": "dialog",
           "lines": [
-            "KID: Have you seen a little",
-            "FLITPECK?! It bolted into",
-            "the reeds by the pond and",
-            "I— I can't reach it!"
+            "KID: You haven't seen a little",
+            "FLITPECK, have you? Answers to",
+            "PIP — sings three notes, can't",
+            "hold a fourth to save itself."
+          ]
+        },
+        {
+          "kind": "dialog",
+          "lines": [
+            "KID: It chased a leaf into the",
+            "reeds by the pond and just…",
+            "didn't come back. I'm not",
+            "allowed near the water alone."
           ]
         }
       ],
@@ -302,9 +323,19 @@
         {
           "kind": "dialog",
           "lines": [
-            "KID: You found PIP! It came",
-            "right back to me — thank you,",
-            "thank you!!"
+            "KID: PIP! You — you found PIP!",
+            "(It launches off your shoulder",
+            "straight into the kid’s arms,",
+            "peeping its whole song at once.)"
+          ]
+        },
+        {
+          "kind": "dialog",
+          "lines": [
+            "KID: You even hummed it back?",
+            "That's our song. Nobody knows",
+            "that but me. ...You're alright.",
+            "I won't forget this."
           ]
         }
       ]
@@ -321,9 +352,9 @@
         {
           "kind": "dialog",
           "lines": [
-            "KID: Here — Mum said to give",
-            "this to whoever helped.",
-            "Take good care out there!"
+            "KID: Here — Mum keeps these for",
+            "the rough days. You gave PIP",
+            "back one of its. Take it."
           ]
         },
         {
