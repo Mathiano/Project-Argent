@@ -113,6 +113,43 @@ describe('save.ts — storage adapter round-trip', () => {
     expect(loaded).toEqual(state);
   });
 
+  test('Phase 6.5 — box/boxBond/dex round-trip through storage', () => {
+    const storage = memoryStorage();
+    const state: SaveState = {
+      version: 1,
+      party: [{ speciesName: 'KINDRAKE', hp: 40, st: 100, momentum: 0 }],
+      position: { map: 'HEARTHWICK_CENTER', x: 7, y: 3, facing: 'up' },
+      flags: [],
+      catchBreathUnlocked: true,
+      rngSeed: 0xa9c0,
+      box: [
+        { speciesName: 'GRUBLEAF', hp: 12, st: 60, momentum: 1 },
+        { speciesName: 'GALEHAWK', hp: 50, st: 100, momentum: 0 },
+      ],
+      boxBond: [11, 5],
+      dex: { seen: ['FLITPECK', 'CAVELURE', 'KINDRAKE'], caught: ['KINDRAKE'] },
+    };
+    saveToStorage(state, storage);
+    expect(loadFromStorage(storage)).toEqual(state);
+  });
+
+  test('Phase 6.5 — a malformed dex (non-string caught entry) nukes the save', () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 1,
+        party: [],
+        position: { map: 'X', x: 0, y: 0, facing: 'down' },
+        flags: [],
+        catchBreathUnlocked: false,
+        rngSeed: 0,
+        dex: { seen: ['FLITPECK'], caught: [42] },
+      }),
+    );
+    expect(loadFromStorage(storage)).toBeNull();
+  });
+
   test('hasSave reports presence correctly across save / wipe cycles', () => {
     const storage = memoryStorage();
     expect(hasSave(storage)).toBe(false);

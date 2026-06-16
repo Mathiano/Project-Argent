@@ -43,6 +43,18 @@ export interface SaveState {
   readonly partyBond?: readonly number[];
   // Phase 6a — the box (caught mons when the party is full). Additive.
   readonly box?: readonly SavedSide[];
+  // Phase 6.5 — bond for boxed mons, index-aligned with `box`. Additive;
+  // missing → defaults per-mon on load (same pattern as partyBond).
+  readonly boxBond?: readonly number[];
+  // Phase 6.5 — the seen/caught registry. Additive; missing → empty dex.
+  readonly dex?: SavedDex;
+}
+
+// Phase 6.5 — the dex save shape (seen/caught species names). Mirrors
+// SavedDex in dex.ts; redeclared here to keep save's wire shape local.
+export interface SavedDex {
+  readonly seen: readonly string[];
+  readonly caught: readonly string[];
 }
 
 export interface SavedBagEntry {
@@ -203,6 +215,17 @@ function validateSave(value: unknown): SaveState | null {
       if (typeof mm.speciesName !== 'string') return null;
       if (typeof mm.hp !== 'number' || typeof mm.st !== 'number' || typeof mm.momentum !== 'number') return null;
     }
+  }
+  // boxBond optional (pre-6.5 saves). When present, a number[].
+  if (v.boxBond !== undefined) {
+    if (!Array.isArray(v.boxBond) || v.boxBond.some((b) => typeof b !== 'number')) return null;
+  }
+  // dex optional (pre-6.5 saves). When present, { seen: string[], caught: string[] }.
+  if (v.dex !== undefined) {
+    if (typeof v.dex !== 'object' || v.dex === null) return null;
+    const d = v.dex as Record<string, unknown>;
+    if (!Array.isArray(d.seen) || d.seen.some((s) => typeof s !== 'string')) return null;
+    if (!Array.isArray(d.caught) || d.caught.some((s) => typeof s !== 'string')) return null;
   }
   return value as SaveState;
 }
