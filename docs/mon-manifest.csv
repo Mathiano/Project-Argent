@@ -14,8 +14,8 @@ L006,1,,1,POSTGAME,roaming/summit,GALE,,Dodger,legendary,,"STANCE BEAST (Fluid) 
 L007,1,,1,POSTGAME,roaming/summit,DRAKE,,Pacer,legendary,,"COVER LEGENDARY - locked: Argent moon-dragon, silver celestial wyrm (namesake). Night-only tracking; fight = moon-phase stance rhythm at Red-tier reads; name must derive from argent"
 L008,1,FLITPECK,2,CH1,route grass,GALE,,Glass nuke,uncommon,16,"GYM LINE (Falkner ace) - locked: gust-dancer, trait GUSTBORNE (surges on arena rhythm rounds), Glass nuke shape"
 L008,2,GALEHAWK,2,CH1,route grass,GALE,,Glass nuke,uncommon,,"GYM LINE (Falkner ace) - locked: gust-dancer, trait GUSTBORNE (surges on arena rhythm rounds), Glass nuke shape"
-L009,1,,2,CH2,old well,VENOM,,Drainer,uncommon,16,GYM LINE — leader of CH2 uses top stage as ace
-L009,2,,2,CH2,old well,VENOM,,Drainer,uncommon,,GYM LINE — leader of CH2 uses top stage as ace
+L009,1,MURKIN,2,CH2,old well,VENOM,,Drainer,uncommon,16,GYM LINE — leader of CH2 uses top stage as ace
+L009,2,SLUDGNATH,2,CH2,old well,VENOM,,Drainer,uncommon,,GYM LINE — leader of CH2 uses top stage as ace
 L010,1,,2,CH3,city outskirts,BASIC,,Dodger,uncommon,16,GYM LINE — leader of CH3 uses top stage as ace
 L010,2,,2,CH3,city outskirts,BASIC,,Dodger,uncommon,,GYM LINE — leader of CH3 uses top stage as ace
 L011,1,,2,CH4,graveyard path,SPIRIT,,Wall,uncommon,16,GYM LINE — leader of CH4 uses top stage as ace
@@ -41,7 +41,7 @@ L020,2,,3,CH7,mountain pass,SPARK,,Glass nuke,uncommon,34,
 L020,3,,3,CH7,mountain pass,SPARK,,Glass nuke,uncommon,,
 L021,1,,2,CH5,whirl sea,SPIRIT,,Pacer,uncommon,16,
 L021,2,,2,CH5,whirl sea,SPIRIT,,Pacer,uncommon,,
-L022,1,,1,CH4,burned tower,AQUA,,Drainer,common,,
+L022,1,TIDEPADDLE,1,CH4,tidepools,AQUA,,Drainer,common,,
 L023,1,GRITHOAX,3,CH1,route grass,TERRA,,Trickster,common,16,
 L023,2,CAVELURE,3,CH1,route grass,TERRA,,Trickster,common,34,
 L023,3,CHASMTRAP,3,CH1,route grass,TERRA,,Trickster,common,,
@@ -220,3 +220,40 @@ L114,1,OREWING,2,TBD,mountain pass,STONE,GALE,Pacer,uncommon,16,approved Batch 2
 L114,2,IRONROC,2,TBD,mountain pass,STONE,GALE,Pacer,uncommon,,approved Batch 2 - chapter TBD
 L115,1,PUMICETTE,2,TBD,volcanic cave,FLAME,STONE,Wall,uncommon,16,approved Batch 2 - chapter TBD
 L115,2,MAGMACRAG,2,TBD,volcanic cave,FLAME,STONE,Wall,uncommon,,approved Batch 2 - chapter TBD
+L116,1,PEBBLAW,3,TBD,beach,STONE,AQUA,Counter-tank,uncommon,16,approved Batch 3 - chapter TBD
+L116,2,CARAPACE,3,TBD,beach,STONE,AQUA,Counter-tank,uncommon,34,approved Batch 3 - chapter TBD
+L116,3,KABULORD,3,TBD,beach,STONE,AQUA,Counter-tank,uncommon,,approved Batch 3 - chapter TBD
+L117,1,SPOUTLING,2,TBD,coast,AQUA,,Glass nuke,common,16,approved Batch 3 - chapter TBD
+L117,2,GEYSARK,2,TBD,coast,AQUA,,Glass nuke,common,,approved Batch 3 - chapter TBD
+L118,1,SEADRIFT,3,TBD,open sea,AQUA,,Pacer,uncommon,16,approved Batch 3 - chapter TBD
+L118,2,CURRENTINE,3,TBD,open sea,AQUA,,Pacer,uncommon,34,approved Batch 3 - chapter TBD
+L118,3,MAERWAKE,3,TBD,open sea,AQUA,,Pacer,uncommon,,approved Batch 3 - chapter TBD
+L119,1,MIREPUP,2,TBD,swamp,VENOM,TERRA,Brawler,common,16,approved Batch 3 - chapter TBD
+L119,2,BOGFANG,2,TBD,swamp,VENOM,TERRA,Brawler,common,,approved Batch 3 - chapter TBD
+L120,1,REEDWISP,2,TBD,marsh,NATURE,SPIRIT,Trickster,uncommon,16,approved Batch 3 - chapter TBD
+L120,2,MARSHADE,2,TBD,marsh,NATURE,SPIRIT,Trickster,uncommon,,approved Batch 3 - chapter TBD
+L121,1,BRINEHISS,2,TBD,salt marsh,AQUA,VENOM,Drainer,uncommon,16,approved Batch 3 - chapter TBD
+L121,2,SALTWYRM,2,TBD,salt marsh,AQUA,VENOM,Drainer,uncommon,,approved Batch 3 - chapter TBD
+L122,1,CORALCLAW,2,TBD,reef,AQUA,STONE,Wall,uncommon,16,approved Batch 3 - chapter TBD
+L122,2,REEFMAUL,2,TBD,reef,AQUA,STONE,Wall,uncommon,,approved Batch 3 - chapter TBD
+L123,1,BRAMBLEKIT,3,TBD,deep forest,NATURE,,Brawler,uncommon,16,approved Batch 4 - chapter TBD
+L123,2,THORNJACK,3,TBD,deep forest,NATURE,,Brawler,uncommon,34,approved Batch 4 - chapter TBD
+L123,3,BRIARFANG,3,TBD,deep forest,NATURE,,Brawler,uncommon,,approved Batch 4 - chapter TBD
+L124,1,MANTILL,2,TBD,forest,INSECT,NATURE,Glass nuke,uncommon,16,approved Batch 4 - chapter TBD
+L124,2,GLAIVEWING,2,TBD,forest,INSECT,NATURE,Glass nuke,uncommon,,approved Batch 4 - chapter TBD
+L125,1,ACORNTLE,3,TBD,woodland,NATURE,STONE,Wall,common,16,approved Batch 4 - chapter TBD
+L125,2,OAKWARD,3,TBD,woodland,NATURE,STONE,Wall,common,34,approved Batch 4 - chapter TBD
+L125,3,TIMBERHIDE,3,TBD,woodland,NATURE,STONE,Wall,common,,approved Batch 4 - chapter TBD
+L126,1,FAWNDLE,2,TBD,meadow,NATURE,,Pacer,common,16,approved Batch 4 - chapter TBD
+L126,2,STRIDEHART,2,TBD,meadow,NATURE,,Pacer,common,,approved Batch 4 - chapter TBD
+L127,1,DUSKWING,2,TBD,deep wood,NATURE,SPIRIT,Trickster,uncommon,16,approved Batch 4 - chapter TBD
+L127,2,NOCTHARE,2,TBD,deep wood,NATURE,SPIRIT,Trickster,uncommon,,approved Batch 4 - chapter TBD
+L128,1,BUZZGRUB,3,TBD,forest,INSECT,,Glass nuke,common,16,approved Batch 4 - chapter TBD
+L128,2,WASPRITE,3,TBD,forest,INSECT,,Glass nuke,common,34,approved Batch 4 - chapter TBD
+L128,3,VESPINE,3,TBD,forest,INSECT,,Glass nuke,common,,approved Batch 4 - chapter TBD
+L129,1,MOSSPAW,2,TBD,forest floor,NATURE,TERRA,Brawler,uncommon,16,approved Batch 4 - chapter TBD
+L129,2,LUMBROCK,2,TBD,forest floor,NATURE,TERRA,Brawler,uncommon,,approved Batch 4 - chapter TBD
+L130,1,PETALISK,2,TBD,glade,NATURE,,Drainer,common,16,approved Batch 4 - chapter TBD
+L130,2,BLOOMAW,2,TBD,glade,NATURE,,Drainer,common,,approved Batch 4 - chapter TBD
+L131,1,CANOPER,2,TBD,canopy,GALE,NATURE,Pacer,uncommon,16,approved Batch 4 - chapter TBD
+L131,2,SOARTALON,2,TBD,canopy,GALE,NATURE,Pacer,uncommon,,approved Batch 4 - chapter TBD
