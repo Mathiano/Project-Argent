@@ -209,17 +209,17 @@ L108,3,HIVEMAW,3,CH1,route grass,INSECT,,Drainer,common,,approved Batch 1
 L109,1,THISTLEKIT,1,CH1,forest edge,NATURE,,Trickster,common,,approved Batch 1
 L110,1,GLIMMERFLY,2,CH1,dusk routes,INSECT,SPIRIT,Pacer,uncommon,16,approved Batch 1
 L110,2,DUSKMOTH,2,CH1,dusk routes,INSECT,SPIRIT,Pacer,uncommon,,approved Batch 1
-L111,1,GROTTLE,2,TBD,cave,STONE,,Wall,common,16,approved Batch 2 - chapter TBD
-L111,2,STALAGNAW,2,TBD,cave,STONE,,Wall,common,,approved Batch 2 - chapter TBD
-L112,1,DRILLNOUT,2,TBD,cave,STONE,INSECT,Glass nuke,uncommon,16,approved Batch 2 - chapter TBD
-L112,2,BORESCARAB,2,TBD,cave,STONE,INSECT,Glass nuke,uncommon,,approved Batch 2 - chapter TBD
-L113,1,RUBBLEPUP,3,TBD,rocky slopes,TERRA,,Brawler,uncommon,16,approved Batch 2 - chapter TBD
-L113,2,SCREEHOUND,3,TBD,rocky slopes,TERRA,,Brawler,uncommon,34,approved Batch 2 - chapter TBD
-L113,3,TALUSFANG,3,TBD,rocky slopes,TERRA,,Brawler,uncommon,,approved Batch 2 - chapter TBD
-L114,1,OREWING,2,TBD,mountain pass,STONE,GALE,Pacer,uncommon,16,approved Batch 2 - chapter TBD
-L114,2,IRONROC,2,TBD,mountain pass,STONE,GALE,Pacer,uncommon,,approved Batch 2 - chapter TBD
-L115,1,PUMICETTE,2,TBD,volcanic cave,FLAME,STONE,Wall,uncommon,16,approved Batch 2 - chapter TBD
-L115,2,MAGMACRAG,2,TBD,volcanic cave,FLAME,STONE,Wall,uncommon,,approved Batch 2 - chapter TBD
+L111,1,GROTTLE,2,CH1,cave,STONE,,Wall,common,16,approved Batch 2
+L111,2,STALAGNAW,2,CH1,cave,STONE,,Wall,common,,approved Batch 2
+L112,1,DRILLNOUT,2,CH1,cave,STONE,INSECT,Glass nuke,uncommon,16,approved Batch 2
+L112,2,BORESCARAB,2,CH1,cave,STONE,INSECT,Glass nuke,uncommon,,approved Batch 2
+L113,1,RUBBLEPUP,3,CH3,rocky slopes,TERRA,,Brawler,uncommon,16,approved Batch 2
+L113,2,SCREEHOUND,3,CH3,rocky slopes,TERRA,,Brawler,uncommon,34,approved Batch 2
+L113,3,TALUSFANG,3,CH3,rocky slopes,TERRA,,Brawler,uncommon,,approved Batch 2
+L114,1,OREWING,2,CH7,mountain pass,STONE,GALE,Pacer,uncommon,16,approved Batch 2
+L114,2,IRONROC,2,CH7,mountain pass,STONE,GALE,Pacer,uncommon,,approved Batch 2
+L115,1,PUMICETTE,2,CH6,volcanic cave,FLAME,STONE,Wall,uncommon,16,approved Batch 2
+L115,2,MAGMACRAG,2,CH6,volcanic cave,FLAME,STONE,Wall,uncommon,,approved Batch 2
 L116,1,PEBBLAW,3,TBD,beach,STONE,AQUA,Counter-tank,uncommon,16,approved Batch 3 - chapter TBD
 L116,2,CARAPACE,3,TBD,beach,STONE,AQUA,Counter-tank,uncommon,34,approved Batch 3 - chapter TBD
 L116,3,KABULORD,3,TBD,beach,STONE,AQUA,Counter-tank,uncommon,,approved Batch 3 - chapter TBD
