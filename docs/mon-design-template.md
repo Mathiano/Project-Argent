@@ -56,7 +56,7 @@
 
 ## THE PILLAR CHECKLIST (every mon must pass — revise if any fail)
 
-Run these after filling the sheet. They encode Argent's non-negotiable design pillars:
+Run these after filling the sheet. They encode Argent's non-negotiable design pillars. **In addition to these 8 mechanical checks, every mon must pass the AESTHETIC test** — grounded · creature-authentic · cool (real animal / mythic beast with edge, never a gimmick or abstract object). See **`docs/mon-aesthetic.md`** (the creature north-star, with the reference set). A mon must pass the mechanical checklist AND fit the aesthetic.
 
 1. **☐ Distinct type identity** — does the mon's type MEAN something mechanically (per its type's identity), not just a damage color? A FLAME mon should hit hard / Burn; a TERRA mon should Stun; etc. If the type is decorative, it fails.
 
@@ -88,4 +88,4 @@ Run these after filling the sheet. They encode Argent's non-negotiable design pi
 - This template is READY NOW (it's process, against the settled schema).
 - **First application:** CH1's roster (the mons that exist) designed through it as the proven example — the template's first real use.
 - **Then:** per-chapter as the world builds, drawing from the manifest's plan.
-- Cross-ref: monmanifest.csv (the skeleton this fills), combat-depth-types-status.md (type identities), mon-character.md (the character substrate), evolution-design.md (bond+badge gates), visual-north-star.md (silhouette + front/back sprites), catching-2-0.md (catch-path lean), bond-track-v2.md (the bond stages the evo gates use).
+- Cross-ref: monmanifest.csv (the skeleton this fills), mon-aesthetic.md (the creature-feel north-star every mon must fit), combat-depth-types-status.md (type identities), mon-character.md (the character substrate), evolution-design.md (bond+badge gates), visual-north-star.md (silhouette + front/back sprites), catching-2-0.md (catch-path lean), bond-track-v2.md (the bond stages the evo gates use).
