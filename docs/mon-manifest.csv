@@ -283,3 +283,23 @@ L141,2,FRIGISHADE,2,CH8,frozen wastes,FROST,SPIRIT,Trickster,uncommon,,"frost-br
 L142,1,SEALUMP,3,CH8,ice floes,FROST,AQUA,Wall,uncommon,16,"blubbery seal-pup → tusked ice-walrus → mountainous berg-tusker; imposing arctic sea-beast"
 L142,2,WALRUST,3,CH8,ice floes,FROST,AQUA,Wall,uncommon,34,"blubbery seal-pup → tusked ice-walrus → mountainous berg-tusker; imposing arctic sea-beast"
 L142,3,TUSKBERG,3,CH8,ice floes,FROST,AQUA,Wall,uncommon,,"blubbery seal-pup → tusked ice-walrus → mountainous berg-tusker; imposing arctic sea-beast"
+L143,1,STATICUB,3,CH3,town outskirts,SPARK,,Brawler,uncommon,16,spark-furred stray pup → crackling street-hound → storm-maned alpha; electric Growlithe/Luxray-cool urban predator
+L143,2,VOLTHOUND,3,CH3,town outskirts,SPARK,,Brawler,uncommon,34,spark-furred stray pup → crackling street-hound → storm-maned alpha; electric Growlithe/Luxray-cool urban predator
+L143,3,DYNASTRAY,3,CH3,town outskirts,SPARK,,Brawler,uncommon,,spark-furred stray pup → crackling street-hound → storm-maned alpha; electric Growlithe/Luxray-cool urban predator
+L144,1,MAGNERAT,2,CH3,rail yards,SPARK,FORGE,Glass nuke,common,16,wire-gnawing rat → magnet-toothed scrap-rodent; urban-scavenger electric
+L144,2,RAILGNAW,2,CH3,rail yards,SPARK,FORGE,Glass nuke,common,,wire-gnawing rat → magnet-toothed scrap-rodent; urban-scavenger electric
+L145,1,BOLTDOVE,2,CH3,rooftops,BASIC,GALE,Pacer,common,16,grimy fast-darting city-dove → power-line gridwing; the urban rooftop bird (bolt = quick/darting)
+L145,2,GRIDWING,2,CH3,rooftops,BASIC,GALE,Pacer,common,,grimy fast-darting city-dove → power-line gridwing; the urban rooftop bird (bolt = quick/darting)
+L146,1,SPARROACH,3,CH3,gutters/wiring,INSECT,SPARK,Drainer,common,16,"charged silverfish → voltmite → arcing swarm; the electric urban-bug, drain identity"
+L146,2,VOLTMITE,3,CH3,gutters/wiring,INSECT,SPARK,Drainer,common,34,"charged silverfish → voltmite → arcing swarm; the electric urban-bug, drain identity"
+L146,3,ARCSWARM,3,CH3,gutters/wiring,INSECT,SPARK,Drainer,common,,"charged silverfish → voltmite → arcing swarm; the electric urban-bug, drain identity"
+L147,1,COILYNX,2,CH3,substations,SPARK,,Glass nuke,uncommon,16,"coil-tailed wildcat → tesla-maned lynx; sleek charged feline, Luxray-grounded"
+L147,2,TESLYNX,2,CH3,substations,SPARK,,Glass nuke,uncommon,,"coil-tailed wildcat → tesla-maned lynx; sleek charged feline, Luxray-grounded"
+L148,1,MUTTGREL,2,CH3,back-alleys,UMBRA,,Brawler,common,16,"mangy alley-cur → junkyard scrap-beast; gritty urban dark-type, real stray menace"
+L148,2,JUNKMAW,2,CH3,back-alleys,UMBRA,,Brawler,common,,"mangy alley-cur → junkyard scrap-beast; gritty urban dark-type, real stray menace"
+L149,1,GLOWVANE,2,CH3,storm clouds,SPARK,GALE,Pacer,uncommon,16,static-finned glider → surge-winged storm-raptor; rides the lightning
+L149,2,SURGEHARK,2,CH3,storm clouds,SPARK,GALE,Pacer,uncommon,,static-finned glider → surge-winged storm-raptor; rides the lightning
+L150,1,PYLOX,2,CH3,power plant,SPARK,STONE,Wall,uncommon,16,"lightning-rod beast → watt-cored pylon-guardian; a charged stone-tank, grounded not a gimmick-orb"
+L150,2,WATTORN,2,CH3,power plant,SPARK,STONE,Wall,uncommon,,"lightning-rod beast → watt-cored pylon-guardian; a charged stone-tank, grounded not a gimmick-orb"
+L151,1,RATTLEPUP,2,CH3,electric fences,SPARK,,Counter-tank,common,16,jolt-collared pup → gridlock guard-beast; absorbs and returns charge
+L151,2,GRIDLOCK,2,CH3,electric fences,SPARK,,Counter-tank,common,,jolt-collared pup → gridlock guard-beast; absorbs and returns charge
