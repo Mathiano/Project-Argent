@@ -303,3 +303,23 @@ L150,1,PYLOX,2,CH3,power plant,SPARK,STONE,Wall,uncommon,16,"lightning-rod beast
 L150,2,WATTORN,2,CH3,power plant,SPARK,STONE,Wall,uncommon,,"lightning-rod beast → watt-cored pylon-guardian; a charged stone-tank, grounded not a gimmick-orb"
 L151,1,RATTLEPUP,2,CH3,electric fences,SPARK,,Counter-tank,common,16,jolt-collared pup → gridlock guard-beast; absorbs and returns charge
 L151,2,GRIDLOCK,2,CH3,electric fences,SPARK,,Counter-tank,common,,jolt-collared pup → gridlock guard-beast; absorbs and returns charge
+L152,1,CIRRUSKIT,3,CH7,high peaks,GALE,,Glass nuke,uncommon,16,fluff-winged owlet → stratosphere owl → great thunder-taloned roc; apex sky-predator
+L152,2,STRATOWL,3,CH7,high peaks,GALE,,Glass nuke,uncommon,34,fluff-winged owlet → stratosphere owl → great thunder-taloned roc; apex sky-predator
+L152,3,THUNDEROC,3,CH7,high peaks,GALE,,Glass nuke,uncommon,,fluff-winged owlet → stratosphere owl → great thunder-taloned roc; apex sky-predator
+L153,1,GLIDEFIN,2,CH7,high cliffs,GALE,,Pacer,common,16,membrane-winged gliding-lizard → zephyr-riding manta-bird; effortless soarer that skims wind currents
+L153,2,SKIMMERAY,2,CH7,high cliffs,GALE,,Pacer,common,,membrane-winged gliding-lizard → zephyr-riding manta-bird; effortless soarer that skims wind currents
+L154,1,PUFFLON,2,CH7,cloud banks,GALE,AQUA,Wall,uncommon,16,"round mist-puffer → cloud-bodied drifting whale; a floating tank, grounded as a real misty-beast not a balloon"
+L154,2,CUMULUMBER,2,CH7,cloud banks,GALE,AQUA,Wall,uncommon,,"round mist-puffer → cloud-bodied drifting whale; a floating tank, grounded as a real misty-beast not a balloon"
+L155,1,NIMBFOX,2,CH7,thunderheads,GALE,SPARK,Glass nuke,uncommon,16,"static-tailed sky-fox → storm-charged vixen; rides the high winds, Sinnoh-cool"
+L155,2,STORMVIX,2,CH7,thunderheads,GALE,SPARK,Glass nuke,uncommon,,"static-tailed sky-fox → storm-charged vixen; rides the high winds, Sinnoh-cool"
+L156,1,MYSTKIT,2,CH5,shrine ruins,PSI,,Pacer,uncommon,16,"third-eyed kitten → prescient oracle-lynx; serene, knowing, Espeon-grounded"
+L156,2,ORACLYNX,2,CH5,shrine ruins,PSI,,Pacer,uncommon,,"third-eyed kitten → prescient oracle-lynx; serene, knowing, Espeon-grounded"
+L157,1,GAZEHATCH,3,CH7,sky temple,PSI,GALE,Glass nuke,rare,16,wide-eyed owlet → augur-owl → great omen-winged seer; mystic apex flyer
+L157,2,AUGUROWL,3,CH7,sky temple,PSI,GALE,Glass nuke,rare,34,wide-eyed owlet → augur-owl → great omen-winged seer; mystic apex flyer
+L157,3,OMENWING,3,CH7,sky temple,PSI,GALE,Glass nuke,rare,,wide-eyed owlet → augur-owl → great omen-winged seer; mystic apex flyer
+L158,1,CALMARE,2,CH5,deep lake,PSI,AQUA,Trickster,uncommon,16,drifting cuttlefish-thing → hypnotic deep-dweller; the mind-bending sea-trickster
+L158,2,DREADNOUS,2,CH5,deep lake,PSI,AQUA,Trickster,uncommon,,drifting cuttlefish-thing → hypnotic deep-dweller; the mind-bending sea-trickster
+L159,1,MEDITAUR,2,CH5,mountain monastery,PSI,BRAWN,Counter-tank,uncommon,16,"meditating bull-calf → serene martial-beast; mind-over-body, Medicham-grounded"
+L159,2,ZENMAW,2,CH5,mountain monastery,PSI,BRAWN,Counter-tank,uncommon,,"meditating bull-calf → serene martial-beast; mind-over-body, Medicham-grounded"
+L160,1,WISPLING,2,CH5,dreaming-grounds,PSI,SPIRIT,Glass nuke,rare,16,flickering thought-wisp → dream-walking wraith; eerie psychic spirit
+L160,2,PSYWRAITH,2,CH5,dreaming-grounds,PSI,SPIRIT,Glass nuke,rare,,flickering thought-wisp → dream-walking wraith; eerie psychic spirit
