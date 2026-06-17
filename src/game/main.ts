@@ -1274,6 +1274,9 @@ function showOverworld(
     onOpenBox() {
       pushBoxMenu();
     },
+    // Encounter rolls use the run's SEEDED rng (risks/gaps #2) so encounter
+    // sequences are deterministic + reproducible, consistent with combat.
+    random: () => run.rng.next(),
     onGiveItem(itemId: string, qty: number) {
       // Phase 7 — hidden items + event rewards. Skip unknown ids loudly
       // (a map typo shouldn't crash); otherwise add to the bag + autosave.
