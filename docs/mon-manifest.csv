@@ -323,3 +323,24 @@ L159,1,MEDITAUR,2,CH5,mountain monastery,PSI,BRAWN,Counter-tank,uncommon,16,"med
 L159,2,ZENMAW,2,CH5,mountain monastery,PSI,BRAWN,Counter-tank,uncommon,,"meditating bull-calf → serene martial-beast; mind-over-body, Medicham-grounded"
 L160,1,WISPLING,2,CH5,dreaming-grounds,PSI,SPIRIT,Glass nuke,rare,16,flickering thought-wisp → dream-walking wraith; eerie psychic spirit
 L160,2,PSYWRAITH,2,CH5,dreaming-grounds,PSI,SPIRIT,Glass nuke,rare,,flickering thought-wisp → dream-walking wraith; eerie psychic spirit
+L161,1,CINDERCUR,3,CH4,scorched ruins,UMBRA,FLAME,Brawler,rare,16,"smoldering black pup → hellhound → dread-jawed infernal beast; the Houndoom slot - sleek, fanged, menacing"
+L161,2,HELLKEN,3,CH4,scorched ruins,UMBRA,FLAME,Brawler,rare,34,"smoldering black pup → hellhound → dread-jawed infernal beast; the Houndoom slot - sleek, fanged, menacing"
+L161,3,DREADMAW,3,CH4,scorched ruins,UMBRA,FLAME,Brawler,rare,,"smoldering black pup → hellhound → dread-jawed infernal beast; the Houndoom slot - sleek, fanged, menacing"
+L162,1,NIGHTNIP,2,CH4,moonlit woods,UMBRA,,Glass nuke,common,16,black-furred prowler-kit → shadow-pelted panther; a sleek night-predator
+L162,2,SHADEPELT,2,CH4,moonlit woods,UMBRA,,Glass nuke,common,,black-furred prowler-kit → shadow-pelted panther; a sleek night-predator
+L163,1,CROAKEN,2,CH4,gallows-trees,UMBRA,GALE,Pacer,common,16,"ragged carrion-crow → omen-winged raven; the harbinger bird, real corvid made eerie"
+L163,2,OMINEX,2,CH4,gallows-trees,UMBRA,GALE,Pacer,common,,"ragged carrion-crow → omen-winged raven; the harbinger bird, real corvid made eerie"
+L164,1,GRUDGNAW,2,CH4,sewers/undercity,UMBRA,VENOM,Drainer,uncommon,16,"spite-soaked rat-thing → malice-fanged vermin-beast; festering, real"
+L164,2,MALICUR,2,CH4,sewers/undercity,UMBRA,VENOM,Drainer,uncommon,,"spite-soaked rat-thing → malice-fanged vermin-beast; festering, real"
+L165,1,PALLKIN,3,CH4,graveyard,SPIRIT,,Wall,rare,16,"pale grave-pup → wraith-hound → tomb-guardian lord; a spectral fortress, grounded as a real spectral beast"
+L165,2,WRAITHOUND,3,CH4,graveyard,SPIRIT,,Wall,rare,34,"pale grave-pup → wraith-hound → tomb-guardian lord; a spectral fortress, grounded as a real spectral beast"
+L165,3,GRAVELORD,3,CH4,graveyard,SPIRIT,,Wall,rare,,"pale grave-pup → wraith-hound → tomb-guardian lord; a spectral fortress, grounded as a real spectral beast"
+L166,1,MOURNMOTH,2,CH4,candle-vigils,SPIRIT,INSECT,Pacer,common,16,grey death's-head moth → requiem-winged spirit-moth; the funeral moth
+L166,2,REQUIEM,2,CH4,candle-vigils,SPIRIT,INSECT,Pacer,common,,grey death's-head moth → requiem-winged spirit-moth; the funeral moth
+L167,1,HOLLOWISP,3,CH4,haunted marsh,SPIRIT,FLAME,Glass nuke,uncommon,16,"flickering corpse-light → lantern-jawed wisp → soul-flame revenant; spectral fire, grounded-eerie not a cute flame"
+L167,2,LANTERNE,3,CH4,haunted marsh,SPIRIT,FLAME,Glass nuke,uncommon,34,"flickering corpse-light → lantern-jawed wisp → soul-flame revenant; spectral fire, grounded-eerie not a cute flame"
+L167,3,SOULFLARE,3,CH4,haunted marsh,SPIRIT,FLAME,Glass nuke,uncommon,,"flickering corpse-light → lantern-jawed wisp → soul-flame revenant; spectral fire, grounded-eerie not a cute flame"
+L168,1,VEILFANG,2,CH4,sunken ruins,SPIRIT,AQUA,Trickster,uncommon,16,shroud-finned eel → drowned-spirit serpent; the haunting deep-thing
+L168,2,SPECTREEL,2,CH4,sunken ruins,SPIRIT,AQUA,Trickster,uncommon,,shroud-finned eel → drowned-spirit serpent; the haunting deep-thing
+L169,1,DOLMEN,2,CH4,standing stones,SPIRIT,STONE,Wall,uncommon,16,"rune-etched stone-spirit → monolith-guardian; an ancient warden, living standing-stone, imposing"
+L169,2,MENHIRA,2,CH4,standing stones,SPIRIT,STONE,Wall,uncommon,,"rune-etched stone-spirit → monolith-guardian; an ancient warden, living standing-stone, imposing"
