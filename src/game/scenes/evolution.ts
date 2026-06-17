@@ -8,6 +8,7 @@ import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
 import { drawPanel, drawText } from '../ui';
+import { emitGameEvent } from '../gameEvents';
 
 export interface EvolutionSceneOpts {
   readonly fromName: string;
@@ -29,6 +30,7 @@ export function createEvolutionScene(opts: EvolutionSceneOpts): Scene {
       if (beat === 0) {
         beat = 1;
         tick = 0;
+        emitGameEvent({ kind: 'evolve', species: opts.toName }); // audio seam
       } else {
         opts.onDone();
       }

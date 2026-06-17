@@ -25,6 +25,7 @@ import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
 import { fleeTelegraphed } from '../catching';
 import type { CatchWindow } from '../catching';
+import { emitGameEvent } from '../gameEvents';
 import { drawSpeciesInSlot } from '../sprites';
 import {
   STANCE_NAME,
@@ -398,6 +399,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let callCursor = 0;
   let tick = 0;
 
+  // Audio seam — a battle began (see gameEvents). Fire-and-forget; no-op
+  // until an audio layer subscribes.
+  emitGameEvent({ kind: 'battle-start' });
+
   function clampMoveScroll(): void {
     const n = activeMon(state.player).species.moves.length;
     if (moveCursor < moveScroll) moveScroll = moveCursor;
@@ -548,7 +553,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (ev.kind === 'commit') {
       // Remember each side's committed stance so a landed strike can be
       // labelled (A-vs-F that DIDN'T dodge = "too slow").
-      if (ev.action.kind === 'move') roundStance[ev.side] = ev.action.stance;
+      if (ev.action.kind === 'move') {
+        roundStance[ev.side] = ev.action.stance;
+        emitGameEvent({ kind: 'move-resolved', side: ev.side, move: ev.action.move });
+      }
       if (ev.action.kind === 'rest') {
         const who = ev.side === 'player' ? activeMon(state.player).species.name : activeMon(state.foe).species.name;
         const note = ev.action.reason === 'exhaustion' ? 'is spent — resting.' : 'has no moves — resting.';
@@ -593,6 +601,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (ev.kind === 'strike') {
       const def = opposite(ev.side);
       display[def].hp = Math.max(0, display[def].hp - ev.damage);
+      emitGameEvent({ kind: 'hit-landed', side: ev.side, effectiveness: ev.effectiveness });
       animSide = ev.side;
       animKind = 'strike';
       animT = 0.25;
@@ -626,6 +635,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // S1 — FLUID slipped past a GUARD stance (acts first, no counter).
       const def = opposite(ev.side);
       display[def].hp = Math.max(0, display[def].hp - ev.damage);
+      emitGameEvent({ kind: 'hit-landed', side: ev.side, effectiveness: ev.effectiveness });
       if (ev.side === 'player') pendingReadWindow = true; // read window (the cleanest catch opener)
       calloutLine = stanceCallout({ kind: 'opening' });
       pushLog('OPENING! FLUID slips past GUARD.');
@@ -638,6 +648,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // S1 — GUARD turned an Aggressive strike back (reflect + stagger).
       const att = opposite(ev.side);
       display[att].hp = Math.max(0, display[att].hp - ev.damage);
+      emitGameEvent({ kind: 'hit-landed', side: ev.side, effectiveness: 1 });
       const who = ev.side === 'player' ? display.player.species.name : 'Foe';
       if (ev.side === 'player') pendingReadWindow = true; // read window
       calloutLine = stanceCallout({ kind: 'counter' });
@@ -685,6 +696,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // 'faint' handles the narrative, and team-wipe is detected in
       // finishResolve via isTeamWiped.
       display[ev.side].hp = 0;
+      emitGameEvent({ kind: 'ko', side: ev.side });
       return;
     }
     if (ev.kind === 'switchOut') {
@@ -749,6 +761,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
     if (endingWinner !== null) {
       phase = 'end';
+      emitGameEvent({ kind: 'battle-end', winner: endingWinner });
       const msg =
         endingWinner === 'player'
           ? ['You won the battle!', 'Press A to continue.']
@@ -838,8 +851,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     const foe = activeMon(state.foe);
     const window = currentWindow();
     const hpFrac = foe.hp / Math.max(1, foe.maxHp);
+    emitGameEvent({ kind: 'catch-attempt' });
     const result = opts.onThrowBall ? opts.onThrowBall(window, hpFrac) : { caught: false };
     if (result.caught) {
+      emitGameEvent({ kind: 'catch-success' });
       setText([`Gotcha! ${foe.species.name} was caught!`], () => opts.onCaught?.(state, 'read'));
       return;
     }
@@ -915,8 +930,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   }
 
   function handleMenuInput(key: InputKey): void {
-    if (key === 'up') menuCursor = stepCursor(menuCursor, -1);
-    else if (key === 'down') menuCursor = stepCursor(menuCursor, 1);
+    if (key === 'up') { menuCursor = stepCursor(menuCursor, -1); emitGameEvent({ kind: 'menu-move' }); }
+    else if (key === 'down') { menuCursor = stepCursor(menuCursor, 1); emitGameEvent({ kind: 'menu-move' }); }
     // START acts as a second confirm — no auto-jump to CALL (that
     // shortcut used to fire CALL even when the user thought they were
     // confirming the FIGHT row, which is the bug this guards against).
@@ -964,6 +979,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const foeName = activeMon(state.foe).species.name;
       const r = opts.onWillingJoin ? opts.onWillingJoin() : { joined: false, hint: '' };
       if (r.joined) {
+        emitGameEvent({ kind: 'catch-success' });
         setText([`You tend the fallen ${foeName} — it chose to join you!`], () => opts.onCaught?.(state, 'mercy'));
       } else {
         setText([r.hint], endWithWin);
@@ -1015,10 +1031,15 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (key === 'up') {
       moveCursor = (moveCursor + moves.length - 1) % moves.length;
       clampMoveScroll();
+      emitGameEvent({ kind: 'menu-move' });
     } else if (key === 'down') {
       moveCursor = (moveCursor + 1) % moves.length;
       clampMoveScroll();
-    } else if (key === 'select') stanceIdx = (stanceIdx + 1) % 3;
+      emitGameEvent({ kind: 'menu-move' });
+    } else if (key === 'select') {
+      stanceIdx = (stanceIdx + 1) % 3;
+      emitGameEvent({ kind: 'stance-selected', stance: STANCES[stanceIdx]! });
+    }
     else if (key === 'b') phase = 'menu';
     else if (key === 'a' || key === 'start') {
       const moveName = moves[moveCursor]!;

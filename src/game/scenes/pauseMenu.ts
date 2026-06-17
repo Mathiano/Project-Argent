@@ -10,6 +10,7 @@ import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
 import { drawPanel, drawText } from '../ui';
+import { emitGameEvent } from '../gameEvents';
 
 export interface PauseMenuOpts {
   readonly onPokemon: () => void;
@@ -89,8 +90,8 @@ export function createPauseMenuScene(opts: PauseMenuOpts): Scene {
         if (key === 'a' || key === 'b' || key === 'start') optionsFlash = false;
         return;
       }
-      if (key === 'up') cursor = stepCursor(cursor, -1);
-      else if (key === 'down') cursor = stepCursor(cursor, 1);
+      if (key === 'up') { cursor = stepCursor(cursor, -1); emitGameEvent({ kind: 'menu-move' }); }
+      else if (key === 'down') { cursor = stepCursor(cursor, 1); emitGameEvent({ kind: 'menu-move' }); }
       else if (key === 'a') confirm();
       else if (key === 'b' || key === 'start') opts.onClose();
     },
