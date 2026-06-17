@@ -1,21 +1,21 @@
 line_id,stage,name,stages_total,bucket,habitat,type1,type2,archetype,rarity,evolve_at,note
-L001,1,KINDRAKE,3,CH1,lab gift,FLAME,,Wall,starter,16,"STARTER LINE - fortress drake (locked: quadruped armored dragon, NOT Charizard-like)"
-L001,2,KILNDRAKE,3,CH1,lab gift,FLAME,,Wall,starter,34,"STARTER LINE - fortress drake (locked: quadruped armored dragon, NOT Charizard-like)"
-L001,3,FORTDRAKE,3,CH1,lab gift,FLAME,DRAKE,Wall,starter,,"STARTER LINE - fortress drake (locked: quadruped armored dragon, NOT Charizard-like)"
-L002,1,GRUBLEAF,3,CH1,lab gift,NATURE,,Dodger,starter,16,STARTER LINE — design with strong silhouette evolution arc
-L002,2,VINESNAP,3,CH1,lab gift,NATURE,,Dodger,starter,34,STARTER LINE — design with strong silhouette evolution arc
-L002,3,WYRMFERN,3,CH1,lab gift,NATURE,,Dodger,starter,,STARTER LINE — design with strong silhouette evolution arc
-L003,1,SILTSKIP,3,CH1,lab gift,AQUA,,Counter-tank,starter,16,STARTER LINE - locked: mudskipper -> tidal leviathan (Counter-tank all stages)
-L003,2,BRACKSLAP,3,CH1,lab gift,AQUA,,Counter-tank,starter,34,STARTER LINE - locked: mudskipper -> tidal leviathan (Counter-tank all stages)
-L003,3,CRASHMAW,3,CH1,lab gift,AQUA,,Counter-tank,starter,,STARTER LINE - locked: mudskipper -> tidal leviathan (Counter-tank all stages)
+L001,1,KINDRAKE,3,CH1,lab gift,FLAME,,Wall,starter,16,"STARTER LINE - fortress drake (locked: quadruped armored dragon, NOT Charizard-like) | quadruped armored fortress drake; ember-veined cub → kiln-hot magma-cracked beast → walking citadel of molten basalt, low and immovable. NOT a fire-bird"
+L001,2,KILNDRAKE,3,CH1,lab gift,FLAME,,Wall,starter,34,"STARTER LINE - fortress drake (locked: quadruped armored dragon, NOT Charizard-like) | quadruped armored fortress drake; ember-veined cub → kiln-hot magma-cracked beast → walking citadel of molten basalt, low and immovable. NOT a fire-bird"
+L001,3,FORTDRAKE,3,CH1,lab gift,FLAME,DRAKE,Wall,starter,,"STARTER LINE - fortress drake (locked: quadruped armored dragon, NOT Charizard-like) | quadruped armored fortress drake; ember-veined cub → kiln-hot magma-cracked beast → walking citadel of molten basalt, low and immovable. NOT a fire-bird"
+L002,1,GRUBLEAF,3,CH1,lab gift,NATURE,,Dodger,starter,16,"STARTER LINE — design with strong silhouette evolution arc | nimble leaf-tailed lizard → vine-whip coiled-spring → serpentine fern-wyrm; the agile glass-dancer, strong silhouette arc"
+L002,2,VINESNAP,3,CH1,lab gift,NATURE,,Dodger,starter,34,"STARTER LINE — design with strong silhouette evolution arc | nimble leaf-tailed lizard → vine-whip coiled-spring → serpentine fern-wyrm; the agile glass-dancer, strong silhouette arc"
+L002,3,WYRMFERN,3,CH1,lab gift,NATURE,,Dodger,starter,,"STARTER LINE — design with strong silhouette evolution arc | nimble leaf-tailed lizard → vine-whip coiled-spring → serpentine fern-wyrm; the agile glass-dancer, strong silhouette arc"
+L003,1,SILTSKIP,3,CH1,lab gift,AQUA,,Counter-tank,starter,16,STARTER LINE - locked: mudskipper -> tidal leviathan (Counter-tank all stages) | sturdy broad-finned mudskipper → brackish slab-finned slapper → tidal leviathan/living breakwater; turns force back
+L003,2,BRACKSLAP,3,CH1,lab gift,AQUA,,Counter-tank,starter,34,STARTER LINE - locked: mudskipper -> tidal leviathan (Counter-tank all stages) | sturdy broad-finned mudskipper → brackish slab-finned slapper → tidal leviathan/living breakwater; turns force back
+L003,3,CRASHMAW,3,CH1,lab gift,AQUA,,Counter-tank,starter,,STARTER LINE - locked: mudskipper -> tidal leviathan (Counter-tank all stages) | sturdy broad-finned mudskipper → brackish slab-finned slapper → tidal leviathan/living breakwater; turns force back
 L004,1,,1,POSTGAME,roaming/summit,BRAWN,,Brawler,legendary,,"STANCE BEAST (Aggressive) - locked: storm gorilla, beats thunder from its chest; fights pure Aggressive at absurd stats"
 L005,1,,1,POSTGAME,roaming/summit,FORGE,,Wall,legendary,,"STANCE BEAST (Guard) - locked: tortoise colossus, a living citadel; fights pure Guard"
 L006,1,,1,POSTGAME,roaming/summit,GALE,,Dodger,legendary,,"STANCE BEAST (Fluid) - locked: ribbon serpent, a streamer of wind with eyes; fights pure Fluid"
 L007,1,,1,POSTGAME,roaming/summit,DRAKE,,Pacer,legendary,,"COVER LEGENDARY - locked: Argent moon-dragon, silver celestial wyrm (namesake). Night-only tracking; fight = moon-phase stance rhythm at Red-tier reads; name must derive from argent"
-L008,1,FLITPECK,2,CH1,route grass,GALE,,Glass nuke,uncommon,16,"GYM LINE (Falkner ace) - locked: gust-dancer, trait GUSTBORNE (surges on arena rhythm rounds), Glass nuke shape"
-L008,2,GALEHAWK,2,CH1,route grass,GALE,,Glass nuke,uncommon,,"GYM LINE (Falkner ace) - locked: gust-dancer, trait GUSTBORNE (surges on arena rhythm rounds), Glass nuke shape"
-L009,1,MURKIN,2,CH2,old well,VENOM,,Drainer,uncommon,16,GYM LINE — leader of CH2 uses top stage as ace
-L009,2,SLUDGNATH,2,CH2,old well,VENOM,,Drainer,uncommon,,GYM LINE — leader of CH2 uses top stage as ace
+L008,1,FLITPECK,2,CH1,route grass,GALE,,Glass nuke,uncommon,16,"GYM LINE (Falkner ace) - locked: gust-dancer, trait GUSTBORNE (surges on arena rhythm rounds), Glass nuke shape | small twitchy gust-dancer → gust-dancer ascendant; sharp/fast/fragile, surges on rhythm rounds"
+L008,2,GALEHAWK,2,CH1,route grass,GALE,,Glass nuke,uncommon,,"GYM LINE (Falkner ace) - locked: gust-dancer, trait GUSTBORNE (surges on arena rhythm rounds), Glass nuke shape | small twitchy gust-dancer → gust-dancer ascendant; sharp/fast/fragile, surges on rhythm rounds"
+L009,1,MURKIN,2,CH2,old well,VENOM,,Drainer,uncommon,16,"GYM LINE — leader of CH2 uses top stage as ace | drip-slick well-eel → venom-maned serpent; CH2 leader ace, sleek and toxic"
+L009,2,SLUDGNATH,2,CH2,old well,VENOM,,Drainer,uncommon,,"GYM LINE — leader of CH2 uses top stage as ace | drip-slick well-eel → venom-maned serpent; CH2 leader ace, sleek and toxic"
 L010,1,,2,CH3,city outskirts,BASIC,,Dodger,uncommon,16,GYM LINE — leader of CH3 uses top stage as ace
 L010,2,,2,CH3,city outskirts,BASIC,,Dodger,uncommon,,GYM LINE — leader of CH3 uses top stage as ace
 L011,1,,2,CH4,graveyard path,SPIRIT,,Wall,uncommon,16,GYM LINE — leader of CH4 uses top stage as ace
@@ -41,10 +41,10 @@ L020,2,,3,CH7,mountain pass,SPARK,,Glass nuke,uncommon,34,
 L020,3,,3,CH7,mountain pass,SPARK,,Glass nuke,uncommon,,
 L021,1,,2,CH5,whirl sea,SPIRIT,,Pacer,uncommon,16,
 L021,2,,2,CH5,whirl sea,SPIRIT,,Pacer,uncommon,,
-L022,1,TIDEPADDLE,1,CH3,tidepools,AQUA,,Drainer,common,,
-L023,1,GRITHOAX,3,CH1,route grass,TERRA,,Trickster,common,16,
-L023,2,CAVELURE,3,CH1,route grass,TERRA,,Trickster,common,34,
-L023,3,CHASMTRAP,3,CH1,route grass,TERRA,,Trickster,common,,
+L022,1,TIDEPADDLE,1,CH3,tidepools,AQUA,,Drainer,common,,round paddle-finned tidepool critter; humble shore common
+L023,1,GRITHOAX,3,CH1,route grass,TERRA,,Trickster,common,16,"squat hooded burrow-mound with peeking eyes (plays dead in dust) → lure-tongued ambusher → living pitfall, chasm-jawed"
+L023,2,CAVELURE,3,CH1,route grass,TERRA,,Trickster,common,34,"squat hooded burrow-mound with peeking eyes (plays dead in dust) → lure-tongued ambusher → living pitfall, chasm-jawed"
+L023,3,CHASMTRAP,3,CH1,route grass,TERRA,,Trickster,common,,"squat hooded burrow-mound with peeking eyes (plays dead in dust) → lure-tongued ambusher → living pitfall, chasm-jawed"
 L024,1,,2,CH4,burned tower,VENOM,,Dodger,uncommon,16,
 L024,2,,2,CH4,burned tower,VENOM,,Dodger,uncommon,,
 L025,1,WYRMLET,3,MT_SILVER,summit,DRAKE,,Wall,uncommon,16,
@@ -52,7 +52,7 @@ L025,2,DRAKESPINE,3,MT_SILVER,summit,DRAKE,,Wall,uncommon,34,
 L025,3,RIDGEWYRM,3,MT_SILVER,summit,DRAKE,,Wall,uncommon,,
 L026,1,,2,MT_SILVER,summit,GALE,,Counter-tank,common,16,
 L026,2,,2,MT_SILVER,summit,GALE,,Counter-tank,common,,
-L027,1,MARSHMASH,1,CH1,route grass,AQUA,,Brawler,common,,
+L027,1,MARSHMASH,1,CH1,route grass,AQUA,,Brawler,common,,"pugnacious pond-frog; scrappy water brawler by the reeds (tough, not cute)"
 L028,1,,1,CH7,ice path,FROST,BRAWN,Glass nuke,common,,
 L029,1,,2,CH7,ice path,FROST,BASIC,Pacer,uncommon,16,
 L029,2,,2,CH7,ice path,FROST,BASIC,Pacer,uncommon,,
@@ -199,64 +199,64 @@ L104,2,,3,KANTO,safari preserve,TERRA,,Dodger,uncommon,34,
 L104,3,,3,KANTO,safari preserve,TERRA,,Dodger,uncommon,,
 L105,1,,2,KANTO,kanto routes,SPIRIT,,Wall,uncommon,16,
 L105,2,,2,KANTO,kanto routes,SPIRIT,,Wall,uncommon,,
-L106,1,NIPVOLE,2,CH1,route grass,BASIC,,Dodger,common,16,approved Batch 1
-L106,2,BURROWDROVE,2,CH1,route grass,BASIC,,Dodger,common,,approved Batch 1
-L107,1,DRISKIT,2,CH1,route grass,BASIC,GALE,Glass nuke,common,16,approved Batch 1
-L107,2,DRISKADE,2,CH1,route grass,BASIC,GALE,Glass nuke,common,,approved Batch 1
-L108,1,CHITTERLING,3,CH1,route grass,INSECT,,Drainer,common,16,approved Batch 1
-L108,2,MITESWARM,3,CH1,route grass,INSECT,,Drainer,common,34,approved Batch 1
-L108,3,HIVEMAW,3,CH1,route grass,INSECT,,Drainer,common,,approved Batch 1
-L109,1,THISTLEKIT,1,CH1,forest edge,NATURE,,Trickster,common,,approved Batch 1
-L110,1,GLIMMERFLY,2,CH1,dusk routes,INSECT,SPIRIT,Pacer,uncommon,16,approved Batch 1
-L110,2,DUSKMOTH,2,CH1,dusk routes,INSECT,SPIRIT,Pacer,uncommon,,approved Batch 1
-L111,1,GROTTLE,2,CH1,cave,STONE,,Wall,common,16,approved Batch 2
-L111,2,STALAGNAW,2,CH1,cave,STONE,,Wall,common,,approved Batch 2
-L112,1,DRILLNOUT,2,CH1,cave,STONE,INSECT,Glass nuke,uncommon,16,approved Batch 2
-L112,2,BORESCARAB,2,CH1,cave,STONE,INSECT,Glass nuke,uncommon,,approved Batch 2
-L113,1,RUBBLEPUP,3,CH3,rocky slopes,TERRA,,Brawler,uncommon,16,approved Batch 2
-L113,2,SCREEHOUND,3,CH3,rocky slopes,TERRA,,Brawler,uncommon,34,approved Batch 2
-L113,3,TALUSFANG,3,CH3,rocky slopes,TERRA,,Brawler,uncommon,,approved Batch 2
-L114,1,OREWING,2,CH7,mountain pass,STONE,GALE,Pacer,uncommon,16,approved Batch 2
-L114,2,IRONROC,2,CH7,mountain pass,STONE,GALE,Pacer,uncommon,,approved Batch 2
-L115,1,PUMICETTE,2,CH6,volcanic cave,FLAME,STONE,Wall,uncommon,16,approved Batch 2
-L115,2,MAGMACRAG,2,CH6,volcanic cave,FLAME,STONE,Wall,uncommon,,approved Batch 2
-L116,1,PEBBLAW,3,CH3,beach,STONE,AQUA,Counter-tank,uncommon,16,approved Batch 3
-L116,2,CARAPACE,3,CH3,beach,STONE,AQUA,Counter-tank,uncommon,34,approved Batch 3
-L116,3,KABULORD,3,CH3,beach,STONE,AQUA,Counter-tank,uncommon,,approved Batch 3
-L117,1,SPOUTLING,2,CH3,coast,AQUA,,Glass nuke,common,16,approved Batch 3
-L117,2,GEYSARK,2,CH3,coast,AQUA,,Glass nuke,common,,approved Batch 3
-L118,1,SEADRIFT,3,CH9,open sea,AQUA,,Pacer,uncommon,16,approved Batch 3
-L118,2,CURRENTINE,3,CH9,open sea,AQUA,,Pacer,uncommon,34,approved Batch 3
-L118,3,MAERWAKE,3,CH9,open sea,AQUA,,Pacer,uncommon,,approved Batch 3
-L119,1,MIREPUP,2,CH5,swamp,VENOM,TERRA,Brawler,common,16,approved Batch 3
-L119,2,BOGFANG,2,CH5,swamp,VENOM,TERRA,Brawler,common,,approved Batch 3
-L120,1,REEDWISP,2,CH5,marsh,NATURE,SPIRIT,Trickster,uncommon,16,approved Batch 3
-L120,2,MARSHADE,2,CH5,marsh,NATURE,SPIRIT,Trickster,uncommon,,approved Batch 3
-L121,1,BRINEHISS,2,CH5,salt marsh,AQUA,VENOM,Drainer,uncommon,16,approved Batch 3
-L121,2,SALTWYRM,2,CH5,salt marsh,AQUA,VENOM,Drainer,uncommon,,approved Batch 3
-L122,1,CORALCLAW,2,CH9,reef,AQUA,STONE,Wall,uncommon,16,approved Batch 3
-L122,2,REEFMAUL,2,CH9,reef,AQUA,STONE,Wall,uncommon,,approved Batch 3
-L123,1,BRAMBLEKIT,3,CH2,deep forest,NATURE,,Brawler,uncommon,16,approved Batch 4
-L123,2,THORNJACK,3,CH2,deep forest,NATURE,,Brawler,uncommon,34,approved Batch 4
-L123,3,BRIARFANG,3,CH2,deep forest,NATURE,,Brawler,uncommon,,approved Batch 4
-L124,1,MANTILL,2,CH2,forest,INSECT,NATURE,Glass nuke,uncommon,16,approved Batch 4
-L124,2,GLAIVEWING,2,CH2,forest,INSECT,NATURE,Glass nuke,uncommon,,approved Batch 4
-L125,1,ACORNTLE,3,CH2,woodland,NATURE,STONE,Wall,common,16,approved Batch 4
-L125,2,OAKWARD,3,CH2,woodland,NATURE,STONE,Wall,common,34,approved Batch 4
-L125,3,TIMBERHIDE,3,CH2,woodland,NATURE,STONE,Wall,common,,approved Batch 4
-L126,1,FAWNDLE,2,CH2,meadow,NATURE,,Pacer,common,16,approved Batch 4
-L126,2,STRIDEHART,2,CH2,meadow,NATURE,,Pacer,common,,approved Batch 4
-L127,1,DUSKWING,2,CH4,deep wood,NATURE,SPIRIT,Trickster,uncommon,16,approved Batch 4
-L127,2,NOCTHARE,2,CH4,deep wood,NATURE,SPIRIT,Trickster,uncommon,,approved Batch 4
-L128,1,BUZZGRUB,3,CH2,forest,INSECT,,Glass nuke,common,16,approved Batch 4
-L128,2,WASPRITE,3,CH2,forest,INSECT,,Glass nuke,common,34,approved Batch 4
-L128,3,VESPINE,3,CH2,forest,INSECT,,Glass nuke,common,,approved Batch 4
-L129,1,MOSSPAW,2,CH2,forest floor,NATURE,TERRA,Brawler,uncommon,16,approved Batch 4
-L129,2,LUMBROCK,2,CH2,forest floor,NATURE,TERRA,Brawler,uncommon,,approved Batch 4
-L130,1,PETALISK,2,CH2,glade,NATURE,,Drainer,common,16,approved Batch 4
-L130,2,BLOOMAW,2,CH2,glade,NATURE,,Drainer,common,,approved Batch 4
-L131,1,CANOPER,2,CH4,canopy,GALE,NATURE,Pacer,uncommon,16,approved Batch 4
-L131,2,SOARTALON,2,CH4,canopy,GALE,NATURE,Pacer,uncommon,,approved Batch 4
+L106,1,NIPVOLE,2,CH1,route grass,BASIC,,Dodger,common,16,"brown field-vole → burrowing drove-rodent; quick weak everywhere, the early-rodent"
+L106,2,BURROWDROVE,2,CH1,route grass,BASIC,,Dodger,common,,"brown field-vole → burrowing drove-rodent; quick weak everywhere, the early-rodent"
+L107,1,DRISKIT,2,CH1,route grass,BASIC,GALE,Glass nuke,common,16,small brown songbird → swift hunting-bird; the early-bird (BASIC/GALE)
+L107,2,DRISKADE,2,CH1,route grass,BASIC,GALE,Glass nuke,common,,small brown songbird → swift hunting-bird; the early-bird (BASIC/GALE)
+L108,1,CHITTERLING,3,CH1,route grass,INSECT,,Drainer,common,16,"leaf-grub → swarm-mite → hive-jawed predator; the early-bug, Sap identity"
+L108,2,MITESWARM,3,CH1,route grass,INSECT,,Drainer,common,34,"leaf-grub → swarm-mite → hive-jawed predator; the early-bug, Sap identity"
+L108,3,HIVEMAW,3,CH1,route grass,INSECT,,Drainer,common,,"leaf-grub → swarm-mite → hive-jawed predator; the early-bug, Sap identity"
+L109,1,THISTLEKIT,1,CH1,forest edge,NATURE,,Trickster,common,,"burr-covered seed-critter; clings and saps, forest-edge"
+L110,1,GLIMMERFLY,2,CH1,dusk routes,INSECT,SPIRIT,Pacer,uncommon,16,faintly-glowing dusk moth line; eerie twilight bug (INSECT/SPIRIT)
+L110,2,DUSKMOTH,2,CH1,dusk routes,INSECT,SPIRIT,Pacer,uncommon,,faintly-glowing dusk moth line; eerie twilight bug (INSECT/SPIRIT)
+L111,1,GROTTLE,2,CH1,cave,STONE,,Wall,common,16,"blind crystal-backed cave-grub → stalactite-jawed grinder; armored, eyeless, real"
+L111,2,STALAGNAW,2,CH1,cave,STONE,,Wall,common,,"blind crystal-backed cave-grub → stalactite-jawed grinder; armored, eyeless, real"
+L112,1,DRILLNOUT,2,CH1,cave,STONE,INSECT,Glass nuke,uncommon,16,horn-drill beetle → spiraling boring-scarab; Kabutops-ish bladed digger
+L112,2,BORESCARAB,2,CH1,cave,STONE,INSECT,Glass nuke,uncommon,,horn-drill beetle → spiraling boring-scarab; Kabutops-ish bladed digger
+L113,1,RUBBLEPUP,3,CH3,rocky slopes,TERRA,,Brawler,uncommon,16,rock-hide jackal pack-line; lean scrappy → boulder-shouldered alpha; Lucario-cool predator
+L113,2,SCREEHOUND,3,CH3,rocky slopes,TERRA,,Brawler,uncommon,34,rock-hide jackal pack-line; lean scrappy → boulder-shouldered alpha; Lucario-cool predator
+L113,3,TALUSFANG,3,CH3,rocky slopes,TERRA,,Brawler,uncommon,,rock-hide jackal pack-line; lean scrappy → boulder-shouldered alpha; Lucario-cool predator
+L114,1,OREWING,2,CH7,mountain pass,STONE,GALE,Pacer,uncommon,16,slate-feathered crag-hawk → great iron-winged raptor; apex highland bird
+L114,2,IRONROC,2,CH7,mountain pass,STONE,GALE,Pacer,uncommon,,slate-feathered crag-hawk → great iron-winged raptor; apex highland bird
+L115,1,PUMICETTE,2,CH6,volcanic cave,FLAME,STONE,Wall,uncommon,16,"glowing pumice-shell critter → magma-cored crag-beast; molten, primal"
+L115,2,MAGMACRAG,2,CH6,volcanic cave,FLAME,STONE,Wall,uncommon,,"glowing pumice-shell critter → magma-cored crag-beast; molten, primal"
+L116,1,PEBBLAW,3,CH3,beach,STONE,AQUA,Counter-tank,uncommon,16,"trilobite-shell crawler → clawed shore-crab → bladed prehistoric reef-predator; the Kabutops homage, primal/armored"
+L116,2,CARAPACE,3,CH3,beach,STONE,AQUA,Counter-tank,uncommon,34,"trilobite-shell crawler → clawed shore-crab → bladed prehistoric reef-predator; the Kabutops homage, primal/armored"
+L116,3,KABULORD,3,CH3,beach,STONE,AQUA,Counter-tank,uncommon,,"trilobite-shell crawler → clawed shore-crab → bladed prehistoric reef-predator; the Kabutops homage, primal/armored"
+L117,1,SPOUTLING,2,CH3,coast,AQUA,,Glass nuke,common,16,"jet-spouting blowfish → pressurized geyser-beast; fast, bursty"
+L117,2,GEYSARK,2,CH3,coast,AQUA,,Glass nuke,common,,"jet-spouting blowfish → pressurized geyser-beast; fast, bursty"
+L118,1,SEADRIFT,3,CH9,open sea,AQUA,,Pacer,uncommon,16,elegant ribbon-eel → great current-rider serpent; Seadra-elegant sea-dragon
+L118,2,CURRENTINE,3,CH9,open sea,AQUA,,Pacer,uncommon,34,elegant ribbon-eel → great current-rider serpent; Seadra-elegant sea-dragon
+L118,3,MAERWAKE,3,CH9,open sea,AQUA,,Pacer,uncommon,,elegant ribbon-eel → great current-rider serpent; Seadra-elegant sea-dragon
+L119,1,MIREPUP,2,CH5,swamp,VENOM,TERRA,Brawler,common,16,"mud-caked swamp-hound → tusked bog-beast; grimy, tough, real"
+L119,2,BOGFANG,2,CH5,swamp,VENOM,TERRA,Brawler,common,,"mud-caked swamp-hound → tusked bog-beast; grimy, tough, real"
+L120,1,REEDWISP,2,CH5,marsh,NATURE,SPIRIT,Trickster,uncommon,16,"will-o'-wisp reed-sprite → drifting marsh-shade; eerie, half-seen"
+L120,2,MARSHADE,2,CH5,marsh,NATURE,SPIRIT,Trickster,uncommon,,"will-o'-wisp reed-sprite → drifting marsh-shade; eerie, half-seen"
+L121,1,BRINEHISS,2,CH5,salt marsh,AQUA,VENOM,Drainer,uncommon,16,"brine-spitting sea-snake → corrosive salt-wyrm; lean, venomous"
+L121,2,SALTWYRM,2,CH5,salt marsh,AQUA,VENOM,Drainer,uncommon,,"brine-spitting sea-snake → corrosive salt-wyrm; lean, venomous"
+L122,1,CORALCLAW,2,CH9,reef,AQUA,STONE,Wall,uncommon,16,coral-armored crab → reef-fortress crusher; bulky living-stone
+L122,2,REEFMAUL,2,CH9,reef,AQUA,STONE,Wall,uncommon,,coral-armored crab → reef-fortress crusher; bulky living-stone
+L123,1,BRAMBLEKIT,3,CH2,deep forest,NATURE,,Brawler,uncommon,16,bramble-furred cub → thorn-knuckled beast → briar-maned alpha; Lucario-ish woodland martial-predator
+L123,2,THORNJACK,3,CH2,deep forest,NATURE,,Brawler,uncommon,34,bramble-furred cub → thorn-knuckled beast → briar-maned alpha; Lucario-ish woodland martial-predator
+L123,3,BRIARFANG,3,CH2,deep forest,NATURE,,Brawler,uncommon,,bramble-furred cub → thorn-knuckled beast → briar-maned alpha; Lucario-ish woodland martial-predator
+L124,1,MANTILL,2,CH2,forest,INSECT,NATURE,Glass nuke,uncommon,16,"leaf-blade mantis → scythe-armed forest hunter; the Scizor homage, bladed/sleek/lethal"
+L124,2,GLAIVEWING,2,CH2,forest,INSECT,NATURE,Glass nuke,uncommon,,"leaf-blade mantis → scythe-armed forest hunter; the Scizor homage, bladed/sleek/lethal"
+L125,1,ACORNTLE,3,CH2,woodland,NATURE,STONE,Wall,common,16,"shelled seed-critter → bark-plated guardian → timber-hided forest tank; sturdy, real"
+L125,2,OAKWARD,3,CH2,woodland,NATURE,STONE,Wall,common,34,"shelled seed-critter → bark-plated guardian → timber-hided forest tank; sturdy, real"
+L125,3,TIMBERHIDE,3,CH2,woodland,NATURE,STONE,Wall,common,,"shelled seed-critter → bark-plated guardian → timber-hided forest tank; sturdy, real"
+L126,1,FAWNDLE,2,CH2,meadow,NATURE,,Pacer,common,16,"spindly fawn → proud antlered stag; graceful real-animal, grounded"
+L126,2,STRIDEHART,2,CH2,meadow,NATURE,,Pacer,common,,"spindly fawn → proud antlered stag; graceful real-animal, grounded"
+L127,1,DUSKWING,2,CH4,deep wood,NATURE,SPIRIT,Trickster,uncommon,16,shadow-eared hare → moonlit spectral leaper; eerie woodland trickster
+L127,2,NOCTHARE,2,CH4,deep wood,NATURE,SPIRIT,Trickster,uncommon,,shadow-eared hare → moonlit spectral leaper; eerie woodland trickster
+L128,1,BUZZGRUB,3,CH2,forest,INSECT,,Glass nuke,common,16,fat grub → darting wasp → barbed hornet-queen; real-insect menace
+L128,2,WASPRITE,3,CH2,forest,INSECT,,Glass nuke,common,34,fat grub → darting wasp → barbed hornet-queen; real-insect menace
+L128,3,VESPINE,3,CH2,forest,INSECT,,Glass nuke,common,,fat grub → darting wasp → barbed hornet-queen; real-insect menace
+L129,1,MOSSPAW,2,CH2,forest floor,NATURE,TERRA,Brawler,uncommon,16,moss-backed badger-thing → boulder-shouldered grove-beast; grounded brute
+L129,2,LUMBROCK,2,CH2,forest floor,NATURE,TERRA,Brawler,uncommon,,moss-backed badger-thing → boulder-shouldered grove-beast; grounded brute
+L130,1,PETALISK,2,CH2,glade,NATURE,,Drainer,common,16,"bud-headed lizard → carnivorous bloom-jawed predator; Venus-flytrap-as-real-beast, predatory not cute"
+L130,2,BLOOMAW,2,CH2,glade,NATURE,,Drainer,common,,"bud-headed lizard → carnivorous bloom-jawed predator; Venus-flytrap-as-real-beast, predatory not cute"
+L131,1,CANOPER,2,CH4,canopy,GALE,NATURE,Pacer,uncommon,16,gliding tree-lizard → great leaf-winged canopy raptor; apex forest flyer
+L131,2,SOARTALON,2,CH4,canopy,GALE,NATURE,Pacer,uncommon,,gliding tree-lizard → great leaf-winged canopy raptor; apex forest flyer
 L132,1,CINDSTOAT,3,CH6,volcano slopes,FLAME,,Glass nuke,uncommon,16,"heat-shimmer stoat → flame-maned weasel → blazing nine-tailed marten; Typhlosion-energy fierce fire-furred mustelid"
 L132,2,PYREWEASEL,3,CH6,volcano slopes,FLAME,,Glass nuke,uncommon,34,"heat-shimmer stoat → flame-maned weasel → blazing nine-tailed marten; Typhlosion-energy fierce fire-furred mustelid"
 L132,3,INFERNINE,3,CH6,volcano slopes,FLAME,,Glass nuke,uncommon,,"heat-shimmer stoat → flame-maned weasel → blazing nine-tailed marten; Typhlosion-energy fierce fire-furred mustelid"
