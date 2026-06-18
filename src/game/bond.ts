@@ -69,13 +69,22 @@ export const BOND_XP_BASE = 9;
 // A boss clear is a landmark — a flat bonus on top of its challenge value.
 export const BOSS_BONUS = 8;
 
-// Surviving on fumes is a real moment → a little extra bond. A fainted mon
-// (hpFrac ≤ 0) gets none (it didn't pull through).
-export function clutchBonus(hpFracRemaining: number): number {
-  if (hpFracRemaining <= 0) return 0;
-  if (hpFracRemaining <= 0.15) return 4;
-  if (hpFracRemaining <= 0.35) return 2;
-  return 0;
+// FIGHT-AWARE strain: how hard the fight actually was ON THIS MON, read off
+// the HP fraction it ended with (HP only falls in battle — no in-battle heal
+// is built — so the survivor's final HP is its lowest point). This MODULATES
+// the power-ratio challenge so bond tracks FELT difficulty, not just nominal
+// stats: a type-advantaged SWEEP that left the mon near-full earns less; a
+// grind that nearly killed it earns more (this subsumes the old clutch
+// bonus). A fainted mon (in a won battle) gets the neutral 1.0 — it fought
+// and fell, but sacrificing isn't rewarded above a hard-won survival.
+// Centred so a typical mid-HP win (≈0.5) is exactly 1.0 → the pacing anchor
+// (and BOND_EFFORT_K) is unchanged by this factor.
+export function strainMultiplier(hpFracRemaining: number): number {
+  if (hpFracRemaining <= 0) return 1.0; // fainted — fought and fell
+  if (hpFracRemaining < 0.2) return 1.35; // clutch: survived on fumes
+  if (hpFracRemaining < 0.5) return 1.15; // a real grind
+  if (hpFracRemaining < 0.85) return 1.0; // a normal fight
+  return 0.6; // barely scratched — a sweep, not a struggle
 }
 
 export interface BondFightInput {
@@ -83,26 +92,25 @@ export interface BondFightInput {
   readonly monPower: number;
   readonly foePower: number;
   readonly kind: FightKind;
-  // The bonding mon's HP fraction at battle end (the clutch signal).
+  // THIS mon's HP fraction at battle end — the fight-strain signal.
   readonly hpFracRemaining: number;
   // Calls the player landed this battle (the partnership deepening). 0 ok.
   readonly callsLanded?: number;
 }
 
-// Bond XP (effort units) earned from one fight. THE FIREWALL: a trivial
-// foe (challenge 0) yields exactly 0 for a wild/trainer — no base, no
-// clutch, no call credit — so grinding weaklings is worthless. A boss
-// always grants at least its landmark bonus (bosses are never trivial by
-// design).
+// Bond XP (effort units) earned from one fight, FOR ONE MON. THE FIREWALL: a
+// trivial foe (challenge 0) yields exactly 0 for a wild/trainer — no base, no
+// strain, no call credit — so grinding weaklings is worthless however hurt
+// you let yourself get. A boss always grants at least its landmark bonus
+// (bosses are never trivial). Strain MODULATES the challenge (felt difficulty)
+// but can never resurrect a zero — the firewall holds.
 export function bondXp(input: BondFightInput): number {
   const challenge = challengeFactor(input.monPower, input.foePower);
   if (challenge <= 0 && input.kind !== 'boss') return 0;
-  let xp = BOND_XP_BASE * challenge * KIND_MULT[input.kind];
+  const strain = strainMultiplier(input.hpFracRemaining);
+  let xp = BOND_XP_BASE * challenge * strain * KIND_MULT[input.kind];
   if (input.kind === 'boss') xp += BOSS_BONUS;
-  if (challenge > 0) {
-    xp += clutchBonus(input.hpFracRemaining);
-    xp += (input.callsLanded ?? 0) * 1.5;
-  }
+  if (challenge > 0) xp += (input.callsLanded ?? 0) * 1.5;
   return xp;
 }
 

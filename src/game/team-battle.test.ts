@@ -226,6 +226,43 @@ describe('Phase 1 GATE — 2v2 player battle, voluntary + forced switching', () 
     void switchedTo;
   });
 
+  test('bond credit: a switched-in mon is reported as a participant (not just the lead)', () => {
+    // Switch the lead out for the bench mon, then win with the bench mon —
+    // onResolve must report BOTH party indices so bond credits the mon that
+    // actually fought, not just slot 0.
+    let participants: readonly number[] | null = null;
+    const grub = createSide(CH1.GRUBLEAF!);
+    const silt = createSide(CH1.SILTSKIP!);
+    const foe = { ...createSide(CH1.FLITPECK!), hp: 1 }; // 1 HP → the switched-in mon KOs it
+    const state = createBattleState(
+      createTeam([grub, silt]),
+      createTeam([foe]),
+      { typeChart: TYPECHART },
+    );
+    const scene = createBattleScene({
+      state,
+      rng: mulberry32(1),
+      chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'G' }),
+      intro: [],
+      catchBreathUnlocked: false,
+      canRun: true,
+      onResolve: (_w, _final, parts) => {
+        participants = parts;
+      },
+    });
+    scene.input?.('down'); // FIGHT → PKMN
+    scene.input?.('a'); // open party picker (SILTSKIP, idx 1)
+    scene.input?.('a'); // confirm switch → commit → switchIn(player, 1)
+    drainResolve(scene); // switch round resolves; back to menu, SILTSKIP active
+    scene.input?.('a'); // FIGHT
+    scene.input?.('a'); // TACKLE → KOs the 1-HP foe
+    drainResolve(scene); // resolve → win → end-text
+    scene.input?.('a'); // advance end-text line 1
+    scene.input?.('a'); // advance end-text line 2 → onResolve
+    expect(participants).not.toBeNull();
+    expect([...participants!]).toEqual([0, 1]); // lead + switched-in mon both fought
+  });
+
   test('forced switch: B is a no-op (player MUST pick), cannot back out', () => {
     const lead = { ...createSide(CH1.GRUBLEAF!), hp: 1 };
     const bench = createSide(CH1.SILTSKIP!);

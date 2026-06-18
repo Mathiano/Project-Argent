@@ -64,13 +64,24 @@ describe('bondXp — challenge-scaled (B2)', () => {
     expect(boss).toBeGreaterThan(0); // bosses are never "trivial"
   });
 
-  test('clutch (won on fumes) adds; a fainted mon gets none', () => {
-    const calm = bondXp({ monPower: 300, foePower: 300, kind: 'trainer', hpFracRemaining: 0.9 });
-    const clutch = bondXp({ monPower: 300, foePower: 300, kind: 'trainer', hpFracRemaining: 0.1 });
-    const fainted = bondXp({ monPower: 300, foePower: 300, kind: 'trainer', hpFracRemaining: 0 });
-    expect(clutch).toBeGreaterThan(calm); // surviving on fumes is a real moment
-    expect(fainted).toBe(calm); // a faint gets NO clutch credit (same as a comfortable win)
-    expect(clutch).toBeGreaterThan(fainted);
+  test('fight strain modulates by felt difficulty (sweep < normal < grind < clutch)', () => {
+    const f = (hp: number) => bondXp({ monPower: 300, foePower: 300, kind: 'trainer', hpFracRemaining: hp });
+    const sweep = f(0.95); // barely scratched
+    const normal = f(0.6); // a normal win
+    const grind = f(0.35); // a real grind
+    const clutch = f(0.1); // survived on fumes
+    const fainted = f(0); // fought and fell (in a won battle)
+    expect(sweep).toBeLessThan(normal);
+    expect(normal).toBeLessThan(grind);
+    expect(grind).toBeLessThan(clutch);
+    expect(fainted).toBe(normal); // neutral — a faint isn't rewarded above a hard-won survival
+  });
+
+  test('felt difficulty beats nominal power: sweeping a strong foe < grinding a parity foe', () => {
+    // The fix for "type-advantaged sweep of a high-power foe over-rewards":
+    const sweepStrong = bondXp({ monPower: 300, foePower: 420, kind: 'trainer', hpFracRemaining: 0.95 });
+    const grindParity = bondXp({ monPower: 300, foePower: 300, kind: 'trainer', hpFracRemaining: 0.25 });
+    expect(grindParity).toBeGreaterThan(sweepStrong);
   });
 });
 

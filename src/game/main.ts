@@ -363,26 +363,35 @@ function addCaughtMon(species: Species, origin: CatchOrigin): void {
   }
   markCaught(run.dex, species.name); // Phase 6.5 — dex CAUGHT on add
 }
-// Award the lead mon's bond on a win — CHALLENGE-SCALED, never flat (the
-// anti-grind firewall: a fight that didn't test THIS mon yields ~nothing;
-// a real trainer/near-power fight is meaningful; a boss is the big bonus).
-// `foe` is the species (wild) or Team (trainer/boss) that was faced; the
-// toughest member sets the challenge. `finalState` gives the lead's
-// surviving HP fraction (the clutch signal). Bond is horizontal — this
-// only moves the bond value, never a stat.
+// Award bond on a win to the mon(s) that ACTUALLY FOUGHT — challenge-scaled,
+// never flat (the anti-grind firewall: a fight that didn't test a mon yields
+// ~nothing; a real trainer/near-power fight is meaningful; a boss is the big
+// bonus). `foe` is the species (wild) or Team (trainer/boss) faced; its
+// toughest member sets the challenge. Each participant is credited relative
+// to ITS OWN power (a weak switched-in mon is challenged more) and how hurt
+// IT ended (finalState.members — the fight-strain signal). `participants` are
+// player party indices, aligned with run.party/run.partyBond. Bond is
+// horizontal — this only moves the bond value, never a stat.
 function awardBondForFight(
   foe: Species | ReturnType<typeof createTeam>,
   kind: FightKind,
   finalState: BattleState,
+  participants: readonly number[],
 ): void {
   if (run.partyBond.length === 0 || run.party.length === 0) return;
-  const monPower = powerIndex(run.party[0]!.species);
   const foePower = foeChallengePower(foe);
-  // members[0] preserves party order across switches; it's the bonding mon.
-  const lead = finalState.player.members[0];
-  const hpFrac = lead ? lead.hp / Math.max(1, lead.maxHp) : 1;
-  const xp = bondXp({ monPower, foePower, kind, hpFracRemaining: hpFrac });
-  run.partyBond[0] = applyBondXp(run.partyBond[0]!, xp);
+  // Fall back to the lead if the scene reported nobody (defensive).
+  const fighters = participants.length > 0 ? participants : [0];
+  for (const i of fighters) {
+    const mon = run.party[i];
+    if (!mon || run.partyBond[i] === undefined) continue;
+    const member = finalState.player.members[i];
+    const hpFrac = member ? member.hp / Math.max(1, member.maxHp) : 1;
+    run.partyBond[i] = applyBondXp(
+      run.partyBond[i]!,
+      bondXp({ monPower: powerIndex(mon.species), foePower, kind, hpFracRemaining: hpFrac }),
+    );
+  }
 }
 
 // The challenge yardstick: the power of the TOUGHEST foe the mon faced (a
@@ -1427,7 +1436,7 @@ function pushWildEncounter(foeSpeciesName: string): void {
         currentOverworldScene?.armPostBattleGrace();
         autosaveNow();
       },
-      onResolve: (winner, finalState) => {
+      onResolve: (winner, finalState, participants) => {
         writebackParty(finalState);
         // BUG 2 — a wild loss blacks out (heal + warp to the Center)
         // rather than leaving a fainted party in the grass.
@@ -1435,7 +1444,7 @@ function pushWildEncounter(foeSpeciesName: string): void {
           blackout();
           return;
         }
-        awardBondForFight(foe, 'wild', finalState); // challenge-scaled (firewall: trivial→~0)
+        awardBondForFight(foe, 'wild', finalState, participants); // challenge-scaled (firewall: trivial→~0)
         recomputeSignpostFlags();
         // Demo-complete S4 (design intent, build in Phase 8 with the
         // bond system): the first Trainer Call should unlock from an
@@ -1501,7 +1510,7 @@ function pushTrainerFight(
       intro: ['Gym trainer sent out', `${leadName}!`, 'Show your read!'],
       catchBreathUnlocked: run.catchBreathUnlocked,
       canRun: false,
-      onResolve: (winner, finalState) => {
+      onResolve: (winner, finalState, participants) => {
         writebackParty(finalState);
         // BUG 2 — losing a trainer fight must NOT leave the player
         // fainted in place (free to walk into the next fight, e.g.
@@ -1512,7 +1521,7 @@ function pushTrainerFight(
           return;
         }
         flagStore.set(winFlag);
-        awardBondForFight(foeTeam, 'trainer', finalState); // trainers weighted above wilds
+        awardBondForFight(foeTeam, 'trainer', finalState, participants); // trainers weighted above wilds
         // Phase 5b — trainer payout (game-layer; engine untouched).
         // Wild wins never reach here (trainers-only, anti-grind).
         if (reward && reward > 0) run.money = awardMoney(run.money, reward);
@@ -1568,13 +1577,13 @@ function pushFalknerBattle(): void {
       ],
       catchBreathUnlocked: true,
       canRun: false,
-      onResolve: (winner, finalState) => {
+      onResolve: (winner, finalState, participants) => {
         writebackParty(finalState);
         scenes.pop(); // drop the battle scene first
         if (winner === 'player') {
           flagStore.set('falkner_beaten');
           run.catchBreathUnlocked = true;
-          awardBondForFight(team, 'boss', finalState); // boss clear = the big bonus
+          awardBondForFight(team, 'boss', finalState, participants); // boss clear = the big bonus
           // Demo-complete S1: award the ZEPHYR badge + a real payoff
           // beat, then return to the gym. awardBadge autosaves; the
           // pop after the fanfare lands the player back on the rooftop.

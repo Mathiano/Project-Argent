@@ -73,7 +73,14 @@ export interface BattleSceneOpts {
   // Final BattleState is handed back so the caller can write party
   // hp/st/momentum forward (the Phase 2 writeback). 1v1 callers can
   // ignore `finalState`; team callers extract state.player.members.
-  readonly onResolve: (winner: 'player' | 'foe', finalState: BattleState) => void;
+  // `participants` = the player member indices that took the field this
+  // battle (initial active + every switch/forced-switch-in), so bond is
+  // credited to the mon(s) that ACTUALLY fought, not just the lead.
+  readonly onResolve: (
+    winner: 'player' | 'foe',
+    finalState: BattleState,
+    participants: readonly number[],
+  ) => void;
   // Fleeing (RUN, wild only) is distinct from a loss — it must NOT
   // black out. When wired, RUN calls this instead of onResolve('foe');
   // the caller returns the player to the same overworld tile, no heal.
@@ -322,6 +329,11 @@ export function callShout(call: CallDef, monName: string): string {
 
 export function createBattleScene(opts: BattleSceneOpts): Scene {
   let state: BattleState = opts.state;
+  // Player member indices that took the field (initial active + every
+  // switch-in). Drives per-mon bond crediting — the mon that fought earns
+  // the bond, not whoever happens to be party slot 0.
+  const playerParticipated = new Set<number>([opts.state.player.active]);
+  const participants = (): number[] => [...playerParticipated].sort((a, b) => a - b);
   let foeAction: Action = { kind: 'rest' };
   // Intent reliability ramp (Phase 6.7-A). `shownIntent` is the (possibly
   // degraded) display recomputed once per turn from the TRUE foeAction; the
@@ -433,7 +445,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function foeGone(): void {
     const cb = opts.onFoeGone ?? opts.onFlee;
     if (cb) cb(state);
-    else opts.onResolve('foe', state);
+    else opts.onResolve('foe', state, participants());
   }
 
   function beginTurn(): void {
@@ -714,6 +726,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
     if (ev.kind === 'switchIn') {
       const who = ev.side === 'player' ? ev.species : `Foe ${ev.species}`;
+      if (ev.side === 'player') playerParticipated.add(ev.toIndex);
       pushLog(`${who} took the field!`);
       // The active mon swapped on the state side. Reseat display so HP/ST
       // bars reflect the new active's values immediately.
@@ -728,6 +741,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
     if (ev.kind === 'forcedSwitch') {
       const who = ev.side === 'player' ? ev.species : `Foe sent out ${ev.species}`;
+      if (ev.side === 'player') playerParticipated.add(ev.toIndex);
       pushLog(`${who}!`);
       const fresh = activeMon(state[ev.side]);
       display[ev.side] = snapshot(fresh);
@@ -775,7 +789,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
           ? ['You won the battle!', 'Press A to continue.']
           : ['Your team fell.', 'Press A to continue.'];
       setText(msg, () => {
-        opts.onResolve(endingWinner!, state);
+        opts.onResolve(endingWinner!, state, participants());
       });
       return;
     }
@@ -924,7 +938,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // caller didn't wire onFlee (legacy/test paths).
       setText(['Got away safely!'], () => {
         if (opts.onFlee) opts.onFlee(state);
-        else opts.onResolve('foe', state);
+        else opts.onResolve('foe', state, participants());
       });
     } else {
       setText(
@@ -973,7 +987,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   // Phase 6a Path 2 — the spare offer (a fainted wild foe + medicine).
   function endWithWin(): void {
-    setText(['You won the battle!', 'Press A to continue.'], () => opts.onResolve('player', state));
+    setText(['You won the battle!', 'Press A to continue.'], () => opts.onResolve('player', state, participants()));
   }
   function handleSpareInput(key: InputKey): void {
     if (key === 'up' || key === 'down') spareCursor = spareCursor === 0 ? 1 : 0;
@@ -1022,6 +1036,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
           const nextTeam: Team = { ...team, active: partyCursor };
           state = { ...state, player: nextTeam };
           display.player = snapshot(activeMon(nextTeam));
+          playerParticipated.add(partyCursor); // the overridden pick also fought
         }
         if (resumeResolveAfterParty) {
           resumeResolveAfterParty = false;
