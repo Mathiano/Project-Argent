@@ -27,6 +27,10 @@ export type GameEvent =
   // No emit site exists yet; the type is here so audio reserves the cue.
   | { readonly kind: 'status-applied'; readonly side: Side; readonly status: string }
   | { readonly kind: 'evolve'; readonly species: string }
+  // A mon crossed into a new bond stage (e.g. Wary → Warming) — the
+  // relationship-milestone beat. Emitted post-battle by the bond award; the
+  // game shows a prompted message, and audio can chime the milestone later.
+  | { readonly kind: 'bond-stage-cross'; readonly species: string; readonly fromStage: number; readonly toStage: number }
   // Reserved: there is no leveling system (stats are species-static). Kept
   // for completeness so a future XP/level beat has a cue.
   | { readonly kind: 'level' };

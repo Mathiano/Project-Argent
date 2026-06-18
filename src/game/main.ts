@@ -55,6 +55,7 @@ import {
   BOND_START_STARTER,
   CATCH_RARITY,
   bondBonus,
+  bondStageName,
   catchChance,
   rollCatch,
   rollWillingJoin,
@@ -62,8 +63,11 @@ import {
   willingJoinChance,
 } from './catching';
 import type { CatchWindow, CatchOrigin } from './catching';
+import { emitGameEvent } from './gameEvents';
+import { createBondStageScene } from './scenes/bondStage';
 import {
   applyBondXp,
+  bondStageCrossing,
   bondXp,
   hasJumpstart,
   powerIndex,
@@ -372,13 +376,21 @@ function addCaughtMon(species: Species, origin: CatchOrigin): void {
 // IT ended (finalState.members — the fight-strain signal). `participants` are
 // player party indices, aligned with run.party/run.partyBond. Bond is
 // horizontal — this only moves the bond value, never a stat.
+// A bond stage-crossing to announce after the battle (Issue 1).
+interface BondCross {
+  readonly species: string;
+  readonly fromName: string;
+  readonly toName: string;
+}
+
 function awardBondForFight(
   foe: Species | ReturnType<typeof createTeam>,
   kind: FightKind,
   finalState: BattleState,
   participants: readonly number[],
-): void {
-  if (run.partyBond.length === 0 || run.party.length === 0) return;
+): BondCross[] {
+  const crossings: BondCross[] = [];
+  if (run.partyBond.length === 0 || run.party.length === 0) return crossings;
   const foePower = foeChallengePower(foe);
   // Fall back to the lead if the scene reported nobody (defensive).
   const fighters = participants.length > 0 ? participants : [0];
@@ -387,11 +399,48 @@ function awardBondForFight(
     if (!mon || run.partyBond[i] === undefined) continue;
     const member = finalState.player.members[i];
     const hpFrac = member ? member.hp / Math.max(1, member.maxHp) : 1;
-    run.partyBond[i] = applyBondXp(
-      run.partyBond[i]!,
+    const before = run.partyBond[i]!;
+    const after = applyBondXp(
+      before,
       bondXp({ monPower: powerIndex(mon.species), foePower, kind, hpFracRemaining: hpFrac }),
     );
+    run.partyBond[i] = after;
+    // Stage-crossing milestone: record it for the post-battle beat + emit
+    // on the event bus (the natural reactive seam — audio chimes it later).
+    const cross = bondStageCrossing(before, after);
+    if (cross) {
+      crossings.push({ species: mon.species.name, fromName: bondStageName(before), toName: bondStageName(after) });
+      emitGameEvent({
+        kind: 'bond-stage-cross',
+        species: mon.species.name,
+        fromStage: cross.fromStage,
+        toStage: cross.toStage,
+      });
+    }
   }
+  return crossings;
+}
+
+// Announce each bond stage-crossing as a prompted beat (like a level-up),
+// then run `onComplete`. Chains scene-by-scene (same pattern as maybeEvolve)
+// so multiple crossings show in sequence. Empty list → straight to onComplete.
+function showBondBeats(crossings: readonly BondCross[], onComplete: () => void): void {
+  if (crossings.length === 0) {
+    onComplete();
+    return;
+  }
+  const [head, ...rest] = crossings;
+  scenes.push(
+    createBondStageScene({
+      species: head!.species,
+      fromName: head!.fromName,
+      toName: head!.toName,
+      onContinue: () => {
+        scenes.pop();
+        showBondBeats(rest, onComplete);
+      },
+    }),
+  );
 }
 
 // The challenge yardstick: the power of the TOUGHEST foe the mon faced (a
@@ -1444,7 +1493,7 @@ function pushWildEncounter(foeSpeciesName: string): void {
           blackout();
           return;
         }
-        awardBondForFight(foe, 'wild', finalState, participants); // challenge-scaled (firewall: trivial→~0)
+        const bondCrossings = awardBondForFight(foe, 'wild', finalState, participants); // challenge-scaled (firewall: trivial→~0)
         recomputeSignpostFlags();
         // Demo-complete S4 (design intent, build in Phase 8 with the
         // bond system): the first Trainer Call should unlock from an
@@ -1460,7 +1509,7 @@ function pushWildEncounter(foeSpeciesName: string): void {
         // never get trapped in an immediate chain.
         currentOverworldScene?.armPostBattleGrace();
         autosaveNow();
-        maybeEvolve(() => {}); // 6b — a bond bump may cross an evo gate
+        showBondBeats(bondCrossings, () => maybeEvolve(() => {})); // bond beat, then evo gates
       },
     }),
   );
@@ -1521,7 +1570,7 @@ function pushTrainerFight(
           return;
         }
         flagStore.set(winFlag);
-        awardBondForFight(foeTeam, 'trainer', finalState, participants); // trainers weighted above wilds
+        const bondCrossings = awardBondForFight(foeTeam, 'trainer', finalState, participants); // trainers weighted above wilds
         // Phase 5b — trainer payout (game-layer; engine untouched).
         // Wild wins never reach here (trainers-only, anti-grind).
         if (reward && reward > 0) run.money = awardMoney(run.money, reward);
@@ -1531,7 +1580,7 @@ function pushTrainerFight(
         // immediately after a trainer victory and getting chained.
         currentOverworldScene?.armPostBattleGrace();
         autosaveNow();
-        maybeEvolve(() => {}); // 6b — a bond bump may cross an evo gate
+        showBondBeats(bondCrossings, () => maybeEvolve(() => {})); // bond beat, then evo gates
       },
     }),
   );
@@ -1583,7 +1632,7 @@ function pushFalknerBattle(): void {
         if (winner === 'player') {
           flagStore.set('falkner_beaten');
           run.catchBreathUnlocked = true;
-          awardBondForFight(team, 'boss', finalState, participants); // boss clear = the big bonus
+          const bondCrossings = awardBondForFight(team, 'boss', finalState, participants); // boss clear = the big bonus
           // Demo-complete S1: award the ZEPHYR badge + a real payoff
           // beat, then return to the gym. awardBadge autosaves; the
           // pop after the fanfare lands the player back on the rooftop.
@@ -1591,8 +1640,10 @@ function pushFalknerBattle(): void {
           pushBadgeAward(() => {
             scenes.pop(); // drop the badge scene → back to the gym
             autosaveNow();
-            // 6b — earning ZEPHYR may complete a bonded mon's badge gate.
-            maybeEvolve(() => {});
+            // After the badge fanfare: the bond beat (a boss clear is the
+            // biggest bond gain), then the evo gate check (ZEPHYR may also
+            // complete a bonded mon's badge gate).
+            showBondBeats(bondCrossings, () => maybeEvolve(() => {}));
           });
         } else {
           // BUG 2 — a boss loss heals + offers INSTANT RETRY (the

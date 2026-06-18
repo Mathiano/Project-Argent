@@ -12,6 +12,7 @@ import {
   JUMPSTART_STAGE,
   applyBondXp,
   bondAfterFight,
+  bondStageCrossing,
   bondXp,
   challengeFactor,
   hasJumpstart,
@@ -179,6 +180,27 @@ describe('hasJumpstart — the one effect’s unlock (B5)', () => {
     expect(hasJumpstart(BOND_STAGES[0]!.max)).toBe(false); // top of stage 1
     expect(hasJumpstart(BOND_STAGES[0]!.max + 1)).toBe(true); // into stage 2
     expect(bondStage(BOND_STAGES[0]!.max + 1)).toBe(JUMPSTART_STAGE);
+  });
+});
+
+describe('bondStageCrossing — the stage-crossing milestone trigger (Issue 1)', () => {
+  test('detects a cross into a new stage; null when the stage is unchanged', () => {
+    // 15 = top of stage 1 (Wary), 16 = stage 2 (Warming).
+    expect(bondStageCrossing(15, 16)).toEqual({ fromStage: 1, toStage: 2 });
+    expect(bondStageCrossing(10, 14)).toBeNull(); // still Wary
+    expect(bondStageCrossing(40, 41)).toBeNull(); // both Companions
+  });
+  test('the trainer win that tips a devoted starter into Warming reports the milestone', () => {
+    let bond = 10; // Wary
+    let cross: ReturnType<typeof bondStageCrossing> = null;
+    for (let i = 0; i < 10 && !cross; i += 1) {
+      const before = bond;
+      bond = bondAfterFight(before, { monPower: 300, foePower: 300, kind: 'trainer', hpFracRemaining: 0.4 });
+      cross = bondStageCrossing(before, bond);
+    }
+    expect(cross).not.toBeNull(); // exactly one fight tips it over
+    expect(cross!.fromStage).toBe(1);
+    expect(cross!.toStage).toBe(2); // Wary → Warming
   });
 });
 

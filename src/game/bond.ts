@@ -174,6 +174,20 @@ export function hasJumpstart(bondValue: number): boolean {
   return bondStage(bondValue) >= JUMPSTART_STAGE;
 }
 
+// Did applying bond XP cross into a new named stage? Returns the from/to
+// stage numbers when it did, else null — the trigger for the post-battle
+// stage-crossing beat (Issue 1). Pure: the caller maps stage → name + shows
+// the message; this just detects the milestone.
+export interface BondStageCross {
+  readonly fromStage: number;
+  readonly toStage: number;
+}
+export function bondStageCrossing(before: number, after: number): BondStageCross | null {
+  const fromStage = bondStage(before);
+  const toStage = bondStage(after);
+  return toStage > fromStage ? { fromStage, toStage } : null;
+}
+
 // ---- The visible meter's "sense of progress" (B4) -----------------------
 
 // Progress 0..1 WITHIN the current stage — surfaced as a few pips, never a
