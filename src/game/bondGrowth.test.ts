@@ -4,10 +4,10 @@ import { bondStage, bondStageName } from './catching';
 import { bondAfterFight, powerIndex } from './bond';
 import type { FightKind } from './bond';
 
-// ── ANTI-GRIND + RENEWABLE proofs (bond-core sim-gate) ───────────────────
-// These sim the GROWTH MECHANIC directly (challenge → xp → value). They are
-// the firewall + renewable evidence the kickoff asks for, and print the
-// curve so the numbers are on record. (Game-layer pure functions, so this
+// ── BOND PACING + sim-gate proofs (re-verified after the 2026-06-18 tune) ──
+// The growth mechanic (challenge → xp → value) is tuned to LOOSELY track gym
+// progression for a devoted core companion. These sim it directly and print
+// the curve so the pacing is on record. (Game-layer pure functions, so this
 // lives under src/game — the ≤3% ladder gate that needs the engine/bots
 // lives in src/sim/bondLadder.test.ts.)
 
@@ -20,77 +20,124 @@ interface Fight {
   readonly hpFracRemaining: number;
 }
 
-// Run a sequence of fights from a starting bond, sampling the curve.
-function runCurve(start: number, fights: readonly Fight[]): { value: number; trace: string[] } {
-  let value = start;
-  const trace: string[] = [`  fight  0: ${fmt(value)}`];
-  fights.forEach((f, i) => {
-    value = bondAfterFight(value, f);
-    trace.push(`  fight ${String(i + 1).padStart(2)}: ${fmt(value)}`);
-  });
-  return { value, trace };
+// One "real fight" on a devoted-starter stream: alternate a parity trainer
+// (the weighted core-loop fight) and a near-power wild. Both are challenge-
+// positive — the unit the pacing is measured in. (Trivia gives 0 and is
+// excluded by definition; the firewall test below proves that.)
+function realFight(i: number): Fight {
+  const trainer = i % 2 === 0;
+  return {
+    monPower: PAR,
+    foePower: PAR * (trainer ? 1.0 : 0.95),
+    kind: trainer ? 'trainer' : 'wild',
+    hpFracRemaining: 0.5, // no clutch — a clean tuning anchor
+  };
 }
+
 function fmt(v: number): string {
   return `bond ${v.toFixed(1).padStart(5)}  stage ${bondStage(v)} (${bondStageName(v)})`;
 }
 
-describe('anti-grind firewall — farming weak foes vs quality play', () => {
-  test('farming weak/under-leveled wilds yields NEAR-ZERO; quality play progresses', () => {
-    // A trivial wild, repeated 30×: foe is 40% of the mon's power.
-    const farming: Fight[] = Array.from({ length: 30 }, () => ({
-      monPower: PAR,
-      foePower: PAR * 0.4,
-      kind: 'wild' as const,
-      hpFracRemaining: 1,
-    }));
-    // Quality play: near-level trainers + near-level wilds, alternating.
-    const quality: Fight[] = Array.from({ length: 12 }, (_, i) => ({
-      monPower: PAR,
-      foePower: PAR * (i % 2 === 0 ? 1.0 : 0.95),
-      kind: (i % 2 === 0 ? 'trainer' : 'wild') as FightKind,
-      hpFracRemaining: 0.55,
-    }));
+describe('devoted-starter pacing — bond loosely tracks gym progression', () => {
+  test('stage at 10 / 30 / 50 / 80 / 100 cumulative real fights tracks the target', () => {
+    const MILESTONES = [10, 30, 50, 80, 100];
+    const gymHint: { [n: number]: string } = {
+      10: 'gym ~1-2 → stage 1-2',
+      30: 'gym ~3-4 → stage 3-4',
+      50: 'gym ~5-6 → stage 5',
+      80: 'gym ~7-8 → stage 6-7',
+      100: 'E4/postgame → stage 7-8 (true max via Arena, aspirational)',
+    };
+    const rows: string[] = [];
+    const stageAt: { [n: number]: number } = {};
+    let value = 10; // a devoted starter begins a little warm
+    let next = 0;
+    for (let n = 1; n <= 100; n += 1) {
+      value = bondAfterFight(value, realFight(n - 1));
+      if (MILESTONES.includes(n)) {
+        stageAt[n] = bondStage(value);
+        rows.push(`  ${String(n).padStart(3)} fights: ${fmt(value)}   ${gymHint[n]}`);
+      }
+      void next;
+    }
+    console.log('\n── DEVOTED-STARTER PACING (start bond 10, real fights only) ──\n' + rows.join('\n') + '\n');
 
-    const farm = runCurve(10, farming);
-    const qual = runCurve(10, quality);
-
-    console.log(
-      '\n── ANTI-GRIND: farming 30 weak wilds (foe = 0.4× mon power) ──\n' +
-        `  start: ${fmt(10)}\n  end:   ${fmt(farm.value)}   ← flat: the firewall holds\n` +
-        '\n── QUALITY: 12 near-level fights (trainers + wilds) ──\n' +
-        qual.trace.filter((_, i) => i % 2 === 0).join('\n') +
-        '\n',
-    );
-
-    // Firewall: 30 farmed stomps do not move bond at all.
-    expect(farm.value).toBe(10);
-    // Quality play climbs several stages over a campaign-ish stretch.
-    expect(bondStage(qual.value)).toBeGreaterThanOrEqual(4);
+    // Loosely track the milestones (ranges — bond is earned, not gym-locked).
+    expect(stageAt[10]!).toBeGreaterThanOrEqual(1);
+    expect(stageAt[10]!).toBeLessThanOrEqual(2);
+    expect(stageAt[30]!).toBeGreaterThanOrEqual(3);
+    expect(stageAt[30]!).toBeLessThanOrEqual(4);
+    expect(stageAt[50]!).toBeGreaterThanOrEqual(4);
+    expect(stageAt[50]!).toBeLessThanOrEqual(5);
+    expect(stageAt[80]!).toBeGreaterThanOrEqual(5);
+    expect(stageAt[80]!).toBeLessThanOrEqual(6);
+    expect(stageAt[100]!).toBeGreaterThanOrEqual(6);
+    // …and NOT maxed early: a starter is near-max, not Inseparable, by ~100.
+    expect(stageAt[80]!).toBeLessThan(7);
   });
 });
 
-describe('renewable fuel — a fresh under-powered mon can still bond', () => {
-  test('a weak/late mon earns meaningful bond from parity opposition', () => {
+describe('early-perceptibility — a new mon FEELS early progress', () => {
+  test('value visibly moves within 1 fight; a devoted starter leaves Wary within a few', () => {
+    // Perceptible immediately — even a freshly-caught mon's value moves on
+    // its first real win (the meter pips shift before the stage name does).
+    const after1 = bondAfterFight(5, realFight(0)); // freshly caught at 5
+    expect(after1).toBeGreaterThan(5 + 1);
+
+    // The brief's subject — a devoted starter (begins a little warm at 10) —
+    // crosses out of Wary within a few real fights, so early progress FEELS
+    // earned, not a slog.
+    let value = 10;
+    let fightsToWarming = 0;
+    for (let n = 0; n < 20 && bondStage(value) < 2; n += 1) {
+      value = bondAfterFight(value, realFight(n));
+      fightsToWarming = n + 1;
+    }
+    expect(bondStage(value)).toBe(2);
+    expect(fightsToWarming).toBeLessThanOrEqual(4);
+  });
+});
+
+describe('anti-grind firewall — STILL holds at the new pace', () => {
+  test('farming weak/under-leveled wilds (≤0.7× power) stays exactly flat', () => {
+    let bond = 10;
+    for (let i = 0; i < 50; i += 1) {
+      bond = bondAfterFight(bond, {
+        monPower: PAR,
+        foePower: PAR * 0.4, // trivial for this mon
+        kind: 'wild',
+        hpFracRemaining: 1,
+      });
+    }
+    console.log(`\n── ANTI-GRIND: 50 farmed weak wilds → ${fmt(bond)} (flat: firewall holds)\n`);
+    expect(bond).toBe(10);
+  });
+});
+
+describe('renewable fuel — STILL holds (at the new, slower rate)', () => {
+  test('a fresh under-powered mon climbs from parity opposition', () => {
     const weakMon = Math.round(PAR * 0.5); // an early-stage / under-powered mon
-    // It fights opposition near ITS OWN power — real challenges for IT.
-    const fights: Fight[] = Array.from({ length: 8 }, () => ({
+    const fights: Fight[] = Array.from({ length: 20 }, () => ({
       monPower: weakMon,
-      foePower: weakMon,
+      foePower: weakMon, // appropriate opposition (parity for the weak mon)
       kind: 'trainer' as const,
       hpFracRemaining: 0.5,
     }));
-    const { value, trace } = runCurve(5, fights); // freshly caught at 5
-
+    let value = 5; // freshly caught
+    const trace: string[] = [`  fight  0: ${fmt(value)}`];
+    fights.forEach((f, i) => {
+      value = bondAfterFight(value, f);
+      if ((i + 1) % 5 === 0) trace.push(`  fight ${String(i + 1).padStart(2)}: ${fmt(value)}`);
+    });
     console.log(
       '\n── RENEWABLE: a fresh under-powered mon (0.5× power) vs parity foes ──\n' +
         trace.join('\n') +
-        '\n  → bond fuel is renewable: appropriate opposition is always available.\n',
+        '\n  → still climbs, just at the stretched campaign rate.\n',
     );
-
-    expect(value).toBeGreaterThan(5 + 15); // it genuinely climbs from fresh
-    expect(bondStage(value)).toBeGreaterThanOrEqual(3);
-    // And it would NOT have climbed by farming trivia: same mon, weak foes.
-    const farmed = runCurve(5, fights.map((f) => ({ ...f, foePower: weakMon * 0.4 })));
-    expect(farmed.value).toBe(5);
+    expect(bondStage(value)).toBeGreaterThanOrEqual(3); // it genuinely climbs over time
+    // …and it would NOT have climbed by farming trivia (same mon, weak foes).
+    let farmed = 5;
+    for (const f of fights) farmed = bondAfterFight(farmed, { ...f, foePower: weakMon * 0.4 });
+    expect(farmed).toBe(5);
   });
 });

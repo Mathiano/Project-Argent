@@ -118,7 +118,18 @@ export function bondXp(input: BondFightInput): number {
 // Implemented as an effort→value map  V = BOND_MAX·(1 − e^(−E/K)).  Bond XP
 // adds to the effort E, so applying XP is order-independent (associative)
 // and strictly monotonic. K sets how fast early stages fill.
-export const BOND_EFFORT_K = 55;
+//
+// PACING (tuned 2026-06-18 to track gym progression for a devoted core
+// companion used since ~start vs real opposition; ~10.5 effort/real-fight on
+// an alternating parity-trainer/near-power-wild stream). K was 55 (curve hit
+// stage 6 in ~8 fights — far too fast); stretched ~10× to span a campaign:
+//   ~stage 2 by ~10 real fights · ~stage 4 by ~30 (gym ~4) · ~stage 5 by ~50
+//   (gym ~5-6) · ~stage 6 by ~80 (gym ~7-8) · ~stage 7 by ~140 (E4/postgame,
+//   and/or the Practice Arena). Early climb stays PERCEPTIBLE (off stage 1 in
+//   a few real fights); the widening shape is preserved, just stretched. True
+//   max stays aspirational — you can't max a starter by gym 4. See the sim
+//   report in bondGrowth.test.ts. Constants-only knob; engine math untouched.
+export const BOND_EFFORT_K = 575;
 
 export function valueToEffort(value: number): number {
   const v = Math.max(0, Math.min(BOND_MAX - 1e-9, value));

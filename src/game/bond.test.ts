@@ -117,16 +117,17 @@ describe('applyBondXp — diminishing-returns / widening curve (B3)', () => {
 });
 
 describe('scenarios — the gate (growth feel, firewall, renewable)', () => {
-  test('bond GROWS on a real trainer fight near the mon’s level', () => {
+  test('bond GROWS on real trainer fights near the mon’s level (a felt step)', () => {
     const start = 10; // a starter’s opening bond (stage 1)
-    const after = bondAfterFight(start, {
-      monPower: PAR,
-      foePower: PAR, // a near-level opponent
-      kind: 'trainer',
-      hpFracRemaining: 0.6,
-    });
-    expect(after).toBeGreaterThan(start);
-    expect(bondStage(after)).toBeGreaterThan(bondStage(start)); // a felt step
+    // One fight is perceptible; a few real fights cross into the next stage
+    // (at the campaign pace a single win no longer jumps a whole stage).
+    expect(bondAfterFight(start, { monPower: PAR, foePower: PAR, kind: 'trainer', hpFracRemaining: 0.6 }))
+      .toBeGreaterThan(start);
+    let bond = start;
+    for (let i = 0; i < 5; i += 1) {
+      bond = bondAfterFight(bond, { monPower: PAR, foePower: PAR, kind: 'trainer', hpFracRemaining: 0.6 });
+    }
+    expect(bondStage(bond)).toBeGreaterThan(bondStage(start)); // a felt step
   });
 
   test('FIREWALL: farming weak wilds is NEAR-ZERO across many repeats', () => {
@@ -148,7 +149,7 @@ describe('scenarios — the gate (growth feel, firewall, renewable)', () => {
     const weakMon = Math.round(PAR * 0.5);
     const start = 5; // freshly caught
     let bond = start;
-    for (let i = 0; i < 4; i += 1) {
+    for (let i = 0; i < 12; i += 1) {
       bond = bondAfterFight(bond, {
         monPower: weakMon,
         foePower: weakMon, // appropriate opposition (parity for the weak mon)
@@ -156,7 +157,7 @@ describe('scenarios — the gate (growth feel, firewall, renewable)', () => {
         hpFracRemaining: 0.5,
       });
     }
-    expect(bond).toBeGreaterThan(start + 10); // it genuinely climbs
+    expect(bond).toBeGreaterThan(start + 10); // it genuinely climbs over time
     expect(bondStage(bond)).toBeGreaterThanOrEqual(2);
   });
 });
