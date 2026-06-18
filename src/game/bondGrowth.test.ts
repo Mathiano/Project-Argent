@@ -141,3 +141,41 @@ describe('renewable fuel — STILL holds (at the new, slower rate)', () => {
     expect(farmed).toBe(5);
   });
 });
+
+describe('goal check — the gym gauntlet brings a devoted starter into Warming', () => {
+  // Real CH1 powers (stat-sums, verified from docs/ch1-batch.json):
+  //   KINDRAKE starter 326 · FLITPECK 286 · GALEHAWK 354.
+  // The Violet gym is now a gauntlet: the existing talk-trainer + three
+  // line-of-sight trainers + Falkner. We sim a devoted starter (bond 10)
+  // fighting all five, PESSIMISTICALLY (every fight a near-untouched sweep,
+  // strain 0.6 — the lowest bond payoff) to prove the floor: even then it
+  // crosses into stage 2 (Warming), which arms the Tier-I jumpstart. Real
+  // play (pressured multi-mon fights + route trainers/wilds) lands higher.
+  const KINDRAKE = 326;
+  const FLITPECK = 286;
+  const GALEHAWK = 354;
+  // Each gym fight: foePower = toughest mon faced. hpFrac 0.95 → strain 0.6.
+  const gauntlet: Fight[] = [
+    { monPower: KINDRAKE, foePower: FLITPECK, kind: 'trainer', hpFracRemaining: 0.95 }, // existing [FLITPECK,FLITPECK]
+    { monPower: KINDRAKE, foePower: GALEHAWK, kind: 'trainer', hpFracRemaining: 0.95 }, // T2 [FLITPECK,GALEHAWK]
+    { monPower: KINDRAKE, foePower: GALEHAWK, kind: 'trainer', hpFracRemaining: 0.95 }, // T3 [GALEHAWK]
+    { monPower: KINDRAKE, foePower: GALEHAWK, kind: 'trainer', hpFracRemaining: 0.95 }, // T4 [GALEHAWK,FLITPECK]
+    { monPower: KINDRAKE, foePower: GALEHAWK, kind: 'boss', hpFracRemaining: 0.95 }, // Falkner
+  ];
+
+  test('a devoted starter reaches stage 2 (Warming) on the gym gauntlet alone (worst-case strain)', () => {
+    let bond = 10; // a devoted starter's opening bond
+    const trace: string[] = [`  start:    ${fmt(bond)}`];
+    const labels = ['gym trainer', 'BIRDKEEPER', 'FLEDGLING', 'ACE', 'FALKNER'];
+    gauntlet.forEach((f, i) => {
+      bond = bondAfterFight(bond, f);
+      trace.push(`  +${labels[i]!.padEnd(11)} ${fmt(bond)}`);
+    });
+    console.log('\n── GOAL CHECK: gym gauntlet → devoted starter bond (worst-case sweeps) ──\n' + trace.join('\n') + '\n');
+    expect(bondStage(bond)).toBeGreaterThanOrEqual(2); // crosses into Warming → jumpstart arms
+    // Every gym fight is challenge-positive (no trivial zero in the chain).
+    for (const f of gauntlet) {
+      expect(bondAfterFight(10, f)).toBeGreaterThan(10);
+    }
+  });
+});
