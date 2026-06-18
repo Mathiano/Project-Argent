@@ -15,7 +15,14 @@ import type {
 } from './types';
 import { activeMon } from './types';
 
-export function createSide(species: Species, scale?: StatScale): SideState {
+export interface SideOpts {
+  // Arm the bond jumpstart (first read-win this battle banks an extra ★).
+  // The game sets this for a sufficiently-bonded mon; omitted everywhere
+  // else, so the returned SideState shape is unchanged (bit-identical).
+  readonly jumpstartArmed?: boolean;
+}
+
+export function createSide(species: Species, scale?: StatScale, opts?: SideOpts): SideState {
   const sp: Species = scale
     ? {
         ...species,
@@ -37,6 +44,9 @@ export function createSide(species: Species, scale?: StatScale): SideState {
     exhausted: false,
     staggered: false,
     momentum: 0,
+    // Conditional spread: when not armed, the field is ABSENT (not `false`),
+    // so the object is identical to the pre-jumpstart shape → bit-identical.
+    ...(opts?.jumpstartArmed ? { jumpstartArmed: true } : {}),
   };
 }
 

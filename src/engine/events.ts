@@ -37,6 +37,10 @@ export type BattleEvent =
   | { readonly kind: 'counter'; readonly side: Side; readonly damage: number }
   | { readonly kind: 'staggered'; readonly side: Side }
   | { readonly kind: 'momentum'; readonly side: Side; readonly total: number }
+  // The bond jumpstart fired: an armed mon's first read-win this battle
+  // banked an extra ★ (the momentum event carries the new total; this marks
+  // WHY). Emitted only for an armed side — never present in legacy/sim runs.
+  | { readonly kind: 'bondJumpstart'; readonly side: Side }
   | {
       readonly kind: 'stamina';
       readonly side: Side;

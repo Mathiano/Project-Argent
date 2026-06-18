@@ -50,6 +50,12 @@ export interface SideState {
   readonly exhausted: boolean;
   readonly staggered: boolean;
   readonly momentum: number;
+  // Generic "jumpstart" flag: when armed, this mon's FIRST read-win of the
+  // battle grants one EXTRA ★ (then disarms). The engine is bond-agnostic —
+  // it only knows the flag; the GAME arms it for a sufficiently-bonded mon
+  // (bond-track-v2.md Call-tier I "Familiar"). Omitted (undefined) on every
+  // legacy/sim side, so the field is absent → behaviour is bit-identical.
+  readonly jumpstartArmed?: boolean;
 }
 
 // A side's roster. The active mon is members[active]; the rest are bench.

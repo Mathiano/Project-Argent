@@ -92,9 +92,22 @@ function initiative(
 }
 
 function gainMomentum(side: SideState, sideKey: Side, events: BattleEvent[]): SideState {
-  if (side.momentum >= COMBAT.momentumCap) return side;
-  const total = side.momentum + 1;
+  const jump = side.jumpstartArmed === true;
+  if (side.momentum >= COMBAT.momentumCap) {
+    // Already at cap: a normal read-win is inert. A jumpstart still "fires"
+    // (it's a once-per-battle perk) but the free ★ can't bank — disarm it
+    // so it doesn't linger to a later read-win.
+    return jump ? { ...side, jumpstartArmed: false } : side;
+  }
+  // Jumpstart (game arms it for a Familiar-tier mon): the FIRST read-win
+  // banks one EXTRA ★ on top of the normal one, capped. Then it disarms.
+  const bonus = jump ? 1 : 0;
+  const total = Math.min(COMBAT.momentumCap, side.momentum + 1 + bonus);
   events.push({ kind: 'momentum', side: sideKey, total });
+  if (jump) {
+    events.push({ kind: 'bondJumpstart', side: sideKey });
+    return { ...side, momentum: total, jumpstartArmed: false };
+  }
   return { ...side, momentum: total };
 }
 

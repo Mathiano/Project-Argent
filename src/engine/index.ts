@@ -26,6 +26,7 @@ export {
   validateActionTeam,
   activeMon,
 } from './state';
+export type { SideOpts } from './state';
 export {
   loadSpeciesAt,
   loadDex,
