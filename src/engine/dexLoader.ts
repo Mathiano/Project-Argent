@@ -19,7 +19,19 @@ export interface DexEntryJson {
   readonly archetype: string;
   readonly rarity: string;
   readonly statFlavor: string;
-  readonly learnset: ReadonlyArray<{ readonly move: string; readonly level: number }>;
+  // `level` gates the base moveset (developmental band). `bondTier` is
+  // RESERVED for bond-gated moves (a line's signature / coverage move
+  // unlocked by bond stage, not level — bond-track-v2.md Track A). Optional
+  // + schema-ready ONLY: loadSpeciesAt does NOT yet consult it (the move
+  // pipeline + the stage→move wiring are the deferred follow-up), so adding
+  // it to a few dex rows now changes no behaviour. 1–7 = the bond stage; an
+  // entry with bondTier set should carry a sentinel level (e.g. 99) so the
+  // level filter never surfaces it before the bond wiring exists.
+  readonly learnset: ReadonlyArray<{
+    readonly move: string;
+    readonly level: number;
+    readonly bondTier?: number;
+  }>;
   readonly evoLine?: { readonly evolvesTo?: string; readonly at?: number } | null;
   readonly dexEntry?: string;
   readonly spriteBrief?: string;

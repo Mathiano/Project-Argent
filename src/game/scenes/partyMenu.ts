@@ -23,6 +23,7 @@
 import { TIERS, lookupMove } from '../../engine';
 import type { SideState } from '../../engine';
 import { bondStageName } from '../catching';
+import { stageProgress } from '../bond';
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
@@ -318,9 +319,30 @@ export function createPartyMenuScene(opts: PartyMenuOpts): Scene {
     drawText(ctx, 'BOND', LIST_PANEL.x + 200, LIST_PANEL.y + 80, PALETTE.paperShadow);
     const bondVal = opts.bond?.[index] ?? 0;
     drawText(ctx, `★ ${bondStageName(bondVal)}`, LIST_PANEL.x + 200, LIST_PANEL.y + 92, PALETTE.star);
+    // Sense of progress WITHIN the stage — five pips filling toward the next
+    // named stage (the relationship deepening), NOT a 0–100 grind-bar. At the
+    // top stage the pips read full. (bond-track-v2 display model: B4.)
+    drawBondPips(ctx, LIST_PANEL.x + 200, LIST_PANEL.y + 102, bondVal);
     const ready = opts.readiness?.(index) ?? null;
     if (ready) {
-      drawText(ctx, ready, LIST_PANEL.x + 200, LIST_PANEL.y + 104, PALETTE.hpOk);
+      drawText(ctx, ready, LIST_PANEL.x + 200, LIST_PANEL.y + 114, PALETTE.hpOk);
     }
   }
+}
+
+// Five pips showing progress WITHIN the current bond stage (deepening toward
+// the next named stage). Filled pips = star glyphs in the star colour; empty
+// = a dim dot. Deliberately coarse (5 steps) so it reads as "growing closer,"
+// never as a precise percentage. (B4 — relationship, not a number.)
+const BOND_PIPS = 5;
+function drawBondPips(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  bondValue: number,
+): void {
+  const filled = Math.round(stageProgress(bondValue) * BOND_PIPS);
+  let glyphs = '';
+  for (let i = 0; i < BOND_PIPS; i += 1) glyphs += i < filled ? '★' : '·';
+  drawText(ctx, glyphs, x, y, PALETTE.star);
 }

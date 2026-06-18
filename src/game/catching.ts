@@ -169,21 +169,21 @@ export function refusalHint(
   return lines[i] ?? lines[0]!;
 }
 
-// ---- Interim bond (S7) ---------------------------------------------------
+// ---- Bond value + display (the persisted state) --------------------------
 
-// Minimal per-mon bond value, 0..100. Quality-earned only (read-wins,
-// boss clears) — never farming. The full Phase-8 system layers on later;
-// for now it just exists + persists so Path 2 + (6b) evolution can read it.
+// Per-mon bond value, 0..100 (hidden; surfaced only as named stages below).
+// Horizontal — never a stat. The GROWTH model (how this value rises:
+// challenge-scaled, renewable, with the widening-tier curve) lives in
+// bond.ts per bond-track-v2.md + bond-growth-refinement.md. This module
+// owns the value range + the display mapping; Path 2 + (6b) evolution +
+// the party-menu meter read it.
 export const BOND_MIN = 0;
 export const BOND_MAX = 100;
 export const BOND_START_CAUGHT = 5; // a freshly-caught/joined mon
 export const BOND_START_STARTER = 10; // your starter begins a little warmer
 
-// Quality bumps. A normal win nudges the active mon; a boss win is worth
-// more. No participation/time XP — only meaningful outcomes.
-export const BOND_BUMP_WIN = 3;
-export const BOND_BUMP_BOSS = 10;
-
+// Clamp helper for the value range (used by tests + any direct adjustment).
+// Normal in-game growth goes through bond.ts's applyBondXp, not this.
 export function bumpBond(bond: number, amount: number): number {
   return Math.max(BOND_MIN, Math.min(BOND_MAX, bond + amount));
 }

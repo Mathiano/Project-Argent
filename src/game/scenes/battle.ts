@@ -667,6 +667,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       pushLog(`★ Momentum +1 (${ev.total}).`);
       return;
     }
+    if (ev.kind === 'bondJumpstart') {
+      // B5 — the bond jumpstart fired: a Familiar-tier mon's first read-win
+      // banked a free ★. A subtle in-battle cue so the player FEELS the bond
+      // do something (the momentum event already moved the ★ readout).
+      const who = ev.side === 'player' ? activeMon(state.player).species.name : 'Foe';
+      pushLog(`${who}'s bond sparks — a free ★!`);
+      return;
+    }
     if (ev.kind === 'winded') {
       pushLog(`${ev.side === 'player' ? activeMon(state.player).species.name : 'Foe'} is winded — heavy moves locked.`);
       return;

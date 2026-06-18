@@ -51,13 +51,10 @@ import { bagAdd, bagByPocket, bagConsume, ITEMS } from './items';
 import type { BagEntry } from './items';
 import { STARTING_MONEY, awardMoney, buyItem, sellItem } from './economy';
 import {
-  BOND_BUMP_BOSS,
-  BOND_BUMP_WIN,
   BOND_START_CAUGHT,
   BOND_START_STARTER,
   CATCH_RARITY,
   bondBonus,
-  bumpBond,
   catchChance,
   rollCatch,
   rollWillingJoin,
@@ -65,6 +62,13 @@ import {
   willingJoinChance,
 } from './catching';
 import type { CatchWindow, CatchOrigin } from './catching';
+import {
+  applyBondXp,
+  bondXp,
+  hasJumpstart,
+  powerIndex,
+} from './bond';
+import type { FightKind } from './bond';
 import { askResponse, evolutionReadiness, evolutionReady } from './evolution';
 import { createEvolutionScene } from './scenes/evolution';
 import {
@@ -276,7 +280,17 @@ function buildPlayerTeam(): ReturnType<typeof createTeam> {
   // run.party between battles. HP carries through (the persistent resource
   // — healed at Centers/potions); STAMINA resets to full at battle start
   // (firstroad-fixes S1). freshBattleSide owns that contract (tested).
-  const fresh = run.party.map(freshBattleSide);
+  // Arm the bond jumpstart (B5) per mon: a Familiar-tier mon's first read-
+  // win this battle banks a free ★. Read-economy only — the engine applies
+  // it; bond never touches stats. Each mon's own bond decides (index-
+  // aligned with run.partyBond), so a bonded mon keeps the perk after a
+  // switch. freshBattleSide already cleared round-local flags.
+  const fresh = run.party.map((mon, i) => {
+    const side = freshBattleSide(mon);
+    return hasJumpstart(run.partyBond[i] ?? 0)
+      ? { ...side, jumpstartArmed: true }
+      : side;
+  });
   return createTeam(fresh);
 }
 
@@ -349,9 +363,35 @@ function addCaughtMon(species: Species, origin: CatchOrigin): void {
   }
   markCaught(run.dex, species.name); // Phase 6.5 — dex CAUGHT on add
 }
-// Bump the lead mon's bond on a quality win (no participation XP).
-function bumpLeadBond(amount: number): void {
-  if (run.partyBond.length > 0) run.partyBond[0] = bumpBond(run.partyBond[0]!, amount);
+// Award the lead mon's bond on a win — CHALLENGE-SCALED, never flat (the
+// anti-grind firewall: a fight that didn't test THIS mon yields ~nothing;
+// a real trainer/near-power fight is meaningful; a boss is the big bonus).
+// `foe` is the species (wild) or Team (trainer/boss) that was faced; the
+// toughest member sets the challenge. `finalState` gives the lead's
+// surviving HP fraction (the clutch signal). Bond is horizontal — this
+// only moves the bond value, never a stat.
+function awardBondForFight(
+  foe: Species | ReturnType<typeof createTeam>,
+  kind: FightKind,
+  finalState: BattleState,
+): void {
+  if (run.partyBond.length === 0 || run.party.length === 0) return;
+  const monPower = powerIndex(run.party[0]!.species);
+  const foePower = foeChallengePower(foe);
+  // members[0] preserves party order across switches; it's the bonding mon.
+  const lead = finalState.player.members[0];
+  const hpFrac = lead ? lead.hp / Math.max(1, lead.maxHp) : 1;
+  const xp = bondXp({ monPower, foePower, kind, hpFracRemaining: hpFrac });
+  run.partyBond[0] = applyBondXp(run.partyBond[0]!, xp);
+}
+
+// The challenge yardstick: the power of the TOUGHEST foe the mon faced (a
+// single wild species, or the hardest mon on a trainer/boss team).
+function foeChallengePower(foe: Species | ReturnType<typeof createTeam>): number {
+  if ('members' in foe) {
+    return Math.max(...foe.members.map((m) => powerIndex(m.species)));
+  }
+  return powerIndex(foe);
 }
 
 // ---- Phase 6b — evolution (bond-gated, boss-capped) ----------------------
@@ -1395,7 +1435,7 @@ function pushWildEncounter(foeSpeciesName: string): void {
           blackout();
           return;
         }
-        bumpLeadBond(BOND_BUMP_WIN); // Phase 6a — a quality win deepens bond
+        awardBondForFight(foe, 'wild', finalState); // challenge-scaled (firewall: trivial→~0)
         recomputeSignpostFlags();
         // Demo-complete S4 (design intent, build in Phase 8 with the
         // bond system): the first Trainer Call should unlock from an
@@ -1472,7 +1512,7 @@ function pushTrainerFight(
           return;
         }
         flagStore.set(winFlag);
-        bumpLeadBond(BOND_BUMP_WIN); // Phase 6a — a real fight deepens bond
+        awardBondForFight(foeTeam, 'trainer', finalState); // trainers weighted above wilds
         // Phase 5b — trainer payout (game-layer; engine untouched).
         // Wild wins never reach here (trainers-only, anti-grind).
         if (reward && reward > 0) run.money = awardMoney(run.money, reward);
@@ -1534,7 +1574,7 @@ function pushFalknerBattle(): void {
         if (winner === 'player') {
           flagStore.set('falkner_beaten');
           run.catchBreathUnlocked = true;
-          bumpLeadBond(BOND_BUMP_BOSS); // Phase 6a — a boss clear deepens bond most
+          awardBondForFight(team, 'boss', finalState); // boss clear = the big bonus
           // Demo-complete S1: award the ZEPHYR badge + a real payoff
           // beat, then return to the gym. awardBadge autosaves; the
           // pop after the fanfare lands the player back on the rooftop.
