@@ -404,3 +404,30 @@ describe('Phase 1 — bench indicators + engine team-wipe contract', () => {
     expect(activeMon(next).hp).toBe(1);
   });
 });
+
+describe('legibility — ★/Call economy reads (bond-feel-polish #1-3)', () => {
+  test('CALL row states the reason inline: unlocked but no ★ → "needs ★"; the ★=0 hint shows', () => {
+    const scene = buildScene({
+      playerParty: [createSide(CH1.GRUBLEAF!)],
+      foeParty: [createSide(CH1.FLITPECK!)],
+      catchBreathUnlocked: true, // Call available, but the mon starts at 0 ★
+    });
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    expect(screen).toContain('CALL — needs ★'); // why it's unavailable, inline
+    expect(screen).toContain('win a read to charge ★'); // the 0-★ micro-hint
+    expect(screen.includes('MOM')).toBe(true); // the ★ pips are labelled
+  });
+
+  test('CALL row reads "locked" when Calls are not yet unlocked', () => {
+    const scene = buildScene({
+      playerParty: [createSide(CH1.GRUBLEAF!)],
+      foeParty: [createSide(CH1.FLITPECK!)],
+      catchBreathUnlocked: false,
+    });
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('CALL — locked');
+  });
+});

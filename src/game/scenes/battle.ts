@@ -151,6 +151,14 @@ function opposite(side: Side): Side {
   return side === 'player' ? 'foe' : 'player';
 }
 
+// The ★ credit a read-win carries — appended to the COUNTER/OPENING/DODGE/
+// CLASH callout so the player SEES that winning a read charges momentum, and
+// (crucially) that LOSING a read charges the FOE's ★. This is the cause/
+// effect the playtest couldn't read ("I couldn't tell I was losing reads").
+function starTag(winner: Side): string {
+  return winner === 'player' ? '  (+★ you!)' : '  (+★ foe)';
+}
+
 function computeInit(side: SideState, moveName: string | null, stance: Stance): number {
   if (moveName === null) return -1;
   const tier = lookupMove(moveName).tier;
@@ -619,7 +627,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       animSide = ev.winner;
       animT = 0.3;
       if (ev.winner === 'player') pendingReadWindow = true; // read window
-      pushLog(`CLASH! ${ev.winner === 'player' ? activeMon(state.player).species.name : 'Foe'} broke through.`);
+      const cw = ev.winner === 'player' ? activeMon(state.player).species.name : 'Foe';
+      calloutLine = `CLASH! ${cw} broke through.${starTag(ev.winner)}`;
+      pushLog(`CLASH! ${cw} broke through.`);
       return;
     }
     if (ev.kind === 'strike') {
@@ -648,7 +658,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // S1 — FLUID dodged an Aggressive strike because it was faster.
       const who = ev.side === 'player' ? display.player.species.name : 'Foe ' + display.foe.species.name;
       if (ev.side === 'player') pendingReadWindow = true; // read window
-      calloutLine = stanceCallout({ kind: 'dodge' });
+      calloutLine = (stanceCallout({ kind: 'dodge' }) ?? 'DODGE!') + starTag(ev.side);
       pushLog(`DODGE! ${who}'s FLUID was faster.`);
       animSide = ev.side;
       animKind = 'dodge';
@@ -661,7 +671,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       display[def].hp = Math.max(0, display[def].hp - ev.damage);
       emitGameEvent({ kind: 'hit-landed', side: ev.side, effectiveness: ev.effectiveness });
       if (ev.side === 'player') pendingReadWindow = true; // read window (the cleanest catch opener)
-      calloutLine = stanceCallout({ kind: 'opening' });
+      calloutLine = (stanceCallout({ kind: 'opening' }) ?? 'OPENING!') + starTag(ev.side);
       pushLog('OPENING! FLUID slips past GUARD.');
       animSide = ev.side;
       animKind = 'opening';
@@ -675,7 +685,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       emitGameEvent({ kind: 'hit-landed', side: ev.side, effectiveness: 1 });
       const who = ev.side === 'player' ? display.player.species.name : 'Foe';
       if (ev.side === 'player') pendingReadWindow = true; // read window
-      calloutLine = stanceCallout({ kind: 'counter' });
+      calloutLine = (stanceCallout({ kind: 'counter' }) ?? 'COUNTER!') + starTag(ev.side);
       pushLog(`COUNTER! ${who}'s GUARD turns it back.`);
       animSide = ev.side;
       animKind = 'counter';
@@ -1302,6 +1312,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawText(ctx, display.player.species.name, PL_PANEL.x + 8, PL_PANEL.y + 6);
     if (display.player.staggered) drawText(ctx, 'STAG', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
     if (display.player.exhausted) drawText(ctx, 'EXH', PL_PANEL.x + 108, PL_PANEL.y + 6, PALETTE.hpCrit);
+    // Label the ★ pips so the player knows what they are (legibility #1).
+    // Skipped while EXH occupies the same slot — momentum is moot then.
+    else drawText(ctx, 'MOM', PL_PANEL.x + 110, PL_PANEL.y + 6, PALETTE.paperShadow);
     drawMomentum(ctx, PL_PANEL.x + 132, PL_PANEL.y + 6, display.player.momentum, COMBAT.momentumCap);
 
     drawText(ctx, 'HP', PL_PANEL.x + 8, PL_PANEL.y + 18, PALETTE.paperShadow);
@@ -1412,7 +1425,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       fight: 'FIGHT',
       pkmn: 'PKMN',
       catch: opts.canCatch ? `BALL x${opts.ballCount?.() ?? 0}` : 'BALL -',
-      call: opts.catchBreathUnlocked ? `CALL ★${me.momentum}` : 'CALL -',
+      // Legibility #3 — the CALL row states WHY it's unavailable inline:
+      // not unlocked yet, or unlocked but not enough ★ to spend.
+      call: !opts.catchBreathUnlocked
+        ? 'CALL — locked'
+        : me.momentum < 1
+          ? 'CALL — needs ★'
+          : `CALL ★${me.momentum}`,
       run: opts.canRun ? 'RUN' : 'STAY',
     };
     const items = menuItems();
@@ -1434,6 +1453,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       );
     });
     drawText(ctx, `R${state.round}`, BOTTOM.x + BOTTOM.w - 28, BOTTOM.y + 10, PALETTE.paperDim);
+    // Legibility #2 — when the player has no ★, teach what charges it (the
+    // cause/effect the callouts now also show: win a read → +★).
+    if (me.momentum === 0) {
+      drawText(ctx, 'win a read to charge ★', BOTTOM.x + 120, BOTTOM.y + 6, PALETTE.paperDim);
+    }
     drawText(
       ctx,
       'A confirm  B back',
