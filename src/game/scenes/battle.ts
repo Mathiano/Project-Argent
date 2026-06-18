@@ -478,6 +478,18 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     );
     const forced = forcedAction(activeMon(state.player));
     if (forced) {
+      // EXHAUSTED / softlock: the player CAN'T input this round. Explain WHY
+      // before the forced rest auto-resolves (Mathias: "I could do nothing,
+      // no idea what's happening"), so a skipped turn reads as a mechanic,
+      // not a frozen game. The EXH panel tag stays up as the indicator.
+      if (forced.kind === 'rest') {
+        const me = activeMon(state.player);
+        const line = me.exhausted
+          ? `${me.species.name} is EXHAUSTED — it must recover stamina before it can act!`
+          : `${me.species.name} has no stamina for a move — it must catch its breath.`;
+        setText([line], () => commit(forced));
+        return;
+      }
       commit(forced);
       return;
     }
@@ -693,7 +705,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
     if (ev.kind === 'exhausted') {
       display[ev.side].exhausted = true;
-      pushLog(`${ev.side === 'player' ? activeMon(state.player).species.name : 'Foe'} is exhausted!`);
+      const who = ev.side === 'player' ? activeMon(state.player).species.name : 'Foe';
+      // Name the mechanic, not just the state: it's out of stamina and must
+      // spend a turn recovering before it can act (the EXH tag shows it's
+      // still in effect).
+      pushLog(`${who} is EXHAUSTED — out of stamina, must recover before acting!`);
       return;
     }
     if (ev.kind === 'breakProgress') {

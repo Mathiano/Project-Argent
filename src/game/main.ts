@@ -1507,7 +1507,7 @@ function pushTrainerFight(
       // but post-demo they should get distinct AI so they fight like
       // people, not wild mons (a per-trainer policy, like the boss cards).
       chooseFoeAction: (s, r) => wildFoeAI(s, r),
-      intro: ['Gym trainer sent out', `${leadName}!`, 'Show your read!'],
+      intro: ['Gym trainer sent out', `${leadName}!`],
       catchBreathUnlocked: run.catchBreathUnlocked,
       canRun: false,
       onResolve: (winner, finalState, participants) => {

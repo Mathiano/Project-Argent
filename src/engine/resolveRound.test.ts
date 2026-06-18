@@ -452,6 +452,49 @@ describe('injected type chart (A1)', () => {
   });
 });
 
+describe('stance-mismatch penalty symmetry — player == foe (C1)', () => {
+  // Identical species both sides + a constant RNG (every draw 0.5), so any
+  // difference between the player's and foe's outcome IS a side-asymmetry.
+  // For each mismatched stance pair, run it and its MIRROR (stances swapped
+  // between the sides); the sp-stance mon must take the same damage whether
+  // it's the player or the foe. This is the read-war integrity guarantee.
+  const stances = ['A', 'G', 'F'] as const;
+  function mirror(sp: 'A' | 'G' | 'F', sf: 'A' | 'G' | 'F') {
+    const base = () => createBattleState(createSide(SPECIES.SPROUTLE!), createSide(SPECIES.SPROUTLE!));
+    const start = pl(base()).hp;
+    const r = resolveRound(
+      base(),
+      { kind: 'move', move: 'TACKLE', stance: sp },
+      { kind: 'move', move: 'TACKLE', stance: sf },
+      fixedRng([0.5]),
+    );
+    const m = resolveRound(
+      base(),
+      { kind: 'move', move: 'TACKLE', stance: sf },
+      { kind: 'move', move: 'TACKLE', stance: sp },
+      fixedRng([0.5]),
+    );
+    return {
+      rPlayerLoss: start - pl(r.state).hp,
+      rFoeLoss: start - fo(r.state).hp,
+      mPlayerLoss: start - pl(m.state).hp,
+      mFoeLoss: start - fo(m.state).hp,
+    };
+  }
+  for (const sp of stances) {
+    for (const sf of stances) {
+      if (sp === sf) continue;
+      test(`player ${sp} vs foe ${sf} is the mirror of foe ${sp} vs player ${sf}`, () => {
+        const o = mirror(sp, sf);
+        // The sp-stance mon takes the same hit as player (run r) and as foe (run m).
+        expect(o.rPlayerLoss).toBeCloseTo(o.mFoeLoss, 6);
+        // The sf-stance mon likewise.
+        expect(o.rFoeLoss).toBeCloseTo(o.mPlayerLoss, 6);
+      });
+    }
+  }
+});
+
 describe('determinism', () => {
   test('two runs with the same seed produce identical results', () => {
     const a = resolveRound(
