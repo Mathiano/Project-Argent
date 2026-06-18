@@ -14,6 +14,9 @@ export interface SideSpec {
   readonly archetype: BotArchetype;
   readonly species: string;
   readonly scale?: StatScale;
+  // Arm the bond jumpstart on this side (B5 ≤3% ladder gate). Default off →
+  // createSide produces the legacy SideState shape → bit-identical ladders.
+  readonly jumpstart?: boolean;
 }
 
 export interface MatchSpec {
@@ -36,8 +39,16 @@ export interface MatchResult {
 export function runMatch(spec: MatchSpec, rng: RNG): MatchResult {
   const maxRounds = spec.maxRounds ?? 200;
   let state: BattleState = createBattleState(
-    createSide(SPECIES[spec.player.species]!, spec.player.scale),
-    createSide(SPECIES[spec.foe.species]!, spec.foe.scale),
+    createSide(
+      SPECIES[spec.player.species]!,
+      spec.player.scale,
+      spec.player.jumpstart ? { jumpstartArmed: true } : undefined,
+    ),
+    createSide(
+      SPECIES[spec.foe.species]!,
+      spec.foe.scale,
+      spec.foe.jumpstart ? { jumpstartArmed: true } : undefined,
+    ),
   );
   let pExh = false;
   let fExh = false;
