@@ -73,6 +73,16 @@ stat-bump path anywhere in the bond code.
 - Confirm bond is ADDITIVE; engine math untouched; ladders move only by
   the intended ★-nudge, within 3%.
 
+## CONTEXT — the renewable high-tier source (NOT a build item)
+The renewable high-tier bond source for late/strong mons is the **Practice
+Arena** — a scaling-challenge facility in a later-game city (per
+`bond-growth-refinement.md`). It builds LATER (endgame content); the
+bond-core sprint just builds the challenge-scaled GROWTH MECHANIC the Arena
+will feed. The sim's renewable-fuel proof stands in for it now (proving a
+fresh under-leveled mon CAN earn bond from appropriate fights — the Arena
+is where that's *guaranteed* at any level later). Don't build the Arena
+now; just know it's the eventual high-tier source.
+
 ## DEFERRED (follow-up, NOT now)
 Full Call-economy deepening (★ cap 2→3, 2nd Call slot, signature-Call
 discount); Resolve/status-clear (needs status system); bond-gated
