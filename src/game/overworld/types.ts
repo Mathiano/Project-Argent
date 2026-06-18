@@ -111,6 +111,14 @@ export type MapObject =
       // placeholder (the element type). Art never blocks gameplay.
       readonly sprite?: string;
       readonly spriteType?: string;
+      // Trainer LINE-OF-SIGHT (F2). When `sightRange` is set, this NPC is a
+      // sight-trainer: it watches straight ahead along `facing` for that many
+      // tiles (blocked by solids/other NPCs). When the player steps into the
+      // line, the trainer walks up and forces its `interact` battle — once
+      // (the battle's winFlag, reused as blockedUntilFlag, prevents re-fight).
+      // Absent on every existing NPC, so behaviour is unchanged.
+      readonly facing?: Facing;
+      readonly sightRange?: number;
     }
   | {
       readonly type: 'gust_pulse';

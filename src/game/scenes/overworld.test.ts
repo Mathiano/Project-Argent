@@ -489,3 +489,56 @@ describe('Phase 5a fix — encounter rolls only on real moves + post-battle grac
     expect(encounters).toBe(1);
   });
 });
+
+describe('trainer line-of-sight (F2) — GYM gauntlet', () => {
+  // Helper: build the GYM scene with the first trainer pre-beaten so the
+  // player can walk straight up column 7 past it, with a recording
+  // onTrainerBattle. `preBeaten` lets a test mark a sight-trainer already
+  // defeated to prove it is NOT re-triggered.
+  function gymScene(preBeaten: string[] = []) {
+    const input = mockInput();
+    const flags = mockFlags();
+    flags.set('gym_trainer_beaten'); // clear the blocking talk-trainer at (7,12)
+    for (const f of preBeaten) flags.set(f);
+    const calls: Array<{ winFlag: string }> = [];
+    const scene = createOverworldScene({
+      map: 'GYM',
+      spawn: 'fromRoute', // (7,14) facing up
+      inputState: input,
+      flags,
+      onWarp: () => {},
+      onEncounter: () => {},
+      onTrainerBattle: (_foe, winFlag) => {
+        calls.push({ winFlag });
+      },
+      onBossBattle: () => {},
+    });
+    return { scene, input, calls };
+  }
+
+  test('walking into a trainer’s sight line forces its battle (unskippable)', () => {
+    const { scene, input, calls } = gymScene();
+    // Up column 7: 14 -> 13 -> 12 (beaten, passable) -> 11 -> 10. The
+    // BIRDKEEPER at (1,10) facing right watches the whole row.
+    walkOne(scene, input, 'up'); // (7,13)
+    walkOne(scene, input, 'up'); // (7,12)
+    walkOne(scene, input, 'up'); // (7,11)
+    walkOne(scene, input, 'up'); // (7,10) — steps into the sight line
+    // Let the alert + walk-up cutscene play out, then the dialog opens.
+    tickStep(scene, 2.5);
+    expect(calls.length).toBe(0); // battle hasn't fired — dialog is up first
+    scene.input?.('a'); // dismiss the trainer's dialog → battle fires
+    expect(calls.map((c) => c.winFlag)).toContain('gym_trainer_2_beaten');
+  });
+
+  test('an already-defeated sight-trainer does NOT re-trigger', () => {
+    const { scene, input, calls } = gymScene(['gym_trainer_2_beaten']);
+    walkOne(scene, input, 'up'); // (7,13)
+    walkOne(scene, input, 'up'); // (7,12)
+    walkOne(scene, input, 'up'); // (7,11)
+    walkOne(scene, input, 'up'); // (7,10) — in the (beaten) trainer's row
+    tickStep(scene, 2.5);
+    scene.input?.('a');
+    expect(calls.some((c) => c.winFlag === 'gym_trainer_2_beaten')).toBe(false);
+  });
+});

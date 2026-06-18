@@ -138,6 +138,87 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
   // just landed back on.
   let skipNextEncounter = false;
 
+  // Trainer line-of-sight cutscene (F2). Non-null while a sighted trainer
+  // walks up to force its battle; freezes player input/movement until it
+  // fires. `x/y` is the trainer's animated tile, `px/py` the previous tile
+  // (for the lerp), `t` the 0..1 step progress, `stopX/Y` the tile adjacent
+  // to the player where it halts. `alertT` holds the "!" beat first.
+  const SIGHT_ALERT_SEC = 0.5;
+  type NpcObj = Extract<MapObject, { type: 'npc' }>;
+  let approach:
+    | {
+        npc: NpcObj;
+        x: number;
+        y: number;
+        px: number;
+        py: number;
+        t: number;
+        stepDir: Facing;
+        stopX: number;
+        stopY: number;
+        alertT: number;
+      }
+    | null = null;
+
+  // Scan for a sight-trainer whose straight-ahead line (along its facing,
+  // unobstructed by solids/other NPCs) lands on the player's tile. Returns
+  // the trainer + the tile it should stop on (adjacent to the player).
+  function trainerSightingAt(playerX: number, playerY: number): {
+    npc: NpcObj;
+    stepDir: Facing;
+    stopX: number;
+    stopY: number;
+  } | null {
+    for (const obj of map.objects) {
+      if (obj.type !== 'npc') continue;
+      if (obj.sightRange === undefined || obj.facing === undefined) continue;
+      // Already defeated → its winFlag (reused as blockedUntilFlag) is set.
+      if (obj.blockedUntilFlag && opts.flags.has(obj.blockedUntilFlag)) continue;
+      const { dx, dy } = facingDelta(obj.facing);
+      for (let step = 1; step <= obj.sightRange; step += 1) {
+        const sx = obj.x + dx * step;
+        const sy = obj.y + dy * step;
+        if (!isWalkable(map, sx, sy)) break; // a wall blocks the sight line
+        if (sx === playerX && sy === playerY) {
+          return { npc: obj, stepDir: obj.facing, stopX: obj.x + dx * (step - 1), stopY: obj.y + dy * (step - 1) };
+        }
+        if (npcAt(sx, sy)) break; // another NPC blocks the line of sight
+      }
+    }
+    return null;
+  }
+
+  function updateApproach(dt: number): void {
+    if (!approach) return;
+    if (approach.alertT > 0) {
+      approach.alertT -= dt;
+      return;
+    }
+    const atStop = approach.x === approach.stopX && approach.y === approach.stopY;
+    if (atStop && approach.t >= 1) {
+      // Arrived — fire the trainer's battle script (dialog + battle). Clear
+      // approach FIRST so the resumed scene (after the battle) isn't mid-cutscene.
+      const npc = approach.npc;
+      approach = null;
+      scriptQueue = [...npc.interact];
+      runNextCommand();
+      return;
+    }
+    approach.t += dt / MOVE_DURATION;
+    if (approach.t >= 1) {
+      if (atStop) {
+        approach.t = 1; // halt; fire next tick
+      } else {
+        const { dx, dy } = facingDelta(approach.stepDir);
+        approach.px = approach.x;
+        approach.py = approach.y;
+        approach.x += dx;
+        approach.y += dy;
+        approach.t = 0;
+      }
+    }
+  }
+
   function openDialog(lines: readonly string[]): void {
     dialogLines = [...lines];
     dialogPage = 0;
@@ -421,6 +502,26 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
       return;
     }
 
+    // Trainer line-of-sight (F2): a watching trainer caught the player in
+    // its sight line → walk up and force the battle (takes priority over a
+    // wild encounter on this tile).
+    const sighting = trainerSightingAt(tx, ty);
+    if (sighting) {
+      approach = {
+        npc: sighting.npc,
+        x: sighting.npc.x,
+        y: sighting.npc.y,
+        px: sighting.npc.x,
+        py: sighting.npc.y,
+        t: 1,
+        stepDir: sighting.stepDir,
+        stopX: sighting.stopX,
+        stopY: sighting.stopY,
+        alertT: SIGHT_ALERT_SEC,
+      };
+      return;
+    }
+
     const zone = findObjectAt(map, tx, ty, 'encounter_zone') as
       | Extract<MapObject, { type: 'encounter_zone' }>
       | null;
@@ -502,6 +603,13 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         }
       }
 
+      // Trainer line-of-sight cutscene takes over: the trainer walks up and
+      // fires its battle. Player movement/input is frozen until it resolves.
+      if (approach && fadePhase === 'normal') {
+        updateApproach(dt);
+        return;
+      }
+
       if (moving) {
         moveT += dt / MOVE_DURATION;
         if (moveT >= 1) {
@@ -518,6 +626,9 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         if (key === 'a' || key === 'b' || key === 'start') advanceDialog();
         return;
       }
+      // Frozen during a trainer's line-of-sight approach — no input until the
+      // forced battle fires.
+      if (approach) return;
       if (fadePhase !== 'normal') return;
       if (key === 'start' && opts.onPauseMenu) {
         // Phase 4: START opens the pause menu when wired. No-op when
@@ -562,7 +673,22 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         drawTiles(ctx, map, rows, camX, camY);
       }
       const gustState = drawGustOverlay(ctx, map, camX, camY, tick);
-      drawObjectMarkers(ctx, map, camX, camY, opts.flags, tick);
+      drawObjectMarkers(ctx, map, camX, camY, opts.flags, tick, approach?.npc);
+      // The trainer walking up on sight: draw at its animated tile + an "!".
+      if (approach) {
+        const ts = map.tilesize;
+        const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+        const ax = lerp(approach.px, approach.x, approach.t) * ts - camX;
+        const ay = lerp(approach.py, approach.y, approach.t) * ts - camY;
+        ctx.fillStyle = approach.npc.color ?? '#d22f2f';
+        ctx.fillRect(ax + 3, ay + 3, ts - 6, ts - 6);
+        ctx.strokeStyle = '#1d1d28';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(ax + 3.5, ay + 3.5, ts - 7, ts - 7);
+        if (approach.alertT > 0) {
+          drawText(ctx, '!', ax + ts / 2 - 1, ay - 7, PALETTE.hpCrit);
+        }
+      }
       // Walk phase: idle (0) when standing; otherwise the current stride
       // foot lifts for the middle 60% of the move and lands flat at the
       // ends, so steps "land" visually instead of hovering.
@@ -790,9 +916,11 @@ function drawObjectMarkers(
   camY: number,
   flags: FlagStore,
   tick: number,
+  skipNpc?: MapObject,
 ): void {
   const ts = map.tilesize;
   for (const obj of map.objects) {
+    if (skipNpc && obj === skipNpc) continue; // drawn separately (mid-approach)
     if (obj.type === 'sign') {
       ctx.fillStyle = '#ffd700';
       ctx.fillRect(obj.x * ts - camX + ts / 2 - 1, obj.y * ts - camY + 2, 2, 4);

@@ -466,6 +466,33 @@ function driveBattleToWin(h: Harness): void {
   }
 }
 
+// Walk to (tx,ty) RESOLVING any line-of-sight trainer battles that
+// interrupt the climb — the gym is now a gauntlet (F2). When a sight-
+// trainer freezes movement (the player can't step), let the walk-up
+// cutscene + dialog play, dismiss it to fire the forced battle, and win.
+function climbResolvingTrainers(h: Harness, tx: number, ty: number): void {
+  for (let i = 0; i < 80; i += 1) {
+    if (h.top() === 'battle') {
+      driveBattleToWin(h);
+      continue;
+    }
+    const p = h.overworld().currentPosition();
+    if (p.x === tx && p.y === ty) return;
+    const dir = bfsNext(getMap(p.map), h.flags, p.x, p.y, tx, ty);
+    if (dir === null) return;
+    step(h, dir);
+    const after = h.overworld().currentPosition();
+    if (after.x === p.x && after.y === p.y && h.top() !== 'battle') {
+      // Didn't move and not yet in battle → a sight-trainer froze us mid-
+      // approach. Let the cutscene + dialog finish, dismiss → forced battle.
+      h.tick(80, 0.03);
+      h.press('a');
+      h.tick(8);
+      if (h.top() === 'battle') driveBattleToWin(h);
+    }
+  }
+}
+
 describe('DEMO-COMPLETE GATE — cold spine intro → Violet → gym → Falkner → badge (one continuous run)', () => {
   beforeEach(() => {
     // Pin the Route 31 grass: Math.random() ≥ rate → no wild encounter
@@ -530,8 +557,13 @@ describe('DEMO-COMPLETE GATE — cold spine intro → Violet → gym → Falkner
     expect(h.top()).toBe('overworld');
 
     // Climb to Falkner: stand at (6,3), the leader is on the throne at
-    // (6,2). walkTo re-attempts through the rooftop gust lanes.
-    walkTo(h, 6, 3);
+    // (6,2). The rooftop is now a GAUNTLET — three line-of-sight trainers
+    // (F2) watch the rows the player must cross; climbResolvingTrainers
+    // fights each forced battle on the way up.
+    climbResolvingTrainers(h, 6, 3);
+    expect(h.flags.has('gym_trainer_2_beaten')).toBe(true);
+    expect(h.flags.has('gym_trainer_3_beaten')).toBe(true);
+    expect(h.flags.has('gym_trainer_4_beaten')).toBe(true);
     expect(h.overworld().currentPosition()).toMatchObject({ x: 6, y: 3 });
     face(h, 'up');
     h.press('a'); // interact → Falkner dialog

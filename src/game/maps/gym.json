@@ -54,6 +54,77 @@
     },
     {
       "type": "npc",
+      "x": 1,
+      "y": 10,
+      "color": "#3a7fbe",
+      "facing": "right",
+      "sightRange": 13,
+      "blockedUntilFlag": "gym_trainer_2_beaten",
+      "interact": [
+        { "kind": "dialog", "lines": [
+          "BIRDKEEPER: My eyes don't",
+          "miss! Up here, neither",
+          "does the wind."
+        ]},
+        { "kind": "start-trainer-battle", "foeSpecies": ["FLITPECK", "GALEHAWK"], "winFlag": "gym_trainer_2_beaten", "reward": 900 }
+      ],
+      "interactAfterFlag": [
+        { "kind": "dialog", "lines": [
+          "BIRDKEEPER: Sharp reads.",
+          "Falkner will test them",
+          "harder."
+        ]}
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 14,
+      "y": 7,
+      "color": "#2f9e6b",
+      "facing": "left",
+      "sightRange": 13,
+      "blockedUntilFlag": "gym_trainer_3_beaten",
+      "interact": [
+        { "kind": "dialog", "lines": [
+          "FLEDGLING: You walked",
+          "into my line! No turning",
+          "back now."
+        ]},
+        { "kind": "start-trainer-battle", "foeSpecies": ["GALEHAWK"], "winFlag": "gym_trainer_3_beaten", "reward": 950 }
+      ],
+      "interactAfterFlag": [
+        { "kind": "dialog", "lines": [
+          "FLEDGLING: One bird, one",
+          "lesson. The rooftop's",
+          "yours to climb."
+        ]}
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 1,
+      "y": 4,
+      "color": "#8a5fb0",
+      "facing": "right",
+      "sightRange": 13,
+      "blockedUntilFlag": "gym_trainer_4_beaten",
+      "interact": [
+        { "kind": "dialog", "lines": [
+          "ACE: Last gate before",
+          "Falkner. Two on the",
+          "wing — read them both!"
+        ]},
+        { "kind": "start-trainer-battle", "foeSpecies": ["GALEHAWK", "FLITPECK"], "winFlag": "gym_trainer_4_beaten", "reward": 1000 }
+      ],
+      "interactAfterFlag": [
+        { "kind": "dialog", "lines": [
+          "ACE: You're ready.",
+          "Falkner is just ahead."
+        ]}
+      ]
+    },
+    {
+      "type": "npc",
       "x": 6,
       "y": 2,
       "color": "#c2491a",
