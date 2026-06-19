@@ -9,6 +9,8 @@ GBC-style monster battler: Pokémon Silver reimagined with Combat 2.0 (stances, 
 
 - `project-argent-scope.md` — vision, pillars, feature tiers
 - `combat-2-0-spec.md` — combat rules + the Whitney boss card (the boss-card template)
+- `combat-enrichment-roadmap.md` — the combat depth layers (base triangle → two-step → environments → info-warfare → trainer profiles)
+- `combat-focus-redesign.md` + `combat-focus-AS-BUILT.md` — the CURRENT two-step model (FOCUS: R1 generic focus → R2 hidden release, rotation triangle). The AS-BUILT doc is the code-truth (live config knobs). Supersedes the distinct-wind-up CHARGE/HIDE/FEINT design.
 - `content-progression-scope.md` — 40h plan, full boss ladder, read-rate ramp
 - `argent-demo.html` — reference implementation of the combat engine (POC)
 

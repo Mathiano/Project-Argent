@@ -50,6 +50,11 @@ Dex content is commissioned from Gemini against `docs/mon-manifest.csv` (200 pre
 | `CLAUDE.md` | Constitution: constants, architecture law, sim gate |
 | `docs/project-argent-scope.md` | Vision and pillars |
 | `docs/combat-2-0-spec.md` | Combat rules (v0.3.2) + Whitney boss-card template |
+| **`docs/combat-enrichment-roadmap.md`** | The combat depth layers (1: base triangle; 2: two-step/FOCUS; 3: environments; 3.5: info-warfare; 4: trainer profiles) |
+| **`docs/combat-focus-redesign.md`** | The FOCUS two-step DESIGN (R1 generic focus → R2 hidden release, rotation triangle) — current two-step model |
+| **`docs/combat-focus-AS-BUILT.md`** | The FOCUS model AS IMPLEMENTED (code-truth: live config knobs, events, sim result) |
+| **`docs/combat-system-candidates-decision.md`** | Decision record: B (distinct wind-ups) vs Focus vs Candidate C |
+| **`docs/combat-depth-types-status.md`** | The 17-type mechanical identities + combat depth status |
 | `docs/content-progression-scope.md` | 42-hour plan, boss ladder, read-rate ramp |
 | `docs/pilot-exit-decisions.md` | Art direction, dex pipeline, overworld architecture |
 | `docs/feature-ambition-scope.md` | Feature map with tiers; anti-scope |

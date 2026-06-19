@@ -59,8 +59,9 @@ export const COMBAT = {
 // ── Combat FOCUS model (docs/combat-focus-redesign.md) ─────────────────────
 // R1 = a generic Focus (release hidden); R2 = a chosen release resolving via
 // the rotation triangle. SIM-GATED (src/sim/focusBalance.test.ts): the FOCUS
-// COST is the master balance lever (~1.1 — too high → focus not worth it; too
-// low → focus-spam creeps up). Tuned 2026-06-19; do not tweak casually.
+// COST is the master balance lever (design sweet spot ~1.0–1.2; tuned to 1.0
+// here — too high → focus not worth it; too low → focus-spam creeps up). See
+// docs/combat-focus-AS-BUILT.md. Tuned 2026-06-19; do not tweak casually.
 export const FOCUS = {
   // R1 FOCUS COST (master knob): the focuser DEALS 0 and TAKES the opponent's
   // single-step strike ×this — the guaranteed cost of gathering energy.

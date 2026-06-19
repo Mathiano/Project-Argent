@@ -18,8 +18,6 @@
 
 ## LAYER 1 — the base triangle (the essential fix, build FIRST)
 
-> **✅ BUILT 2026-06-19** (KICKOFF-combat-layer1-triangle.md). Engine: Aggressive PUNISHES Fluid (was the dodge), Fluid acts-first-vs-non-Fluid but loses the exchange, the ★-award flips with the edge, thrice-repeat self-daze. Sim-gated (src/sim/stanceBalance.test.ts): **PureFLUID 99.7%→25.5%** (now the WORST spam), Balanced on top (71%), spread 97pp→46pp, every stance used. Both archetype ladders re-baselined (intended). Two-steps (Layer 2) NOT built.
-
 **AGGRESSIVE > FLUID > GUARD > AGGRESSIVE** (hard counters).
 
 - **AGGRESSIVE beats FLUID** — aggression catches the dodger when they commit; the evasive get cornered. (This is the dominance fix. Thematically: Fluid is about slipping past Guard, so it's exposed to direct aggression.)
@@ -34,11 +32,13 @@
 
 This single layer (just the rebalanced triangle + Fluid-acts-first + thrice-daze) is the **essential, must-build fix.** Monte Carlo proves it breaks Fluid dominance. NO new mechanics required — it's a tuning/rule change to the existing stance system. **Build and verify this FIRST, before any enrichment.**
 
-> **Verified (mirror test, 2026-06-18):** the stance penalty is already symmetric for player and foe; asymmetric OUTCOMES come from different triangle edges (Guard counters Aggressive with mitigation+reflect; Guard loses to Fluid via a full-damage opening with no counter), not a side bug. The gap is LEGIBILITY, not math.
+> **BUILD DEPENDENCY — momentum-★ award follows the win-triangle (do NOT miss this).** The momentum-★ on each exchange is awarded to whoever WINS the read. So flipping the Aggressive/Fluid edge (Fluid-beats-Aggressive → Aggressive-beats-Fluid) MUST ALSO flip the ★ award on that edge: after Layer 1, an Aggressive-vs-Fluid exchange is an *Aggressive* win, so the **Aggressive player gets the ★, not the Fluid dodger.** The damage-result and the momentum-award are two expressions of the same "who won the read" — they flip TOGETHER. (Pre-Layer-1, the Fluid dodger correctly gets the ★ because Fluid currently beats Aggressive; this is consistent NOW and only flips when the edge does.) If the damage flips but the ★ award doesn't, you get an incoherent state — Aggressive wins the hit but Fluid still charges ★. Verify both flip in lockstep; the DODGE/COUNTER/OPENING/CLASH "(+★ you/foe)" callout must reflect the new winner.
 
 ---
 
 ## LAYER 2 — two-step plays (the depth layer, build AFTER layer 1 is sound)
+
+> **⚠️ SUPERSEDED — the two-step layer is being REBUILT to the FOCUS model (see docs/combat-focus-redesign.md).** The "distinct visible wind-ups" design described below was BUILT (shipped Layer 2) and sim-balanced, but it has the "guess 2 turns out" readability problem: the wind-up telegraphs WHICH release is coming, so the opponent pre-counters a turn early. The adopted replacement (the FOCUS model, sim-validated, ~10pp spread, Adaptive tops) makes R1 a SHARED generic "gathering energy" wind-up and R2 a player-selected HIDDEN release (Heavy/Feint/Hide) resolved via a rotation triangle — converting the hard 2-turn prediction into a clean 1-turn round-2 read. The base triangle (Layer 1), the both-escalate FLIP, and the Call escapes are PRESERVED. The Candidate C "Focus as a 4th stance" variant was explored and ARCHIVED (sim showed it over-punishes focus / promotes defensive play). **For the current two-step design, read combat-focus-redesign.md; the section below is retained as the prior (superseded) design for reference.**
 
 Each base stance has a **two-step**: a 2-round commitment with a setup (phase 1) and a payoff (phase 2).
 - **CHARGE** (Aggressive+) — wind up a big hit; phase-2 PUSHES THROUGH GUARD (brace can't block it).
@@ -65,6 +65,14 @@ Logic: single-step rewards *aggression* (commitment beats evasion); two-step rew
 
 ### Escaping a committed enemy two-step = CALL only, not a stance
 The ONLY way out of a committed enemy CHARGE is a Call (★-powered): "GET AWAY" (guaranteed no-hit/dodge) or "HANG IN THERE" (can't die this round). Not a stance. This makes the ★ economy genuinely clutch (saved for "they charged, I'm caught, spend ★ to survive").
+
+### Momentum-★ on two-steps (the award rule for the two-step layer)
+★ goes to whoever WON A READ — and a two-step only counts as a "read" when matched against ANOTHER two-step:
+- **Two-step vs two-step** → a genuine MUTUAL read (both escalated; the flipped triangle Hide>Charge>Feint resolves who read better). The flipped-triangle WINNER gets ★. ✓
+- **Single-step PUNISHES a two-step's phase-1** → the SINGLE-STEPPER read the wind-up and capitalized = a read-win for THEM → they get the ★ (consistent with the base triangle). ✓
+- **Two-step "survives" a non-punishing single-step** → NOBODY gets ★. It was a phase-1 GAMBLE (survive/punished), not a read — surviving a gamble isn't out-reading anyone. ✓
+
+So two-stepping is NOT a reliable momentum source — you only earn ★ from a two-step when you out-read another two-stepper (the flipped triangle), or when you (as a single-stepper) punish someone's exposed wind-up. This keeps ★ tied to genuine reads, not to commitment-gambling. (Build with Layer 2; the rule follows the same "★ = won a read" principle as Layer 1.)
 
 ---
 
@@ -101,6 +109,30 @@ Each environment TILTS the triangle AND biases opponent behavior. Two effects:
 
 ---
 
+## LAYER 3.5 — INFORMATION WARFARE (the bluff/hidden-info progression axis)
+
+A third axis of depth, alongside the base triangle and the two-steps: **what the player can SEE.** Difficulty scales not by adding mechanics but by progressively REMOVING information — forcing the player to read behavior/tells instead of explicit readouts. Leak-free difficulty: same system, less spoon-feeding.
+
+### Momentum-★ is HIDDEN information (the foundational case)
+- **YOUR own ★/momentum:** visible + clearly LABELED (you know your own resources).
+- **The FOE's ★/momentum:** HIDDEN. You do NOT see how much momentum the opponent has banked.
+- **Why:** this creates the emotional spike — "do they have ★? can they Call right now? are they about to unleash something?" Not knowing if the foe can escape-Call a committed Charge, or unleash a banked resource, makes every exchange a BLUFF read. The Call economy becomes a bluff layer, not just a resource meter.
+- **Consistency with the read-war:** foe INTENT stays visible (that's the core read — the skill is reacting to it). But resource-STATE (momentum) is hidden — you see what you READ, not what they HOARD. Intent = shown (the read); momentum = hidden (the bluff).
+
+### Information visibility as a PROGRESSION CURVE
+Early game (tutorial → first gym): lots shown — INTENT, BASE SPD, your own ★ — the game TEACHES the read. **After the first gym and beyond, opponents progressively HIDE information:**
+- A skilled trainer doesn't telegraph intent clearly (vaguer/no tells).
+- Conceals momentum, bluffs a Call threat they can't afford (or hides one they can).
+- Later/elite opponents may hide intent entirely — forcing the player to read PATTERNS and BEHAVIOR, not readouts.
+So the read-war DEEPENS by removing the training wheels — the same combat, progressively less explicit. This is a difficulty axis with NO new mechanics (leak-cap-safe).
+
+### Connections
+- **The Concord:** their augmented/manufactured-loyalty mons are the MASTERS of information denial — cold, unreadable, no tells. Makes them feel genuinely threatening (you can't read a machine-loyal mon the way you read a bonded one — thematic AND mechanical).
+- **Trainer variety (Layer 4):** WHAT information a trainer hides becomes part of their identity, alongside HOW they play. A leader who hides momentum is a different read than one who shows it.
+- **Build note:** the foundational piece (hide foe ★, label own ★) ships with the ★/Call economy. The PROGRESSION (opponents hiding more post-gym-1) is a per-trainer/per-chapter dial layered on as content builds — part of trainer-strategy authoring.
+
+---
+
 ## LAYER 4 — trainer-strategy variety (the biggest depth-per-effort, ongoing)
 The SAME system feels infinitely varied when opponents PLAY DIFFERENTLY: an aggressive trainer charges a lot (bait their commitment); a defensive one braces + feints; a tricky one (Concord/Trickster-user) hides + ambushes. Trainer *style* becomes part of trainer identity — you read not just their stance but their TENDENCIES (informed by their character + their terrain). This is why anime battles feel rich: every opponent THINKS differently. Cheapest, highest-impact depth — zero new mechanics, just varied AI policies. (Risk 5 in the risks doc — the trainer-AI build.)
 
@@ -113,7 +145,7 @@ Calls are ★-powered OVERRIDES that FORCE outcomes the stance-read wouldn't giv
 
 ## BUILD ORDER (essential first, depth layered, each playtested)
 1. **Layer 1 — the base triangle fix** (AGG>FLUID>GUARD + Fluid-acts-first + thrice-daze). ESSENTIAL. Sim-proven to break Fluid dominance. No new mechanics. Build + verify FIRST.
-2. **Layer 2 — two-steps** (Charge/Hide/Feint, simultaneous, flipped triangle, soft counters, phase-1 vulnerability TUNED HARSH, Call-only escape). The depth layer. Build on the sound base; verify two-step-spam sits below balanced play.
+2. **Layer 2 — two-steps (the FOCUS model — see combat-focus-redesign.md)** — R1 shared "gathering energy" Focus (focuser pays the focus cost), R2 player-selected HIDDEN release (Heavy/Feint/Hide) via the rotation triangle (Heavy>Brace, Feint>Agg, Hide>Fluid); both-focus = flipped triangle; Call escapes preserved. Sim-validated (~10pp spread, Adaptive tops, FOCUS_COST~1.1 the master knob). The depth layer; verify focus-spam sits below balanced play. (Replaces the superseded "distinct visible wind-ups" version.)
 3. **Layer 3 — environments** (mechanical tilts + the meta-read / terrain-biased opponent policies). Ties to the world.
 4. **Layer 4 — trainer-strategy variety** (ongoing — varied AI policies per trainer/character/terrain). The cheapest richest depth.
 
