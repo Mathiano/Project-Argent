@@ -58,7 +58,7 @@ Dex content is commissioned from Gemini against `docs/mon-manifest.csv` (200 pre
 | `docs/content-progression-scope.md` | 42-hour plan, boss ladder, read-rate ramp |
 | `docs/pilot-exit-decisions.md` | Art direction, dex pipeline, overworld architecture |
 | `docs/feature-ambition-scope.md` | Feature map with tiers; anti-scope |
-| `docs/chapter-1-dex.md` | Schema, types, catching params, style bible (species sections superseded) |
+| `docs/type-chart.md` + `docs/catching-2-0.md` + `docs/mon-design-template.md` | Type chart, catching params, dex/species schema + style bible (replaces the old `chapter-1-dex.md`) |
 | `docs/mon-manifest.csv` + `docs/mon-commission-kit.md` | The 200-slot commission system |
 | `docs/sim-archetypes.md` | Canonical bots + rival AI + design debt |
 | `docs/falkner-boss-card.md` | v2 — Falkner gym kit on the new ace + starters |
