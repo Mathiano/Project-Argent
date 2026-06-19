@@ -18,6 +18,8 @@
 
 ## LAYER 1 — the base triangle (the essential fix, build FIRST)
 
+> **✅ BUILT 2026-06-19** (KICKOFF-combat-layer1-triangle.md). Engine: Aggressive PUNISHES Fluid (was the dodge), Fluid acts-first-vs-non-Fluid but loses the exchange, the ★-award flips with the edge, thrice-repeat self-daze. Sim-gated (src/sim/stanceBalance.test.ts): **PureFLUID 99.7%→25.5%** (now the WORST spam), Balanced on top (71%), spread 97pp→46pp, every stance used. Both archetype ladders re-baselined (intended). Two-steps (Layer 2) NOT built.
+
 **AGGRESSIVE > FLUID > GUARD > AGGRESSIVE** (hard counters).
 
 - **AGGRESSIVE beats FLUID** — aggression catches the dodger when they commit; the evasive get cornered. (This is the dominance fix. Thematically: Fluid is about slipping past Guard, so it's exposed to direct aggression.)

@@ -20,13 +20,16 @@ When code and docs conflict: **docs win**. Flag conflicts; never silently change
 - Winded ≤25: heavy/nuke locked. Exhausted at ≤0: forced rest round (+25), takes ×1.25 that round
 - Softlock guard: if no move is affordable → forced rest round
 - Stances: Aggressive ×1.25 dealt / ×1.15 taken; Guard ×0.75 dealt / ×0.60 taken; Fluid neutral
+- TRIANGLE (Combat Layer 1, 2026-06-19): **AGGRESSIVE > FLUID > GUARD > AGGRESSIVE** (hard counters; combat-enrichment-roadmap.md)
 - Guard vs Aggressive: counter = 0.5× reflect (pre-mitigation damage) + stagger (next-round initiative ×0.5), only if defender survives the hit
-- Fluid vs Guard: opening = ×1.15 through ×0.85 guard, Fluid side acts first, no counter
-- Aggressive vs Fluid: defender dodge p = clamp((spdDef/spdAtk − 1) × 2, 0, 0.9)
+- Fluid vs Guard: opening = ×1.15 through ×0.85 guard, no counter
+- Aggressive vs Fluid: **PUNISH** = the aggressor catches the dodger for ×1.35 (punishMult) and charges ★ (was a Fluid dodge — flipped in Layer 1; the ★-award follows the win-edge)
+- Fluid = INITIATIVE not safety: a Fluid move ACTS FIRST vs any non-Fluid stance (even when slower); both-Fluid → faster first; it gets its hit in but loses the exchange to Aggressive
 - Aggressive vs Aggressive: clash — p(win) ∝ stamina × speed; loser whiffs and is staggered
+- Thrice-repeat self-daze: the same move stance 3 rounds running → the repeater takes ×1.30 (dazeTaken) that round (anti-spam; symmetric)
 - Tier weights (move): light 0.85 / mid 1.00 / heavy 1.15 / nuke 1.30
 - Initiative: speed / move weight; stagger halves it
-- ★ Momentum: +1 on read-wins (counter landed, opening landed, dodge succeeded, clash won), cap 2. Calls spend ★ (Catch Breath = rest action, +35 ST)
+- ★ Momentum: +1 on read-wins (counter landed, opening landed, **punish landed (A>F)**, clash won), cap 2. Calls spend ★ (Catch Breath = rest action, +35 ST)
 
 ## Architecture rules
 
