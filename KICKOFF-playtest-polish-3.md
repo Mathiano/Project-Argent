@@ -34,8 +34,29 @@ NOTE: foundation of a broader information-warfare layer (combat-enrichment-
 roadmap.md, Layer 3.5) — opponents hide more post-gym-1. For now: hide foe ★,
 label own ★. Also make momentum vs bond visually distinct if confusable.
 
+## FIX 4 — two-step OUTCOME legibility (callouts)
+Playtest: the two-step layer FEELS great but its outcomes aren't clear — the
+player can't tell what happens when (a) the foe attacks during their charge
+wind-up, (b) a Charge hits a one-stepping Guard, (c) a Feint hits a one-stepper
+who didn't take the bait. The MECHANICS are correct; they're just invisible
+(compounded by the too-fast text — Fix 2). Add clear outcome callouts (held as
+consequential beats per Fix 2's click-wall):
+- Charge release vs Guard → "CHARGE PIERCES THE BRACE!"
+- Wind-up punished by a reading single-step → "WIND-UP PUNISHED — [mon] was
+  caught charging!"
+- Wind-up NOT punished (survived) → "[mon] finishes charging!" (then the big
+  release beat).
+- Feint vs a defensive reaction → "FEINT! [foe] took the bait — DAZED!"
+- Feint vs a non-defensive one-stepper (whiffed) → "FEINT WHIFFED — [foe]
+  didn't bite" (and the feinter is exposed).
+- Flipped-triangle resolution (both two-step) → name the winner clearly
+  ("HIDE slips the CHARGE!" etc.).
+The player should be able to READ every two-step outcome. Same legibility theme
+as EXH/stance-edges/★ — the math is right, surface it.
+
 ## GATE
 JAY stays at his walked-up position through dialogue+battle (no snap-back);
 battle text readable (~35-40 cps + click-wall on faints/KOs/key beats, routine
-auto-flows); foe ★ hidden, own ★ clearly labeled, foe intent still shown.
-Existing tests green; bit-identical near combat.
+auto-flows); foe ★ hidden, own ★ clearly labeled, foe intent still shown; every
+two-step outcome reads via a clear held callout (pierce/punished/survived/daze/
+whiff/flip). Existing tests green; bit-identical near combat.
