@@ -19,7 +19,9 @@ import type {
   Species,
   Stance,
   Team,
+  TwoStep,
 } from '../../engine';
+import { twoStepForStance } from '../../engine';
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
@@ -133,6 +135,10 @@ interface DisplaySide {
   // per-round verdict from history) — set by the `dazed` event, cleared at
   // each roundStart, shown as a panel tag so the player sees the effect.
   dazed: boolean;
+  // Layer 2 — the two-step this mon is WINDING UP (phase 1), shown as a HUD tag
+  // so the wind-up is VISIBLE (the foe must see it to soft-counter; the player
+  // reads it). Set by `windUp`, cleared by `release`; persists across roundStart.
+  winding: TwoStep | null;
   species: Species;
 }
 
@@ -150,6 +156,7 @@ function snapshot(side: SideState): DisplaySide {
     exhausted: side.exhausted,
     staggered: side.staggered,
     dazed: false,
+    winding: side.winding?.step ?? null,
     species: side.species,
   };
 }
@@ -157,6 +164,10 @@ function snapshot(side: SideState): DisplaySide {
 function opposite(side: Side): Side {
   return side === 'player' ? 'foe' : 'player';
 }
+
+// Layer 2 — short panel tags for a winding (phase-1) mon, so the wind-up is
+// visible on the HUD (the foe must see it to soft-counter; the player reads it).
+const WIND_TAG: { readonly [k in TwoStep]: string } = { charge: 'CHRG', hide: 'HIDE', feint: 'FEINT' };
 
 // The ★ credit a read-win carries — appended to the COUNTER/OPENING/DODGE/
 // CLASH callout so the player SEES that winning a read charges momentum, and
@@ -263,6 +274,9 @@ function foeActionLine(action: Action, name: string): { stance: Stance | null; l
   if (action.kind === 'catchBreath') return { stance: null, line: `${name} is recovering` };
   if (action.kind === 'switch') return { stance: null, line: `${name} is switching` };
   if (action.kind === 'throwBall') return { stance: null, line: `${name} readies a ball` };
+  if (action.kind === 'call') return { stance: null, line: `${name} calls out` };
+  // Layer 2 — a committing move still telegraphs its base stance (the wind-up
+  // is visible); intent reads off that stance like any move.
   return { stance: action.stance, line: `${name} ${stanceIntentVerb(action.stance)}` };
 }
 
@@ -329,11 +343,14 @@ export interface CallDef {
 }
 export const CALL_SET: readonly CallDef[] = [
   { id: 'catch-breath', name: 'Catch Breath', starCost: 1, built: true, shout: '{MON}, catch your breath!' },
+  // Layer 2 — the two Calls that ESCAPE a committed enemy Charge (the only way
+  // out, never a stance): GET AWAY = guaranteed no-hit; HANG IN THERE = can't
+  // die this round. Both spend 1 ★ and forgo the strike.
+  { id: 'get-away', name: 'Get Away', starCost: 1, built: true, shout: '{MON}, get away!' },
+  { id: 'hang-in', name: 'Hang In There', starCost: 1, built: true, shout: '{MON}, hang in there!' },
   { id: 'recover', name: 'Recover', starCost: 1, built: false, shout: '{MON}, shake it off!' },
   { id: 'dodge', name: 'Dodge', starCost: 1, built: false, shout: '{MON}, dodge it!' },
-  { id: 'hang-on', name: 'Hang On', starCost: 1, built: false, shout: '{MON}, hang on!' },
   { id: 'full-power', name: 'Full Power', starCost: 2, built: false, shout: 'Now — {MON}, full power!' },
-  { id: 'get-back', name: 'Get Back', starCost: 1, built: false, shout: '{MON}, get back!' },
 ];
 
 export function callShout(call: CallDef, monName: string): string {
@@ -425,6 +442,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   const MOVES_VISIBLE = 5;
   let moveScroll = 0;
   let stanceIdx = 0;
+  // Layer 2 — when true, confirming a move INITIATES its two-step (the
+  // commit-modifier): the current stance picks which (A→CHARGE, F→HIDE,
+  // G→FEINT). Toggled with ←/→ in the move menu; reset each time it opens.
+  let committing = false;
   let callCursor = 0;
   let tick = 0;
 
@@ -510,6 +531,16 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       commit(forced);
       return;
     }
+    const me = activeMon(state.player);
+    if (me.winding !== undefined) {
+      // Layer 2 — LOCKED into the release of a committed two-step; the player
+      // can't re-pick. Explain, then auto-resolve (the engine forces the
+      // release; the passed action is ignored for a winding mon).
+      setText([`${me.species.name} releases its ${me.winding.step.toUpperCase()}!`], () =>
+        commit({ kind: 'move', move: me.winding!.move, stance: STANCES[stanceIdx]! }),
+      );
+      return;
+    }
     phase = 'menu';
     menuCursor = 0;
   }
@@ -546,6 +577,12 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (ev.kind === 'dodge') return true;
     if (ev.kind === 'punish') return true; // A>F read-win — a damage beat to read
     if (ev.kind === 'dazed') return true; // pause so the player reads the daze + its effect
+    // Layer 2 — each two-step beat holds so the player reads the commitment.
+    if (ev.kind === 'windUp') return true;
+    if (ev.kind === 'release') return true;
+    if (ev.kind === 'phase1Punish') return true;
+    if (ev.kind === 'flipResolve') return true;
+    if (ev.kind === 'call') return true;
     if (ev.kind === 'opening') return true;
     if (ev.kind === 'counter') return true;
     if (ev.kind === 'clash') return true;
@@ -612,6 +649,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         pushLog(`${who}: catch your breath!`);
       } else if (ev.action.kind === 'throwBall') {
         pushLog('You hurled a ball!');
+      } else if (ev.action.kind === 'twoStep' || ev.action.kind === 'call') {
+        // Layer 2 — the dedicated windUp/release/call events carry the text;
+        // the commit announce stays quiet for these so it doesn't double up.
       } else if (ev.side === 'foe' && ev.action.kind === 'move') {
         // Resolution confirmation (the teaching loop, all tiers): name the
         // foe's committed STANCE *and* MOVE in plain language so the player
@@ -704,6 +744,80 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       animSide = ev.side;
       animKind = 'strike';
       animT = 0.25;
+      return;
+    }
+    if (ev.kind === 'windUp') {
+      // Layer 2 — a two-step WIND-UP (phase 1). Make it VISIBLE: a HUD tag + a
+      // callout so the foe could soft-counter it and the player reads the tell.
+      display[ev.side].winding = ev.step;
+      const who = ev.side === 'player' ? display.player.species.name : 'Foe ' + display.foe.species.name;
+      const label = ev.step.toUpperCase();
+      calloutLine = `${who} winds up — ${label}!`;
+      pushLog(`${who} commits to a ${label} — winding up (exposed)!`);
+      animSide = ev.side;
+      animKind = 'strike';
+      animT = 0.2;
+      return;
+    }
+    if (ev.kind === 'release') {
+      // Layer 2 — phase 2 lands. ev.damage is the ACTUAL applied amount (0 if a
+      // Call negated it). Clear the wind-up tag.
+      const def = opposite(ev.side);
+      display[def].hp = Math.max(0, display[def].hp - ev.damage);
+      display[ev.side].winding = null;
+      emitGameEvent({ kind: 'hit-landed', side: ev.side, effectiveness: ev.effectiveness });
+      if (ev.side === 'player') pendingReadWindow = true;
+      const label = ev.step.toUpperCase();
+      const extra = ev.pierced
+        ? ' — pierces GUARD!'
+        : ev.concealed
+          ? ' — from concealment!'
+          : ev.step === 'feint'
+            ? ' — punishes the brace!'
+            : '!';
+      calloutLine = `${label} RELEASE${extra}`;
+      pushLog(`${label} releases${extra}`);
+      animSide = ev.side;
+      animKind = 'strike';
+      animT = 0.25;
+      return;
+    }
+    if (ev.kind === 'phase1Punish') {
+      // Layer 2 — a single-step READ the wind-up (the punisher earns ★ via a
+      // separate momentum event). The winder (def) takes the punish.
+      const def = opposite(ev.side);
+      display[def].hp = Math.max(0, display[def].hp - ev.damage);
+      emitGameEvent({ kind: 'hit-landed', side: ev.side, effectiveness: 1 });
+      if (ev.side === 'player') pendingReadWindow = true;
+      const who = ev.side === 'player' ? display.player.species.name : 'Foe';
+      calloutLine = `READ! ${who} catches the ${ev.step.toUpperCase()} wind-up!` + starTag(ev.side);
+      pushLog(`PUNISH! The ${ev.step.toUpperCase()} wind-up was read.`);
+      animSide = ev.side;
+      animKind = 'strike';
+      animT = 0.25;
+      return;
+    }
+    if (ev.kind === 'flipResolve') {
+      // Layer 2 — both released: the flipped triangle resolved (the winner's
+      // ★ arrives via a separate momentum event).
+      if (ev.winner !== null) {
+        const who = ev.winner === 'player' ? display.player.species.name : 'Foe';
+        if (ev.winner === 'player') pendingReadWindow = true;
+        calloutLine = `FLIP! ${who} reads the clash!` + starTag(ev.winner);
+        pushLog(`Both committed — ${who}'s two-step wins the exchange.`);
+      } else {
+        pushLog('Both committed — the two-steps cancel out.');
+      }
+      return;
+    }
+    if (ev.kind === 'call') {
+      // Layer 2 — a ★-Call override fired (the ★ is spent; the momentum readout
+      // updates here since no `momentum` event accompanies a Call).
+      display[ev.side].momentum = Math.max(0, display[ev.side].momentum - 1);
+      const who = ev.side === 'player' ? display.player.species.name : 'Foe';
+      const label = ev.call === 'getAway' ? 'GET AWAY' : 'HANG IN THERE';
+      calloutLine = `${label}!`;
+      pushLog(`${who}: ${label}! (★ spent)`);
       return;
     }
     if (ev.kind === 'dazed') {
@@ -974,6 +1088,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       phase = 'move';
       moveCursor = 0;
       moveScroll = 0;
+      committing = false; // the commit-modifier resets each time the menu opens
       return;
     }
     if (focus.kind === 'pkmn') {
@@ -1134,6 +1249,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     } else if (key === 'select') {
       stanceIdx = (stanceIdx + 1) % 3;
       emitGameEvent({ kind: 'stance-selected', stance: STANCES[stanceIdx]! });
+    } else if (key === 'left' || key === 'right') {
+      // Layer 2 — toggle the COMMIT modifier: confirm now initiates the
+      // current stance's two-step (CHARGE/HIDE/FEINT) instead of a single step.
+      committing = !committing;
+      emitGameEvent({ kind: 'menu-move' });
     }
     else if (key === 'b') phase = 'menu';
     else if (key === 'a' || key === 'start') {
@@ -1159,7 +1279,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         );
         return;
       }
-      commit({ kind: 'move', move: moveName, stance: STANCES[stanceIdx]! });
+      commit({ kind: 'move', move: moveName, stance: STANCES[stanceIdx]!, ...(committing ? { commit: true } : {}) });
     }
   }
 
@@ -1171,7 +1291,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // than greyed — for now they're greyed so the player sees the set.
   function callUnlocked(call: CallDef): boolean {
     if (!call.built) return false;
-    if (call.id === 'catch-breath') return opts.catchBreathUnlocked;
+    // Catch Breath + the two Layer-2 escape Calls unlock together (the run's
+    // Calls-unlocked gate); they each still cost ★ to fire.
+    if (call.id === 'catch-breath' || call.id === 'get-away' || call.id === 'hang-in') {
+      return opts.catchBreathUnlocked;
+    }
     return false;
   }
   function callAffordable(call: CallDef): boolean {
@@ -1198,6 +1322,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     const monName = activeMon(state.player).species.name;
     setText([callShout(call, monName)], () => {
       if (call.id === 'catch-breath') commit({ kind: 'catchBreath' });
+      else if (call.id === 'get-away') commit({ kind: 'call', call: 'getAway' });
+      else if (call.id === 'hang-in') commit({ kind: 'call', call: 'hangInThere' });
       else phase = 'menu';
     });
   }
@@ -1275,7 +1401,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function drawFoePanel(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, FOE_PANEL.x, FOE_PANEL.y, FOE_PANEL.w, FOE_PANEL.h);
     drawText(ctx, display.foe.species.name, FOE_PANEL.x + 8, FOE_PANEL.y + 6);
-    if (display.foe.dazed) drawText(ctx, 'DAZE', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpCrit);
+    if (display.foe.winding) drawText(ctx, WIND_TAG[display.foe.winding], FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
+    else if (display.foe.dazed) drawText(ctx, 'DAZE', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpCrit);
     else if (display.foe.staggered) drawText(ctx, 'STAG', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
     if (display.foe.exhausted) drawText(ctx, 'EXH', FOE_PANEL.x + 108, FOE_PANEL.y + 6, PALETTE.hpCrit);
     drawMomentum(ctx, FOE_PANEL.x + 132, FOE_PANEL.y + 6, display.foe.momentum, COMBAT.momentumCap);
@@ -1356,7 +1483,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function drawPlayerPanel(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, PL_PANEL.x, PL_PANEL.y, PL_PANEL.w, PL_PANEL.h);
     drawText(ctx, display.player.species.name, PL_PANEL.x + 8, PL_PANEL.y + 6);
-    if (display.player.dazed) drawText(ctx, 'DAZE', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpCrit);
+    if (display.player.winding) drawText(ctx, WIND_TAG[display.player.winding], PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
+    else if (display.player.dazed) drawText(ctx, 'DAZE', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpCrit);
     else if (display.player.staggered) drawText(ctx, 'STAG', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
     if (display.player.exhausted) drawText(ctx, 'EXH', PL_PANEL.x + 108, PL_PANEL.y + 6, PALETTE.hpCrit);
     // Label the ★ pips so the player knows what they are (legibility #1).
@@ -1564,7 +1692,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
     const stance = STANCES[stanceIdx]!;
     drawStanceBadge(ctx, BOTTOM.x + 170, BOTTOM.y + 8, stance);
-    drawText(ctx, STANCE_NAME[stance], BOTTOM.x + 182, BOTTOM.y + 8);
+    // Layer 2 — when the commit-modifier is on, the confirm initiates a
+    // two-step; show its name (and that ←/→ toggles it) so the wind-up is a
+    // deliberate, visible choice.
+    if (committing) {
+      drawText(ctx, `▶${twoStepForStance(stance).toUpperCase()}`, BOTTOM.x + 182, BOTTOM.y + 8, PALETTE.hpCrit);
+    } else {
+      drawText(ctx, STANCE_NAME[stance], BOTTOM.x + 182, BOTTOM.y + 8);
+    }
 
     // Turn-order preview — the HONEST "who acts first" for THIS move
     // (initiative = speed ÷ move weight, with the Fluid-vs-Guard override).
@@ -1591,7 +1726,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       BOTTOM.y + 22,
       fluidFirst ? PALETTE.stanceF : PALETTE.paperShadow,
     );
-    drawText(ctx, 'SEL=stance  B=back', BOTTOM.x + 170, BOTTOM.y + BOTTOM.h - 12, PALETTE.paperDim);
+    drawText(ctx, 'SEL=stance ←→=commit B=back', BOTTOM.x + 170, BOTTOM.y + BOTTOM.h - 12, PALETTE.paperDim);
   }
 
   function drawBottomCall(ctx: CanvasRenderingContext2D): void {

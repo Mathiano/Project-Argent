@@ -27,8 +27,6 @@ import type { Action, BattleState, RNG, Side, Stance, TwoStep } from '../engine'
 // An action-level policy: returns a legal Action for `side` this round.
 export type ActionPolicy = (state: BattleState, side: Side, rng: RNG) => Action;
 
-const STANCES: readonly Stance[] = ['A', 'F', 'G'];
-
 // All six measured options (3 base + 3 two-step) for usage accounting.
 export type Option = Stance | TwoStep;
 

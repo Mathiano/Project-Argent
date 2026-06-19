@@ -105,6 +105,14 @@ function applyHp(defHp: number, dmg: number, call: CallKind | null): number {
   return Math.max(0, hp);
 }
 
+// Apply damage and report the ACTUAL amount dealt (0 if a Call negated it), so
+// two-step events carry what truly landed — the game replays event.damage to
+// animate hp, and a negated Call hit must read as 0.
+function dealt(defHp: number, dmg: number, call: CallKind | null): { hp: number; applied: number } {
+  const hp = applyHp(defHp, dmg, call);
+  return { hp, applied: defHp - hp };
+}
+
 function actionStance(action: Action): Stance {
   if (action.kind === 'move') return action.stance;
   // Throwing leaves you EXPOSED — treated as Aggressive on defense so the
@@ -287,6 +295,12 @@ function paySide(
   }
   if (action.kind === 'catchBreath') {
     return { ...side, st: Math.min(100, side.st + CATCH_BREATH_RESTORE) };
+  }
+  if (action.kind === 'call') {
+    // Layer 2 — a Call spends ★ (handled in the round), no stamina change.
+    // (resolveRound never routes a call through paySide; this satisfies the
+    // type and is correct regardless.)
+    return side;
   }
   if (action.kind === 'switch') {
     // Switching is the turn — no stamina change for the side that switched.
@@ -475,8 +489,8 @@ export function resolveRound(
           else if (winner === 'foe') dd *= TWO_STEP.flipLoseMult;
           dd *= TWO_STEP.releaseIncomingMult[foeStep]; // foe's follow-through blunts the counter
           if (foe.exhausted) dd *= COMBAT.exhTaken;
-          foe = { ...foe, hp: applyHp(foe.hp, dd, foeCall) };
-          events.push({ kind: 'release', side: 'player', step: plStep, damage: dd, effectiveness: eff, ...(plStep === 'charge' ? { pierced: true } : {}), ...(plStep === 'hide' ? { concealed: true } : {}) });
+          { const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
+          events.push({ kind: 'release', side: 'player', step: plStep, damage: r.applied, effectiveness: eff, ...(plStep === 'charge' ? { pierced: true } : {}), ...(plStep === 'hide' ? { concealed: true } : {}) }); }
           if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
         } else {
           const { d, eff } = rawHit(foe, pl, foeRel, rng, state.typeChart, state.traits, rhythm);
@@ -485,8 +499,8 @@ export function resolveRound(
           else if (winner === 'player') dd *= TWO_STEP.flipLoseMult;
           dd *= TWO_STEP.releaseIncomingMult[plStep];
           if (pl.exhausted) dd *= COMBAT.exhTaken;
-          pl = { ...pl, hp: applyHp(pl.hp, dd, plCall) };
-          events.push({ kind: 'release', side: 'foe', step: foeStep, damage: dd, effectiveness: eff, ...(foeStep === 'charge' ? { pierced: true } : {}), ...(foeStep === 'hide' ? { concealed: true } : {}) });
+          { const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
+          events.push({ kind: 'release', side: 'foe', step: foeStep, damage: r.applied, effectiveness: eff, ...(foeStep === 'charge' ? { pierced: true } : {}), ...(foeStep === 'hide' ? { concealed: true } : {}) }); }
           if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
         }
       }
@@ -518,16 +532,16 @@ export function resolveRound(
           if (foeSingle && foeStanceS === 'A') dd *= COMBAT.aggrTaken;
           if (step === 'feint' && foeSingle && foeStanceS === 'G') dd *= COMBAT.dazeTaken; // FEINT punishes the brace
           if (foe.exhausted) dd *= COMBAT.exhTaken;
-          foe = { ...foe, hp: applyHp(foe.hp, dd, foeCall) };
-          events.push({ kind: 'release', side: 'player', step, damage: dd, effectiveness: eff, ...(pierce ? { pierced: true } : {}), ...(step === 'hide' ? { concealed: true } : {}) });
+          { const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
+          events.push({ kind: 'release', side: 'player', step, damage: r.applied, effectiveness: eff, ...(pierce ? { pierced: true } : {}), ...(step === 'hide' ? { concealed: true } : {}) }); }
           if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
         } else if (foeSingle && foeMoveS !== null) {
           const { d, eff } = rawHit(foe, pl, foeMoveS, rng, state.typeChart, state.traits, rhythm);
           let dd = d * stanceOutMult(foeStanceS!);
           dd *= TWO_STEP.releaseIncomingMult[step]; // releaser's follow-through blunts the counter
           if (pl.exhausted) dd *= COMBAT.exhTaken;
-          pl = { ...pl, hp: applyHp(pl.hp, dd, plCall) };
-          events.push({ kind: 'strike', side: 'foe', move: foeMoveS, damage: dd, effectiveness: eff });
+          { const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
+          events.push({ kind: 'strike', side: 'foe', move: foeMoveS, damage: r.applied, effectiveness: eff }); }
           if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
         }
       }
@@ -553,16 +567,16 @@ export function resolveRound(
           if (plSingle && plStanceS === 'A') dd *= COMBAT.aggrTaken;
           if (step === 'feint' && plSingle && plStanceS === 'G') dd *= COMBAT.dazeTaken;
           if (pl.exhausted) dd *= COMBAT.exhTaken;
-          pl = { ...pl, hp: applyHp(pl.hp, dd, plCall) };
-          events.push({ kind: 'release', side: 'foe', step, damage: dd, effectiveness: eff, ...(pierce ? { pierced: true } : {}), ...(step === 'hide' ? { concealed: true } : {}) });
+          { const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
+          events.push({ kind: 'release', side: 'foe', step, damage: r.applied, effectiveness: eff, ...(pierce ? { pierced: true } : {}), ...(step === 'hide' ? { concealed: true } : {}) }); }
           if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
         } else if (plSingle && plMoveS !== null) {
           const { d, eff } = rawHit(pl, foe, plMoveS, rng, state.typeChart, state.traits, rhythm);
           let dd = d * stanceOutMult(plStanceS!);
           dd *= TWO_STEP.releaseIncomingMult[step];
           if (foe.exhausted) dd *= COMBAT.exhTaken;
-          foe = { ...foe, hp: applyHp(foe.hp, dd, foeCall) };
-          events.push({ kind: 'strike', side: 'player', move: plMoveS, damage: dd, effectiveness: eff });
+          { const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
+          events.push({ kind: 'strike', side: 'player', move: plMoveS, damage: r.applied, effectiveness: eff }); }
           if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
         }
       }
@@ -589,12 +603,12 @@ export function resolveRound(
             dd *= TWO_STEP.phase1Vuln[tStep][plStance];
           }
           if (foe.exhausted) dd *= COMBAT.exhTaken;
-          foe = { ...foe, hp: applyHp(foe.hp, dd, foeCall) };
+          const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
           if (tStep !== null && TWO_STEP.punishedBy[tStep].includes(plStance)) {
-            events.push({ kind: 'phase1Punish', side: 'player', step: tStep, damage: dd });
+            events.push({ kind: 'phase1Punish', side: 'player', step: tStep, damage: r.applied });
             pl = gainMomentum(pl, 'player', events);
           } else {
-            events.push({ kind: 'strike', side: 'player', move: plMove!, damage: dd, effectiveness: eff });
+            events.push({ kind: 'strike', side: 'player', move: plMove!, damage: r.applied, effectiveness: eff });
           }
           if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
         } else if (sk === 'foe' && foeStrikes) {
@@ -606,12 +620,12 @@ export function resolveRound(
             dd *= TWO_STEP.phase1Vuln[tStep][foeStance];
           }
           if (pl.exhausted) dd *= COMBAT.exhTaken;
-          pl = { ...pl, hp: applyHp(pl.hp, dd, plCall) };
+          const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
           if (tStep !== null && TWO_STEP.punishedBy[tStep].includes(foeStance)) {
-            events.push({ kind: 'phase1Punish', side: 'foe', step: tStep, damage: dd });
+            events.push({ kind: 'phase1Punish', side: 'foe', step: tStep, damage: r.applied });
             foe = gainMomentum(foe, 'foe', events);
           } else {
-            events.push({ kind: 'strike', side: 'foe', move: foeMove!, damage: dd, effectiveness: eff });
+            events.push({ kind: 'strike', side: 'foe', move: foeMove!, damage: r.applied, effectiveness: eff });
           }
           if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
         }
@@ -623,16 +637,16 @@ export function resolveRound(
         const { d, eff } = rawHit(pl, foe, plMove, rng, state.typeChart, state.traits, rhythm);
         let dd = d * stanceOutMult(plStance) * TWO_STEP.windUpChipMult;
         if (foe.exhausted) dd *= COMBAT.exhTaken;
-        foe = { ...foe, hp: applyHp(foe.hp, dd, foeCall) };
-        events.push({ kind: 'strike', side: 'player', move: plMove, damage: dd, effectiveness: eff });
+        const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
+        events.push({ kind: 'strike', side: 'player', move: plMove, damage: r.applied, effectiveness: eff });
         if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
       }
       if (foeCommitting && foeMove !== null && pl.hp > 0 && foe.hp > 0) {
         const { d, eff } = rawHit(foe, pl, foeMove, rng, state.typeChart, state.traits, rhythm);
         let dd = d * stanceOutMult(foeStance) * TWO_STEP.windUpChipMult;
         if (pl.exhausted) dd *= COMBAT.exhTaken;
-        pl = { ...pl, hp: applyHp(pl.hp, dd, plCall) };
-        events.push({ kind: 'strike', side: 'foe', move: foeMove, damage: dd, effectiveness: eff });
+        const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
+        events.push({ kind: 'strike', side: 'foe', move: foeMove, damage: r.applied, effectiveness: eff });
         if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
       }
     }

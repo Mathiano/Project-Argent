@@ -678,20 +678,25 @@ describe('battle menu — CALL paths (Call-menu sprint: submenu + shout + exit)'
     expect(ctx.texts.join('|')).toContain('Catch Breath');
   });
 
-  test('design-only Calls render greyed + LOCKED (cursor skips them, stays on Catch Breath)', () => {
+  test('design-only Calls render greyed + LOCKED; the cursor skips them across the built Calls', () => {
     const { scene } = buildScene({ catchBreathUnlocked: true, playerPatch: { momentum: 1 } });
     scene.input?.('down');
-    scene.input?.('a'); // submenu
-    // DOWN repeatedly must keep the cursor on the only unlocked Call
-    // (Catch Breath) — the locked ones are skipped.
-    scene.input?.('down');
-    scene.input?.('down');
+    scene.input?.('a'); // submenu — cursor starts on Catch Breath (first built+unlocked)
     const ctx = stubCtx();
     scene.draw(ctx);
-    const screen = ctx.texts.join('|');
-    expect(screen).toContain('LOCKED'); // locked Calls labelled
-    // The cursor marker '>' sits on Catch Breath (it's drawn as "> Catch Breath...").
+    let screen = ctx.texts.join('|');
+    expect(screen).toContain('LOCKED'); // the design-only Calls (Recover/Dodge/Full Power) are labelled LOCKED
     expect(screen).toContain('>Catch Breath');
+    // DOWN steps onto the Layer-2 escape Calls (now BUILT), skipping locked rows.
+    scene.input?.('down');
+    ctx.reset();
+    scene.draw(ctx);
+    screen = ctx.texts.join('|');
+    expect(screen).toContain('>Get Away');
+    scene.input?.('down');
+    ctx.reset();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('>Hang In There');
   });
 
   test('Catch Breath resolves with a VISIBLE stamina effect (+50) — legibility (S4)', () => {
