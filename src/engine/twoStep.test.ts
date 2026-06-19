@@ -129,6 +129,37 @@ describe('phase-1 vulnerability + the L2.7 ★-award rule', () => {
     expect(fo(r.state).winding).toEqual(winding('charge')); // still winding (it survived to release)
   });
 
+  // FIX 4 — the legibility signals: a survived wind-up emits `windUpResolved`
+  // ("finishes charging"); a punished one emits `phase1Punish` instead.
+  test('a survived wind-up emits windUpResolved; a punished one does NOT', () => {
+    const survived = resolveRound(mirror(), single('G'), commit('A'), rng0()); // G doesn't read charge
+    expect(survived.events.some((e) => e.kind === 'windUpResolved' && e.side === 'foe' && e.step === 'charge')).toBe(true);
+    expect(survived.events.some((e) => e.kind === 'phase1Punish')).toBe(false);
+
+    const punished = resolveRound(mirror(), single('A'), commit('A'), rng0()); // A reads charge
+    expect(punished.events.some((e) => e.kind === 'phase1Punish')).toBe(true);
+    expect(punished.events.some((e) => e.kind === 'windUpResolved')).toBe(false);
+  });
+});
+
+describe('FIX 4 — flipResolve carries the winner/loser steps for the callout', () => {
+  test('hide vs charge → flipResolve names winnerStep=hide, loserStep=charge', () => {
+    let s = patchPlayer(mirror(), { winding: winding('hide') });
+    s = patchFoe(s, { winding: winding('charge') });
+    const r = resolveRound(s, ignored, ignored, rng0());
+    const flip = r.events.find((e) => e.kind === 'flipResolve');
+    expect(flip).toMatchObject({ kind: 'flipResolve', winner: 'player', winnerStep: 'hide', loserStep: 'charge' });
+  });
+
+  test('a mirror (charge vs charge) → no winner, no steps', () => {
+    let s = patchPlayer(mirror(), { winding: winding('charge') });
+    s = patchFoe(s, { winding: winding('charge') });
+    const r = resolveRound(s, ignored, ignored, rng0());
+    const flip = r.events.find((e) => e.kind === 'flipResolve') as { winner: unknown; winnerStep?: unknown };
+    expect(flip.winner).toBeNull();
+    expect(flip.winnerStep).toBeUndefined();
+  });
+
   test('a RELEASE vs a single-step grants NO ★ either way (phase-1 already resolved)', () => {
     const base = patchPlayer(mirror(), { winding: winding('charge') });
     const r = resolveRound(base, ignored, single('F'), rng0());

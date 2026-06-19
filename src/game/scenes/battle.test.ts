@@ -903,6 +903,35 @@ describe('battle resolve + end-text', () => {
   });
 });
 
+describe('two-step outcome callouts (playtest-polish-3 FIX 4)', () => {
+  // Collect ALL on-screen text across a resolve (incl. held beats), pressing
+  // through, until the next menu / end-text.
+  function collectResolveText(scene: ReturnType<typeof createBattleScene>): string {
+    const seen: string[] = [];
+    for (let i = 0; i < 200; i += 1) {
+      scene.update?.(0.1);
+      const c = stubCtx();
+      scene.draw(c);
+      seen.push(...c.texts);
+      if (/FIGHT|won the battle|team fell/.test(c.texts.join('|'))) break;
+      scene.input?.('a'); // advance held beats / the auto-release text
+    }
+    return seen.join('|');
+  }
+
+  test('a Charge vs a guarding foe: "finishes charging" then "PIERCES THE BRACE"', () => {
+    const { scene } = buildScene(); // foe single-steps GUARD by default
+    scene.input?.('a'); // FIGHT → move menu
+    scene.input?.('left'); // toggle the COMMIT modifier (→ two-step)
+    scene.input?.('a'); // commit CHARGE (default stance Aggressive) — round 1 wind-up
+    const text = collectResolveText(scene); // drains wind-up + auto-release round
+    // Wind-up survived a non-punishing Guard → "finishes charging".
+    expect(text).toContain('finishes charging');
+    // Release vs the brace → pierces it (the headline outcome callout).
+    expect(text).toContain('PIERCES THE BRACE');
+  });
+});
+
 describe('momentum visibility (playtest-polish-3)', () => {
   test('foe ★/momentum is HIDDEN; the player’s is labeled MOMENTUM', () => {
     const { scene } = buildScene({ playerPatch: { momentum: 2 } });

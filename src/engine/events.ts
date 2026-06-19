@@ -51,6 +51,10 @@ export type BattleEvent =
   // ── Combat Layer 2 — two-step events ──────────────────────────────────
   // A side WOUND UP a two-step (phase 1 — exposed this round).
   | { readonly kind: 'windUp'; readonly side: Side; readonly step: TwoStep }
+  // A wind-up was NOT punished — it survived phase 1 and will release next
+  // round ("finishes charging"). Only emitted for a surviving, unpunished
+  // committer; a punished one gets `phase1Punish` instead.
+  | { readonly kind: 'windUpResolved'; readonly side: Side; readonly step: TwoStep }
   // A single-step PUNISHED a wind-up's phase-1 vulnerability. `side` is the
   // PUNISHER (single-stepper) — they read the wind-up and earn ★. `damage` is
   // already amplified by the phase-1 vuln multiplier.
@@ -68,7 +72,14 @@ export type BattleEvent =
     }
   // Both sides released two-steps — the FLIPPED triangle resolved. `winner` is
   // the flipped-triangle winner (HIDE>CHARGE>FEINT>HIDE), or null on a mirror.
-  | { readonly kind: 'flipResolve'; readonly winner: Side | null }
+  // `winnerStep`/`loserStep` name the two-steps for the callout (absent on a
+  // mirror).
+  | {
+      readonly kind: 'flipResolve';
+      readonly winner: Side | null;
+      readonly winnerStep?: TwoStep;
+      readonly loserStep?: TwoStep;
+    }
   // A ★-Call override fired. `side` is the caller (spent 1 ★).
   | { readonly kind: 'call'; readonly side: Side; readonly call: CallKind }
   | { readonly kind: 'staggered'; readonly side: Side }

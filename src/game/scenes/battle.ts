@@ -570,6 +570,23 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     phase = 'resolve';
   }
 
+  // Display name for a side: the player's bare species name; the foe prefixed
+  // "Foe" (so callouts read naturally — "Foe FLITPECK took the bait").
+  const monName = (side: Side): string =>
+    side === 'player' ? display.player.species.name : `Foe ${display.foe.species.name}`;
+  // "X finishes its CHARGE" / "completes its HIDE" / "sells its FEINT".
+  const FINISH_VERB: { readonly [k in TwoStep]: string } = {
+    charge: 'finishes charging',
+    hide: 'completes its HIDE',
+    feint: 'sells the FEINT',
+  };
+  // Flipped-triangle verb for the winning two-step over the loser.
+  const FLIP_VERB: { readonly [k in TwoStep]: string } = {
+    hide: 'slips',
+    charge: 'crushes',
+    feint: 'catches',
+  };
+
   // A line is "consequential" when it carries information the player
   // needs to actually read before the round resolves: which move was
   // committed, type-effective hits, the read-vs-read events (dodge,
@@ -587,6 +604,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (ev.kind === 'dazed') return true; // pause so the player reads the daze + its effect
     // Layer 2 — each two-step beat holds so the player reads the commitment.
     if (ev.kind === 'windUp') return true;
+    if (ev.kind === 'windUpResolved') return true;
     if (ev.kind === 'release') return true;
     if (ev.kind === 'phase1Punish') return true;
     if (ev.kind === 'flipResolve') return true;
@@ -775,45 +793,63 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       display[ev.side].winding = null;
       emitGameEvent({ kind: 'hit-landed', side: ev.side, effectiveness: ev.effectiveness });
       if (ev.side === 'player') pendingReadWindow = true;
-      const label = ev.step.toUpperCase();
-      const extra = ev.pierced
-        ? ' — pierces GUARD!'
-        : ev.concealed
-          ? ' — from concealment!'
-          : ev.step === 'feint'
-            ? ' — punishes the brace!'
-            : '!';
-      calloutLine = `${label} RELEASE${extra}`;
-      pushLog(`${label} releases${extra}`);
+      // FIX 4 — name the OUTCOME by the defender's response (its committed
+      // stance, when it single-stepped; null when the foe also two-stepped).
+      const defStance = roundStance[def];
+      const defName = monName(def);
+      let line: string;
+      if (ev.step === 'charge') {
+        line = defStance === 'G' ? 'CHARGE PIERCES THE BRACE!' : 'CHARGE UNLEASHED!';
+      } else if (ev.step === 'hide') {
+        line = 'HIDE STRIKE — from concealment!';
+      } else {
+        // feint
+        line =
+          defStance === 'G'
+            ? `FEINT! ${defName} took the bait — DAZED!`
+            : defStance
+              ? `FEINT WHIFFED — ${defName} didn't bite.`
+              : 'FEINT RELEASED!';
+      }
+      calloutLine = line;
+      pushLog(line);
       animSide = ev.side;
       animKind = 'strike';
       animT = 0.25;
       return;
     }
     if (ev.kind === 'phase1Punish') {
-      // Layer 2 — a single-step READ the wind-up (the punisher earns ★ via a
-      // separate momentum event). The winder (def) takes the punish.
+      // FIX 4 — a single-step READ the wind-up. The WINDER (def) was caught
+      // mid-commit; the punisher (ev.side) earns ★ (separate momentum event).
       const def = opposite(ev.side);
       display[def].hp = Math.max(0, display[def].hp - ev.damage);
       emitGameEvent({ kind: 'hit-landed', side: ev.side, effectiveness: 1 });
       if (ev.side === 'player') pendingReadWindow = true;
-      const who = ev.side === 'player' ? display.player.species.name : 'Foe';
-      calloutLine = `READ! ${who} catches the ${ev.step.toUpperCase()} wind-up!` + starTag(ev.side);
-      pushLog(`PUNISH! The ${ev.step.toUpperCase()} wind-up was read.`);
+      const verb = ev.step === 'charge' ? 'charging' : ev.step === 'hide' ? 'hiding' : 'feinting';
+      calloutLine = `WIND-UP PUNISHED — ${monName(def)} was caught ${verb}!` + starTag(ev.side);
+      pushLog(`WIND-UP PUNISHED — ${monName(def)} was caught ${verb}!`);
       animSide = ev.side;
       animKind = 'strike';
       animT = 0.25;
       return;
     }
+    if (ev.kind === 'windUpResolved') {
+      // FIX 4 — the wind-up was NOT read; it survives to release next round.
+      const line = `${monName(ev.side)} ${FINISH_VERB[ev.step]}!`;
+      calloutLine = line;
+      pushLog(line);
+      return;
+    }
     if (ev.kind === 'flipResolve') {
-      // Layer 2 — both released: the flipped triangle resolved (the winner's
-      // ★ arrives via a separate momentum event).
-      if (ev.winner !== null) {
-        const who = ev.winner === 'player' ? display.player.species.name : 'Foe';
+      // FIX 4 — both released: name the winner by what its two-step did to the
+      // other ("HIDE slips the CHARGE!"). The winner's ★ arrives separately.
+      if (ev.winner !== null && ev.winnerStep && ev.loserStep) {
         if (ev.winner === 'player') pendingReadWindow = true;
-        calloutLine = `FLIP! ${who} reads the clash!` + starTag(ev.winner);
-        pushLog(`Both committed — ${who}'s two-step wins the exchange.`);
+        const line = `${ev.winnerStep.toUpperCase()} ${FLIP_VERB[ev.winnerStep]} the ${ev.loserStep.toUpperCase()}!`;
+        calloutLine = line + starTag(ev.winner);
+        pushLog(`${monName(ev.winner)}: ${line}`);
       } else {
+        calloutLine = 'Both committed — the two-steps cancel out.';
         pushLog('Both committed — the two-steps cancel out.');
       }
       return;
@@ -988,7 +1024,16 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // (vs routine hits/stances that auto-flow): a faint/KO, a phase Break, and a
   // Call firing.
   function isKeyBeat(ev: BattleEvent): boolean {
-    return ev.kind === 'faint' || ev.kind === 'ko' || ev.kind === 'break' || ev.kind === 'call';
+    return (
+      ev.kind === 'faint' ||
+      ev.kind === 'ko' ||
+      ev.kind === 'break' ||
+      ev.kind === 'call' ||
+      // Layer 2 outcomes LAND (FIX 4) — the read moments the player must see.
+      ev.kind === 'phase1Punish' ||
+      ev.kind === 'release' ||
+      ev.kind === 'flipResolve'
+    );
   }
 
   function beginBeat(grewLog: boolean, ev: BattleEvent): void {

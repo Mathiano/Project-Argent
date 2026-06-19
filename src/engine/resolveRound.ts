@@ -476,7 +476,6 @@ export function resolveRound(
         : flipBeats(foeStep, plStep)
           ? 'foe'
           : null;
-      events.push({ kind: 'flipResolve', winner });
       const plI = initiative(pl, plRel, rhythm, arena, state.traits);
       const foeI = initiative(foe, foeRel, rhythm, arena, state.traits);
       const ord: Side[] = plI >= foeI ? ['player', 'foe'] : ['foe', 'player'];
@@ -504,6 +503,16 @@ export function resolveRound(
           if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
         }
       }
+      // Emit the flip verdict AFTER the strikes so its callout is the one that
+      // lands (names the winner + both steps), and award the winner's ★.
+      const winnerStep = winner === 'player' ? plStep : winner === 'foe' ? foeStep : undefined;
+      const loserStep = winner === 'player' ? foeStep : winner === 'foe' ? plStep : undefined;
+      events.push({
+        kind: 'flipResolve',
+        winner,
+        ...(winnerStep ? { winnerStep } : {}),
+        ...(loserStep ? { loserStep } : {}),
+      });
       if (winner === 'player' && pl.hp > 0) pl = gainMomentum(pl, 'player', events);
       else if (winner === 'foe' && foe.hp > 0) foe = gainMomentum(foe, 'foe', events);
     } else if (plReleasing) {
@@ -592,6 +601,10 @@ export function resolveRound(
       const plI = plStrikes ? initiative(pl, plMove, rhythm, arena, state.traits) : COMBAT.restInitiative;
       const foeI = foeStrikes ? initiative(foe, foeMove, rhythm, arena, state.traits) : COMBAT.restInitiative;
       const ord: Side[] = plI >= foeI ? ['player', 'foe'] : ['foe', 'player'];
+      // Track whether each committer's wind-up got READ (punished) — drives the
+      // "finishes charging" (survived) vs "wind-up punished" legibility beat.
+      let plWindUpPunished = false;
+      let foeWindUpPunished = false;
       for (const sk of ord) {
         if (pl.hp <= 0 || foe.hp <= 0) break;
         if (sk === 'player' && plStrikes) {
@@ -606,6 +619,7 @@ export function resolveRound(
           const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
           if (tStep !== null && TWO_STEP.punishedBy[tStep].includes(plStance)) {
             events.push({ kind: 'phase1Punish', side: 'player', step: tStep, damage: r.applied });
+            foeWindUpPunished = true; // foe was the winder that got read
             pl = gainMomentum(pl, 'player', events);
           } else {
             events.push({ kind: 'strike', side: 'player', move: plMove!, damage: r.applied, effectiveness: eff });
@@ -623,6 +637,7 @@ export function resolveRound(
           const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
           if (tStep !== null && TWO_STEP.punishedBy[tStep].includes(foeStance)) {
             events.push({ kind: 'phase1Punish', side: 'foe', step: tStep, damage: r.applied });
+            plWindUpPunished = true; // player was the winder that got read
             foe = gainMomentum(foe, 'foe', events);
           } else {
             events.push({ kind: 'strike', side: 'foe', move: foeMove!, damage: r.applied, effectiveness: eff });
@@ -648,6 +663,14 @@ export function resolveRound(
         const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
         events.push({ kind: 'strike', side: 'foe', move: foeMove, damage: r.applied, effectiveness: eff });
         if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
+      }
+      // A surviving, UNPUNISHED wind-up "finishes charging" — it'll release
+      // next round. (A punished one already got its phase1Punish beat.)
+      if (plCommitting && pl.hp > 0 && !plWindUpPunished) {
+        events.push({ kind: 'windUpResolved', side: 'player', step: twoStepForStance(plStance) });
+      }
+      if (foeCommitting && foe.hp > 0 && !foeWindUpPunished) {
+        events.push({ kind: 'windUpResolved', side: 'foe', step: twoStepForStance(foeStance) });
       }
     }
 
