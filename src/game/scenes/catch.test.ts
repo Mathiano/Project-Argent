@@ -94,11 +94,11 @@ function makeScene(opts: {
   return { scene, rec };
 }
 
-// Flush a resolve to the next menu: ONE A (skipResolve) + ticks. Use
-// right after a commit — do NOT call at a menu (A there enters FIGHT).
+// Drain a resolve to the next phase (menu, spare offer, or end). Beats
+// stream + auto-advance, so just tick generously — no presses (a press at a
+// menu would enter FIGHT). Use right after a commit.
 function flush(scene: ReturnType<typeof createBattleScene>): void {
-  scene.input?.('a');
-  for (let i = 0; i < 6; i += 1) scene.update?.(0.2);
+  for (let i = 0; i < 80; i += 1) scene.update?.(0.2);
 }
 
 // From the FIGHT menu, move down to the BALL row and throw.
@@ -113,7 +113,7 @@ function throwBall(scene: ReturnType<typeof createBattleScene>): void {
 function outThrowCycle(scene: ReturnType<typeof createBattleScene>): void {
   throwBall(scene); // down, a
   scene.input?.('a'); // clear the 1-line miss message → commit throwBall
-  scene.input?.('a'); // skipResolve → finishResolve → beginTurn
+  flush(scene); // auto-advance the throwBall round → next turn
 }
 
 describe('Phase 6a — the BALL row + window detection', () => {

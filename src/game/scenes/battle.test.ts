@@ -596,14 +596,11 @@ function buildScene(opts: SceneBuildOpts = {}): {
 }
 
 function drainResolve(scene: ReturnType<typeof createBattleScene>): void {
-  // Resolve now HOLDS on consequential events (commit, dodge/opening/
-  // counter/clash, eff-≠-1 strike, faint, break) until A/Start. A press
-  // when not held still flushes via skipResolve. For tests we want a
-  // deterministic, fast drain — press A first (no hold yet, so this
-  // triggers skipResolve and flushes the round in one go), then tick
-  // briefly to let the subsequent setText / beginTurn settle.
-  scene.input?.('a');
-  for (let i = 0; i < 5; i += 1) scene.update?.(0.1);
+  // Resolve presents one beat at a time (streaming + a short auto-advance
+  // hold per beat). Tick generously to auto-advance the whole round to the
+  // next phase (menu, or end-text). No presses — ticking can't over-advance
+  // (update() only drives the resolve while phase==='resolve').
+  for (let i = 0; i < 80; i += 1) scene.update?.(0.2);
 }
 
 describe('battle menu — CALL paths (Call-menu sprint: submenu + shout + exit)', () => {
@@ -706,18 +703,17 @@ describe('battle menu — CALL paths (Call-menu sprint: submenu + shout + exit)'
     scene.input?.('a'); // submenu
     scene.input?.('a'); // Catch Breath → shout
     scene.input?.('a'); // advance shout → commit catchBreath → resolve
-    // The catchBreath event now HOLDS (consequential). Auto-advance via
-    // update() to ENGAGE each hold (an early A would skipResolve past it),
-    // draw/check, then release the hold with A and continue.
+    // The catchBreath beat streams + holds during resolve. Sample in SMALL
+    // ticks (no presses) so the beat is caught while it's shown — the round
+    // auto-advances past it otherwise.
     const ctx = stubCtx();
     let found = false;
-    for (let i = 0; i < 25 && !found; i += 1) {
-      for (let j = 0; j < 5; j += 1) scene.update?.(0.5); // advance to the next HELD beat
+    for (let i = 0; i < 400 && !found; i += 1) {
+      scene.update?.(0.05);
       ctx.reset();
       scene.draw(ctx);
       const screen = ctx.texts.join('|');
       if (screen.includes('catches its breath') && screen.includes('50')) found = true;
-      else scene.input?.('a'); // release this hold, continue to the next
     }
     expect(found).toBe(true);
   });
@@ -835,14 +831,11 @@ describe('battle move list — cursor wrap + rejection paths + B-back', () => {
 });
 
 describe('battle resolve + end-text', () => {
-  test('A in resolve phase skips the event animation (drains to next turn immediately)', () => {
+  test('resolve auto-advances to the next turn (no longer stuck on the move list)', () => {
     const { scene } = buildScene();
     scene.input?.('a'); // FIGHT
     scene.input?.('a'); // TACKLE — commit → resolve
-
-    // Don't tick; instead press A — skipResolve should drain events
-    // synchronously and either return to menu or end the battle.
-    scene.input?.('a');
+    drainResolve(scene); // beats stream + auto-advance to the next turn / end
 
     const ctx = stubCtx();
     scene.draw(ctx);
@@ -852,13 +845,12 @@ describe('battle resolve + end-text', () => {
     expect(screen.includes('FIGHT') || screen.includes('Press A')).toBe(true);
   });
 
-  test('A on end-text dispatches onResolve (battle leaves the scene)', () => {
-    // Player at 1 HP attacks Aggressive — foe Guards (default foeAction
-    // in buildScene) → counter reflects 0.5×preMit, KOs the 1-HP player.
+  test('end-text dispatches onResolve once the round resolves', () => {
+    // Player at 1 HP attacks Aggressive — foe Guards (default) → counter KOs.
     const { scene, resolved } = buildScene({ playerPatch: { hp: 1 } });
     scene.input?.('a'); // FIGHT
     scene.input?.('a'); // TACKLE — counter KOs player
-    scene.input?.('a'); // skipResolve → finishResolve → setText("Your team fell.","Press A to continue.")
+    drainResolve(scene); // auto-advance the round to the end-text
 
     const ctx = stubCtx();
     scene.draw(ctx);
@@ -1037,76 +1029,54 @@ describe('combat legibility (S1/S2) — pure callout + speed helpers', () => {
   });
 });
 
-describe('resolve cadence — auto-play pauses on consequential lines until A/Start', () => {
-  test('auto-play stops at the first consequential event (commit log line); next tick does not advance', () => {
+describe('battle text flow — stream + one-press-per-message (Presentation 1)', () => {
+  test('the current beat STREAMS (reveals progressively, not an instant dump)', () => {
     const { scene } = buildScene();
     scene.input?.('a'); // FIGHT
-    scene.input?.('a'); // TACKLE → phase=resolve, no hold yet, no events processed
-
-    // Tick a single STEP_SEC. The first non-hold event (roundStart) is
-    // applied, then the second (player's commit) is applied AND the
-    // hold engages — auto-advance stops.
-    scene.update?.(1.0);
-
-    // Capture the log on screen at this paused state.
+    scene.input?.('a'); // TACKLE → resolve
+    scene.update?.(0.02); // first beat set up + a sliver streamed
     const ctx = stubCtx();
     scene.draw(ctx);
-    const before = ctx.texts.join('|');
-
-    // Tick a LOT more — without input, the screen must not change.
-    for (let i = 0; i < 30; i += 1) scene.update?.(1.0);
-
+    const partial = ctx.texts.join('|').length;
+    // Tick more — the line reveals fully.
+    for (let i = 0; i < 25; i += 1) scene.update?.(0.05);
     ctx.reset();
     scene.draw(ctx);
-    const after = ctx.texts.join('|');
-    expect(after).toBe(before);
-    // Sanity: the commit line did make it onto the log.
-    expect(before).toContain('used TACKLE');
+    const full = ctx.texts.join('|');
+    expect(full).toContain('used TACKLE'); // fully revealed
+    expect(full.length).toBeGreaterThan(partial); // progressive reveal (streamed)
   });
 
-  test('A on a held resolve releases just that hold; auto-play resumes (does NOT skip to end)', () => {
+  test('ONE press finishes the current stream; it does NOT flush the whole round', () => {
     const { scene } = buildScene();
     scene.input?.('a'); // FIGHT
     scene.input?.('a'); // TACKLE → resolve
-    scene.update?.(1.0); // first hold (commit)
-
-    // Release the hold — auto-play continues to the next event, which
-    // for a non-clash A-vs-G round is the next commit (also held).
-    scene.input?.('a');
-    scene.update?.(1.0);
-
+    scene.update?.(0.02); // start streaming the first beat
+    scene.input?.('a'); // finish the stream (reveal the current line fully)
     const ctx = stubCtx();
     scene.draw(ctx);
-    // We should be at the foe's commit (held) now — two commit log lines
-    // on screen, but NOT yet finished (resolve hasn't called beginTurn).
     const screen = ctx.texts.join('|');
-    expect(screen).toContain('GRUBLEAF used TACKLE');
-    // The foe's commit line is now the plain-language stance confirmation
-    // (honest-partial model) — GUARD → "braces with <move>!" (names stance AND
-    // move; was "Foe FLITPECK used TACKLE").
-    expect(screen).toContain('FLITPECK braces with TACKLE!');
-    // Still in resolve phase: no FIGHT menu, no end-text yet.
-    expect(screen).not.toContain('>FIGHT');
+    expect(screen).toContain('used TACKLE'); // current line fully shown
+    // NOT flushed to the end — still mid-resolve (no menu / end-text).
     expect(screen).not.toContain('Press A to continue');
+    expect(screen).not.toContain('> FIGHT');
   });
 
-  test('A when NOT held flushes the rest fast (skipResolve), past every remaining event', () => {
-    // Drive to a steady "between holds" state, then A flushes to end.
+  test('presses advance ONE beat at a time — the foe commit appears after, still resolving', () => {
     const { scene } = buildScene();
     scene.input?.('a'); // FIGHT
     scene.input?.('a'); // TACKLE → resolve
-    // No ticks yet → no hold engaged → A press triggers skipResolve.
-    scene.input?.('a');
-
-    // Settle.
-    for (let i = 0; i < 5; i += 1) scene.update?.(0.1);
-
+    // Walk the beats: a short tick to stream + a press to advance, a few times.
+    for (let i = 0; i < 4; i += 1) {
+      scene.update?.(0.3);
+      scene.input?.('a');
+    }
     const ctx = stubCtx();
     scene.draw(ctx);
     const screen = ctx.texts.join('|');
-    // Resolve done; back at menu (or end-text on KO). Either way the
-    // hold is gone and we're past resolve.
-    expect(screen.includes('FIGHT') || screen.includes('Press A')).toBe(true);
+    expect(screen).toContain('GRUBLEAF used TACKLE'); // player commit beat
+    // The foe commit is the plain-language stance confirmation (GUARD).
+    expect(screen).toContain('FLITPECK braces with TACKLE!');
   });
 });
 

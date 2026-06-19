@@ -389,14 +389,15 @@ describe('Phase 0 GATE — cold-start integration', () => {
       }),
     );
 
-    // Drive: 2 A's intro, A FIGHT, A TACKLE, A skipResolve, 2 A's end-text.
-    scenes.input('a');
-    scenes.input('a');
-    scenes.input('a');
-    scenes.input('a');
-    scenes.input('a');
-    scenes.input('a');
-    scenes.input('a');
+    // Drive: 2 A's intro → A FIGHT → A TACKLE → auto-advance the round →
+    // 2 A's end-text → onResolve.
+    scenes.input('a'); // intro line 1
+    scenes.input('a'); // intro line 2 → beginTurn (menu)
+    scenes.input('a'); // FIGHT
+    scenes.input('a'); // TACKLE (Aggressive) → counter KOs the 1-HP player → resolve
+    for (let i = 0; i < 80; i += 1) scenes.update?.(0.2); // auto-advance resolve → end-text
+    scenes.input('a'); // end-text line 1
+    scenes.input('a'); // end-text line 2 → onResolve('foe')
     expect(resolved).toBe('foe');
   });
 });

@@ -39,11 +39,13 @@ import {
   hpColor,
 } from '../ui';
 
-// Auto-cadence between non-hold log lines. Tuned so a human can read a
-// short line at default speed without animation help; consequential
-// lines (commits, dodge/opening/counter, eff ≠ 1 strikes, faints,
-// breaks) then HOLD the playback until A/Start.
-const STEP_SEC = 0.9;
+// Battle-text stream speed (chars/sec). Tuned readable, ~Gen 4+ feel. Each
+// beat's message reveals progressively; a press finishes it (see tickResolve
+// / handleResolveInput — the consistent one-press-per-message model).
+const CHARS_PER_SEC = 56;
+// After a beat's message is fully revealed it holds this long, then auto-
+// advances (a consistent rhythm). A press skips the stream / advances now.
+const BEAT_HOLD_SEC = 0.5;
 const STANCES: readonly Stance[] = ['A', 'G', 'F'];
 // Fixed seed for the intent-display feint RNG (Phase 6.7-A). Deliberately
 // constant + independent of the engine RNG so degrading the FOE INTENT
@@ -403,12 +405,16 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let textDismissable = false;
   let log: string[] = [];
   let pendingEvents: BattleEvent[] = [];
-  let eventTimer = 0;
-  // resolveHeld: the last applied event was "consequential" (a commit,
-  // a dodge/opening/counter/clash, a typed-effective strike, a faint,
-  // a break). Auto-advance is paused until A/Start releases it.
-  // A press while NOT held still triggers skipResolve (impatient flush).
-  let resolveHeld = false;
+  // Battle-text flow (Presentation 1): the resolve presents one BEAT (a
+  // consequential event) at a time. The current beat's message STREAMS
+  // (reveal grows over time); once fully shown it HOLDS until the player
+  // presses. A press FINISHES the stream if mid-reveal, else ADVANCES to the
+  // next beat (draining minor events silently). Consistent, one-press-per-
+  // message — no "skip the whole round" flush, no "press did nothing".
+  let reveal = 0; // chars revealed of the current beat's message
+  let beatMsg = ''; // the message streaming this beat ('' = a no-text beat)
+  let resolveHeld = false; // a beat is currently shown (streaming or holding)
+  let holdT = 0; // time the fully-revealed beat has been held (auto-advance)
   let endingWinner: 'player' | 'foe' | null = null;
 
   let menuCursor = 0;
@@ -518,7 +524,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     const result = resolveRound(state, action, foeAction, opts.rng);
     state = result.state;
     pendingEvents = [...result.events];
-    eventTimer = 0;
+    reveal = 0;
+    beatMsg = '';
     resolveHeld = false;
     // Display state is reseated by the first roundStart event's snapshot.
     phase = 'resolve';
@@ -852,45 +859,49 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     beginTurn();
   }
 
-  function tickResolve(dt: number): void {
-    if (animT > 0) animT = Math.max(0, animT - dt);
-    // While held on a consequential event, auto-advance pauses entirely
-    // — eventTimer doesn't tick, no new events pop. handleResolveInput
-    // releases the hold and play continues.
-    if (resolveHeld) return;
-    eventTimer -= dt;
-    while (eventTimer <= 0 && pendingEvents.length > 0) {
-      const ev = pendingEvents.shift()!;
-      applyEvent(ev);
-      // applyEvent may flip phase (forcedSwitch on player → 'party').
-      // Stop draining so the renderer can show the party picker.
-      if (phase !== 'resolve') return;
-      if (isConsequential(ev)) {
-        resolveHeld = true;
-        eventTimer = 0;
-        return;
-      }
-      eventTimer += STEP_SEC;
-    }
-    if (pendingEvents.length === 0 && eventTimer <= 0) finishResolve();
+  // Begin a beat: stream its message (the newest log line if this event
+  // added one; else a no-text beat that still holds for its animation/HP
+  // tick). The beat HOLDS once fully revealed, until the player presses.
+  function beginBeat(grewLog: boolean): void {
+    beatMsg = grewLog && log.length > 0 ? log[log.length - 1]! : '';
+    reveal = 0;
+    holdT = 0;
+    resolveHeld = true;
   }
 
-  function skipResolve(): void {
+  // Drain events until the next BEAT (a consequential event) — applying the
+  // minor events (state/momentum/etc.) silently along the way — then hold +
+  // stream it. No more events → end the round. May hand off to the party
+  // picker (forcedSwitch flips phase); we stop draining if so.
+  function advanceToNextBeat(): void {
     while (pendingEvents.length > 0) {
-      applyEvent(pendingEvents.shift()!);
-      // applyEvent may flip phase (forcedSwitch on player → 'party').
-      // Stop draining + don't call finishResolve — that would call
-      // beginTurn and overwrite the party picker. Resumes when the
-      // player confirms in handlePartyInput.
-      if (phase !== 'resolve') {
-        eventTimer = 0;
-        resolveHeld = false;
+      const ev = pendingEvents.shift()!;
+      const before = log.length;
+      applyEvent(ev);
+      if (phase !== 'resolve') return; // forcedSwitch → party picker; resume later
+      if (isConsequential(ev)) {
+        beginBeat(log.length > before);
         return;
       }
     }
-    eventTimer = 0;
-    resolveHeld = false;
     finishResolve();
+  }
+
+  function tickResolve(dt: number): void {
+    if (animT > 0) animT = Math.max(0, animT - dt);
+    // No beat active (initial, or just advanced) → fetch the next one. Fall
+    // through so this same tick also starts streaming it (so one update both
+    // shows the beat AND begins its reveal).
+    if (!resolveHeld) advanceToNextBeat();
+    if (!resolveHeld) return; // round ended or handed off to the party picker
+    // Stream the current beat's text.
+    if (reveal < beatMsg.length) {
+      reveal = Math.min(beatMsg.length, reveal + CHARS_PER_SEC * dt);
+      return;
+    }
+    // Fully revealed → hold a beat-rhythm, then auto-advance.
+    holdT += dt;
+    if (holdT >= BEAT_HOLD_SEC) resolveHeld = false; // next tick advances
   }
 
   // Menu rows in DISPLAY order. The `enabled` flag controls whether the
@@ -1096,6 +1107,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         }
         if (resumeResolveAfterParty) {
           resumeResolveAfterParty = false;
+          // Resume the beat drain cleanly: clear the held beat so tickResolve
+          // advances to the next one.
+          beatMsg = '';
+          reveal = 0;
+          resolveHeld = false;
           phase = 'resolve';
         } else {
           // Out-of-round forced (rare path): fall back to beginTurn.
@@ -1234,16 +1250,15 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function handleResolveInput(key: InputKey): void {
     if (key !== 'a' && key !== 'start') return;
-    if (resolveHeld) {
-      // Release just this hold; auto-play continues until the next
-      // consequential event or the end. Gives the reader pace control
-      // without forcing them to skip the rest.
-      resolveHeld = false;
-      eventTimer = 0;
+    // ONE press finishes the current message's stream (reveal it fully);
+    // the NEXT press advances to the next beat. Predictable, one message at
+    // a time — never flushes the whole round.
+    if (reveal < beatMsg.length) {
+      reveal = beatMsg.length;
       return;
     }
-    // Between holds (or hold-free runs): flush fast for impatient replay.
-    skipResolve();
+    resolveHeld = false;
+    advanceToNextBeat();
   }
 
   function spriteOffset(side: Side): number {
@@ -1630,7 +1645,17 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function drawBottomLog(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     for (let i = 0; i < log.length; i += 1) {
-      drawText(ctx, log[i]!, BOTTOM.x + 8, BOTTOM.y + 8 + i * 12);
+      let line = log[i]!;
+      // Stream the current beat's line (the newest): reveal it progressively.
+      if (i === log.length - 1 && line === beatMsg && reveal < beatMsg.length) {
+        line = line.slice(0, Math.floor(reveal));
+      }
+      drawText(ctx, line, BOTTOM.x + 8, BOTTOM.y + 8 + i * 12);
+    }
+    // The "press to continue" prompt — only once the current beat is fully
+    // revealed (so the player knows a press now advances, not skips text).
+    if (resolveHeld && reveal >= beatMsg.length && Math.floor(tick * 2) % 2 === 0) {
+      drawText(ctx, '▼', BOTTOM.x + BOTTOM.w - 14, BOTTOM.y + BOTTOM.h - 12, PALETTE.ink);
     }
   }
 

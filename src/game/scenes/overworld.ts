@@ -86,6 +86,10 @@ export interface OverworldSceneOpts {
 export interface OverworldScene extends Scene {
   currentPosition(): { readonly map: string; readonly x: number; readonly y: number; readonly facing: Facing };
   armPostBattleGrace(): void;
+  // FLOW 1 — after a trainer battle, auto-start the just-beaten NPC's
+  // follow-up line (no manual walk-up). main.ts calls this on return from a
+  // trainer win, passing the trainer's winFlag (= the NPC's blockedUntilFlag).
+  runNpcFollowup(winFlag: string): void;
 }
 
 export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
@@ -575,6 +579,21 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
     },
     armPostBattleGrace() {
       skipNextEncounter = true;
+    },
+    runNpcFollowup(winFlag: string) {
+      // Auto-start the beaten trainer's follow-up dialogue (their
+      // interactAfterFlag), so story/gym trainers tell you their line the
+      // moment the fight ends — no manual walk-up. No-op if the NPC has no
+      // follow-up, or if a dialog/cutscene is already running.
+      if (dialogLines !== null || scriptQueue.length > 0 || approach) return;
+      for (const obj of map.objects) {
+        if (obj.type !== 'npc' || obj.blockedUntilFlag !== winFlag) continue;
+        if (obj.interactAfterFlag && obj.interactAfterFlag.length > 0) {
+          scriptQueue = [...obj.interactAfterFlag];
+          runNextCommand();
+        }
+        return;
+      }
     },
     update(dt) {
       tick += dt;

@@ -99,8 +99,10 @@ function buildScene(
 }
 
 function drainResolve(scene: ReturnType<typeof createBattleScene>): void {
-  scene.input?.('a'); // skipResolve when not held
-  for (let i = 0; i < 5; i += 1) scene.update?.(0.1);
+  // Resolve auto-advances one beat at a time (streaming + a short hold each).
+  // Tick generously to drain the whole round to the next phase; ticking can't
+  // over-advance (update() only drives resolve while phase==='resolve').
+  for (let i = 0; i < 80; i += 1) scene.update?.(0.2);
 }
 
 describe('Phase 1 GATE — 2v2 player battle, voluntary + forced switching', () => {
@@ -201,7 +203,7 @@ describe('Phase 1 GATE — 2v2 player battle, voluntary + forced switching', () 
     });
     scene.input?.('a'); // FIGHT
     scene.input?.('a'); // TACKLE → resolve, counter KOs lead, faint+forcedSwitch event
-    scene.input?.('a'); // skipResolve flushes events; forcedSwitch applies → phase='party'
+    drainResolve(scene); // resolve auto-advances; the faint's forcedSwitch opens the party picker
 
     let ctx = stubCtx();
     scene.draw(ctx);
@@ -272,7 +274,7 @@ describe('Phase 1 GATE — 2v2 player battle, voluntary + forced switching', () 
     });
     scene.input?.('a'); // FIGHT
     scene.input?.('a'); // TACKLE → counter KO
-    scene.input?.('a'); // skipResolve → phase=party (forced)
+    drainResolve(scene); // resolve auto-advances → forcedSwitch opens the party picker
 
     let ctx = stubCtx();
     scene.draw(ctx);
@@ -300,7 +302,7 @@ describe('Phase 1 GATE — 2v2 player battle, voluntary + forced switching', () 
     );
     scene.input?.('a'); // FIGHT
     scene.input?.('a'); // TACKLE → counter KO; no bench survivor
-    scene.input?.('a'); // skipResolve → end-text
+    drainResolve(scene); // resolve auto-advances → end-text
     scene.input?.('a'); // advance end-text line 1
     scene.input?.('a'); // advance end-text line 2 → onResolve('foe')
     expect(resolved).toBe('foe');
@@ -331,9 +333,8 @@ describe('Phase 1 — HP bar render contract on switch-in (regression)', () => {
     scene.input?.('down');
     scene.input?.('a');
     scene.input?.('a');
-    // Drain resolve (skipResolve) — switch + foe TACKLE round finishes.
-    scene.input?.('a');
-    for (let i = 0; i < 5; i += 1) scene.update?.(0.1);
+    // Drain the switch round (auto-advances) to the next turn.
+    drainResolve(scene);
 
     ctx = stubCtx();
     scene.draw(ctx);

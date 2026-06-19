@@ -320,6 +320,7 @@ function writebackParty(finalState: BattleState): void {
   run.party = finalState.player.members.map((m) => ({
     ...fromSavedSide(toSavedSide(m), resolveSpecies),
     st: 100, // full stamina between fights
+    momentum: 0, // ★ is per-battle — never banked into the overworld
   }));
 }
 
@@ -398,6 +399,9 @@ interface BondCross {
   readonly species: string;
   readonly fromName: string;
   readonly toName: string;
+  // This crossing NEWLY unlocked the Call economy (crossed into the Warming
+  // bond moment, and Calls weren't already unlocked by the run flag).
+  readonly unlocksCalls: boolean;
 }
 
 function awardBondForFight(
@@ -426,7 +430,15 @@ function awardBondForFight(
     // on the event bus (the natural reactive seam — audio chimes it later).
     const cross = bondStageCrossing(before, after);
     if (cross) {
-      crossings.push({ species: mon.species.name, fromName: bondStageName(before), toName: bondStageName(after) });
+      // Calls newly unlock when this crossing reaches the Warming bond moment
+      // (hasJumpstart threshold) and the run flag hadn't already unlocked them.
+      const unlocksCalls = !hasJumpstart(before) && hasJumpstart(after) && !run.catchBreathUnlocked;
+      crossings.push({
+        species: mon.species.name,
+        fromName: bondStageName(before),
+        toName: bondStageName(after),
+        unlocksCalls,
+      });
       emitGameEvent({
         kind: 'bond-stage-cross',
         species: mon.species.name,
@@ -452,6 +464,7 @@ function showBondBeats(crossings: readonly BondCross[], onComplete: () => void):
       species: head!.species,
       fromName: head!.fromName,
       toName: head!.toName,
+      unlocksCalls: head!.unlocksCalls,
       onContinue: () => {
         scenes.pop();
         showBondBeats(rest, onComplete);
@@ -1597,7 +1610,11 @@ function pushTrainerFight(
         // immediately after a trainer victory and getting chained.
         currentOverworldScene?.armPostBattleGrace();
         autosaveNow();
-        showBondBeats(bondCrossings, () => maybeEvolve(() => {})); // bond beat, then evo gates
+        // bond beat → evo gates → FLOW 1: the trainer's follow-up line
+        // auto-starts (no manual walk-up to re-talk).
+        showBondBeats(bondCrossings, () =>
+          maybeEvolve(() => currentOverworldScene?.runNpcFollowup(winFlag)),
+        );
       },
     }),
   );

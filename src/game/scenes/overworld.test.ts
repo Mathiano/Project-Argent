@@ -52,6 +52,32 @@ function mockInput(): MockInputState {
   };
 }
 
+// Recording canvas stub — captures fillText so a test can assert on-screen
+// text (e.g. an auto-started dialogue line).
+interface RecordingCtx extends CanvasRenderingContext2D {
+  readonly texts: string[];
+}
+function stubCtx(): RecordingCtx {
+  const noop = () => {};
+  const texts: string[] = [];
+  return new Proxy(
+    { texts },
+    {
+      get(target, prop) {
+        if (prop === 'texts') return (target as { texts: string[] }).texts;
+        if (prop === 'fillText') return (text: string) => texts.push(String(text));
+        if (prop === 'beginPath') return () => ({ fill: noop, stroke: noop, ellipse: noop });
+        if (prop === 'measureText') return () => ({ width: 10 });
+        if (prop === 'canvas') return { width: 320, height: 180 };
+        return noop;
+      },
+      set() {
+        return true;
+      },
+    },
+  ) as unknown as RecordingCtx;
+}
+
 // Advance update by enough ticks to cover duration at dt=0.02.
 function tickStep(scene: ReturnType<typeof createOverworldScene>, durationSec = 0.22): void {
   const dt = 0.02;
@@ -540,5 +566,48 @@ describe('trainer line-of-sight (F2) — GYM gauntlet', () => {
     tickStep(scene, 2.5);
     scene.input?.('a');
     expect(calls.some((c) => c.winFlag === 'gym_trainer_2_beaten')).toBe(false);
+  });
+});
+
+describe('post-battle NPC follow-up auto-starts (FLOW 1)', () => {
+  test('runNpcFollowup auto-opens the beaten trainer\'s follow-up dialogue', () => {
+    const input = mockInput();
+    const flags = mockFlags();
+    flags.set('gym_trainer_2_beaten'); // the BIRDKEEPER (LoS trainer) is beaten
+    const scene = createOverworldScene({
+      map: 'GYM',
+      spawn: 'fromRoute',
+      inputState: input,
+      flags,
+      onWarp: () => {},
+      onEncounter: () => {},
+      onTrainerBattle: () => {},
+      onBossBattle: () => {},
+    });
+    // main.ts calls this on return from the trainer win — no manual walk-up.
+    scene.runNpcFollowup('gym_trainer_2_beaten');
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    // The BIRDKEEPER's interactAfterFlag line is now on screen.
+    expect(ctx.texts.some((t) => t.includes('BIRDKEEPER') || t.includes('Sharp reads'))).toBe(true);
+  });
+
+  test('runNpcFollowup is a no-op for an unknown / follow-up-less flag', () => {
+    const input = mockInput();
+    const scene = createOverworldScene({
+      map: 'GYM',
+      spawn: 'fromRoute',
+      inputState: input,
+      flags: mockFlags(),
+      onWarp: () => {},
+      onEncounter: () => {},
+      onTrainerBattle: () => {},
+      onBossBattle: () => {},
+    });
+    scene.runNpcFollowup('no_such_trainer');
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    // No dialogue panel text from a follow-up — the map renders normally.
+    expect(ctx.texts.some((t) => t.includes('BIRDKEEPER'))).toBe(false);
   });
 });

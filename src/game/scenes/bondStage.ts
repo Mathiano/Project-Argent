@@ -19,6 +19,9 @@ export interface BondStageSceneOpts {
   readonly species: string;
   readonly fromName: string;
   readonly toName: string;
+  // True when THIS crossing newly unlocked the Call economy (the Warming
+  // bond moment). Shows a line tying the power to the relationship.
+  readonly unlocksCalls?: boolean;
   readonly onContinue: () => void;
 }
 
@@ -50,8 +53,14 @@ export function createBondStageScene(opts: BondStageSceneOpts): Scene {
 
       drawPanel(ctx, 24, 92, LOGICAL_W - 48, 74);
       drawText(ctx, `${opts.species} feels closer to you!`, 36, 100, PALETTE.paper);
-      drawText(ctx, 'Your bond deepened —', 36, 116, PALETTE.paperShadow);
-      drawText(ctx, `${opts.fromName}  →  ${opts.toName}`, 36, 130, PALETTE.star);
+      // Name the mon on the transition line too (unambiguous with a party).
+      drawText(ctx, `${opts.species}:  ${opts.fromName}  →  ${opts.toName}`, 36, 116, PALETTE.star);
+      // The Warming bond moment GRANTS a power — the relationship empowers
+      // the mon (bonds-empower-your-mon). Shown only when it newly unlocked.
+      if (opts.unlocksCalls) {
+        drawText(ctx, `You can now CALL to ${opts.species} in battle!`, 36, 132, PALETTE.hpOk);
+        drawText(ctx, '(Recover Breath unlocked — spend ★)', 36, 144, PALETTE.paperShadow);
+      }
 
       if (Math.floor(tick * 2) % 2 === 0) {
         drawText(ctx, 'A: continue', LOGICAL_W - 90, 168, PALETTE.paper);

@@ -27,12 +27,12 @@ registerMoves(loadMoves(movesData as MoveJson[]));
 const CH1 = loadDex(ch1BatchData as DexEntryJson[], 13);
 
 describe('S1 — stamina resets to full at battle start (HP carries over)', () => {
-  test('freshBattleSide restores ST to 100, keeps HP, clears round-local flags', () => {
+  test('freshBattleSide resets ST + ★ (per-battle), keeps HP, clears round flags', () => {
     const tired = { ...createSide(CH1.KINDRAKE!), hp: 17, st: 4, momentum: 2, exhausted: true, staggered: true };
     const fresh = freshBattleSide(tired);
-    expect(fresh.st).toBe(100); // ST reset — the per-battle tactical resource
+    expect(fresh.st).toBe(100); // ST reset — a per-battle tactical resource
+    expect(fresh.momentum).toBe(0); // ★ reset — per-battle, never carried over (Bug 1)
     expect(fresh.hp).toBe(17); // HP carries over — the persistent resource
-    expect(fresh.momentum).toBe(2); // momentum unchanged
     expect(fresh.exhausted).toBe(false);
     expect(fresh.staggered).toBe(false);
   });
