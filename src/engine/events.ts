@@ -1,7 +1,10 @@
-import type { Side, Stance } from './types';
+import type { CallKind, Side, Stance, TwoStep } from './types';
 
 export type CommitDescriptor =
   | { readonly kind: 'move'; readonly move: string; readonly stance: Stance }
+  // Layer 2 — a two-step WIND-UP (phase 1) or RELEASE (phase 2) was committed.
+  | { readonly kind: 'twoStep'; readonly step: TwoStep; readonly phase: 1 | 2; readonly move: string }
+  | { readonly kind: 'call'; readonly call: CallKind }
   | { readonly kind: 'rest'; readonly reason: 'softlock' | 'exhaustion' }
   | { readonly kind: 'catchBreath' }
   | { readonly kind: 'throwBall' };
@@ -45,6 +48,29 @@ export type BattleEvent =
   | { readonly kind: 'dazed'; readonly side: Side }
   | { readonly kind: 'opening'; readonly side: Side; readonly damage: number; readonly effectiveness: number }
   | { readonly kind: 'counter'; readonly side: Side; readonly damage: number }
+  // ── Combat Layer 2 — two-step events ──────────────────────────────────
+  // A side WOUND UP a two-step (phase 1 — exposed this round).
+  | { readonly kind: 'windUp'; readonly side: Side; readonly step: TwoStep }
+  // A single-step PUNISHED a wind-up's phase-1 vulnerability. `side` is the
+  // PUNISHER (single-stepper) — they read the wind-up and earn ★. `damage` is
+  // already amplified by the phase-1 vuln multiplier.
+  | { readonly kind: 'phase1Punish'; readonly side: Side; readonly step: TwoStep; readonly damage: number }
+  // A two-step RELEASED (phase 2). `side` is the releaser. `pierced` = Charge
+  // pushed through Guard; `concealed` = Hide struck from concealment.
+  | {
+      readonly kind: 'release';
+      readonly side: Side;
+      readonly step: TwoStep;
+      readonly damage: number;
+      readonly effectiveness: number;
+      readonly pierced?: boolean;
+      readonly concealed?: boolean;
+    }
+  // Both sides released two-steps — the FLIPPED triangle resolved. `winner` is
+  // the flipped-triangle winner (HIDE>CHARGE>FEINT>HIDE), or null on a mirror.
+  | { readonly kind: 'flipResolve'; readonly winner: Side | null }
+  // A ★-Call override fired. `side` is the caller (spent 1 ★).
+  | { readonly kind: 'call'; readonly side: Side; readonly call: CallKind }
   | { readonly kind: 'staggered'; readonly side: Side }
   | { readonly kind: 'momentum'; readonly side: Side; readonly total: number }
   // The bond jumpstart fired: an armed mon's first read-win this battle

@@ -1,4 +1,4 @@
-import { COMBAT, TIERS } from './config';
+import { COMBAT, TIERS, TWO_STEP } from './config';
 import { typeMult } from './data';
 import type { BattleEvent, CommitDescriptor, SideSnapshot } from './events';
 import type { RNG } from './rng';
@@ -7,14 +7,16 @@ import type {
   Action,
   ArenaSchedule,
   BattleState,
+  CallKind,
   Side,
   SideState,
   Stance,
   Team,
   TraitTable,
+  TwoStep,
   TypeChart,
 } from './types';
-import { activeMon, firstSurvivor, isRhythmRound, traitMods } from './types';
+import { activeMon, firstSurvivor, isRhythmRound, stanceForTwoStep, traitMods, twoStepForStance } from './types';
 
 export interface RoundResult {
   readonly state: BattleState;
@@ -59,6 +61,50 @@ function stanceOutMult(stance: Stance): number {
   return 1;
 }
 
+// Layer 2 — raw pre-stance damage (the shared damage core, no triangle/mitigation).
+function rawHit(
+  att: SideState,
+  def: SideState,
+  moveName: string,
+  rng: RNG,
+  typeChart: TypeChart,
+  traits: TraitTable,
+  rhythm: boolean,
+): { d: number; eff: number } {
+  const move = lookupMove(moveName);
+  const tier = TIERS[move.tier];
+  const eff = typeMult(typeChart, move.type, def.species.types);
+  const variance = COMBAT.damageVarianceMin + rng.next() * COMBAT.damageVarianceSpan;
+  let d = (tier.power * att.species.atk) / def.species.dfn * COMBAT.dmgScale * variance;
+  d *= eff;
+  d *= traitMods(att, rhythm, traits).dmgMult;
+  return { d, eff };
+}
+
+// Layer 2 — the FLIPPED triangle (both released two-steps): HIDE>CHARGE>FEINT>HIDE.
+function flipBeats(a: TwoStep, b: TwoStep): boolean {
+  return (
+    (a === 'hide' && b === 'charge') ||
+    (a === 'charge' && b === 'feint') ||
+    (a === 'feint' && b === 'hide')
+  );
+}
+
+function stripWinding(side: SideState): SideState {
+  if (side.winding === undefined) return side;
+  const { winding: _drop, ...rest } = side;
+  return rest;
+}
+
+// Apply damage to a defender respecting an active ★-Call: GET AWAY = no-hit;
+// HANG IN THERE = floored at 1 hp.
+function applyHp(defHp: number, dmg: number, call: CallKind | null): number {
+  if (call === 'getAway') return defHp;
+  const hp = defHp - dmg;
+  if (call === 'hangInThere') return Math.max(1, hp);
+  return Math.max(0, hp);
+}
+
 function actionStance(action: Action): Stance {
   if (action.kind === 'move') return action.stance;
   // Throwing leaves you EXPOSED — treated as Aggressive on defense so the
@@ -74,7 +120,18 @@ function actionMove(action: Action): string | null {
 }
 
 function describeAction(action: Action, side: SideState): CommitDescriptor {
-  if (action.kind === 'move') return { kind: 'move', move: action.move, stance: action.stance };
+  // Layer 2 — a mon mid-wind-up RELEASES this round regardless of the passed
+  // action (it's committed): describe the phase-2 release.
+  if (side.winding !== undefined) {
+    return { kind: 'twoStep', step: side.winding.step, phase: 2, move: side.winding.move };
+  }
+  if (action.kind === 'move') {
+    if (action.commit === true) {
+      return { kind: 'twoStep', step: twoStepForStance(action.stance), phase: 1, move: action.move };
+    }
+    return { kind: 'move', move: action.move, stance: action.stance };
+  }
+  if (action.kind === 'call') return { kind: 'call', call: action.call };
   if (action.kind === 'catchBreath') return { kind: 'catchBreath' };
   if (action.kind === 'throwBall') return { kind: 'throwBall' };
   if (action.kind === 'switch') return { kind: 'rest', reason: 'softlock' };
@@ -275,8 +332,11 @@ export function resolveRound(
   foeAction: Action,
   rng: RNG,
 ): RoundResult {
-  validateActionTeam(state.player, playerAction);
-  validateActionTeam(state.foe, foeAction);
+  // A mon mid-wind-up is LOCKED into releasing this round — its passed action
+  // is overridden, so skip validation for it (the release is legal by
+  // construction). Single-step sides validate exactly as before.
+  if (activeMon(state.player).winding === undefined) validateActionTeam(state.player, playerAction);
+  if (activeMon(state.foe).winding === undefined) validateActionTeam(state.foe, foeAction);
 
   const events: BattleEvent[] = [];
 
@@ -291,6 +351,11 @@ export function resolveRound(
   let pl: SideState = activeMon(playerTeam);
   let foe: SideState = activeMon(foeTeam);
 
+  // Layer 2 — a mon carrying `winding` from last round RELEASES (phase 2) this
+  // round; its passed action is ignored. Captured before any mutation.
+  const plReleasing = pl.winding !== undefined;
+  const foeReleasing = foe.winding !== undefined;
+
   events.push({
     kind: 'roundStart',
     round: state.round,
@@ -304,7 +369,7 @@ export function resolveRound(
   // mon takes any hit this round (handled naturally: actionMove is null
   // for switch, so the switching side does not strike; the other side's
   // strike targets the new active because pl/foe are reassigned here).
-  if (playerAction.kind === 'switch') {
+  if (!plReleasing && playerAction.kind === 'switch') {
     const fromIndex = playerTeam.active;
     events.push({
       kind: 'switchOut',
@@ -321,7 +386,7 @@ export function resolveRound(
       species: pl.species.name,
     });
   }
-  if (foeAction.kind === 'switch') {
+  if (!foeReleasing && foeAction.kind === 'switch') {
     const fromIndex = foeTeam.active;
     events.push({
       kind: 'switchOut',
@@ -339,11 +404,11 @@ export function resolveRound(
     });
   }
 
-  if (playerAction.kind === 'catchBreath') {
+  if (!plReleasing && playerAction.kind === 'catchBreath') {
     events.push({ kind: 'catchBreath', side: 'player', restored: CATCH_BREATH_RESTORE });
     pl = { ...pl, momentum: pl.momentum - 1 };
   }
-  if (foeAction.kind === 'catchBreath') {
+  if (!foeReleasing && foeAction.kind === 'catchBreath') {
     events.push({ kind: 'catchBreath', side: 'foe', restored: CATCH_BREATH_RESTORE });
     foe = { ...foe, momentum: foe.momentum - 1 };
   }
@@ -353,88 +418,313 @@ export function resolveRound(
   const plMove = actionMove(playerAction);
   const foeMove = actionMove(foeAction);
 
-  // Layer 1 — THRICE-REPEAT SELF-DAZE. The same MOVE stance 3 rounds running
-  // (this round + the two prior committed stances) dazes the repeater: it
-  // takes extra damage this round (predictability punished). Symmetric.
-  const plMoveStance = plMove !== null ? plStance : null;
-  const foeMoveStance = foeMove !== null ? foeStance : null;
-  const plDazed = thriceRepeat(state.history, 'player', plMoveStance);
-  const foeDazed = thriceRepeat(state.history, 'foe', foeMoveStance);
-
   const arena = state.bossCard?.arenaSchedule;
   const rhythm = isRhythmRound(arena, state.round, state.rhythmAnchor ?? 0);
 
-  const plInit = initiative(pl, plMove, rhythm, arena, state.traits);
-  const foeInit = initiative(foe, foeMove, rhythm, arena, state.traits);
+  // Layer 2 — classify each side's mode this round (a releasing side is locked
+  // from last round's wind-up; a committing side initiates a two-step now).
+  const plCommitting = playerAction.kind === 'move' && playerAction.commit === true && !plReleasing;
+  const foeCommitting = foeAction.kind === 'move' && foeAction.commit === true && !foeReleasing;
+  const plCall: CallKind | null = !plReleasing && playerAction.kind === 'call' ? playerAction.call : null;
+  const foeCall: CallKind | null = !foeReleasing && foeAction.kind === 'call' ? foeAction.call : null;
+  const twoStepInvolved =
+    plReleasing || foeReleasing || plCommitting || foeCommitting || plCall !== null || foeCall !== null;
 
-  // Layer 1 — FLUID = INITIATIVE. A Fluid move ACTS FIRST vs any non-Fluid
-  // stance (even when slower in raw speed); it gets its hit in before the
-  // opponent but loses the exchange on net (Aggressive punishes it). If both
-  // are Fluid, the faster (initiative) strikes first; otherwise by initiative.
-  const plFluid = plMove !== null && plStance === 'F';
-  const foeFluid = foeMove !== null && foeStance === 'F';
-  let order: Side[];
-  if (plInit < 0 && foeInit < 0) order = [];
-  else if (plInit < 0) order = ['foe'];
-  else if (foeInit < 0) order = ['player'];
-  else if (plFluid && !foeFluid) order = ['player', 'foe'];
-  else if (foeFluid && !plFluid) order = ['foe', 'player'];
-  else if (plInit > foeInit) order = ['player', 'foe'];
-  else if (foeInit > plInit) order = ['foe', 'player'];
-  else order = rng.next() < 0.5 ? ['player', 'foe'] : ['foe', 'player'];
+  // History stance recorded for thrice-daze continuity: a release round
+  // contributes the wound-up step's BASE stance (captured before strip).
+  const plReleaseBase: Stance | null = plReleasing ? stanceForTwoStep(pl.winding!.step) : null;
+  const foeReleaseBase: Stance | null = foeReleasing ? stanceForTwoStep(foe.winding!.step) : null;
 
-  events.push({
-    kind: 'initiative',
-    playerInit: plInit,
-    foeInit: foeInit,
-    first: order.length > 0 ? order[0]! : null,
-  });
-  if (plDazed) events.push({ kind: 'dazed', side: 'player' });
-  if (foeDazed) events.push({ kind: 'dazed', side: 'foe' });
+  if (twoStepInvolved) {
+    // ── Combat Layer 2 — two-step resolution path ──────────────────────────
+    // Spend ★ for any Calls (validated ≥1) and announce the override.
+    if (plCall !== null) {
+      pl = { ...pl, momentum: Math.max(0, pl.momentum - 1) };
+      events.push({ kind: 'call', side: 'player', call: plCall });
+    }
+    if (foeCall !== null) {
+      foe = { ...foe, momentum: Math.max(0, foe.momentum - 1) };
+      events.push({ kind: 'call', side: 'foe', call: foeCall });
+    }
+    // Stagger consumed this round.
+    pl = { ...pl, staggered: false };
+    foe = { ...foe, staggered: false };
 
-  // Stagger is consumed for initiative this round, then cleared.
-  pl = { ...pl, staggered: false };
-  foe = { ...foe, staggered: false };
-
-  const isClash = plMove !== null && foeMove !== null && plStance === 'A' && foeStance === 'A';
-
-  if (isClash) {
-    const psc = pl.st * pl.species.spd;
-    const fsc = foe.st * foe.species.spd;
-    const total = psc + fsc;
-    const plWins = total > 0 ? rng.next() < psc / total : rng.next() < 0.5;
-    if (plWins) {
-      events.push({ kind: 'clash', winner: 'player' });
-      pl = gainMomentum(pl, 'player', events);
-      const r = resolveStrike(pl, foe, plMove!, "A", "A", "player", rng, events, state.typeChart, state.traits, rhythm, foeDazed);
-      pl = r.attacker;
-      foe = r.defender;
-      if (foe.hp > 0) {
-        foe = { ...foe, staggered: true };
-        events.push({ kind: 'staggered', side: 'foe' });
+    if (plReleasing && foeReleasing) {
+      // CASE A — BOTH release: the FLIPPED triangle (HIDE>CHARGE>FEINT>HIDE,
+      // soft tilt). The flip winner earns ★ (a genuine mutual read — L2.7).
+      const plStep = pl.winding!.step;
+      const foeStep = foe.winding!.step;
+      const plRel = pl.winding!.move;
+      const foeRel = foe.winding!.move;
+      const winner: Side | null = flipBeats(plStep, foeStep)
+        ? 'player'
+        : flipBeats(foeStep, plStep)
+          ? 'foe'
+          : null;
+      events.push({ kind: 'flipResolve', winner });
+      const plI = initiative(pl, plRel, rhythm, arena, state.traits);
+      const foeI = initiative(foe, foeRel, rhythm, arena, state.traits);
+      const ord: Side[] = plI >= foeI ? ['player', 'foe'] : ['foe', 'player'];
+      for (const sk of ord) {
+        if (pl.hp <= 0 || foe.hp <= 0) break;
+        if (sk === 'player') {
+          const { d, eff } = rawHit(pl, foe, plRel, rng, state.typeChart, state.traits, rhythm);
+          let dd = d * TWO_STEP.releaseMult[plStep];
+          if (winner === 'player') dd *= TWO_STEP.flipWinMult;
+          else if (winner === 'foe') dd *= TWO_STEP.flipLoseMult;
+          dd *= TWO_STEP.releaseIncomingMult[foeStep]; // foe's follow-through blunts the counter
+          if (foe.exhausted) dd *= COMBAT.exhTaken;
+          foe = { ...foe, hp: applyHp(foe.hp, dd, foeCall) };
+          events.push({ kind: 'release', side: 'player', step: plStep, damage: dd, effectiveness: eff, ...(plStep === 'charge' ? { pierced: true } : {}), ...(plStep === 'hide' ? { concealed: true } : {}) });
+          if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
+        } else {
+          const { d, eff } = rawHit(foe, pl, foeRel, rng, state.typeChart, state.traits, rhythm);
+          let dd = d * TWO_STEP.releaseMult[foeStep];
+          if (winner === 'foe') dd *= TWO_STEP.flipWinMult;
+          else if (winner === 'player') dd *= TWO_STEP.flipLoseMult;
+          dd *= TWO_STEP.releaseIncomingMult[plStep];
+          if (pl.exhausted) dd *= COMBAT.exhTaken;
+          pl = { ...pl, hp: applyHp(pl.hp, dd, plCall) };
+          events.push({ kind: 'release', side: 'foe', step: foeStep, damage: dd, effectiveness: eff, ...(foeStep === 'charge' ? { pierced: true } : {}), ...(foeStep === 'hide' ? { concealed: true } : {}) });
+          if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
+        }
+      }
+      if (winner === 'player' && pl.hp > 0) pl = gainMomentum(pl, 'player', events);
+      else if (winner === 'foe' && foe.hp > 0) foe = gainMomentum(foe, 'foe', events);
+    } else if (plReleasing) {
+      // CASE B — player releases, foe responds (the wind-up is SEEN → a foe
+      // single-step SOFT-counters: tilts, never negates). No ★ either way
+      // (the phase-1 read already happened last round — surviving isn't a read).
+      const step = pl.winding!.step;
+      const relMove = pl.winding!.move;
+      const foeSingle = foeAction.kind === 'move' && foeAction.commit !== true;
+      const foeStanceS: Stance | null = foeSingle ? foeAction.stance : null;
+      const foeMoveS: string | null = foeSingle ? foeAction.move : null;
+      const soft = foeSingle && foeStanceS === TWO_STEP.softCounterStance[step];
+      const plI = initiative(pl, relMove, rhythm, arena, state.traits);
+      const foeI = foeMoveS !== null ? initiative(foe, foeMoveS, rhythm, arena, state.traits) : COMBAT.restInitiative;
+      const ord: Side[] = plI >= foeI ? ['player', 'foe'] : ['foe', 'player'];
+      for (const sk of ord) {
+        if (pl.hp <= 0 || foe.hp <= 0) break;
+        if (sk === 'player') {
+          const { d, eff } = rawHit(pl, foe, relMove, rng, state.typeChart, state.traits, rhythm);
+          let dd = d * TWO_STEP.releaseMult[step];
+          if (soft) dd *= TWO_STEP.softCounterMult;
+          const pierce = step === 'charge';
+          // Guard mitigates a release EXCEPT vs Charge (pierces) or Feint (the
+          // feint punishes the brace — no mitigation, then dazes).
+          if (foeSingle && foeStanceS === 'G' && !pierce && step !== 'feint') dd *= COMBAT.guardTaken;
+          if (foeSingle && foeStanceS === 'A') dd *= COMBAT.aggrTaken;
+          if (step === 'feint' && foeSingle && foeStanceS === 'G') dd *= COMBAT.dazeTaken; // FEINT punishes the brace
+          if (foe.exhausted) dd *= COMBAT.exhTaken;
+          foe = { ...foe, hp: applyHp(foe.hp, dd, foeCall) };
+          events.push({ kind: 'release', side: 'player', step, damage: dd, effectiveness: eff, ...(pierce ? { pierced: true } : {}), ...(step === 'hide' ? { concealed: true } : {}) });
+          if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
+        } else if (foeSingle && foeMoveS !== null) {
+          const { d, eff } = rawHit(foe, pl, foeMoveS, rng, state.typeChart, state.traits, rhythm);
+          let dd = d * stanceOutMult(foeStanceS!);
+          dd *= TWO_STEP.releaseIncomingMult[step]; // releaser's follow-through blunts the counter
+          if (pl.exhausted) dd *= COMBAT.exhTaken;
+          pl = { ...pl, hp: applyHp(pl.hp, dd, plCall) };
+          events.push({ kind: 'strike', side: 'foe', move: foeMoveS, damage: dd, effectiveness: eff });
+          if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
+        }
+      }
+    } else if (foeReleasing) {
+      // CASE B mirror — foe releases, player responds.
+      const step = foe.winding!.step;
+      const relMove = foe.winding!.move;
+      const plSingle = playerAction.kind === 'move' && playerAction.commit !== true;
+      const plStanceS: Stance | null = plSingle ? playerAction.stance : null;
+      const plMoveS: string | null = plSingle ? playerAction.move : null;
+      const soft = plSingle && plStanceS === TWO_STEP.softCounterStance[step];
+      const foeI = initiative(foe, relMove, rhythm, arena, state.traits);
+      const plI = plMoveS !== null ? initiative(pl, plMoveS, rhythm, arena, state.traits) : COMBAT.restInitiative;
+      const ord: Side[] = foeI >= plI ? ['foe', 'player'] : ['player', 'foe'];
+      for (const sk of ord) {
+        if (pl.hp <= 0 || foe.hp <= 0) break;
+        if (sk === 'foe') {
+          const { d, eff } = rawHit(foe, pl, relMove, rng, state.typeChart, state.traits, rhythm);
+          let dd = d * TWO_STEP.releaseMult[step];
+          if (soft) dd *= TWO_STEP.softCounterMult;
+          const pierce = step === 'charge';
+          if (plSingle && plStanceS === 'G' && !pierce && step !== 'feint') dd *= COMBAT.guardTaken;
+          if (plSingle && plStanceS === 'A') dd *= COMBAT.aggrTaken;
+          if (step === 'feint' && plSingle && plStanceS === 'G') dd *= COMBAT.dazeTaken;
+          if (pl.exhausted) dd *= COMBAT.exhTaken;
+          pl = { ...pl, hp: applyHp(pl.hp, dd, plCall) };
+          events.push({ kind: 'release', side: 'foe', step, damage: dd, effectiveness: eff, ...(pierce ? { pierced: true } : {}), ...(step === 'hide' ? { concealed: true } : {}) });
+          if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
+        } else if (plSingle && plMoveS !== null) {
+          const { d, eff } = rawHit(pl, foe, plMoveS, rng, state.typeChart, state.traits, rhythm);
+          let dd = d * stanceOutMult(plStanceS!);
+          dd *= TWO_STEP.releaseIncomingMult[step];
+          if (foe.exhausted) dd *= COMBAT.exhTaken;
+          foe = { ...foe, hp: applyHp(foe.hp, dd, foeCall) };
+          events.push({ kind: 'strike', side: 'player', move: plMoveS, damage: dd, effectiveness: eff });
+          if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
+        }
       }
     } else {
-      events.push({ kind: 'clash', winner: 'foe' });
-      foe = gainMomentum(foe, 'foe', events);
-      const r = resolveStrike(foe, pl, foeMove!, "A", "A", "foe", rng, events, state.typeChart, state.traits, rhythm, plDazed);
-      foe = r.attacker;
-      pl = r.defender;
-      if (pl.hp > 0) {
-        pl = { ...pl, staggered: true };
-        events.push({ kind: 'staggered', side: 'player' });
+      // CASE C — WIND-UP / Call round (no releases yet). A single-step striker
+      // catches a winding mon: phase-1 vulnerability (HARSH). If the striker's
+      // stance is a PUNISHER it earns ★ (read the wind-up — L2.7); a stance
+      // that only "survives" the wind-up grants no ★.
+      if (plCommitting) events.push({ kind: 'windUp', side: 'player', step: twoStepForStance(plStance) });
+      if (foeCommitting) events.push({ kind: 'windUp', side: 'foe', step: twoStepForStance(foeStance) });
+      const plStrikes = playerAction.kind === 'move' && playerAction.commit !== true && plMove !== null && plCall === null;
+      const foeStrikes = foeAction.kind === 'move' && foeAction.commit !== true && foeMove !== null && foeCall === null;
+      const plI = plStrikes ? initiative(pl, plMove, rhythm, arena, state.traits) : COMBAT.restInitiative;
+      const foeI = foeStrikes ? initiative(foe, foeMove, rhythm, arena, state.traits) : COMBAT.restInitiative;
+      const ord: Side[] = plI >= foeI ? ['player', 'foe'] : ['foe', 'player'];
+      for (const sk of ord) {
+        if (pl.hp <= 0 || foe.hp <= 0) break;
+        if (sk === 'player' && plStrikes) {
+          const { d, eff } = rawHit(pl, foe, plMove!, rng, state.typeChart, state.traits, rhythm);
+          let dd = d * stanceOutMult(plStance);
+          let tStep: TwoStep | null = null;
+          if (foeCommitting) {
+            tStep = twoStepForStance(foeStance);
+            dd *= TWO_STEP.phase1Vuln[tStep][plStance];
+          }
+          if (foe.exhausted) dd *= COMBAT.exhTaken;
+          foe = { ...foe, hp: applyHp(foe.hp, dd, foeCall) };
+          if (tStep !== null && TWO_STEP.punishedBy[tStep].includes(plStance)) {
+            events.push({ kind: 'phase1Punish', side: 'player', step: tStep, damage: dd });
+            pl = gainMomentum(pl, 'player', events);
+          } else {
+            events.push({ kind: 'strike', side: 'player', move: plMove!, damage: dd, effectiveness: eff });
+          }
+          if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
+        } else if (sk === 'foe' && foeStrikes) {
+          const { d, eff } = rawHit(foe, pl, foeMove!, rng, state.typeChart, state.traits, rhythm);
+          let dd = d * stanceOutMult(foeStance);
+          let tStep: TwoStep | null = null;
+          if (plCommitting) {
+            tStep = twoStepForStance(plStance);
+            dd *= TWO_STEP.phase1Vuln[tStep][foeStance];
+          }
+          if (pl.exhausted) dd *= COMBAT.exhTaken;
+          pl = { ...pl, hp: applyHp(pl.hp, dd, plCall) };
+          if (tStep !== null && TWO_STEP.punishedBy[tStep].includes(foeStance)) {
+            events.push({ kind: 'phase1Punish', side: 'foe', step: tStep, damage: dd });
+            foe = gainMomentum(foe, 'foe', events);
+          } else {
+            events.push({ kind: 'strike', side: 'foe', move: foeMove!, damage: dd, effectiveness: eff });
+          }
+          if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
+        }
+      }
+      // Wind-up chip: a winding mon lands a glancing poke (no read/★/effect),
+      // softening the tempo cost of committing. It already ate the phase-1
+      // punish above, so the gamble holds.
+      if (plCommitting && plMove !== null && pl.hp > 0 && foe.hp > 0) {
+        const { d, eff } = rawHit(pl, foe, plMove, rng, state.typeChart, state.traits, rhythm);
+        let dd = d * stanceOutMult(plStance) * TWO_STEP.windUpChipMult;
+        if (foe.exhausted) dd *= COMBAT.exhTaken;
+        foe = { ...foe, hp: applyHp(foe.hp, dd, foeCall) };
+        events.push({ kind: 'strike', side: 'player', move: plMove, damage: dd, effectiveness: eff });
+        if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
+      }
+      if (foeCommitting && foeMove !== null && pl.hp > 0 && foe.hp > 0) {
+        const { d, eff } = rawHit(foe, pl, foeMove, rng, state.typeChart, state.traits, rhythm);
+        let dd = d * stanceOutMult(foeStance) * TWO_STEP.windUpChipMult;
+        if (pl.exhausted) dd *= COMBAT.exhTaken;
+        pl = { ...pl, hp: applyHp(pl.hp, dd, plCall) };
+        events.push({ kind: 'strike', side: 'foe', move: foeMove, damage: dd, effectiveness: eff });
+        if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
       }
     }
+
+    // Two-step state transitions: a releaser clears its pending step; a fresh
+    // committer (that survived) carries `winding` into next round.
+    if (plReleasing) pl = stripWinding(pl);
+    else if (plCommitting && pl.hp > 0) pl = { ...pl, winding: { step: twoStepForStance(plStance), move: plMove! } };
+    if (foeReleasing) foe = stripWinding(foe);
+    else if (foeCommitting && foe.hp > 0) foe = { ...foe, winding: { step: twoStepForStance(foeStance), move: foeMove! } };
   } else {
-    for (const sideKey of order) {
-      if (pl.hp <= 0 || foe.hp <= 0) break;
-      if (sideKey === 'player' && plMove !== null) {
-        const r = resolveStrike(pl, foe, plMove, plStance, foeStance, "player", rng, events, state.typeChart, state.traits, rhythm, foeDazed);
+    // ── Single-step path (Layer 1 / legacy) — RNG- and event-identical ──────
+    // Layer 1 — THRICE-REPEAT SELF-DAZE. The same MOVE stance 3 rounds running
+    // (this round + the two prior committed stances) dazes the repeater: it
+    // takes extra damage this round (predictability punished). Symmetric.
+    const plMoveStance = plMove !== null ? plStance : null;
+    const foeMoveStance = foeMove !== null ? foeStance : null;
+    const plDazed = thriceRepeat(state.history, 'player', plMoveStance);
+    const foeDazed = thriceRepeat(state.history, 'foe', foeMoveStance);
+
+    const plInit = initiative(pl, plMove, rhythm, arena, state.traits);
+    const foeInit = initiative(foe, foeMove, rhythm, arena, state.traits);
+
+    // Layer 1 — FLUID = INITIATIVE. A Fluid move ACTS FIRST vs any non-Fluid
+    // stance (even when slower in raw speed); it gets its hit in before the
+    // opponent but loses the exchange on net (Aggressive punishes it). If both
+    // are Fluid, the faster (initiative) strikes first; otherwise by initiative.
+    const plFluid = plMove !== null && plStance === 'F';
+    const foeFluid = foeMove !== null && foeStance === 'F';
+    let order: Side[];
+    if (plInit < 0 && foeInit < 0) order = [];
+    else if (plInit < 0) order = ['foe'];
+    else if (foeInit < 0) order = ['player'];
+    else if (plFluid && !foeFluid) order = ['player', 'foe'];
+    else if (foeFluid && !plFluid) order = ['foe', 'player'];
+    else if (plInit > foeInit) order = ['player', 'foe'];
+    else if (foeInit > plInit) order = ['foe', 'player'];
+    else order = rng.next() < 0.5 ? ['player', 'foe'] : ['foe', 'player'];
+
+    events.push({
+      kind: 'initiative',
+      playerInit: plInit,
+      foeInit: foeInit,
+      first: order.length > 0 ? order[0]! : null,
+    });
+    if (plDazed) events.push({ kind: 'dazed', side: 'player' });
+    if (foeDazed) events.push({ kind: 'dazed', side: 'foe' });
+
+    // Stagger is consumed for initiative this round, then cleared.
+    pl = { ...pl, staggered: false };
+    foe = { ...foe, staggered: false };
+
+    const isClash = plMove !== null && foeMove !== null && plStance === 'A' && foeStance === 'A';
+
+    if (isClash) {
+      const psc = pl.st * pl.species.spd;
+      const fsc = foe.st * foe.species.spd;
+      const total = psc + fsc;
+      const plWins = total > 0 ? rng.next() < psc / total : rng.next() < 0.5;
+      if (plWins) {
+        events.push({ kind: 'clash', winner: 'player' });
+        pl = gainMomentum(pl, 'player', events);
+        const r = resolveStrike(pl, foe, plMove!, "A", "A", "player", rng, events, state.typeChart, state.traits, rhythm, foeDazed);
         pl = r.attacker;
         foe = r.defender;
-      } else if (sideKey === 'foe' && foeMove !== null) {
-        const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, "foe", rng, events, state.typeChart, state.traits, rhythm, plDazed);
+        if (foe.hp > 0) {
+          foe = { ...foe, staggered: true };
+          events.push({ kind: 'staggered', side: 'foe' });
+        }
+      } else {
+        events.push({ kind: 'clash', winner: 'foe' });
+        foe = gainMomentum(foe, 'foe', events);
+        const r = resolveStrike(foe, pl, foeMove!, "A", "A", "foe", rng, events, state.typeChart, state.traits, rhythm, plDazed);
         foe = r.attacker;
         pl = r.defender;
+        if (pl.hp > 0) {
+          pl = { ...pl, staggered: true };
+          events.push({ kind: 'staggered', side: 'player' });
+        }
+      }
+    } else {
+      for (const sideKey of order) {
+        if (pl.hp <= 0 || foe.hp <= 0) break;
+        if (sideKey === 'player' && plMove !== null) {
+          const r = resolveStrike(pl, foe, plMove, plStance, foeStance, "player", rng, events, state.typeChart, state.traits, rhythm, foeDazed);
+          pl = r.attacker;
+          foe = r.defender;
+        } else if (sideKey === 'foe' && foeMove !== null) {
+          const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, "foe", rng, events, state.typeChart, state.traits, rhythm, plDazed);
+          foe = r.attacker;
+          pl = r.defender;
+        }
       }
     }
   }
@@ -448,7 +738,12 @@ export function resolveRound(
 
   if (!plFainted) {
     const plBefore = pl;
-    pl = paySide(pl, playerAction, rhythm, arena);
+    // Layer 2 — a RELEASE strike is free (energy was spent on the wind-up):
+    // just regen. A Call spends ★ (no stamina change). A wind-up (commit move)
+    // pays its move cost via the normal paySide path.
+    if (plReleasing) pl = { ...pl, st: Math.min(100, pl.st + COMBAT.regen) };
+    else if (playerAction.kind === 'call') { /* ★ already spent; no stamina */ }
+    else pl = paySide(pl, playerAction, rhythm, arena);
     if (pl.st !== plBefore.st) {
       events.push({
         kind: 'stamina',
@@ -462,7 +757,9 @@ export function resolveRound(
   }
   if (!foeFainted) {
     const foeBefore = foe;
-    foe = paySide(foe, foeAction, rhythm, arena);
+    if (foeReleasing) foe = { ...foe, st: Math.min(100, foe.st + COMBAT.regen) };
+    else if (foeAction.kind === 'call') { /* ★ already spent; no stamina */ }
+    else foe = paySide(foe, foeAction, rhythm, arena);
     if (foe.st !== foeBefore.st) {
       events.push({
         kind: 'stamina',
@@ -526,6 +823,8 @@ export function resolveRound(
       else if (ev.kind === 'opening' && ev.side === 'player') gained += 1;
       else if (ev.kind === 'punish' && ev.side === 'player') gained += 1; // A>F read-win (was 'dodge')
       else if (ev.kind === 'clash' && ev.winner === 'player') gained += 1;
+      else if (ev.kind === 'phase1Punish' && ev.side === 'player') gained += 1; // L2: read a wind-up
+      else if (ev.kind === 'flipResolve' && ev.winner === 'player') gained += 1; // L2: won the flip
     }
     if (gained > 0) {
       breakProgress += gained;
@@ -555,8 +854,11 @@ export function resolveRound(
       history: [
         ...state.history,
         {
-          player: playerAction.kind === 'move' ? playerAction.stance : null,
-          foe: foeAction.kind === 'move' ? foeAction.stance : null,
+          // Layer 2 — a release round records the wound-up step's BASE stance
+          // (a commit move already records its stance via the 'move' branch),
+          // so thrice-daze sees two-steps as their base stance. Calls/rest → null.
+          player: plReleaseBase ?? (playerAction.kind === 'move' ? playerAction.stance : null),
+          foe: foeReleaseBase ?? (foeAction.kind === 'move' ? foeAction.stance : null),
         },
       ],
     },

@@ -2,6 +2,20 @@ export type Side = 'player' | 'foe';
 
 export type Stance = 'A' | 'G' | 'F';
 
+// Combat Layer 2 — two-step plays. Each is a 2-round COMMITMENT initiated
+// from a base stance (NOT a 4th–6th permanent stance): CHARGE from Aggressive,
+// HIDE from Fluid, FEINT from Guard. See combat-enrichment-roadmap.md / Layer 2.
+export type TwoStep = 'charge' | 'hide' | 'feint';
+
+export type CallKind = 'getAway' | 'hangInThere';
+
+export function twoStepForStance(s: Stance): TwoStep {
+  return s === 'A' ? 'charge' : s === 'F' ? 'hide' : 'feint';
+}
+export function stanceForTwoStep(ts: TwoStep): Stance {
+  return ts === 'charge' ? 'A' : ts === 'hide' ? 'F' : 'G';
+}
+
 export type TierName = 'light' | 'mid' | 'heavy' | 'nuke';
 
 // Type identifiers are arbitrary strings now (data-driven).
@@ -56,6 +70,11 @@ export interface SideState {
   // (bond-track-v2.md Call-tier I "Familiar"). Omitted (undefined) on every
   // legacy/sim side, so the field is absent → behaviour is bit-identical.
   readonly jumpstartArmed?: boolean;
+  // Combat Layer 2 — a pending two-step. Set on the WIND-UP round (phase 1)
+  // when this mon commits a two-step; present at the start of the next round
+  // means this mon RELEASES (phase 2) and the field is then cleared. Absent
+  // (undefined) on every legacy/sim/single-step side → bit-identical shape.
+  readonly winding?: { readonly step: TwoStep; readonly move: string };
 }
 
 // A side's roster. The active mon is members[active]; the rest are bench.
@@ -119,7 +138,10 @@ export interface BattleState {
 }
 
 export type Action =
-  | { readonly kind: 'move'; readonly move: string; readonly stance: Stance }
+  // `commit: true` (Layer 2) INITIATES the stance's two-step: A→CHARGE,
+  // F→HIDE, G→FEINT. Absent/false = a normal single-step move (the legacy
+  // shape → single-step resolution is bit-identical).
+  | { readonly kind: 'move'; readonly move: string; readonly stance: Stance; readonly commit?: boolean }
   | { readonly kind: 'rest' }
   | { readonly kind: 'catchBreath' }
   | { readonly kind: 'switch'; readonly toIndex: number }
@@ -128,7 +150,12 @@ export type Action =
   // engine only governs the turn — the thrower does not strike, the foe
   // acts normally, no stamina change. Sim bots never throw, so the
   // ladders stay bit-identical (this branch is dead code for them).
-  | { readonly kind: 'throwBall' };
+  | { readonly kind: 'throwBall' }
+  // Layer 2 — a ★-powered Call OVERRIDE. The ONLY escape from a committed
+  // enemy Charge (not a stance): GET AWAY = guaranteed no-hit this round;
+  // HANG IN THERE = cannot drop below 1 hp this round. Spends 1 ★ (momentum);
+  // the caller forgoes its strike. Sim/legacy bots never call → bit-identical.
+  | { readonly kind: 'call'; readonly call: CallKind };
 
 export interface StatScale {
   readonly hp?: number;

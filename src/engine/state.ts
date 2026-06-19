@@ -156,6 +156,12 @@ export function validateAction(side: SideState, action: Action): void {
     // auto-fail game-side). No engine constraint.
     return;
   }
+  if (action.kind === 'call') {
+    // Layer 2 — a ★-Call override (GET AWAY / HANG IN THERE). Costs 1 ★.
+    if (side.momentum < 1) throw new Error('Call needs ≥1 momentum');
+    if (side.exhausted) throw new Error('Cannot Call while exhausted');
+    return;
+  }
   if (side.exhausted) throw new Error('Cannot move while exhausted');
   if (!side.species.moves.includes(action.move)) {
     throw new Error(`Side cannot use ${action.move}`);
