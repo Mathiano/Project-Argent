@@ -54,6 +54,7 @@ Dex content is commissioned from Gemini against `docs/mon-manifest.csv` (200 pre
 | **`docs/combat-focus-redesign.md`** | The FOCUS two-step DESIGN (R1 generic focus → R2 hidden release, rotation triangle) — current two-step model |
 | **`docs/combat-focus-AS-BUILT.md`** | The FOCUS model AS IMPLEMENTED (code-truth: live config knobs, events, sim result) |
 | **`docs/combat-system-candidates-decision.md`** | Decision record: B (distinct wind-ups) vs Focus vs Candidate C |
+| **`docs/trainer-combat-profiles.md`** | Layer 4 DESIGN — trainer-AI variety (profiles, decision tree); build gated on Focus feel sign-off |
 | **`docs/combat-depth-types-status.md`** | The 17-type mechanical identities + combat depth status |
 | `docs/content-progression-scope.md` | 42-hour plan, boss ladder, read-rate ramp |
 | `docs/pilot-exit-decisions.md` | Art direction, dex pipeline, overworld architecture |
