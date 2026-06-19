@@ -31,8 +31,21 @@ export const COMBAT = {
   reflect: 0.5,
   openDmg: 1.15,
   openTaken: 0.85,
-  dodgeSlope: 2.0,
-  dodgeCap: 0.9,
+
+  // ── Combat Layer 1 — base-triangle fix (combat-enrichment-roadmap.md) ──
+  // AGGRESSIVE now BEATS FLUID (was a Fluid dodge). When an Aggressive strike
+  // lands on a Fluid defender it's a PUNISH — the dodger gets caught — dealing
+  // punishMult× extra and charging the AGGRESSOR's ★ (the read-win flips with
+  // the edge). This is the dominance fix: Fluid's old safety (the reliable
+  // dodge) is gone, so spamming it is now punishable. Sim-gated (PureFLUID
+  // collapses from dominant to a losing strategy).
+  punishMult: 1.35,
+  // THRICE-REPEAT SELF-DAZE: the same stance 3 rounds running makes the
+  // repeater DAZED — it takes dazeTaken× extra that round (predictability
+  // punished). Symmetric for player + foe.
+  dazeTaken: 1.3,
+  // (Legacy dodge knobs removed with the Layer-1 flip: Fluid no longer dodges
+  // Aggressive — it gets punished. dodgeSlope/dodgeCap are gone.)
 
   // Phase 6b — Catch Breath restores 50% of the 100-ST cap (= +50), a
   // percentage so it scales with the full bar. Was +35 flat — a weak

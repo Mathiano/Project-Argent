@@ -364,18 +364,18 @@ describe('momentum charging on each read-win', () => {
     expect(fo(result.state).momentum).toBe(0);
   });
 
-  test('dodge grants momentum to the defender', () => {
-    // AQUAFIN attacks Aggressive into EMBERCUB Fluid; speed ratio 108/72 - 1 = 0.5 → p ≈ 0.9.
+  test('Layer 1: Aggressive PUNISHES Fluid (A>F) — the aggressor charges ★, not the dodger', () => {
     const state = createBattleState(createSide(SPECIES.AQUAFIN!), createSide(SPECIES.EMBERCUB!));
-    const rng = fixedRng([0.5, 0.1]); // variance, dodge roll
     const result = resolveRound(
       state,
       { kind: 'move', move: 'TACKLE', stance: 'A' },
       { kind: 'move', move: 'TACKLE', stance: 'F' },
-      rng,
+      fixedRng([0.5]),
     );
-    expect(result.events.some((e) => e.kind === 'dodge' && e.side === 'foe')).toBe(true);
-    expect(fo(result.state).momentum).toBe(1);
+    expect(result.events.some((e) => e.kind === 'punish' && e.side === 'player')).toBe(true);
+    expect(result.events.some((e) => e.kind === 'dodge')).toBe(false); // Fluid no longer evades
+    expect(pl(result.state).momentum).toBe(1); // ★ to the aggressor (the read-winner)
+    expect(fo(result.state).momentum).toBe(0); // NOT the Fluid dodger
   });
 
   test('momentum caps at 2', () => {
@@ -449,6 +449,92 @@ describe('injected type chart (A1)', () => {
       (e): e is Extract<typeof e, { kind: 'strike' }> => e.kind === 'strike' && e.side === 'foe',
     );
     expect(struck?.effectiveness).toBe(2);
+  });
+});
+
+describe('Combat Layer 1 — base-triangle fix', () => {
+  test('Aggressive WINS the A-vs-F exchange (deals more than the Fluid side)', () => {
+    // Mirror species so only the stance matters. Player Aggressive, foe Fluid.
+    const state = createBattleState(createSide(SPECIES.SPROUTLE!), createSide(SPECIES.SPROUTLE!));
+    const r = resolveRound(
+      state,
+      { kind: 'move', move: 'TACKLE', stance: 'A' },
+      { kind: 'move', move: 'TACKLE', stance: 'F' },
+      fixedRng([0.5]),
+    );
+    const start = pl(state).hp;
+    const aggDealt = start - fo(r.state).hp; // damage Aggressive did to Fluid
+    const fluidDealt = start - pl(r.state).hp; // damage Fluid did to Aggressive
+    expect(aggDealt).toBeGreaterThan(fluidDealt); // Aggressive wins on net
+  });
+
+  test('FLUID acts first vs a non-Fluid stance, even when slower', () => {
+    // AQUAFIN (spd 72) Fluid vs EMBERCUB (spd 108) Aggressive — the slower
+    // Fluid still strikes first (initiative identity). The first damage event
+    // (the Fluid side's normal strike) precedes the Aggressive punish.
+    const state = createBattleState(createSide(SPECIES.AQUAFIN!), createSide(SPECIES.EMBERCUB!));
+    const r = resolveRound(
+      state,
+      { kind: 'move', move: 'TACKLE', stance: 'F' },
+      { kind: 'move', move: 'TACKLE', stance: 'A' },
+      fixedRng([0.5]),
+    );
+    const init = r.events.find((e) => e.kind === 'initiative') as { first?: string } | undefined;
+    expect(init?.first).toBe('player'); // the Fluid (slower) side goes first
+    const firstDmg = r.events.find((e) => e.kind === 'strike' || e.kind === 'punish');
+    expect(firstDmg?.kind).toBe('strike'); // Fluid's strike lands before the punish
+    expect(firstDmg?.side).toBe('player');
+  });
+
+  test('THRICE-REPEAT self-daze: 3 rounds of the same stance dazes the repeater', () => {
+    let state = createBattleState(createSide(SPECIES.SPROUTLE!), createSide(SPECIES.SPROUTLE!));
+    // Player guards 3 rounds running; foe varies (so the foe isn't dazed).
+    const foeStances: Array<'A' | 'G' | 'F'> = ['A', 'F', 'A'];
+    let dazedOnThird = false;
+    for (let round = 0; round < 3; round += 1) {
+      const r = resolveRound(
+        state,
+        { kind: 'move', move: 'TACKLE', stance: 'G' },
+        { kind: 'move', move: 'TACKLE', stance: foeStances[round]! },
+        fixedRng([0.5]),
+      );
+      if (round === 2) {
+        dazedOnThird = r.events.some((e) => e.kind === 'dazed' && e.side === 'player');
+      } else {
+        expect(r.events.some((e) => e.kind === 'dazed' && e.side === 'player')).toBe(false);
+      }
+      state = r.state;
+    }
+    expect(dazedOnThird).toBe(true); // the 3rd identical stance dazes
+  });
+
+  test('daze makes the repeater take MORE damage that round (a real vulnerability)', () => {
+    // Build a state where the player has guarded the prior two rounds (history),
+    // then guards a third time → dazed → takes extra from the foe's hit.
+    const base = createBattleState(createSide(SPECIES.SPROUTLE!), createSide(SPECIES.EMBERCUB!));
+    const withHistory: BattleState = {
+      ...base,
+      history: [
+        { player: 'G', foe: 'A' },
+        { player: 'G', foe: 'A' },
+      ],
+    };
+    const dazed = resolveRound(
+      withHistory,
+      { kind: 'move', move: 'TACKLE', stance: 'G' }, // 3rd guard → dazed
+      { kind: 'move', move: 'TACKLE', stance: 'A' },
+      fixedRng([0.5]),
+    );
+    const notYet = resolveRound(
+      { ...base, history: [{ player: 'G', foe: 'A' }] }, // only 2nd guard → not dazed
+      { kind: 'move', move: 'TACKLE', stance: 'G' },
+      { kind: 'move', move: 'TACKLE', stance: 'A' },
+      fixedRng([0.5]),
+    );
+    expect(dazed.events.some((e) => e.kind === 'dazed' && e.side === 'player')).toBe(true);
+    const dazedLoss = pl(withHistory).hp - pl(dazed.state).hp;
+    const normalLoss = pl(base).hp - pl(notYet.state).hp;
+    expect(dazedLoss).toBeGreaterThan(normalLoss); // dazed → took more
   });
 });
 

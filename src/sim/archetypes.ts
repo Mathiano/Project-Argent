@@ -99,8 +99,6 @@ function staminaReaderPolicy(
   telegraph?: Action,
 ): Action {
   const me = activeMon(state[side]);
-  const foeKey: Side = side === 'player' ? 'foe' : 'player';
-  const foe = activeMon(state[foeKey]);
 
   const forced = forcedAction(me);
   if (forced) return forced;
@@ -108,14 +106,17 @@ function staminaReaderPolicy(
   if (me.momentum >= 1 && me.st < 30) return { kind: 'catchBreath' };
 
   const foeStance = telegraphStance(telegraph);
-  const mySpd = me.species.spd;
-  const foeSpd = foe.species.spd;
 
+  // Read the foe's telegraph and counter it on the CURRENT triangle
+  // (Combat Layer 1: AGGRESSIVE > FLUID > GUARD > AGGRESSIVE). This bot is a
+  // "competent reader" measurement instrument, so it must read the live
+  // triangle — pre-Layer-1 it countered Aggressive with Fluid (the old
+  // dodge); now Aggressive is countered with GUARD. Stamina-aware: it falls
+  // back to Guard when too drained to afford the Fluid surcharge.
   let stance: Stance;
-  if (foeStance === 'A') stance = mySpd > foeSpd && me.st >= 40 ? 'F' : 'G';
-  else if (foeStance === 'G') stance = me.st >= 40 ? 'F' : 'G';
-  else if (foeStance === 'F') stance = mySpd > foeSpd ? 'A' : 'G';
-  else stance = 'A';
+  if (foeStance === null) stance = 'G';
+  else stance = triangleCounter(foeStance); // A→G, G→F, F→A
+  if (stance === 'F' && me.st < 40) stance = 'G'; // can't afford Fluid → brace
 
   return { kind: 'move', move: pickMidOrLight(me), stance };
 }

@@ -967,55 +967,21 @@ describe('resolve cadence + stance labels — legibility pass', () => {
     expect(advanceUntilLog(scene, 'FLUID slips past GUARD', 12)).toBe(true);
   });
 
-  test('stance label on dodge: "FLUID dodged" when A attacks F and the speed roll lands', () => {
+  test('Layer 1: Aggressive into Fluid shows the PUNISH beat (no dodge)', () => {
     const scene = createBattleScene({
       state: createBattleState(
         createTeam([createSide(SPECIES.AQUAFIN!)]),
         createTeam([createSide(SPECIES.EMBERCUB!)]),
       ),
-      // First draw: variance. Second: dodge roll. Force a low dodge
-      // roll so the dodge always succeeds (p ≈ 0.9 from speed ratio).
-      rng: {
-        next: (() => {
-          const seq = [0.5, 0.05, 0.5, 0.05, 0.5, 0.05, 0.5, 0.05];
-          let i = 0;
-          return () => seq[i++ % seq.length]!;
-        })(),
-      },
+      rng: { next: () => 0.5 },
       chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'F' }),
       intro: [],
       catchBreathUnlocked: false,
       canRun: true,
       onResolve: () => {},
     });
-    pickStance(scene, 'A');
-    expect(advanceUntilLog(scene, 'DODGE', 12)).toBe(true);
-  });
-
-  test('explanatory callout when an Aggressive strike LANDS on Fluid (no dodge): "too slow to evade"', () => {
-    // A-vs-F where the dodge roll FAILS (forced high) → the strike lands
-    // and the callout names the rule: the attacker was faster.
-    const scene = createBattleScene({
-      state: createBattleState(
-        createTeam([createSide(SPECIES.AQUAFIN!)]),
-        createTeam([createSide(SPECIES.EMBERCUB!)]),
-      ),
-      // [variance, dodge-roll] repeating — dodge roll 0.99 > p ⇒ no dodge.
-      rng: {
-        next: (() => {
-          const seq = [0.5, 0.99, 0.5, 0.99, 0.5, 0.99, 0.5, 0.99];
-          let i = 0;
-          return () => seq[i++ % seq.length]!;
-        })(),
-      },
-      chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'F' }),
-      intro: [],
-      catchBreathUnlocked: false,
-      canRun: true,
-      onResolve: () => {},
-    });
-    pickStance(scene, 'A');
-    expect(advanceUntilLog(scene, 'evade', 12)).toBe(true);
+    pickStance(scene, 'A'); // Aggressive vs the foe's Fluid → PUNISH (A>F)
+    expect(advanceUntilLog(scene, 'PUNISH', 12)).toBe(true);
   });
 });
 
@@ -1025,11 +991,12 @@ describe('combat legibility (S1/S2) — pure callout + speed helpers', () => {
     expect(stanceCallout({ kind: 'counter' })).toContain('GUARD');
     expect(stanceCallout({ kind: 'opening' })).toContain('OPENING');
     expect(stanceCallout({ kind: 'opening' })).toContain('FLUID');
-    expect(stanceCallout({ kind: 'dodge' })).toContain('DODGE');
-    expect(stanceCallout({ kind: 'dodge' })).toContain('faster');
-    // Aggressive strike that LANDED on Fluid = failed dodge = "too slow".
-    expect(stanceCallout({ kind: 'strike', attackerStance: 'A', defenderStance: 'F' })).toContain('too slow');
-    // A normal strike (not A-vs-F) is not a triangle teaching moment.
+    // Layer 1: Aggressive beats Fluid → the PUNISH callout names the rule.
+    expect(stanceCallout({ kind: 'punish' })).toContain('PUNISH');
+    expect(stanceCallout({ kind: 'punish' })).toContain('FLUID');
+    // A normal strike is not itself a triangle teaching moment (the A-vs-F
+    // case is a `punish` event now, not a strike).
+    expect(stanceCallout({ kind: 'strike', attackerStance: 'A', defenderStance: 'F' })).toBeNull();
     expect(stanceCallout({ kind: 'strike', attackerStance: 'A', defenderStance: 'G' })).toBeNull();
     expect(stanceCallout({ kind: 'strike' })).toBeNull();
   });

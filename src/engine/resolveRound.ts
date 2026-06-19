@@ -40,8 +40,17 @@ function snapshot(side: SideState): SideSnapshot {
   };
 }
 
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, v));
+// Layer 1 — has `side` committed the SAME (non-null) move stance for the two
+// most recent rounds, matching `stance` this round? Three running = a daze.
+function thriceRepeat(
+  history: readonly { readonly player: Stance | null; readonly foe: Stance | null }[],
+  side: Side,
+  stance: Stance | null,
+): boolean {
+  if (stance === null || history.length < 2) return false;
+  const a = history[history.length - 1]![side];
+  const b = history[history.length - 2]![side];
+  return a === stance && b === stance;
 }
 
 function stanceOutMult(stance: Stance): number {
@@ -128,6 +137,7 @@ function resolveStrike(
   typeChart: TypeChart,
   traits: TraitTable,
   rhythm: boolean,
+  defDazed: boolean,
 ): StrikeResult {
   const move = lookupMove(moveName);
   const tier = TIERS[move.tier];
@@ -142,24 +152,27 @@ function resolveStrike(
   // Trait damage modifier (e.g., GUSTBORNE x1.3 on rhythm rounds).
   d *= traitMods(attacker, rhythm, traits).dmgMult;
 
-  // A vs F — dodge check
+  // Extra damage a DAZED defender takes this round (thrice-repeat punish).
+  // Applied to whichever damage branch lands below.
+  const dazeMult = defDazed ? COMBAT.dazeTaken : 1;
+
+  // A vs F — Layer 1: AGGRESSIVE BEATS FLUID. The aggressor catches the
+  // committing dodger — a PUNISH (hard counter, was the Fluid dodge). Extra
+  // damage + the AGGRESSOR charges ★ (the read-win flips with the edge).
   if (attStance === 'A' && defStance === 'F') {
-    const p = clamp(
-      (defender.species.spd / attacker.species.spd - 1) * COMBAT.dodgeSlope,
-      0,
-      COMBAT.dodgeCap,
-    );
-    if (rng.next() < p) {
-      events.push({ kind: 'dodge', side: defSide });
-      const dodged = gainMomentum(defender, defSide, events);
-      return { attacker, defender: dodged };
-    }
+    let dd = d * COMBAT.punishMult * dazeMult;
+    if (defender.exhausted) dd *= COMBAT.exhTaken;
+    const newDef: SideState = { ...defender, hp: Math.max(0, defender.hp - dd) };
+    events.push({ kind: 'punish', side: attSide, damage: dd, effectiveness: eff });
+    const newAtt = gainMomentum(attacker, attSide, events);
+    if (newDef.hp <= 0) events.push({ kind: 'ko', side: defSide });
+    return { attacker: newAtt, defender: newDef };
   }
 
   // F vs G — opening (no counter possible)
   if (attStance === 'F' && defStance === 'G') {
-    const mit = defender.exhausted ? COMBAT.openTaken * COMBAT.exhTaken : COMBAT.openTaken;
-    const dd = d * COMBAT.openDmg * mit;
+    const baseMit = defender.exhausted ? COMBAT.openTaken * COMBAT.exhTaken : COMBAT.openTaken;
+    const dd = d * COMBAT.openDmg * baseMit * dazeMult;
     const newDef: SideState = { ...defender, hp: Math.max(0, defender.hp - dd) };
     events.push({ kind: 'opening', side: attSide, damage: dd, effectiveness: eff });
     const newAtt = gainMomentum(attacker, attSide, events);
@@ -167,11 +180,14 @@ function resolveStrike(
     return { attacker: newAtt, defender: newDef };
   }
 
-  // Normal hit (with defender mitigation)
+  // Normal hit (with defender mitigation). preMit stays PRE-daze so the
+  // counter reflect isn't amplified by the defender's own daze (daze is a
+  // vulnerability, never a buff).
   const preMit = d;
   if (defStance === 'A') d *= COMBAT.aggrTaken;
   if (defStance === 'G') d *= COMBAT.guardTaken;
   if (defender.exhausted) d *= COMBAT.exhTaken;
+  d *= dazeMult;
 
   let newDef: SideState = { ...defender, hp: Math.max(0, defender.hp - d) };
   let newAtt: SideState = attacker;
@@ -337,18 +353,32 @@ export function resolveRound(
   const plMove = actionMove(playerAction);
   const foeMove = actionMove(foeAction);
 
+  // Layer 1 — THRICE-REPEAT SELF-DAZE. The same MOVE stance 3 rounds running
+  // (this round + the two prior committed stances) dazes the repeater: it
+  // takes extra damage this round (predictability punished). Symmetric.
+  const plMoveStance = plMove !== null ? plStance : null;
+  const foeMoveStance = foeMove !== null ? foeStance : null;
+  const plDazed = thriceRepeat(state.history, 'player', plMoveStance);
+  const foeDazed = thriceRepeat(state.history, 'foe', foeMoveStance);
+
   const arena = state.bossCard?.arenaSchedule;
   const rhythm = isRhythmRound(arena, state.round, state.rhythmAnchor ?? 0);
 
   const plInit = initiative(pl, plMove, rhythm, arena, state.traits);
   const foeInit = initiative(foe, foeMove, rhythm, arena, state.traits);
 
+  // Layer 1 — FLUID = INITIATIVE. A Fluid move ACTS FIRST vs any non-Fluid
+  // stance (even when slower in raw speed); it gets its hit in before the
+  // opponent but loses the exchange on net (Aggressive punishes it). If both
+  // are Fluid, the faster (initiative) strikes first; otherwise by initiative.
+  const plFluid = plMove !== null && plStance === 'F';
+  const foeFluid = foeMove !== null && foeStance === 'F';
   let order: Side[];
   if (plInit < 0 && foeInit < 0) order = [];
   else if (plInit < 0) order = ['foe'];
   else if (foeInit < 0) order = ['player'];
-  else if (plStance === 'F' && foeStance === 'G') order = ['player', 'foe'];
-  else if (foeStance === 'F' && plStance === 'G') order = ['foe', 'player'];
+  else if (plFluid && !foeFluid) order = ['player', 'foe'];
+  else if (foeFluid && !plFluid) order = ['foe', 'player'];
   else if (plInit > foeInit) order = ['player', 'foe'];
   else if (foeInit > plInit) order = ['foe', 'player'];
   else order = rng.next() < 0.5 ? ['player', 'foe'] : ['foe', 'player'];
@@ -359,6 +389,8 @@ export function resolveRound(
     foeInit: foeInit,
     first: order.length > 0 ? order[0]! : null,
   });
+  if (plDazed) events.push({ kind: 'dazed', side: 'player' });
+  if (foeDazed) events.push({ kind: 'dazed', side: 'foe' });
 
   // Stagger is consumed for initiative this round, then cleared.
   pl = { ...pl, staggered: false };
@@ -374,7 +406,7 @@ export function resolveRound(
     if (plWins) {
       events.push({ kind: 'clash', winner: 'player' });
       pl = gainMomentum(pl, 'player', events);
-      const r = resolveStrike(pl, foe, plMove!, "A", "A", "player", rng, events, state.typeChart, state.traits, rhythm);
+      const r = resolveStrike(pl, foe, plMove!, "A", "A", "player", rng, events, state.typeChart, state.traits, rhythm, foeDazed);
       pl = r.attacker;
       foe = r.defender;
       if (foe.hp > 0) {
@@ -384,7 +416,7 @@ export function resolveRound(
     } else {
       events.push({ kind: 'clash', winner: 'foe' });
       foe = gainMomentum(foe, 'foe', events);
-      const r = resolveStrike(foe, pl, foeMove!, "A", "A", "foe", rng, events, state.typeChart, state.traits, rhythm);
+      const r = resolveStrike(foe, pl, foeMove!, "A", "A", "foe", rng, events, state.typeChart, state.traits, rhythm, plDazed);
       foe = r.attacker;
       pl = r.defender;
       if (pl.hp > 0) {
@@ -396,11 +428,11 @@ export function resolveRound(
     for (const sideKey of order) {
       if (pl.hp <= 0 || foe.hp <= 0) break;
       if (sideKey === 'player' && plMove !== null) {
-        const r = resolveStrike(pl, foe, plMove, plStance, foeStance, "player", rng, events, state.typeChart, state.traits, rhythm);
+        const r = resolveStrike(pl, foe, plMove, plStance, foeStance, "player", rng, events, state.typeChart, state.traits, rhythm, foeDazed);
         pl = r.attacker;
         foe = r.defender;
       } else if (sideKey === 'foe' && foeMove !== null) {
-        const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, "foe", rng, events, state.typeChart, state.traits, rhythm);
+        const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, "foe", rng, events, state.typeChart, state.traits, rhythm, plDazed);
         foe = r.attacker;
         pl = r.defender;
       }
@@ -492,7 +524,7 @@ export function resolveRound(
     for (const ev of events) {
       if (ev.kind === 'counter' && ev.side === 'player') gained += 1;
       else if (ev.kind === 'opening' && ev.side === 'player') gained += 1;
-      else if (ev.kind === 'dodge' && ev.side === 'player') gained += 1;
+      else if (ev.kind === 'punish' && ev.side === 'player') gained += 1; // A>F read-win (was 'dodge')
       else if (ev.kind === 'clash' && ev.winner === 'player') gained += 1;
     }
     if (gained > 0) {

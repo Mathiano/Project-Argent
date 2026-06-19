@@ -32,7 +32,17 @@ export type BattleEvent =
   | { readonly kind: 'catchBreath'; readonly side: Side; readonly restored: number }
   | { readonly kind: 'clash'; readonly winner: Side }
   | { readonly kind: 'strike'; readonly side: Side; readonly move: string; readonly damage: number; readonly effectiveness: number }
+  // Legacy (pre-Layer-1): a Fluid defender evaded an Aggressive strike. NO
+  // LONGER EMITTED after the Layer-1 triangle fix (Aggressive beats Fluid →
+  // `punish`). Kept for replay/back-compat; safe to remove once nothing reads it.
   | { readonly kind: 'dodge'; readonly side: Side }
+  // Layer 1: an Aggressive strike CAUGHT a Fluid defender (the dodger
+  // committed) — the read-win on the A>F edge. `side` is the AGGRESSOR (who
+  // charges ★). The damage already includes the punish multiplier.
+  | { readonly kind: 'punish'; readonly side: Side; readonly damage: number; readonly effectiveness: number }
+  // Layer 1: a side picked the same stance 3 rounds running → DAZED this
+  // round (took extra damage). `side` is the dazed (predictable) mon.
+  | { readonly kind: 'dazed'; readonly side: Side }
   | { readonly kind: 'opening'; readonly side: Side; readonly damage: number; readonly effectiveness: number }
   | { readonly kind: 'counter'; readonly side: Side; readonly damage: number }
   | { readonly kind: 'staggered'; readonly side: Side }

@@ -20,43 +20,41 @@ const SEED = 1;
 //
 // INTENTIONAL CATCH-BREATH RE-BASELINE (Phase 6b, 2026-06-15): Catch Breath
 // restore went +35 flat → 50% of the 100-ST cap (+50); 4 cells shifted.
+// INTENTIONAL TTK RE-BASELINE (2026-06-15): COMBAT.hpScale 1.0 → 1.30.
 //
-// ── INTENTIONAL TTK RE-BASELINE (2026-06-15) ─────────────────────────────
-// Global HP:damage-ratio knob `COMBAT.hpScale` 1.0 → 1.30, to lengthen fights
-// so reads/comebacks have room (KICKOFF-ttk-tuning.md, combat-depth Issue B).
-// It scales every mon's maxHp uniformly — a LENGTH lever, not power — so ALL
-// 15 cells moved. The win% RELATIONSHIPS are preserved and SHARPENED: the
-// reading archetypes gain (more rounds → reads matter more) while pure-mash
-// brute LOSES (longer fights expose it to more counters). Mean fight length
-// rose from ~4-5 to ~6-10 rounds. Before → after wins:
-//   SPROUTLE→EMBERCUB  staticGuard 1631→1856  brute 304→271  naive 1496→1594
-//                      stamReader 1511→1663   human 1142→1233
-//   EMBERCUB→AQUAFIN   staticGuard  930→1023  brute 320→249  naive  730→1004
-//                      stamReader 1157→1184   human  932→974
-//   AQUAFIN→SPROUTLE   staticGuard 1767→1934  brute 319→263  naive 1604→1695
-//                      stamReader 1516→1633   human 1134→1243
-// The Falkner ladder was re-locked to new bands in the same pass (see there).
+// ── INTENTIONAL COMBAT-LAYER-1 RE-BASELINE (2026-06-19) ───────────────────
+// The base-triangle fix (combat-enrichment-roadmap.md): AGGRESSIVE now BEATS
+// FLUID (was a Fluid dodge → now an Aggressive PUNISH), Fluid acts-first but
+// loses that exchange, the ★-award flips with the edge, and thrice-repeat
+// self-dazes. This CHANGES combat outcomes, so all 15 cells moved — an
+// intended re-baseline, NOT drift. The stance-balance sim-gate
+// (stanceBalance.test.ts) is the real validation (PureFLUID collapsed from
+// dominant to a losing spam). The READING archetypes rise (naive-triangle's
+// counter + the now-fixed stamina-reader both read the NEW triangle); the
+// stamina-reader's stance logic was updated to the live triangle (it used to
+// counter Aggressive with Fluid — the old dodge — which now LOSES). Cells
+// are exact + deterministic at seed=1.
 const BASELINE: ReadonlyArray<{
   player: string;
   foe: string;
   archetype: BotArchetype;
   wins: number;
 }> = [
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: staticGuard, wins: 1856 },
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: brute, wins: 271 },
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: naiveTriangle, wins: 1594 },
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: staminaReader, wins: 1663 },
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: humanIsh, wins: 1233 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: staticGuard, wins: 1023 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: brute, wins: 249 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: naiveTriangle, wins: 1004 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: staminaReader, wins: 1184 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: humanIsh, wins: 974 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: staticGuard, wins: 1934 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: brute, wins: 263 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: naiveTriangle, wins: 1695 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: staminaReader, wins: 1633 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: humanIsh, wins: 1243 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: staticGuard, wins: 1280 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: brute, wins: 341 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: naiveTriangle, wins: 1807 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: staminaReader, wins: 1783 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: humanIsh, wins: 1299 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: staticGuard, wins: 473 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: brute, wins: 265 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: naiveTriangle, wins: 1016 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: staminaReader, wins: 841 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: humanIsh, wins: 553 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: staticGuard, wins: 1371 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: brute, wins: 330 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: naiveTriangle, wins: 1852 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: staminaReader, wins: 1845 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: humanIsh, wins: 1324 },
 ];
 
 describe('rival ladder regressions (n=2000, seed=1)', () => {

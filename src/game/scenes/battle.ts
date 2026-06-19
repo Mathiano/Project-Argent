@@ -170,11 +170,11 @@ function computeInit(side: SideState, moveName: string | null, stance: Stance): 
 }
 
 // The TRUE turn-order verdict, mirroring the engine's resolveRound order
-// logic: Fluid-vs-Guard acts first regardless of speed, else by initiative
-// (speed ÷ move weight, stagger-halved). This is what the move-menu NEXT
-// preview shows — the honest answer to "who acts first" (NOT raw speed,
-// which is only the dodge lever + initiative numerator). Exported so a
-// test can pin it against the engine's actual `first`.
+// logic: Layer 1 — a FLUID move acts first vs any non-Fluid stance (even when
+// slower); both-Fluid or neither-Fluid falls to initiative (speed ÷ move
+// weight, stagger-halved). This is what the move-menu NEXT preview shows —
+// the honest answer to "who acts first". Exported so a test can pin it
+// against the engine's actual `first`.
 export function orderHint(
   pl: SideState,
   foe: SideState,
@@ -183,10 +183,10 @@ export function orderHint(
   foeMove: string | null,
   foeStance: Stance,
 ): 'YOU > FOE' | 'FOE > YOU' | 'TIE' {
-  if (plMove !== null && foeMove !== null) {
-    if (plStance === 'F' && foeStance === 'G') return 'YOU > FOE';
-    if (foeStance === 'F' && plStance === 'G') return 'FOE > YOU';
-  }
+  const plFluid = plMove !== null && plStance === 'F';
+  const foeFluid = foeMove !== null && foeStance === 'F';
+  if (plFluid && !foeFluid) return 'YOU > FOE';
+  if (foeFluid && !plFluid) return 'FOE > YOU';
   const pi = computeInit(pl, plMove, plStance);
   const fi = computeInit(foe, foeMove, foeStance);
   if (pi < 0 && fi < 0) return 'TIE';
@@ -283,18 +283,16 @@ export function degradeIntent(
 // player learns the triangle by playing. Returns null when the event
 // isn't a triangle teaching moment.
 export function stanceCallout(args: {
-  readonly kind: 'counter' | 'opening' | 'dodge' | 'strike';
+  readonly kind: 'counter' | 'opening' | 'dodge' | 'punish' | 'strike';
   readonly attackerStance?: Stance | undefined;
   readonly defenderStance?: Stance | undefined;
 }): string | null {
   if (args.kind === 'counter') return 'COUNTER! GUARD turns AGGRESSION back';
   if (args.kind === 'opening') return 'OPENING! FLUID slips past GUARD';
+  // Layer 1 — AGGRESSIVE beats FLUID: the aggressor catches the dodger.
+  if (args.kind === 'punish') return 'PUNISH! AGGRESSION catches FLUID';
+  // Legacy (pre-Layer-1): Fluid evaded Aggressive. No longer emitted.
   if (args.kind === 'dodge') return 'DODGE! FLUID evaded — it was faster';
-  // A landed strike where the attacker went Aggressive into a Fluid
-  // defender means the dodge check FAILED — the attacker was faster.
-  if (args.kind === 'strike' && args.attackerStance === 'A' && args.defenderStance === 'F') {
-    return "Couldn't evade — too slow!";
-  }
   return null;
 }
 
@@ -534,6 +532,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // each strike.
     if (ev.kind === 'strike') return true;
     if (ev.kind === 'dodge') return true;
+    if (ev.kind === 'punish') return true; // A>F read-win — a damage beat to read
     if (ev.kind === 'opening') return true;
     if (ev.kind === 'counter') return true;
     if (ev.kind === 'clash') return true;
@@ -676,6 +675,26 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       animSide = ev.side;
       animKind = 'opening';
       animT = 0.25;
+      return;
+    }
+    if (ev.kind === 'punish') {
+      // Layer 1 — AGGRESSIVE caught a FLUID dodger (the A>F read-win). The
+      // aggressor (ev.side) charges ★; the Fluid defender takes the punish.
+      const def = opposite(ev.side);
+      display[def].hp = Math.max(0, display[def].hp - ev.damage);
+      emitGameEvent({ kind: 'hit-landed', side: ev.side, effectiveness: ev.effectiveness });
+      if (ev.side === 'player') pendingReadWindow = true; // read window
+      calloutLine = (stanceCallout({ kind: 'punish' }) ?? 'PUNISH!') + starTag(ev.side);
+      pushLog('PUNISH! Aggression catches the dodge.');
+      animSide = ev.side;
+      animKind = 'strike';
+      animT = 0.25;
+      return;
+    }
+    if (ev.kind === 'dazed') {
+      // Layer 1 — the same stance 3 rounds running: predictability punished.
+      const who = ev.side === 'player' ? activeMon(state.player).species.name : 'Foe';
+      pushLog(`${who} is DAZED — too predictable! (3× same stance → wide open)`);
       return;
     }
     if (ev.kind === 'counter') {
