@@ -1,4 +1,4 @@
-import { COMBAT, TIERS, TWO_STEP } from './config';
+import { COMBAT, FOCUS, TIERS } from './config';
 import { typeMult } from './data';
 import type { BattleEvent, CommitDescriptor, SideSnapshot } from './events';
 import type { RNG } from './rng';
@@ -8,15 +8,23 @@ import type {
   ArenaSchedule,
   BattleState,
   CallKind,
+  ReleaseKind,
   Side,
   SideState,
   Stance,
   Team,
   TraitTable,
-  TwoStep,
   TypeChart,
 } from './types';
-import { activeMon, firstSurvivor, isRhythmRound, stanceForTwoStep, traitMods, twoStepForStance } from './types';
+import {
+  activeMon,
+  defaultReleaseForStance,
+  firstSurvivor,
+  flipBeats,
+  isRhythmRound,
+  releaseVsStance,
+  traitMods,
+} from './types';
 
 export interface RoundResult {
   readonly state: BattleState;
@@ -61,7 +69,7 @@ function stanceOutMult(stance: Stance): number {
   return 1;
 }
 
-// Layer 2 — raw pre-stance damage (the shared damage core, no triangle/mitigation).
+// Raw pre-stance damage (the shared damage core, no triangle/mitigation).
 function rawHit(
   att: SideState,
   def: SideState,
@@ -81,18 +89,9 @@ function rawHit(
   return { d, eff };
 }
 
-// Layer 2 — the FLIPPED triangle (both released two-steps): HIDE>CHARGE>FEINT>HIDE.
-function flipBeats(a: TwoStep, b: TwoStep): boolean {
-  return (
-    (a === 'hide' && b === 'charge') ||
-    (a === 'charge' && b === 'feint') ||
-    (a === 'feint' && b === 'hide')
-  );
-}
-
-function stripWinding(side: SideState): SideState {
-  if (side.winding === undefined) return side;
-  const { winding: _drop, ...rest } = side;
+function stripFocus(side: SideState): SideState {
+  if (side.focus === undefined) return side;
+  const { focus: _drop, ...rest } = side;
   return rest;
 }
 
@@ -128,17 +127,17 @@ function actionMove(action: Action): string | null {
 }
 
 function describeAction(action: Action, side: SideState): CommitDescriptor {
-  // Layer 2 — a mon mid-wind-up RELEASES this round regardless of the passed
-  // action (it's committed): describe the phase-2 release.
-  if (side.winding !== undefined) {
-    return { kind: 'twoStep', step: side.winding.step, phase: 2, move: side.winding.move };
+  // FOCUS model — a focusing mon RELEASES this round (its chosen release, or
+  // the focus's default if none was passed).
+  if (side.focus !== undefined) {
+    const release = action.kind === 'release' ? action.release : defaultReleaseForStance(side.focus.stance);
+    return { kind: 'release', release };
   }
   if (action.kind === 'move') {
-    if (action.commit === true) {
-      return { kind: 'twoStep', step: twoStepForStance(action.stance), phase: 1, move: action.move };
-    }
+    if (action.commit === true) return { kind: 'focus' };
     return { kind: 'move', move: action.move, stance: action.stance };
   }
+  if (action.kind === 'release') return { kind: 'release', release: action.release };
   if (action.kind === 'call') return { kind: 'call', call: action.call };
   if (action.kind === 'catchBreath') return { kind: 'catchBreath' };
   if (action.kind === 'throwBall') return { kind: 'throwBall' };
@@ -296,8 +295,14 @@ function paySide(
   if (action.kind === 'catchBreath') {
     return { ...side, st: Math.min(100, side.st + CATCH_BREATH_RESTORE) };
   }
+  if (action.kind === 'release') {
+    // A release strike is free (energy was spent on the focus); a releasing
+    // side is settled by the regen-only branch in resolveRound, not here. This
+    // satisfies the type and is correct regardless.
+    return side;
+  }
   if (action.kind === 'call') {
-    // Layer 2 — a Call spends ★ (handled in the round), no stamina change.
+    // A Call spends ★ (handled in the round), no stamina change.
     // (resolveRound never routes a call through paySide; this satisfies the
     // type and is correct regardless.)
     return side;
@@ -349,8 +354,8 @@ export function resolveRound(
   // A mon mid-wind-up is LOCKED into releasing this round — its passed action
   // is overridden, so skip validation for it (the release is legal by
   // construction). Single-step sides validate exactly as before.
-  if (activeMon(state.player).winding === undefined) validateActionTeam(state.player, playerAction);
-  if (activeMon(state.foe).winding === undefined) validateActionTeam(state.foe, foeAction);
+  if (activeMon(state.player).focus === undefined) validateActionTeam(state.player, playerAction);
+  if (activeMon(state.foe).focus === undefined) validateActionTeam(state.foe, foeAction);
 
   const events: BattleEvent[] = [];
 
@@ -365,10 +370,10 @@ export function resolveRound(
   let pl: SideState = activeMon(playerTeam);
   let foe: SideState = activeMon(foeTeam);
 
-  // Layer 2 — a mon carrying `winding` from last round RELEASES (phase 2) this
-  // round; its passed action is ignored. Captured before any mutation.
-  const plReleasing = pl.winding !== undefined;
-  const foeReleasing = foe.winding !== undefined;
+  // FOCUS model — a mon carrying `focus` from last round RELEASES (R2) this
+  // round (its chosen release). Captured before any mutation.
+  const plReleasing = pl.focus !== undefined;
+  const foeReleasing = foe.focus !== undefined;
 
   events.push({
     kind: 'roundStart',
@@ -435,22 +440,32 @@ export function resolveRound(
   const arena = state.bossCard?.arenaSchedule;
   const rhythm = isRhythmRound(arena, state.round, state.rhythmAnchor ?? 0);
 
-  // Layer 2 — classify each side's mode this round (a releasing side is locked
-  // from last round's wind-up; a committing side initiates a two-step now).
-  const plCommitting = playerAction.kind === 'move' && playerAction.commit === true && !plReleasing;
-  const foeCommitting = foeAction.kind === 'move' && foeAction.commit === true && !foeReleasing;
+  // FOCUS model — classify each side's mode this round (a releasing side is
+  // locked from last round's focus; an initiating side starts a Focus now).
+  const plInitiating = playerAction.kind === 'move' && playerAction.commit === true && !plReleasing;
+  const foeInitiating = foeAction.kind === 'move' && foeAction.commit === true && !foeReleasing;
   const plCall: CallKind | null = !plReleasing && playerAction.kind === 'call' ? playerAction.call : null;
   const foeCall: CallKind | null = !foeReleasing && foeAction.kind === 'call' ? foeAction.call : null;
-  const twoStepInvolved =
-    plReleasing || foeReleasing || plCommitting || foeCommitting || plCall !== null || foeCall !== null;
+  const focusInvolved =
+    plReleasing || foeReleasing || plInitiating || foeInitiating || plCall !== null || foeCall !== null;
 
-  // History stance recorded for thrice-daze continuity: a release round
-  // contributes the wound-up step's BASE stance (captured before strip).
-  const plReleaseBase: Stance | null = plReleasing ? stanceForTwoStep(pl.winding!.step) : null;
-  const foeReleaseBase: Stance | null = foeReleasing ? stanceForTwoStep(foe.winding!.step) : null;
+  // The release a releasing side fires this round (its R2 choice; defaults from
+  // the focus's base stance when no release was passed).
+  const plRelease: ReleaseKind | null = plReleasing
+    ? playerAction.kind === 'release'
+      ? playerAction.release
+      : defaultReleaseForStance(pl.focus!.stance)
+    : null;
+  const foeRelease: ReleaseKind | null = foeReleasing
+    ? foeAction.kind === 'release'
+      ? foeAction.release
+      : defaultReleaseForStance(foe.focus!.stance)
+    : null;
+  // Focus + release rounds are commitments, not single-step stances → they
+  // don't feed the single-step thrice-daze (recorded as null).
 
-  if (twoStepInvolved) {
-    // ── Combat Layer 2 — two-step resolution path ──────────────────────────
+  if (focusInvolved) {
+    // ── Combat FOCUS resolution path ───────────────────────────────────────
     // Spend ★ for any Calls (validated ≥1) and announce the override.
     if (plCall !== null) {
       pl = { ...pl, momentum: Math.max(0, pl.momentum - 1) };
@@ -465,221 +480,168 @@ export function resolveRound(
     foe = { ...foe, staggered: false };
 
     if (plReleasing && foeReleasing) {
-      // CASE A — BOTH release: the FLIPPED triangle (HIDE>CHARGE>FEINT>HIDE,
-      // soft tilt). The flip winner earns ★ (a genuine mutual read — L2.7).
-      const plStep = pl.winding!.step;
-      const foeStep = foe.winding!.step;
-      const plRel = pl.winding!.move;
-      const foeRel = foe.winding!.move;
-      const winner: Side | null = flipBeats(plStep, foeStep)
-        ? 'player'
-        : flipBeats(foeStep, plStep)
-          ? 'foe'
-          : null;
-      const plI = initiative(pl, plRel, rhythm, arena, state.traits);
-      const foeI = initiative(foe, foeRel, rhythm, arena, state.traits);
+      // CASE A — BOTH release → the FLIPPED triangle (HIDE>HEAVY>FEINT>HIDE).
+      // The flip winner earns ★ (a genuine mutual read).
+      const a = plRelease!;
+      const b = foeRelease!;
+      const plMv = pl.focus!.move;
+      const foeMv = foe.focus!.move;
+      const winner: Side | null = flipBeats(a, b) ? 'player' : flipBeats(b, a) ? 'foe' : null;
+      const plI = initiative(pl, plMv, rhythm, arena, state.traits);
+      const foeI = initiative(foe, foeMv, rhythm, arena, state.traits);
       const ord: Side[] = plI >= foeI ? ['player', 'foe'] : ['foe', 'player'];
       for (const sk of ord) {
         if (pl.hp <= 0 || foe.hp <= 0) break;
         if (sk === 'player') {
-          const { d, eff } = rawHit(pl, foe, plRel, rng, state.typeChart, state.traits, rhythm);
-          let dd = d * TWO_STEP.releaseMult[plStep];
-          if (winner === 'player') dd *= TWO_STEP.flipWinMult;
-          else if (winner === 'foe') dd *= TWO_STEP.flipLoseMult;
-          dd *= TWO_STEP.releaseIncomingMult[foeStep]; // foe's follow-through blunts the counter
+          const { d, eff } = rawHit(pl, foe, plMv, rng, state.typeChart, state.traits, rhythm);
+          let dd = d * FOCUS.releaseBase * (winner === 'player' ? FOCUS.flipWin : winner === 'foe' ? FOCUS.flipLose : 1);
           if (foe.exhausted) dd *= COMBAT.exhTaken;
-          { const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
-          events.push({ kind: 'release', side: 'player', step: plStep, damage: r.applied, effectiveness: eff, ...(plStep === 'charge' ? { pierced: true } : {}), ...(plStep === 'hide' ? { concealed: true } : {}) }); }
+          const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
+          events.push({ kind: 'release', side: 'player', release: a, outcome: winner === 'player' ? 'win' : winner === 'foe' ? 'lose' : 'neutral', damage: r.applied, effectiveness: eff });
           if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
         } else {
-          const { d, eff } = rawHit(foe, pl, foeRel, rng, state.typeChart, state.traits, rhythm);
-          let dd = d * TWO_STEP.releaseMult[foeStep];
-          if (winner === 'foe') dd *= TWO_STEP.flipWinMult;
-          else if (winner === 'player') dd *= TWO_STEP.flipLoseMult;
-          dd *= TWO_STEP.releaseIncomingMult[plStep];
+          const { d, eff } = rawHit(foe, pl, foeMv, rng, state.typeChart, state.traits, rhythm);
+          let dd = d * FOCUS.releaseBase * (winner === 'foe' ? FOCUS.flipWin : winner === 'player' ? FOCUS.flipLose : 1);
           if (pl.exhausted) dd *= COMBAT.exhTaken;
-          { const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
-          events.push({ kind: 'release', side: 'foe', step: foeStep, damage: r.applied, effectiveness: eff, ...(foeStep === 'charge' ? { pierced: true } : {}), ...(foeStep === 'hide' ? { concealed: true } : {}) }); }
+          const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
+          events.push({ kind: 'release', side: 'foe', release: b, outcome: winner === 'foe' ? 'win' : winner === 'player' ? 'lose' : 'neutral', damage: r.applied, effectiveness: eff });
           if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
         }
       }
-      // Emit the flip verdict AFTER the strikes so its callout is the one that
-      // lands (names the winner + both steps), and award the winner's ★.
-      const winnerStep = winner === 'player' ? plStep : winner === 'foe' ? foeStep : undefined;
-      const loserStep = winner === 'player' ? foeStep : winner === 'foe' ? plStep : undefined;
+      // Flip verdict AFTER the strikes so its callout lands; award the ★.
       events.push({
         kind: 'flipResolve',
         winner,
-        ...(winnerStep ? { winnerStep } : {}),
-        ...(loserStep ? { loserStep } : {}),
+        ...(winner === 'player' ? { winnerRelease: a, loserRelease: b } : {}),
+        ...(winner === 'foe' ? { winnerRelease: b, loserRelease: a } : {}),
       });
       if (winner === 'player' && pl.hp > 0) pl = gainMomentum(pl, 'player', events);
       else if (winner === 'foe' && foe.hp > 0) foe = gainMomentum(foe, 'foe', events);
-    } else if (plReleasing) {
-      // CASE B — player releases, foe responds (the wind-up is SEEN → a foe
-      // single-step SOFT-counters: tilts, never negates). No ★ either way
-      // (the phase-1 read already happened last round — surviving isn't a read).
-      const step = pl.winding!.step;
-      const relMove = pl.winding!.move;
-      const foeSingle = foeAction.kind === 'move' && foeAction.commit !== true;
-      const foeStanceS: Stance | null = foeSingle ? foeAction.stance : null;
-      const foeMoveS: string | null = foeSingle ? foeAction.move : null;
-      const soft = foeSingle && foeStanceS === TWO_STEP.softCounterStance[step];
-      const plI = initiative(pl, relMove, rhythm, arena, state.traits);
-      const foeI = foeMoveS !== null ? initiative(foe, foeMoveS, rhythm, arena, state.traits) : COMBAT.restInitiative;
-      const ord: Side[] = plI >= foeI ? ['player', 'foe'] : ['foe', 'player'];
-      for (const sk of ord) {
-        if (pl.hp <= 0 || foe.hp <= 0) break;
-        if (sk === 'player') {
-          const { d, eff } = rawHit(pl, foe, relMove, rng, state.typeChart, state.traits, rhythm);
-          let dd = d * TWO_STEP.releaseMult[step];
-          if (soft) dd *= TWO_STEP.softCounterMult;
-          const pierce = step === 'charge';
-          // Guard mitigates a release EXCEPT vs Charge (pierces) or Feint (the
-          // feint punishes the brace — no mitigation, then dazes).
-          if (foeSingle && foeStanceS === 'G' && !pierce && step !== 'feint') dd *= COMBAT.guardTaken;
-          if (foeSingle && foeStanceS === 'A') dd *= COMBAT.aggrTaken;
-          if (step === 'feint' && foeSingle && foeStanceS === 'G') dd *= COMBAT.dazeTaken; // FEINT punishes the brace
-          if (foe.exhausted) dd *= COMBAT.exhTaken;
-          { const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
-          events.push({ kind: 'release', side: 'player', step, damage: r.applied, effectiveness: eff, ...(pierce ? { pierced: true } : {}), ...(step === 'hide' ? { concealed: true } : {}) }); }
-          if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
-        } else if (foeSingle && foeMoveS !== null) {
-          const { d, eff } = rawHit(foe, pl, foeMoveS, rng, state.typeChart, state.traits, rhythm);
-          let dd = d * stanceOutMult(foeStanceS!);
-          dd *= TWO_STEP.releaseIncomingMult[step]; // releaser's follow-through blunts the counter
-          if (pl.exhausted) dd *= COMBAT.exhTaken;
-          { const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
-          events.push({ kind: 'strike', side: 'foe', move: foeMoveS, damage: r.applied, effectiveness: eff }); }
-          if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
-        }
+    } else if (plReleasing || foeReleasing) {
+      // CASE B — ONE releases (R2), the other responds. The release resolves
+      // vs the opponent's SINGLE-STEP via the ROTATION triangle (win/lose/
+      // neutral), or vs a FOCUSING opponent via the timing mismatch (F.4). The
+      // read-winner earns ★ (win → releaser; lose → opponent; neutral → none).
+      const relSide: Side = plReleasing ? 'player' : 'foe';
+      const oppSide: Side = relSide === 'player' ? 'foe' : 'player';
+      const rel = (relSide === 'player' ? plRelease : foeRelease)!;
+      const relMv = (relSide === 'player' ? pl : foe).focus!.move;
+      const oppAction = oppSide === 'player' ? playerAction : foeAction;
+      const oppInit = oppSide === 'player' ? plInitiating : foeInitiating;
+      const oppCall = oppSide === 'player' ? plCall : foeCall;
+      const oppSingle = oppAction.kind === 'move' && oppAction.commit !== true;
+      const oppStance: Stance | null = oppSingle ? oppAction.stance : null;
+      const oppMove: string | null = oppSingle ? oppAction.move : null;
+
+      // Determine the outcome + multipliers.
+      let outcome: 'win' | 'lose' | 'neutral';
+      let relMult: number;
+      let foeMult: number; // multiplier on the opponent's single-step counter
+      if (oppSingle) {
+        outcome = releaseVsStance(rel, oppStance!);
+        relMult = outcome === 'win' ? FOCUS.winDmg : outcome === 'lose' ? FOCUS.loseDmg : FOCUS.neutralDmg;
+        foeMult = outcome === 'win' ? FOCUS.winFoe : outcome === 'lose' ? FOCUS.loseFoe : FOCUS.neutralFoe;
+      } else if (oppInit) {
+        // F.4 timing mismatch — release vs a focusing opponent (deals 0).
+        relMult = FOCUS.mismatch[rel];
+        outcome = relMult > 1.05 ? 'win' : relMult < 0.95 ? 'lose' : 'neutral';
+        foeMult = 0;
+      } else {
+        // Opponent rests/calls — unopposed release.
+        outcome = 'neutral';
+        relMult = FOCUS.neutralDmg;
+        foeMult = 0;
       }
-    } else if (foeReleasing) {
-      // CASE B mirror — foe releases, player responds.
-      const step = foe.winding!.step;
-      const relMove = foe.winding!.move;
-      const plSingle = playerAction.kind === 'move' && playerAction.commit !== true;
-      const plStanceS: Stance | null = plSingle ? playerAction.stance : null;
-      const plMoveS: string | null = plSingle ? playerAction.move : null;
-      const soft = plSingle && plStanceS === TWO_STEP.softCounterStance[step];
-      const foeI = initiative(foe, relMove, rhythm, arena, state.traits);
-      const plI = plMoveS !== null ? initiative(pl, plMoveS, rhythm, arena, state.traits) : COMBAT.restInitiative;
-      const ord: Side[] = foeI >= plI ? ['foe', 'player'] : ['player', 'foe'];
-      for (const sk of ord) {
-        if (pl.hp <= 0 || foe.hp <= 0) break;
-        if (sk === 'foe') {
-          const { d, eff } = rawHit(foe, pl, relMove, rng, state.typeChart, state.traits, rhythm);
-          let dd = d * TWO_STEP.releaseMult[step];
-          if (soft) dd *= TWO_STEP.softCounterMult;
-          const pierce = step === 'charge';
-          if (plSingle && plStanceS === 'G' && !pierce && step !== 'feint') dd *= COMBAT.guardTaken;
-          if (plSingle && plStanceS === 'A') dd *= COMBAT.aggrTaken;
-          if (step === 'feint' && plSingle && plStanceS === 'G') dd *= COMBAT.dazeTaken;
-          if (pl.exhausted) dd *= COMBAT.exhTaken;
-          { const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
-          events.push({ kind: 'release', side: 'foe', step, damage: r.applied, effectiveness: eff, ...(pierce ? { pierced: true } : {}), ...(step === 'hide' ? { concealed: true } : {}) }); }
-          if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
-        } else if (plSingle && plMoveS !== null) {
-          const { d, eff } = rawHit(pl, foe, plMoveS, rng, state.typeChart, state.traits, rhythm);
-          let dd = d * stanceOutMult(plStanceS!);
-          dd *= TWO_STEP.releaseIncomingMult[step];
-          if (foe.exhausted) dd *= COMBAT.exhTaken;
-          { const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
-          events.push({ kind: 'strike', side: 'player', move: plMoveS, damage: r.applied, effectiveness: eff }); }
-          if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
-        }
+
+      // Bind generic releaser/defender to pl/foe (avoids per-side duplication).
+      const releaserFirst = (() => {
+        const rI = initiative(relSide === 'player' ? pl : foe, relMv, rhythm, arena, state.traits);
+        const oI = oppMove !== null ? initiative(oppSide === 'player' ? pl : foe, oppMove, rhythm, arena, state.traits) : COMBAT.restInitiative;
+        return rI >= oI;
+      })();
+
+      const doRelease = (): void => {
+        if ((relSide === 'player' ? pl.hp : foe.hp) <= 0 || (oppSide === 'player' ? pl.hp : foe.hp) <= 0) return;
+        const att = relSide === 'player' ? pl : foe;
+        const def = oppSide === 'player' ? pl : foe;
+        const { d, eff } = rawHit(att, def, relMv, rng, state.typeChart, state.traits, rhythm);
+        let dd = d * FOCUS.releaseBase * relMult;
+        if (def.exhausted) dd *= COMBAT.exhTaken;
+        const r = dealt(def.hp, dd, oppCall);
+        if (oppSide === 'player') pl = { ...pl, hp: r.hp };
+        else foe = { ...foe, hp: r.hp };
+        events.push({ kind: 'release', side: relSide, release: rel, outcome, damage: r.applied, effectiveness: eff, ...(oppStance ? { vsStance: oppStance } : {}), ...(oppInit ? { vsFocus: true } : {}) });
+        if ((oppSide === 'player' ? pl.hp : foe.hp) <= 0) events.push({ kind: 'ko', side: oppSide });
+      };
+      const doCounter = (): void => {
+        if (!oppSingle || oppMove === null) return;
+        if (pl.hp <= 0 || foe.hp <= 0) return;
+        const att = oppSide === 'player' ? pl : foe;
+        const def = relSide === 'player' ? pl : foe;
+        const relCall = relSide === 'player' ? plCall : foeCall;
+        const { d, eff } = rawHit(att, def, oppMove, rng, state.typeChart, state.traits, rhythm);
+        let dd = d * stanceOutMult(oppStance!) * foeMult;
+        if (def.exhausted) dd *= COMBAT.exhTaken;
+        const r = dealt(def.hp, dd, relCall);
+        if (relSide === 'player') pl = { ...pl, hp: r.hp };
+        else foe = { ...foe, hp: r.hp };
+        events.push({ kind: 'strike', side: oppSide, move: oppMove, damage: r.applied, effectiveness: eff });
+        if ((relSide === 'player' ? pl.hp : foe.hp) <= 0) events.push({ kind: 'ko', side: relSide });
+      };
+      if (releaserFirst) { doRelease(); doCounter(); } else { doCounter(); doRelease(); }
+
+      // ★ to the read-winner.
+      if (outcome === 'win') {
+        if (relSide === 'player' && pl.hp > 0) pl = gainMomentum(pl, 'player', events);
+        else if (relSide === 'foe' && foe.hp > 0) foe = gainMomentum(foe, 'foe', events);
+      } else if (outcome === 'lose') {
+        if (oppSide === 'player' && pl.hp > 0) pl = gainMomentum(pl, 'player', events);
+        else if (oppSide === 'foe' && foe.hp > 0) foe = gainMomentum(foe, 'foe', events);
       }
     } else {
-      // CASE C — WIND-UP / Call round (no releases yet). A single-step striker
-      // catches a winding mon: phase-1 vulnerability (HARSH). If the striker's
-      // stance is a PUNISHER it earns ★ (read the wind-up — L2.7); a stance
-      // that only "survives" the wind-up grants no ★.
-      if (plCommitting) events.push({ kind: 'windUp', side: 'player', step: twoStepForStance(plStance) });
-      if (foeCommitting) events.push({ kind: 'windUp', side: 'foe', step: twoStepForStance(foeStance) });
-      const plStrikes = playerAction.kind === 'move' && playerAction.commit !== true && plMove !== null && plCall === null;
-      const foeStrikes = foeAction.kind === 'move' && foeAction.commit !== true && foeMove !== null && foeCall === null;
+      // CASE C — FOCUS round (no releasing side). An initiator DEALS 0 and is
+      // exposed; a single-stepping opponent's strike hits it ×FOCUS_COST (the
+      // guaranteed focus cost — generic, no read, no ★).
+      const plStrikes = playerAction.kind === 'move' && !plInitiating && plMove !== null && plCall === null;
+      const foeStrikes = foeAction.kind === 'move' && !foeInitiating && foeMove !== null && foeCall === null;
       const plI = plStrikes ? initiative(pl, plMove, rhythm, arena, state.traits) : COMBAT.restInitiative;
       const foeI = foeStrikes ? initiative(foe, foeMove, rhythm, arena, state.traits) : COMBAT.restInitiative;
       const ord: Side[] = plI >= foeI ? ['player', 'foe'] : ['foe', 'player'];
-      // Track whether each committer's wind-up got READ (punished) — drives the
-      // "finishes charging" (survived) vs "wind-up punished" legibility beat.
-      let plWindUpPunished = false;
-      let foeWindUpPunished = false;
+      let plFocusCost = 0;
+      let foeFocusCost = 0;
       for (const sk of ord) {
         if (pl.hp <= 0 || foe.hp <= 0) break;
         if (sk === 'player' && plStrikes) {
           const { d, eff } = rawHit(pl, foe, plMove!, rng, state.typeChart, state.traits, rhythm);
           let dd = d * stanceOutMult(plStance);
-          let tStep: TwoStep | null = null;
-          if (foeCommitting) {
-            tStep = twoStepForStance(foeStance);
-            dd *= TWO_STEP.phase1Vuln[tStep][plStance];
-          }
+          if (foeInitiating) dd *= FOCUS.focusCost; // hitting a focuser → the focus cost
           if (foe.exhausted) dd *= COMBAT.exhTaken;
           const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
-          if (tStep !== null && TWO_STEP.punishedBy[tStep].includes(plStance)) {
-            events.push({ kind: 'phase1Punish', side: 'player', step: tStep, damage: r.applied });
-            foeWindUpPunished = true; // foe was the winder that got read
-            pl = gainMomentum(pl, 'player', events);
-          } else {
-            events.push({ kind: 'strike', side: 'player', move: plMove!, damage: r.applied, effectiveness: eff });
-          }
+          if (foeInitiating) foeFocusCost = r.applied;
+          else events.push({ kind: 'strike', side: 'player', move: plMove!, damage: r.applied, effectiveness: eff });
           if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
         } else if (sk === 'foe' && foeStrikes) {
           const { d, eff } = rawHit(foe, pl, foeMove!, rng, state.typeChart, state.traits, rhythm);
           let dd = d * stanceOutMult(foeStance);
-          let tStep: TwoStep | null = null;
-          if (plCommitting) {
-            tStep = twoStepForStance(plStance);
-            dd *= TWO_STEP.phase1Vuln[tStep][foeStance];
-          }
+          if (plInitiating) dd *= FOCUS.focusCost;
           if (pl.exhausted) dd *= COMBAT.exhTaken;
           const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
-          if (tStep !== null && TWO_STEP.punishedBy[tStep].includes(foeStance)) {
-            events.push({ kind: 'phase1Punish', side: 'foe', step: tStep, damage: r.applied });
-            plWindUpPunished = true; // player was the winder that got read
-            foe = gainMomentum(foe, 'foe', events);
-          } else {
-            events.push({ kind: 'strike', side: 'foe', move: foeMove!, damage: r.applied, effectiveness: eff });
-          }
+          if (plInitiating) plFocusCost = r.applied;
+          else events.push({ kind: 'strike', side: 'foe', move: foeMove!, damage: r.applied, effectiveness: eff });
           if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
         }
       }
-      // Wind-up chip: a winding mon lands a glancing poke (no read/★/effect),
-      // softening the tempo cost of committing. It already ate the phase-1
-      // punish above, so the gamble holds.
-      if (plCommitting && plMove !== null && pl.hp > 0 && foe.hp > 0) {
-        const { d, eff } = rawHit(pl, foe, plMove, rng, state.typeChart, state.traits, rhythm);
-        let dd = d * stanceOutMult(plStance) * TWO_STEP.windUpChipMult;
-        if (foe.exhausted) dd *= COMBAT.exhTaken;
-        const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
-        events.push({ kind: 'strike', side: 'player', move: plMove, damage: r.applied, effectiveness: eff });
-        if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
-      }
-      if (foeCommitting && foeMove !== null && pl.hp > 0 && foe.hp > 0) {
-        const { d, eff } = rawHit(foe, pl, foeMove, rng, state.typeChart, state.traits, rhythm);
-        let dd = d * stanceOutMult(foeStance) * TWO_STEP.windUpChipMult;
-        if (pl.exhausted) dd *= COMBAT.exhTaken;
-        const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
-        events.push({ kind: 'strike', side: 'foe', move: foeMove, damage: r.applied, effectiveness: eff });
-        if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
-      }
-      // A surviving, UNPUNISHED wind-up "finishes charging" — it'll release
-      // next round. (A punished one already got its phase1Punish beat.)
-      if (plCommitting && pl.hp > 0 && !plWindUpPunished) {
-        events.push({ kind: 'windUpResolved', side: 'player', step: twoStepForStance(plStance) });
-      }
-      if (foeCommitting && foe.hp > 0 && !foeWindUpPunished) {
-        events.push({ kind: 'windUpResolved', side: 'foe', step: twoStepForStance(foeStance) });
-      }
+      // Announce the Focus (generic — release hidden) + its cost.
+      if (plInitiating) events.push({ kind: 'focus', side: 'player', costDamage: plFocusCost });
+      if (foeInitiating) events.push({ kind: 'focus', side: 'foe', costDamage: foeFocusCost });
     }
 
-    // Two-step state transitions: a releaser clears its pending step; a fresh
-    // committer (that survived) carries `winding` into next round.
-    if (plReleasing) pl = stripWinding(pl);
-    else if (plCommitting && pl.hp > 0) pl = { ...pl, winding: { step: twoStepForStance(plStance), move: plMove! } };
-    if (foeReleasing) foe = stripWinding(foe);
-    else if (foeCommitting && foe.hp > 0) foe = { ...foe, winding: { step: twoStepForStance(foeStance), move: foeMove! } };
+    // FOCUS state transitions: a releaser clears its focus; a fresh initiator
+    // (that survived) carries `focus` into next round (R2 = the release).
+    if (plReleasing) pl = stripFocus(pl);
+    else if (plInitiating && pl.hp > 0) pl = { ...pl, focus: { stance: plStance, move: plMove! } };
+    if (foeReleasing) foe = stripFocus(foe);
+    else if (foeInitiating && foe.hp > 0) foe = { ...foe, focus: { stance: foeStance, move: foeMove! } };
   } else {
     // ── Single-step path (Layer 1 / legacy) — RNG- and event-identical ──────
     // Layer 1 — THRICE-REPEAT SELF-DAZE. The same MOVE stance 3 rounds running
@@ -860,8 +822,8 @@ export function resolveRound(
       else if (ev.kind === 'opening' && ev.side === 'player') gained += 1;
       else if (ev.kind === 'punish' && ev.side === 'player') gained += 1; // A>F read-win (was 'dodge')
       else if (ev.kind === 'clash' && ev.winner === 'player') gained += 1;
-      else if (ev.kind === 'phase1Punish' && ev.side === 'player') gained += 1; // L2: read a wind-up
-      else if (ev.kind === 'flipResolve' && ev.winner === 'player') gained += 1; // L2: won the flip
+      else if (ev.kind === 'release' && ev.side === 'player' && ev.outcome === 'win') gained += 1; // FOCUS: won the release read
+      else if (ev.kind === 'flipResolve' && ev.winner === 'player') gained += 1; // FOCUS: won the flip
     }
     if (gained > 0) {
       breakProgress += gained;
@@ -891,11 +853,11 @@ export function resolveRound(
       history: [
         ...state.history,
         {
-          // Layer 2 — a release round records the wound-up step's BASE stance
-          // (a commit move already records its stance via the 'move' branch),
-          // so thrice-daze sees two-steps as their base stance. Calls/rest → null.
-          player: plReleaseBase ?? (playerAction.kind === 'move' ? playerAction.stance : null),
-          foe: foeReleaseBase ?? (foeAction.kind === 'move' ? foeAction.stance : null),
+          // FOCUS model — only SINGLE-STEP moves feed thrice-daze; a focus
+          // initiation (commit) and a release are commitments, not single-step
+          // stances → recorded as null (calls/rest also null).
+          player: playerAction.kind === 'move' && playerAction.commit !== true ? playerAction.stance : null,
+          foe: foeAction.kind === 'move' && foeAction.commit !== true ? foeAction.stance : null,
         },
       ],
     },

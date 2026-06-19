@@ -14,14 +14,13 @@ import type {
   BattleEvent,
   BattleState,
   RNG,
+  ReleaseKind,
   Side,
   SideState,
   Species,
   Stance,
   Team,
-  TwoStep,
 } from '../../engine';
-import { twoStepForStance } from '../../engine';
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
@@ -54,6 +53,13 @@ const BEAT_HOLD_SEC = 0.7;
 // eventually, and a press skips the wait immediately.
 const CONSEQUENTIAL_HOLD_SEC = 2.2;
 const STANCES: readonly Stance[] = ['A', 'G', 'F'];
+// FOCUS R2 — the release menu, with a one-line "beats" hint per the rotation
+// triangle (HEAVY>Brace, FEINT>Aggressive, HIDE>Fluid).
+const RELEASES: readonly { readonly kind: ReleaseKind; readonly name: string; readonly beats: string }[] = [
+  { kind: 'heavy', name: 'HEAVY', beats: 'crushes a Brace' },
+  { kind: 'feint', name: 'FEINT', beats: 'punishes Aggression' },
+  { kind: 'hide', name: 'HIDE', beats: 'catches Fluid' },
+];
 // Fixed seed for the intent-display feint RNG (Phase 6.7-A). Deliberately
 // constant + independent of the engine RNG so degrading the FOE INTENT
 // display never touches combat resolution (ladders stay bit-identical).
@@ -140,10 +146,10 @@ interface DisplaySide {
   // per-round verdict from history) — set by the `dazed` event, cleared at
   // each roundStart, shown as a panel tag so the player sees the effect.
   dazed: boolean;
-  // Layer 2 — the two-step this mon is WINDING UP (phase 1), shown as a HUD tag
-  // so the wind-up is VISIBLE (the foe must see it to soft-counter; the player
-  // reads it). Set by `windUp`, cleared by `release`; persists across roundStart.
-  winding: TwoStep | null;
+  // FOCUS model — this mon is FOCUSING (R1, gathering energy), shown as a
+  // GENERIC "FOCUS" HUD tag: the opponent sees that a release is coming, NOT
+  // which. Set by `focus`, cleared by `release`; persists across roundStart.
+  focusing: boolean;
   species: Species;
 }
 
@@ -161,7 +167,7 @@ function snapshot(side: SideState): DisplaySide {
     exhausted: side.exhausted,
     staggered: side.staggered,
     dazed: false,
-    winding: side.winding?.step ?? null,
+    focusing: side.focus !== undefined,
     species: side.species,
   };
 }
@@ -169,10 +175,6 @@ function snapshot(side: SideState): DisplaySide {
 function opposite(side: Side): Side {
   return side === 'player' ? 'foe' : 'player';
 }
-
-// Layer 2 — short panel tags for a winding (phase-1) mon, so the wind-up is
-// visible on the HUD (the foe must see it to soft-counter; the player reads it).
-const WIND_TAG: { readonly [k in TwoStep]: string } = { charge: 'CHG', hide: 'HID', feint: 'FNT' };
 
 // The ★ credit a read-win carries — appended to the COUNTER/OPENING/DODGE/
 // CLASH callout so the player SEES that winning a read charges momentum, and
@@ -280,8 +282,12 @@ function foeActionLine(action: Action, name: string): { stance: Stance | null; l
   if (action.kind === 'switch') return { stance: null, line: `${name} is switching` };
   if (action.kind === 'throwBall') return { stance: null, line: `${name} readies a ball` };
   if (action.kind === 'call') return { stance: null, line: `${name} calls out` };
-  // Layer 2 — a committing move still telegraphs its base stance (the wind-up
-  // is visible); intent reads off that stance like any move.
+  // FOCUS R2 — a release is hidden (no stance to read; the focus telegraphed
+  // only that A release is coming).
+  if (action.kind === 'release') return { stance: null, line: `${name} unleashes its focus` };
+  // A committing move (R1 focus) still telegraphs only "focusing"; a normal
+  // single-step reads off its stance.
+  if (action.commit === true) return { stance: null, line: `${name} is focusing` };
   return { stance: action.stance, line: `${name} ${stanceIntentVerb(action.stance)}` };
 }
 
@@ -400,7 +406,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let roundStance: { player: Stance | null; foe: Stance | null } = { player: null, foe: null };
   let calloutLine: string | null = null;
 
-  let phase: 'text' | 'menu' | 'move' | 'call' | 'spare' | 'party' | 'resolve' | 'end' = 'text';
+  let phase: 'text' | 'menu' | 'move' | 'call' | 'release' | 'spare' | 'party' | 'resolve' | 'end' = 'text';
   // Phase 6a catch state (wild only). pendingReadWindow = a player
   // read-win opened a 1-round window last round; wariness rises on
   // out-of-window throws → flee telegraph; spareCursor drives the
@@ -450,6 +456,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   const MOVES_VISIBLE = 5;
   let moveScroll = 0;
   let stanceIdx = 0;
+  // FOCUS R2 — the release-selection cursor over [HEAVY, FEINT, HIDE].
+  let releaseCursor = 0;
   // Layer 2 — when true, confirming a move INITIATES its two-step (the
   // commit-modifier): the current stance picks which (A→CHARGE, F→HIDE,
   // G→FEINT). Toggled with ←/→ in the move menu; reset each time it opens.
@@ -540,13 +548,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       return;
     }
     const me = activeMon(state.player);
-    if (me.winding !== undefined) {
-      // Layer 2 — LOCKED into the release of a committed two-step; the player
-      // can't re-pick. Explain, then auto-resolve (the engine forces the
-      // release; the passed action is ignored for a winding mon).
-      setText([`${me.species.name} releases its ${me.winding.step.toUpperCase()}!`], () =>
-        commit({ kind: 'move', move: me.winding!.move, stance: STANCES[stanceIdx]! }),
-      );
+    if (me.focus !== undefined) {
+      // FOCUS R2 — the player now CHOOSES the release (the read is made here,
+      // not predetermined by R1). Open the release menu.
+      phase = 'release';
+      releaseCursor = 0;
       return;
     }
     phase = 'menu';
@@ -574,16 +580,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // "Foe" (so callouts read naturally — "Foe FLITPECK took the bait").
   const monName = (side: Side): string =>
     side === 'player' ? display.player.species.name : `Foe ${display.foe.species.name}`;
-  // "X finishes its CHARGE" / "completes its HIDE" / "sells its FEINT".
-  const FINISH_VERB: { readonly [k in TwoStep]: string } = {
-    charge: 'finishes charging',
-    hide: 'completes its HIDE',
-    feint: 'sells the FEINT',
-  };
-  // Flipped-triangle verb for the winning two-step over the loser.
-  const FLIP_VERB: { readonly [k in TwoStep]: string } = {
+  // Flipped-triangle verb for the winning release over the loser (HIDE slips
+  // the HEAVY, HEAVY crushes the FEINT, FEINT catches the HIDE).
+  const FLIP_VERB: { readonly [k in ReleaseKind]: string } = {
     hide: 'slips',
-    charge: 'crushes',
+    heavy: 'crushes',
     feint: 'catches',
   };
 
@@ -603,10 +604,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (ev.kind === 'punish') return true; // A>F read-win — a damage beat to read
     if (ev.kind === 'dazed') return true; // pause so the player reads the daze + its effect
     // Layer 2 — each two-step beat holds so the player reads the commitment.
-    if (ev.kind === 'windUp') return true;
-    if (ev.kind === 'windUpResolved') return true;
+    if (ev.kind === 'focus') return true;
     if (ev.kind === 'release') return true;
-    if (ev.kind === 'phase1Punish') return true;
     if (ev.kind === 'flipResolve') return true;
     if (ev.kind === 'call') return true;
     if (ev.kind === 'opening') return true;
@@ -675,9 +674,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         pushLog(`${who}: catch your breath!`);
       } else if (ev.action.kind === 'throwBall') {
         pushLog('You hurled a ball!');
-      } else if (ev.action.kind === 'twoStep' || ev.action.kind === 'call') {
-        // Layer 2 — the dedicated windUp/release/call events carry the text;
-        // the commit announce stays quiet for these so it doesn't double up.
+      } else if (ev.action.kind === 'focus' || ev.action.kind === 'release' || ev.action.kind === 'call') {
+        // FOCUS — the dedicated focus/release/call events carry the text; the
+        // commit announce stays quiet for these so it doesn't double up.
       } else if (ev.side === 'foe' && ev.action.kind === 'move') {
         // Resolution confirmation (the teaching loop, all tiers): name the
         // foe's committed STANCE *and* MOVE in plain language so the player
@@ -772,85 +771,64 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       animT = 0.25;
       return;
     }
-    if (ev.kind === 'windUp') {
-      // Layer 2 — a two-step WIND-UP (phase 1). Make it VISIBLE: a HUD tag + a
-      // callout so the foe could soft-counter it and the player reads the tell.
-      display[ev.side].winding = ev.step;
-      const who = ev.side === 'player' ? display.player.species.name : 'Foe ' + display.foe.species.name;
-      const label = ev.step.toUpperCase();
-      calloutLine = `${who} winds up — ${label}!`;
-      pushLog(`${who} commits to a ${label} — winding up (exposed)!`);
+    if (ev.kind === 'focus') {
+      // FOCUS R1 — a GENERIC commitment (release HIDDEN). ev.costDamage is what
+      // the focuser took (informational; the cost was already applied via the
+      // opponent's strike event, so don't subtract it again). Set the HUD tag.
+      display[ev.side].focusing = true;
+      const who = monName(ev.side);
+      calloutLine = `${who} is FOCUSING — gathering energy!`;
+      pushLog(`${who} is FOCUSING — a release is coming (but not which).`);
       animSide = ev.side;
       animKind = 'strike';
       animT = 0.2;
       return;
     }
     if (ev.kind === 'release') {
-      // Layer 2 — phase 2 lands. ev.damage is the ACTUAL applied amount (0 if a
-      // Call negated it). Clear the wind-up tag.
+      // FOCUS R2 — the chosen release lands. ev.damage is the ACTUAL applied
+      // amount (0 if a Call negated it). Clear the focus tag; name the OUTCOME.
       const def = opposite(ev.side);
       display[def].hp = Math.max(0, display[def].hp - ev.damage);
-      display[ev.side].winding = null;
+      display[ev.side].focusing = false;
       emitGameEvent({ kind: 'hit-landed', side: ev.side, effectiveness: ev.effectiveness });
-      if (ev.side === 'player') pendingReadWindow = true;
-      // FIX 4 — name the OUTCOME by the defender's response (its committed
-      // stance, when it single-stepped; null when the foe also two-stepped).
-      const defStance = roundStance[def];
+      if (ev.side === 'player' && ev.outcome === 'win') pendingReadWindow = true;
+      const rel = ev.release.toUpperCase();
       const defName = monName(def);
       let line: string;
-      if (ev.step === 'charge') {
-        line = defStance === 'G' ? 'CHARGE PIERCES THE BRACE!' : 'CHARGE UNLEASHED!';
-      } else if (ev.step === 'hide') {
-        line = 'HIDE STRIKE — from concealment!';
-      } else {
-        // feint
+      if (ev.vsFocus) {
+        // F.4 timing mismatch — released into a focusing foe.
         line =
-          defStance === 'G'
-            ? `FEINT! ${defName} took the bait — DAZED!`
-            : defStance
-              ? `FEINT WHIFFED — ${defName} didn't bite.`
-              : 'FEINT RELEASED!';
+          ev.outcome === 'win'
+            ? `${rel} CATCHES ${defName} MID-FOCUS!`
+            : ev.outcome === 'lose'
+              ? `${rel} GLANCES OFF — ${defName} kept gathering.`
+              : `${rel} released.`;
+      } else if (ev.release === 'heavy') {
+        line = ev.outcome === 'win' ? 'HEAVY CRUSHES THE BRACE!' : ev.outcome === 'lose' ? `HEAVY DODGED — ${defName} slipped it!` : 'HEAVY traded.';
+      } else if (ev.release === 'feint') {
+        line = ev.outcome === 'win' ? `FEINT! ${defName} took the bait!` : ev.outcome === 'lose' ? `FEINT WHIFFED — ${defName} didn't bite.` : 'FEINT — both landed.';
+      } else {
+        // hide
+        line = ev.outcome === 'win' ? `HIDE SLIPS IN — caught ${defName}!` : ev.outcome === 'lose' ? `HIDE FLUSHED OUT by ${defName}!` : 'HIDE — stalemate.';
       }
-      calloutLine = line;
+      calloutLine = line + (ev.outcome === 'win' ? starTag(ev.side) : '');
       pushLog(line);
       animSide = ev.side;
       animKind = 'strike';
       animT = 0.25;
-      return;
-    }
-    if (ev.kind === 'phase1Punish') {
-      // FIX 4 — a single-step READ the wind-up. The WINDER (def) was caught
-      // mid-commit; the punisher (ev.side) earns ★ (separate momentum event).
-      const def = opposite(ev.side);
-      display[def].hp = Math.max(0, display[def].hp - ev.damage);
-      emitGameEvent({ kind: 'hit-landed', side: ev.side, effectiveness: 1 });
-      if (ev.side === 'player') pendingReadWindow = true;
-      const verb = ev.step === 'charge' ? 'charging' : ev.step === 'hide' ? 'hiding' : 'feinting';
-      calloutLine = `WIND-UP PUNISHED — ${monName(def)} was caught ${verb}!` + starTag(ev.side);
-      pushLog(`WIND-UP PUNISHED — ${monName(def)} was caught ${verb}!`);
-      animSide = ev.side;
-      animKind = 'strike';
-      animT = 0.25;
-      return;
-    }
-    if (ev.kind === 'windUpResolved') {
-      // FIX 4 — the wind-up was NOT read; it survives to release next round.
-      const line = `${monName(ev.side)} ${FINISH_VERB[ev.step]}!`;
-      calloutLine = line;
-      pushLog(line);
       return;
     }
     if (ev.kind === 'flipResolve') {
-      // FIX 4 — both released: name the winner by what its two-step did to the
-      // other ("HIDE slips the CHARGE!"). The winner's ★ arrives separately.
-      if (ev.winner !== null && ev.winnerStep && ev.loserStep) {
+      // Both released → name the winner by what its release did to the other
+      // ("HIDE slips the HEAVY!"). The winner's ★ arrives via a momentum event.
+      if (ev.winner !== null && ev.winnerRelease && ev.loserRelease) {
         if (ev.winner === 'player') pendingReadWindow = true;
-        const line = `${ev.winnerStep.toUpperCase()} ${FLIP_VERB[ev.winnerStep]} the ${ev.loserStep.toUpperCase()}!`;
+        const line = `${ev.winnerRelease.toUpperCase()} ${FLIP_VERB[ev.winnerRelease]} the ${ev.loserRelease.toUpperCase()}!`;
         calloutLine = line + starTag(ev.winner);
         pushLog(`${monName(ev.winner)}: ${line}`);
       } else {
-        calloutLine = 'Both committed — the two-steps cancel out.';
-        pushLog('Both committed — the two-steps cancel out.');
+        calloutLine = 'Both released — the clash cancels out.';
+        pushLog('Both released — the clash cancels out.');
       }
       return;
     }
@@ -1029,8 +1007,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       ev.kind === 'ko' ||
       ev.kind === 'break' ||
       ev.kind === 'call' ||
-      // Layer 2 outcomes LAND (FIX 4) — the read moments the player must see.
-      ev.kind === 'phase1Punish' ||
+      // FOCUS outcomes LAND — the read moments the player must see.
+      ev.kind === 'focus' ||
       ev.kind === 'release' ||
       ev.kind === 'flipResolve'
     );
@@ -1346,6 +1324,22 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
   }
 
+  // ---- FOCUS R2 release menu -------------------------------------------------
+  // The focusing mon picks its HIDDEN release now (HEAVY/FEINT/HIDE). It resolves
+  // vs the foe's simultaneous single-step via the rotation triangle.
+  function handleReleaseInput(key: InputKey): void {
+    if (key === 'up') {
+      releaseCursor = (releaseCursor + RELEASES.length - 1) % RELEASES.length;
+      emitGameEvent({ kind: 'menu-move' });
+    } else if (key === 'down') {
+      releaseCursor = (releaseCursor + 1) % RELEASES.length;
+      emitGameEvent({ kind: 'menu-move' });
+    } else if (key === 'a' || key === 'start') {
+      commit({ kind: 'release', release: RELEASES[releaseCursor]!.kind });
+    }
+    // No 'b' — a committed Focus MUST release (the commitment is locked).
+  }
+
   // ---- Call submenu (Call-menu sprint) -------------------------------------
   // A Call is UNLOCKED (cursor can land) when it's built AND unlocked for
   // this run. Catch Breath is the only built Call; it unlocks via the run
@@ -1464,7 +1458,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function drawFoePanel(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, FOE_PANEL.x, FOE_PANEL.y, FOE_PANEL.w, FOE_PANEL.h);
     drawText(ctx, display.foe.species.name, FOE_PANEL.x + 8, FOE_PANEL.y + 6);
-    if (display.foe.winding) drawText(ctx, WIND_TAG[display.foe.winding], FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
+    if (display.foe.focusing) drawText(ctx, 'FOCUS', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
     else if (display.foe.dazed) drawText(ctx, 'DAZE', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpCrit);
     else if (display.foe.staggered) drawText(ctx, 'STAG', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
     if (display.foe.exhausted) drawText(ctx, 'EXH', FOE_PANEL.x + 108, FOE_PANEL.y + 6, PALETTE.hpCrit);
@@ -1548,7 +1542,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function drawPlayerPanel(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, PL_PANEL.x, PL_PANEL.y, PL_PANEL.w, PL_PANEL.h);
     drawText(ctx, display.player.species.name, PL_PANEL.x + 8, PL_PANEL.y + 6);
-    if (display.player.winding) drawText(ctx, WIND_TAG[display.player.winding], PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
+    if (display.player.focusing) drawText(ctx, 'FOCUS', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
     else if (display.player.dazed) drawText(ctx, 'DAZE', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpCrit);
     else if (display.player.staggered) drawText(ctx, 'STAG', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
     if (display.player.exhausted) drawText(ctx, 'EXH', PL_PANEL.x + 108, PL_PANEL.y + 6, PALETTE.hpCrit);
@@ -1758,11 +1752,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
     const stance = STANCES[stanceIdx]!;
     drawStanceBadge(ctx, BOTTOM.x + 170, BOTTOM.y + 8, stance);
-    // Layer 2 — when the commit-modifier is on, the confirm initiates a
-    // two-step; show its name (and that ←/→ toggles it) so the wind-up is a
-    // deliberate, visible choice.
+    // FOCUS — when the commit-modifier is on, confirm initiates a generic
+    // FOCUS (the release is CHOSEN next round, hidden until then).
     if (committing) {
-      drawText(ctx, `▶${twoStepForStance(stance).toUpperCase()}`, BOTTOM.x + 182, BOTTOM.y + 8, PALETTE.hpCrit);
+      drawText(ctx, '▶FOCUS', BOTTOM.x + 182, BOTTOM.y + 8, PALETTE.hpCrit);
     } else {
       drawText(ctx, STANCE_NAME[stance], BOTTOM.x + 182, BOTTOM.y + 8);
     }
@@ -1793,6 +1786,21 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       fluidFirst ? PALETTE.stanceF : PALETTE.paperShadow,
     );
     drawText(ctx, 'SEL=stance ←→=commit B=back', BOTTOM.x + 170, BOTTOM.y + BOTTOM.h - 12, PALETTE.paperDim);
+  }
+
+  // FOCUS R2 — the release picker (the hidden release is chosen NOW).
+  function drawBottomRelease(ctx: CanvasRenderingContext2D): void {
+    drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+    drawText(ctx, 'RELEASE:', BOTTOM.x + 8, BOTTOM.y + 4, PALETTE.paperShadow);
+    RELEASES.forEach((r, i) => {
+      const y = BOTTOM.y + 5 + i * 10;
+      const marker = releaseCursor === i ? '>' : ' ';
+      drawText(ctx, `${marker}${r.name}`, BOTTOM.x + 8, y);
+    });
+    // The selected release's rotation hint.
+    const sel = RELEASES[releaseCursor]!;
+    drawText(ctx, sel.beats, BOTTOM.x + 90, BOTTOM.y + 8, PALETTE.paperShadow);
+    drawText(ctx, 'A=release', BOTTOM.x + 90, BOTTOM.y + BOTTOM.h - 12, PALETTE.paperDim);
   }
 
   function drawBottomCall(ctx: CanvasRenderingContext2D): void {
@@ -1891,6 +1899,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         handleCallInput(key);
         return;
       }
+      if (phase === 'release') {
+        handleReleaseInput(key);
+        return;
+      }
       if (phase === 'spare') {
         handleSpareInput(key);
         return;
@@ -1939,7 +1951,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       if (breakThreshold > 0) drawBossStrip(ctx);
       drawPlayerPanel(ctx);
 
-      if (phase === 'menu' || phase === 'move' || phase === 'call') drawIntent(ctx);
+      if (phase === 'menu' || phase === 'move' || phase === 'call' || phase === 'release') drawIntent(ctx);
       // S1 — the triangle callout occupies the intent slot during resolve.
       if (phase === 'resolve') drawCallout(ctx);
 
@@ -1977,6 +1989,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       else if (phase === 'menu') drawBottomMenu(ctx);
       else if (phase === 'move') drawBottomMoves(ctx);
       else if (phase === 'call') drawBottomCall(ctx);
+      else if (phase === 'release') drawBottomRelease(ctx);
       else if (phase === 'spare') drawBottomSpare(ctx);
       else if (phase === 'party') drawBottomParty(ctx);
       else if (phase === 'resolve' || phase === 'end') drawBottomLog(ctx);

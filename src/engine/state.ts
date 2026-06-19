@@ -157,9 +157,15 @@ export function validateAction(side: SideState, action: Action): void {
     return;
   }
   if (action.kind === 'call') {
-    // Layer 2 — a ★-Call override (GET AWAY / HANG IN THERE). Costs 1 ★.
+    // A ★-Call override (GET AWAY / HANG IN THERE). Costs 1 ★.
     if (side.momentum < 1) throw new Error('Call needs ≥1 momentum');
     if (side.exhausted) throw new Error('Cannot Call while exhausted');
+    return;
+  }
+  if (action.kind === 'release') {
+    // FOCUS R2 — only legal for a focusing mon (resolveRound skips validation
+    // for a mon whose `focus` is set; this guards a stray release otherwise).
+    if (side.focus === undefined) throw new Error('Release needs an active focus');
     return;
   }
   if (side.exhausted) throw new Error('Cannot move while exhausted');

@@ -1,4 +1,4 @@
-import type { Stance, Tier, TierName } from './types';
+import type { ReleaseKind, Tier, TierName } from './types';
 
 export const COMBAT = {
   dmgScale: 0.155,
@@ -56,66 +56,38 @@ export const COMBAT = {
   restInitiative: -1,
 } as const;
 
-// ── Combat Layer 2 — two-step plays (combat-enrichment-roadmap.md) ─────────
-// Knobs for CHARGE/HIDE/FEINT. SIM-GATED (src/sim/twoStepBalance.test.ts):
-// the PHASE-1 vulnerability is the master balance lever — tuned HARSH so that
-// two-stepping is a real gamble and two-step-SPAM sits BELOW balanced play.
-// Tuned 2026-06-19; do not tweak casually.
-export const TWO_STEP = {
-  // PHASE-1 vulnerability: a multiplier on the opponent's single-step strike
-  // against a mon that is WINDING UP (exposed). ≥1 = extra damage. HARSH on
-  // the hard-counter matchups, ~1 where the wind-up is safe vs that stance.
-  // Keyed [twoStep][opponent base stance]. (Charge is interrupted by Aggressive
-  // and poked by Fluid; Hide is cornered by Guard/Fluid; Feint is bulldozed by
-  // Aggressive and out-waited by Guard.)
-  // A wind-up is SAFE unless deliberately READ: harsh (≫1) only vs the one
-  // hard-counter stance, ~neutral otherwise (a random single-stepper rarely
-  // happens onto the read). This keeps two-stepping positive vs non-readers
-  // and punished by readers (the design). Charge is interrupted by Aggression;
-  // Hide is cornered by Guard; Feint is bulldozed by Aggression. Fluid punishes
-  // nothing (it's initiative, not a punish).
-  phase1Vuln: {
-    charge: { A: 1.55, F: 1.0, G: 1.0 },
-    hide: { A: 1.0, F: 1.0, G: 1.55 },
-    feint: { A: 1.55, F: 1.0, G: 1.0 },
-  } as { readonly [k in 'charge' | 'hide' | 'feint']: { readonly A: number; readonly F: number; readonly G: number } },
-  // The one stance that PUNISHES (reads) each wind-up — it earns ★ and deals
-  // the harsh vuln. Any other single-step only "survives" the wind-up (no ★).
-  // (L2.7: surviving a non-punishing single-step is a GAMBLE, not a read.)
-  punishedBy: {
-    charge: ['A'],
-    hide: ['G'],
-    feint: ['A'],
-  } as { readonly [k in 'charge' | 'hide' | 'feint']: readonly Stance[] },
-  // RELEASE (phase 2) damage bonus — the boosted payoff strike that rewards
-  // surviving phase 1.
-  releaseMult: { charge: 1.8, hide: 1.7, feint: 1.95 } as {
-    readonly [k in 'charge' | 'hide' | 'feint']: number;
-  },
-  // Incoming damage to a RELEASING mon this round — its committed blow's
-  // momentum/follow-through blunts the counter-hit (Hide blunts most, struck
-  // from concealment). Keyed by the releasing mon's step.
-  releaseIncomingMult: { charge: 0.85, hide: 0.7, feint: 0.85 } as {
-    readonly [k in 'charge' | 'hide' | 'feint']: number;
-  },
-  // FLIPPED triangle (both release) — SOFT tilt: winner's release ×flipWin,
-  // loser's ×flipLose. HIDE>CHARGE>FEINT>HIDE.
-  flipWinMult: 1.45,
-  flipLoseMult: 0.68,
-  // WIND-UP chip: a winding mon isn't a passive punching bag — it lands a
-  // glancing poke (no read, no ★, no special effect) on the wind-up round,
-  // softening the tempo cost of committing so two-stepping isn't self-defeating
-  // vs a single-stepper. It STILL eats the phase-1 punish, so the gamble holds.
-  windUpChipMult: 0.35,
-  // SOFT counter: a single-step responding to a SEEN release tilts it down
-  // (does NOT negate — a telegraphed two-step must stay viable, L2.5).
-  softCounterMult: 0.7,
-  // Which single-step stance SOFT-counters each releasing two-step (the seen
-  // response that tilts the odds). charge↞Guard (brace the blow — though it
-  // pierces, it blunts), hide↞Aggressive (chase the concealer), feint↞Fluid
-  // (flow past the bluff).
-  softCounterStance: { charge: 'G', hide: 'A', feint: 'F' } as {
-    readonly [k in 'charge' | 'hide' | 'feint']: Stance;
+// ── Combat FOCUS model (docs/combat-focus-redesign.md) ─────────────────────
+// R1 = a generic Focus (release hidden); R2 = a chosen release resolving via
+// the rotation triangle. SIM-GATED (src/sim/focusBalance.test.ts): the FOCUS
+// COST is the master balance lever (~1.1 — too high → focus not worth it; too
+// low → focus-spam creeps up). Tuned 2026-06-19; do not tweak casually.
+export const FOCUS = {
+  // R1 FOCUS COST (master knob): the focuser DEALS 0 and TAKES the opponent's
+  // single-step strike ×this — the guaranteed cost of gathering energy.
+  focusCost: 1.0,
+  // R2 release base damage multiplier (the payoff strike, before the rotation
+  // outcome tilt).
+  releaseBase: 1.7,
+  // ROTATION outcome (R2 release vs the opponent's single-step):
+  //   win  — releaser ×winDmg + its effect; the opponent's strike ×winFoe.
+  //   lose — releaser ×loseDmg (blunted); the opponent's strike ×loseFoe.
+  //   neutral — a trade: releaser ×neutralDmg, opponent normal.
+  winDmg: 1.8,
+  winFoe: 0.35,
+  loseDmg: 0.5,
+  loseFoe: 1.15,
+  neutralDmg: 1.0,
+  neutralFoe: 1.0,
+  // FLIPPED triangle (BOTH release): winner ×flipWin, loser ×flipLose.
+  // HIDE > HEAVY > FEINT > HIDE.
+  flipWin: 1.45,
+  flipLose: 0.62,
+  // TIMING MISMATCH (F.4) — a release lands vs a still-FOCUSING opponent (who
+  // deals 0, mid-gather). Multiplier on the releaser's strike by its release:
+  // HEAVY devastates the gatherer, FEINT whiffs (they're committing not
+  // defending), HIDE ~neutral.
+  mismatch: { heavy: 1.7, feint: 0.4, hide: 1.0 } as {
+    readonly [k in ReleaseKind]: number;
   },
 } as const;
 

@@ -2,18 +2,39 @@ export type Side = 'player' | 'foe';
 
 export type Stance = 'A' | 'G' | 'F';
 
-// Combat Layer 2 — two-step plays. Each is a 2-round COMMITMENT initiated
-// from a base stance (NOT a 4th–6th permanent stance): CHARGE from Aggressive,
-// HIDE from Fluid, FEINT from Guard. See combat-enrichment-roadmap.md / Layer 2.
-export type TwoStep = 'charge' | 'hide' | 'feint';
+// Combat FOCUS model (docs/combat-focus-redesign.md). A 2-round COMMITMENT:
+// R1 = a GENERIC focus (the opponent sees "gathering energy", not which
+// release is coming); R2 = a player-chosen HIDDEN release. Replaces the old
+// distinct-wind-up two-steps (CHARGE/HIDE/FEINT) — see KICKOFF-combat-focus-rebuild.
+export type ReleaseKind = 'heavy' | 'feint' | 'hide';
 
 export type CallKind = 'getAway' | 'hangInThere';
 
-export function twoStepForStance(s: Stance): TwoStep {
-  return s === 'A' ? 'charge' : s === 'F' ? 'hide' : 'feint';
+// The default release a Focus falls back to when none is chosen (the internal
+// base stance the focus is tied to): Aggressive→HEAVY, Fluid→HIDE, Guard→FEINT.
+export function defaultReleaseForStance(s: Stance): ReleaseKind {
+  return s === 'A' ? 'heavy' : s === 'F' ? 'hide' : 'feint';
 }
-export function stanceForTwoStep(ts: TwoStep): Stance {
-  return ts === 'charge' ? 'A' : ts === 'hide' ? 'F' : 'G';
+
+// The ROTATION triangle (R2 release vs the opponent's single-step stance):
+//   HEAVY > Brace(G) ; loses to Fluid(F) ; neutral vs Agg(A)
+//   FEINT > Agg(A)   ; loses to Brace(G) ; neutral vs Fluid(F)
+//   HIDE  > Fluid(F) ; loses to Agg(A)   ; neutral vs Brace(G)
+export function releaseVsStance(release: ReleaseKind, stance: Stance): 'win' | 'lose' | 'neutral' {
+  const beats: { readonly [k in ReleaseKind]: Stance } = { heavy: 'G', feint: 'A', hide: 'F' };
+  const losesTo: { readonly [k in ReleaseKind]: Stance } = { heavy: 'F', feint: 'G', hide: 'A' };
+  if (beats[release] === stance) return 'win';
+  if (losesTo[release] === stance) return 'lose';
+  return 'neutral';
+}
+
+// The FLIPPED triangle (both focus → both release): HIDE > HEAVY > FEINT > HIDE.
+export function flipBeats(a: ReleaseKind, b: ReleaseKind): boolean {
+  return (
+    (a === 'hide' && b === 'heavy') ||
+    (a === 'heavy' && b === 'feint') ||
+    (a === 'feint' && b === 'hide')
+  );
 }
 
 export type TierName = 'light' | 'mid' | 'heavy' | 'nuke';
@@ -70,11 +91,12 @@ export interface SideState {
   // (bond-track-v2.md Call-tier I "Familiar"). Omitted (undefined) on every
   // legacy/sim side, so the field is absent → behaviour is bit-identical.
   readonly jumpstartArmed?: boolean;
-  // Combat Layer 2 — a pending two-step. Set on the WIND-UP round (phase 1)
-  // when this mon commits a two-step; present at the start of the next round
-  // means this mon RELEASES (phase 2) and the field is then cleared. Absent
+  // Combat FOCUS model — a pending focus. Set on the FOCUS round (R1) when this
+  // mon initiates a Focus (tied to `stance` internally; `move` is the strike it
+  // releases with). Present at the start of the next round means this mon
+  // RELEASES (R2, the chosen release) and the field is then cleared. Absent
   // (undefined) on every legacy/sim/single-step side → bit-identical shape.
-  readonly winding?: { readonly step: TwoStep; readonly move: string };
+  readonly focus?: { readonly stance: Stance; readonly move: string };
 }
 
 // A side's roster. The active mon is members[active]; the rest are bench.
@@ -138,10 +160,13 @@ export interface BattleState {
 }
 
 export type Action =
-  // `commit: true` (Layer 2) INITIATES the stance's two-step: A→CHARGE,
-  // F→HIDE, G→FEINT. Absent/false = a normal single-step move (the legacy
-  // shape → single-step resolution is bit-identical).
+  // `commit: true` INITIATES a FOCUS (R1) tied to `stance` (generic to the
+  // opponent — the release is hidden until R2). Absent/false = a normal
+  // single-step move (the legacy shape → single-step resolution is bit-identical).
   | { readonly kind: 'move'; readonly move: string; readonly stance: Stance; readonly commit?: boolean }
+  // R2 of a Focus — the player-chosen HIDDEN release. Submitted by a mon whose
+  // `focus` is set (the prior round's commit); resolves via the rotation triangle.
+  | { readonly kind: 'release'; readonly release: ReleaseKind }
   | { readonly kind: 'rest' }
   | { readonly kind: 'catchBreath' }
   | { readonly kind: 'switch'; readonly toIndex: number }
