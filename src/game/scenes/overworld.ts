@@ -163,6 +163,12 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
       }
     | null = null;
 
+  // The tile a forced/sighted trainer WALKED UP to (set when the approach
+  // arrives). Persists for the scene's life so the trainer renders at the spot
+  // it confronted the player from — through the dialogue, battle, and relent —
+  // instead of snapping back to its map spawn tile.
+  let confront: { npc: NpcObj; x: number; y: number } | null = null;
+
   // Begin a trainer's walk-up cutscene: the NPC paces from its tile to
   // (stopX, stopY) (adjacent to the player), then fires its interact. Used by
   // both line-of-sight (straight line) and forced-entry (greedy path).
@@ -230,6 +236,10 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
       // Arrived — fire the trainer's battle script (dialog + battle). Clear
       // approach FIRST so the resumed scene (after the battle) isn't mid-cutscene.
       const npc = approach.npc;
+      // Persist the WALKED-UP position so the trainer STAYS there through the
+      // dialogue + battle (he's confronting you — no snap-back to his spawn
+      // tile). The scene survives the battle, so this holds for the relent too.
+      confront = { npc, x: approach.x, y: approach.y };
       approach = null;
       scriptQueue = [...npc.interact];
       runNextCommand();
@@ -722,10 +732,14 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         drawTiles(ctx, map, rows, camX, camY);
       }
       const gustState = drawGustOverlay(ctx, map, camX, camY, tick);
-      drawObjectMarkers(ctx, map, camX, camY, opts.flags, tick, approach?.npc);
-      // The trainer walking up on sight: draw at its animated tile + an "!".
+      // The confronting trainer is drawn separately (mid-walk-up OR parked at
+      // its walked-up tile), so skip its static marker to avoid a double-draw
+      // back at its spawn tile.
+      const confrontingNpc = approach?.npc ?? confront?.npc;
+      drawObjectMarkers(ctx, map, camX, camY, opts.flags, tick, confrontingNpc);
+      const ts = map.tilesize;
       if (approach) {
-        const ts = map.tilesize;
+        // Walking up on sight/entry: draw at its animated tile + an "!".
         const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
         const ax = lerp(approach.px, approach.x, approach.t) * ts - camX;
         const ay = lerp(approach.py, approach.y, approach.t) * ts - camY;
@@ -737,6 +751,16 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         if (approach.alertT > 0) {
           drawText(ctx, '!', ax + ts / 2 - 1, ay - 7, PALETTE.hpCrit);
         }
+      } else if (confront) {
+        // Arrived — STAYS at the walked-up tile through the dialogue + battle
+        // (+ relent), no snap-back to spawn.
+        const cx = confront.x * ts - camX;
+        const cy = confront.y * ts - camY;
+        ctx.fillStyle = confront.npc.color ?? '#d22f2f';
+        ctx.fillRect(cx + 3, cy + 3, ts - 6, ts - 6);
+        ctx.strokeStyle = '#1d1d28';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(cx + 3.5, cy + 3.5, ts - 7, ts - 7);
       }
       // Walk phase: idle (0) when standing; otherwise the current stride
       // foot lifts for the middle 60% of the move and lands flat at the

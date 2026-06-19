@@ -65,22 +65,29 @@ function mockInput(): MockInputState {
 // text (e.g. an auto-started dialogue line).
 interface RecordingCtx extends CanvasRenderingContext2D {
   readonly texts: string[];
+  readonly rects: { x: number; y: number; w: number; h: number; fill: string }[];
 }
 function stubCtx(): RecordingCtx {
   const noop = () => {};
   const texts: string[] = [];
+  const rects: { x: number; y: number; w: number; h: number; fill: string }[] = [];
+  let fill = '';
   return new Proxy(
-    { texts },
+    { texts, rects },
     {
       get(target, prop) {
         if (prop === 'texts') return (target as { texts: string[] }).texts;
+        if (prop === 'rects') return (target as { rects: typeof rects }).rects;
+        if (prop === 'fillStyle') return fill;
         if (prop === 'fillText') return (text: string) => texts.push(String(text));
+        if (prop === 'fillRect') return (x: number, y: number, w: number, h: number) => rects.push({ x, y, w, h, fill });
         if (prop === 'beginPath') return () => ({ fill: noop, stroke: noop, ellipse: noop });
         if (prop === 'measureText') return () => ({ width: 10 });
         if (prop === 'canvas') return { width: 320, height: 180 };
         return noop;
       },
-      set() {
+      set(_target, prop, value) {
+        if (prop === 'fillStyle') fill = String(value);
         return true;
       },
     },
@@ -651,6 +658,42 @@ describe('JAY the robber — the opening bond hook is UNMISSABLE (forced on entr
     const ctx = stubCtx();
     scene.draw(ctx);
     expect(ctx.texts.some((t) => t.includes('Keep it') || t.includes('Took the hit'))).toBe(true);
+  });
+
+  // FIX 1 (playtest-polish-3) — JAY must STAY at the tile he walked up to,
+  // not snap back to his spawn (7,4), the moment his dialogue triggers.
+  // The on-screen NPC square (the flat-colour body, width tilesize-6) is
+  // JAY's; with the camera fixed (player hasn't moved) we compare his drawn
+  // x while confronting against where he'd render parked at spawn.
+  function jayMarkerX(ctx: ReturnType<typeof stubCtx>): number | null {
+    // JAY's body square is his flat colour (#c2491a alive / #777 once beaten)
+    // — unambiguous vs the player/UI rects. (Approach, confront, and the static
+    // marker all use the npc colour; beaten greys it.)
+    const jay = ctx.rects.filter((r) => ['#c2491a', '#777'].includes(r.fill.toLowerCase()));
+    return jay.length > 0 ? jay[0]!.x : null;
+  }
+
+  test('JAY stays at his walked-up tile through the dialogue — no snap-back to spawn', () => {
+    // Where JAY renders when simply parked at his spawn (7,4), beaten.
+    const beaten = jayScene(true);
+    const cb = stubCtx();
+    beaten.scene.draw(cb);
+    const spawnX = jayMarkerX(cb);
+
+    // The live encounter: let JAY walk up + his dialogue open.
+    const live = jayScene(false);
+    tickStep(live.scene, 3);
+    const cc = stubCtx();
+    live.scene.draw(cc);
+    // His threat dialogue is up (we're mid-confrontation, not mid-walk).
+    expect(cc.texts.join(' ')).toContain('sharp little');
+    const confrontX = jayMarkerX(cc);
+
+    expect(spawnX).not.toBeNull();
+    expect(confrontX).not.toBeNull();
+    // He walked LEFT toward the player (entry at x=4) and STAYED there — his
+    // confronting position is left of his spawn column, not snapped back.
+    expect(confrontX!).toBeLessThan(spawnX!);
   });
 });
 

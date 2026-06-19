@@ -596,11 +596,19 @@ function buildScene(opts: SceneBuildOpts = {}): {
 }
 
 function drainResolve(scene: ReturnType<typeof createBattleScene>): void {
-  // Resolve presents one beat at a time (streaming + a short auto-advance
-  // hold per beat). Tick generously to auto-advance the whole round to the
-  // next phase (menu, or end-text). No presses — ticking can't over-advance
-  // (update() only drives the resolve while phase==='resolve').
-  for (let i = 0; i < 80; i += 1) scene.update?.(0.2);
+  // Resolve presents one beat at a time. ROUTINE beats auto-advance; the
+  // CONSEQUENTIAL ones (KO/faint/break/Call) now WAIT for a press so they land
+  // (playtest-polish-3). So drain by ticking AND pressing through any waiting
+  // beat — but STOP at the menu / end-text (don't press past those; callers
+  // assert on them).
+  for (let i = 0; i < 200; i += 1) {
+    scene.update?.(0.2);
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const s = ctx.texts.join('|');
+    if (/FIGHT|won the battle|team fell|Got away|fled|continue\./.test(s)) return;
+    scene.input?.('a'); // nudge a waiting consequential beat (no-op past resolve)
+  }
 }
 
 describe('battle menu — CALL paths (Call-menu sprint: submenu + shout + exit)', () => {
@@ -865,6 +873,48 @@ describe('battle resolve + end-text', () => {
     scene.input?.('a');
     scene.input?.('a');
     expect(resolved.winner).toBe('foe');
+  });
+
+  // FIX 2 (playtest-polish-3) — a consequential beat (a faint) is a HELD beat:
+  // it LANDS (holds markedly longer, doesn't flash past) and a press advances
+  // it. Routine beats keep their gentle auto-advance.
+  test('a faint is a held, press-advanceable beat (it lands, does not flash past)', () => {
+    const { scene } = buildScene({ playerPatch: { hp: 1 } });
+    scene.input?.('a'); // FIGHT
+    scene.input?.('a'); // TACKLE Aggressive → foe Guards → counter KOs the player
+    // Step in small ticks until the faint line is FULLY shown (it streams in).
+    let sawFaint = false;
+    for (let i = 0; i < 60 && !sawFaint; i += 1) {
+      scene.update?.(0.1);
+      const c = stubCtx();
+      scene.draw(c);
+      if (c.texts.join('|').includes('fainted!')) sawFaint = true;
+    }
+    expect(sawFaint).toBe(true);
+    // It's HOLDING (acknowledgment) — not yet flowed to the end-text.
+    const held = stubCtx();
+    scene.draw(held);
+    expect(held.texts.join('|')).not.toContain('team fell');
+    // A press advances past the held faint to the end-text.
+    scene.input?.('a');
+    const after = stubCtx();
+    scene.draw(after);
+    expect(after.texts.join('|')).toContain('team fell');
+  });
+});
+
+describe('momentum visibility (playtest-polish-3)', () => {
+  test('foe ★/momentum is HIDDEN; the player’s is labeled MOMENTUM', () => {
+    const { scene } = buildScene({ playerPatch: { momentum: 2 } });
+    const ctx = stubCtx();
+    scene.draw(ctx); // at the battle menu — panels visible
+    const screen = ctx.texts.join('|');
+    // Your meter is clearly labelled (not the terse "MOM").
+    expect(screen).toContain('MOMENTUM');
+    // Only the PLAYER's ★ pips render (cap = 2) — the foe's are hidden, so the
+    // total ★ pip count is 2, not 4.
+    const pips = ctx.texts.filter((t) => t === '★').length;
+    expect(pips).toBe(2);
   });
 });
 

@@ -41,13 +41,18 @@ import {
   hpColor,
 } from '../ui';
 
-// Battle-text stream speed (chars/sec). Tuned readable, ~Gen 4+ feel. Each
-// beat's message reveals progressively; a press finishes it (see tickResolve
-// / handleResolveInput — the consistent one-press-per-message model).
-const CHARS_PER_SEC = 56;
-// After a beat's message is fully revealed it holds this long, then auto-
-// advances (a consistent rhythm). A press skips the stream / advances now.
-const BEAT_HOLD_SEC = 0.5;
+// Battle-text stream speed (chars/sec). Tuned readable, ~modern-Pokémon feel
+// (was 56 — over-corrected to "too fast to read"). Each beat's message reveals
+// progressively; a press finishes it (see tickResolve / handleResolveInput —
+// the consistent one-press-per-message model).
+const CHARS_PER_SEC = 38;
+// After a ROUTINE beat is fully revealed it holds this long, then auto-advances
+// (a gentle rhythm). A press skips the stream / advances now.
+const BEAT_HOLD_SEC = 0.7;
+// CONSEQUENTIAL beats (KO/faint/break/Call) hold MARKEDLY longer so they LAND
+// ("FLITPECK fainted!" must register, not flow past) — but still auto-advance
+// eventually, and a press skips the wait immediately.
+const CONSEQUENTIAL_HOLD_SEC = 2.2;
 const STANCES: readonly Stance[] = ['A', 'G', 'F'];
 // Fixed seed for the intent-display feint RNG (Phase 6.7-A). Deliberately
 // constant + independent of the engine RNG so degrading the FOE INTENT
@@ -167,7 +172,7 @@ function opposite(side: Side): Side {
 
 // Layer 2 — short panel tags for a winding (phase-1) mon, so the wind-up is
 // visible on the HUD (the foe must see it to soft-counter; the player reads it).
-const WIND_TAG: { readonly [k in TwoStep]: string } = { charge: 'CHRG', hide: 'HIDE', feint: 'FEINT' };
+const WIND_TAG: { readonly [k in TwoStep]: string } = { charge: 'CHG', hide: 'HID', feint: 'FNT' };
 
 // The ★ credit a read-win carries — appended to the COUNTER/OPENING/DODGE/
 // CLASH callout so the player SEES that winning a read charges momentum, and
@@ -432,6 +437,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let beatMsg = ''; // the message streaming this beat ('' = a no-text beat)
   let resolveHeld = false; // a beat is currently shown (streaming or holding)
   let holdT = 0; // time the fully-revealed beat has been held (auto-advance)
+  // A CONSEQUENTIAL beat (KO/faint/break/Call) WAITS for a press once revealed
+  // instead of auto-advancing, so the big moments land. Routine beats auto-flow.
+  let beatWaits = false;
   let endingWinner: 'player' | 'foe' | null = null;
 
   let menuCursor = 0;
@@ -976,11 +984,19 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // Begin a beat: stream its message (the newest log line if this event
   // added one; else a no-text beat that still holds for its animation/HP
   // tick). The beat HOLDS once fully revealed, until the player presses.
-  function beginBeat(grewLog: boolean): void {
+  // The "this matters — acknowledge it" beats that WAIT for a press once shown
+  // (vs routine hits/stances that auto-flow): a faint/KO, a phase Break, and a
+  // Call firing.
+  function isKeyBeat(ev: BattleEvent): boolean {
+    return ev.kind === 'faint' || ev.kind === 'ko' || ev.kind === 'break' || ev.kind === 'call';
+  }
+
+  function beginBeat(grewLog: boolean, ev: BattleEvent): void {
     beatMsg = grewLog && log.length > 0 ? log[log.length - 1]! : '';
     reveal = 0;
     holdT = 0;
     resolveHeld = true;
+    beatWaits = isKeyBeat(ev);
   }
 
   // Drain events until the next BEAT (a consequential event) — applying the
@@ -994,7 +1010,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       applyEvent(ev);
       if (phase !== 'resolve') return; // forcedSwitch → party picker; resume later
       if (isConsequential(ev)) {
-        beginBeat(log.length > before);
+        beginBeat(log.length > before, ev);
         return;
       }
     }
@@ -1013,9 +1029,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       reveal = Math.min(beatMsg.length, reveal + CHARS_PER_SEC * dt);
       return;
     }
-    // Fully revealed → hold a beat-rhythm, then auto-advance.
+    // Fully revealed → hold, then auto-advance. A CONSEQUENTIAL beat holds
+    // markedly longer so it LANDS (the blink indicator shows a press advances
+    // now); a routine beat holds a gentle rhythm.
     holdT += dt;
-    if (holdT >= BEAT_HOLD_SEC) resolveHeld = false; // next tick advances
+    if (holdT >= (beatWaits ? CONSEQUENTIAL_HOLD_SEC : BEAT_HOLD_SEC)) resolveHeld = false;
   }
 
   // Menu rows in DISPLAY order. The `enabled` flag controls whether the
@@ -1405,7 +1423,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     else if (display.foe.dazed) drawText(ctx, 'DAZE', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpCrit);
     else if (display.foe.staggered) drawText(ctx, 'STAG', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
     if (display.foe.exhausted) drawText(ctx, 'EXH', FOE_PANEL.x + 108, FOE_PANEL.y + 6, PALETTE.hpCrit);
-    drawMomentum(ctx, FOE_PANEL.x + 132, FOE_PANEL.y + 6, display.foe.momentum, COMBAT.momentumCap);
+    // FOE ★/momentum is HIDDEN (playtest-polish-3): you don't know the
+    // opponent's resource state — can they Call? — which adds bluff tension.
+    // (Foundation of the info-warfare layer; foe INTENT stays shown.)
     // Break meter moved to the dedicated boss strip below the panel
     // (BUG 3 — the in-panel pips were too small to notice).
 
@@ -1487,10 +1507,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     else if (display.player.dazed) drawText(ctx, 'DAZE', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpCrit);
     else if (display.player.staggered) drawText(ctx, 'STAG', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
     if (display.player.exhausted) drawText(ctx, 'EXH', PL_PANEL.x + 108, PL_PANEL.y + 6, PALETTE.hpCrit);
-    // Label the ★ pips so the player knows what they are (legibility #1).
-    // Skipped while EXH occupies the same slot — momentum is moot then.
-    else drawText(ctx, 'MOM', PL_PANEL.x + 110, PL_PANEL.y + 6, PALETTE.paperShadow);
-    drawMomentum(ctx, PL_PANEL.x + 132, PL_PANEL.y + 6, display.player.momentum, COMBAT.momentumCap);
+    // Label YOUR ★ pips clearly (playtest-polish-3 — "MOM" was too terse): the
+    // player should immediately read this as their momentum meter. (The foe's
+    // is hidden; only yours is shown.) Skipped while EXH occupies the row.
+    else drawText(ctx, 'MOMENTUM', PL_PANEL.x + 100, PL_PANEL.y + 6, PALETTE.paperShadow);
+    drawMomentum(ctx, PL_PANEL.x + 152, PL_PANEL.y + 6, display.player.momentum, COMBAT.momentumCap);
 
     drawText(ctx, 'HP', PL_PANEL.x + 8, PL_PANEL.y + 18, PALETTE.paperShadow);
     drawBar(
