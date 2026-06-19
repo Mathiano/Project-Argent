@@ -961,6 +961,25 @@ describe('resolve cadence + stance labels — legibility pass', () => {
     expect(advanceUntilLog(scene, 'COUNTER', 12)).toBe(true);
   });
 
+  test('Bug 1: a read-win increments USABLE ★ — the Call submenu reflects it (not just the callout)', () => {
+    // GRUBLEAF Guard vs FLITPECK Aggressive → COUNTER → the player charges ★.
+    const { scene } = buildScene({
+      foeAction: { kind: 'move', move: 'TACKLE', stance: 'A' },
+      catchBreathUnlocked: true,
+    });
+    pickStance(scene, 'G');
+    drainResolve(scene);
+    // FIGHT → CALL (PKMN + BALL are disabled on a solo, no-catch team).
+    scene.input?.('down');
+    scene.input?.('a'); // open the Call submenu
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    // The submenu reads the LIVE engine ★ (the resource Calls spend), so this
+    // proves the read-win actually banked usable ★, not just fired a callout.
+    // ★1 ≥ Catch Breath's cost (1) → the Call is now usable.
+    expect(ctx.texts.join('|')).toContain('Your ★1');
+  });
+
   test('stance label on opening: "FLUID slips past GUARD" when F attacks G', () => {
     const scene = driveStanceScenario('F', 'G', SPECIES.AQUAFIN!, SPECIES.EMBERCUB!, 42);
     pickStance(scene, 'F');

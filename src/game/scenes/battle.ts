@@ -127,6 +127,10 @@ interface DisplaySide {
   momentum: number;
   exhausted: boolean;
   staggered: boolean;
+  // Per-round daze indicator (thrice-repeat). Not on SideState (it's a
+  // per-round verdict from history) — set by the `dazed` event, cleared at
+  // each roundStart, shown as a panel tag so the player sees the effect.
+  dazed: boolean;
   species: Species;
 }
 
@@ -143,6 +147,7 @@ function snapshot(side: SideState): DisplaySide {
     momentum: side.momentum,
     exhausted: side.exhausted,
     staggered: side.staggered,
+    dazed: false,
     species: side.species,
   };
 }
@@ -533,6 +538,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (ev.kind === 'strike') return true;
     if (ev.kind === 'dodge') return true;
     if (ev.kind === 'punish') return true; // A>F read-win — a damage beat to read
+    if (ev.kind === 'dazed') return true; // pause so the player reads the daze + its effect
     if (ev.kind === 'opening') return true;
     if (ev.kind === 'counter') return true;
     if (ev.kind === 'clash') return true;
@@ -559,6 +565,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         momentum: ev.player.momentum,
         exhausted: ev.player.exhausted,
         staggered: ev.player.staggered,
+        dazed: false, // daze is per-round — cleared as the new round opens
       };
       display.foe = {
         ...display.foe,
@@ -568,6 +575,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         momentum: ev.foe.momentum,
         exhausted: ev.foe.exhausted,
         staggered: ev.foe.staggered,
+        dazed: false,
       };
       pushLog(`— round ${ev.round} —`);
       return;
@@ -692,9 +700,12 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       return;
     }
     if (ev.kind === 'dazed') {
-      // Layer 1 — the same stance 3 rounds running: predictability punished.
+      // Layer 1 — same stance 3 rounds running: predictability punished. Show
+      // a panel tag (DAZE) + name the EFFECT so the player knows what it does.
+      display[ev.side].dazed = true;
       const who = ev.side === 'player' ? activeMon(state.player).species.name : 'Foe';
-      pushLog(`${who} is DAZED — too predictable! (3× same stance → wide open)`);
+      calloutLine = `${who} is DAZED — takes extra damage this round!`;
+      pushLog(`${who} is DAZED — predictable! It takes extra damage this round.`);
       return;
     }
     if (ev.kind === 'counter') {
@@ -1249,7 +1260,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function drawFoePanel(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, FOE_PANEL.x, FOE_PANEL.y, FOE_PANEL.w, FOE_PANEL.h);
     drawText(ctx, display.foe.species.name, FOE_PANEL.x + 8, FOE_PANEL.y + 6);
-    if (display.foe.staggered) drawText(ctx, 'STAG', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
+    if (display.foe.dazed) drawText(ctx, 'DAZE', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpCrit);
+    else if (display.foe.staggered) drawText(ctx, 'STAG', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
     if (display.foe.exhausted) drawText(ctx, 'EXH', FOE_PANEL.x + 108, FOE_PANEL.y + 6, PALETTE.hpCrit);
     drawMomentum(ctx, FOE_PANEL.x + 132, FOE_PANEL.y + 6, display.foe.momentum, COMBAT.momentumCap);
     // Break meter moved to the dedicated boss strip below the panel
@@ -1329,7 +1341,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function drawPlayerPanel(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, PL_PANEL.x, PL_PANEL.y, PL_PANEL.w, PL_PANEL.h);
     drawText(ctx, display.player.species.name, PL_PANEL.x + 8, PL_PANEL.y + 6);
-    if (display.player.staggered) drawText(ctx, 'STAG', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
+    if (display.player.dazed) drawText(ctx, 'DAZE', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpCrit);
+    else if (display.player.staggered) drawText(ctx, 'STAG', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
     if (display.player.exhausted) drawText(ctx, 'EXH', PL_PANEL.x + 108, PL_PANEL.y + 6, PALETTE.hpCrit);
     // Label the ★ pips so the player knows what they are (legibility #1).
     // Skipped while EXH occupies the same slot — momentum is moot then.

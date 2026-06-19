@@ -307,14 +307,20 @@ function resolveSpecies(name: string): Species {
 }
 
 // The Phase 2 writeback. Called from every battle's onResolve with the
-// final BattleState — extracts the post-battle Team's members back
-// into run.party so hp/st/momentum carry forward. Uses toSavedSide /
-// fromSavedSide so the writeback shape MATCHES the save/load shape
-// exactly (single source of truth — the two consumers can't drift).
+// final BattleState — extracts the post-battle Team's members back into
+// run.party so HP/momentum carry forward. Uses toSavedSide / fromSavedSide
+// so the writeback shape MATCHES the save/load shape exactly.
+//
+// STAMINA recovers between fights (Bug 2): ST is a per-battle resource —
+// every battle already STARTS full (freshBattleSide), so a mon never carries
+// drained ST into the next fight. We reset it here too so the OVERWORLD
+// (party screen) shows it recovered rather than stuck at its end-of-fight
+// value. HP persists (the real overworld resource, healed at Centers).
 function writebackParty(finalState: BattleState): void {
-  run.party = finalState.player.members.map((m) =>
-    fromSavedSide(toSavedSide(m), resolveSpecies),
-  );
+  run.party = finalState.player.members.map((m) => ({
+    ...fromSavedSide(toSavedSide(m), resolveSpecies),
+    st: 100, // full stamina between fights
+  }));
 }
 
 // ---- Phase 6a — catching helpers (game-side; math lives in catching.ts) --
@@ -376,6 +382,17 @@ function addCaughtMon(species: Species, origin: CatchOrigin): void {
 // IT ended (finalState.members — the fight-strain signal). `participants` are
 // player party indices, aligned with run.party/run.partyBond. Bond is
 // horizontal — this only moves the bond value, never a stat.
+// Calls unlock as a BOND moment — the Tier-I "Familiar" step (bond stage ≥ 2,
+// Warming; the same threshold as the ★-jumpstart) — OR via the legacy run
+// flag (kept so existing unlock paths still fire). This fixes "Calls never
+// usable": the flag was set only by specific fight wins, so a path that
+// missed them left Calls locked forever even with ★ banked. Bond now unlocks
+// them robustly (bond-track-v2: the Call economy is a bond reward). Read off
+// the lead's bond (the active mon in the common 1-mon case).
+function callsUnlocked(): boolean {
+  return run.catchBreathUnlocked || hasJumpstart(run.partyBond[0] ?? 0);
+}
+
 // A bond stage-crossing to announce after the battle (Issue 1).
 interface BondCross {
   readonly species: string;
@@ -513,7 +530,7 @@ function autosaveNow(): void {
     party: run.party.map(toSavedSide),
     position: pos,
     flags: Array.from(sessionFlags),
-    catchBreathUnlocked: run.catchBreathUnlocked,
+    catchBreathUnlocked: run.catchBreathUnlocked, // persist the real run flag; bond-unlock is derived
     rngSeed: currentRngSeed,
     bag: run.bag.map((e) => ({ itemId: e.itemId, qty: e.qty })),
     money: run.money,
@@ -926,7 +943,7 @@ function showRivalBattle(): void {
         '— but it hesitates.',
         'Out-read them.',
       ],
-      catchBreathUnlocked: run.catchBreathUnlocked,
+      catchBreathUnlocked: callsUnlocked(),
       canRun: false,
       onResolve: (winner, finalState) => {
         writebackParty(finalState);
@@ -1040,7 +1057,7 @@ function showTestBattle(): void {
       rng: run.rng,
       chooseFoeAction: (s, r) => wildFoeAI(s, r),
       intro: [`Test battle:`, `wild ${foe.name} appeared!`],
-      catchBreathUnlocked: run.catchBreathUnlocked,
+      catchBreathUnlocked: callsUnlocked(),
       canRun: true,
       onResolve: (_winner, finalState) => {
         // Loop so Mathias can hammer the input layer repeatedly.
@@ -1083,7 +1100,7 @@ function showTestBattle2v2(): void {
         `Lead is at a type`,
         `disadvantage — switch?`,
       ],
-      catchBreathUnlocked: run.catchBreathUnlocked,
+      catchBreathUnlocked: callsUnlocked(),
       canRun: true,
       onResolve: (_winner, finalState) => {
         writebackParty(finalState);
@@ -1425,7 +1442,7 @@ function pushWildEncounter(foeSpeciesName: string): void {
       rng: run.rng,
       chooseFoeAction: (s, r) => wildFoeAI(s, r),
       intro: [`A wild ${foe.name}`, 'appeared!'],
-      catchBreathUnlocked: run.catchBreathUnlocked,
+      catchBreathUnlocked: callsUnlocked(),
       canRun: true,
       // Phase 6a — Catching 2.0 (wild only). The math lives game-side.
       canCatch: true,
@@ -1557,7 +1574,7 @@ function pushTrainerFight(
       // people, not wild mons (a per-trainer policy, like the boss cards).
       chooseFoeAction: (s, r) => wildFoeAI(s, r),
       intro: ['Gym trainer sent out', `${leadName}!`],
-      catchBreathUnlocked: run.catchBreathUnlocked,
+      catchBreathUnlocked: callsUnlocked(),
       canRun: false,
       onResolve: (winner, finalState, participants) => {
         writebackParty(finalState);
