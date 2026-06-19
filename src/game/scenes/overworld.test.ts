@@ -29,6 +29,15 @@ function mockFlags(): MockFlags {
   };
 }
 
+// Flags for a Route 31 TRAVERSAL test — JAY (the forced-entry robber) is
+// pre-marked beaten so his unmissable approach doesn't hijack tests that are
+// about warps/encounters/items. JAY's forced encounter has its own test.
+function route31Flags(): MockFlags {
+  const f = mockFlags();
+  f.set('route31_trainer_beaten');
+  return f;
+}
+
 interface MockInputState {
   pressed(key: InputKey): boolean;
   press(key: InputKey): void;
@@ -164,7 +173,7 @@ describe('overworld cold-start warp round-trip', () => {
       map: 'ROUTE31',
       spawn: 'fromHearthwick',
       inputState: input,
-      flags: mockFlags(),
+      flags: route31Flags(),
       onWarp: (target) => {
         warpTarget = target;
       },
@@ -223,7 +232,7 @@ describe('Demo-complete — Violet City hub wires Route 31 → Violet → gym', 
       map: 'ROUTE31',
       spawn: 'fromViolet', // one tile north of the bottom-edge gap (Phase 7 route)
       inputState: input,
-      flags: mockFlags(),
+      flags: route31Flags(),
       onWarp: (target) => {
         warpTarget = target;
       },
@@ -462,7 +471,7 @@ describe('Phase 5a fix — encounter rolls only on real moves + post-battle grac
       spawn: 'default',
       spawnAt: { x: 2, y: 6, facing: 'down' },
       inputState: input,
-      flags: mockFlags(),
+      flags: route31Flags(),
       onWarp: () => {},
       onEncounter: () => {
         encounters += 1;
@@ -492,7 +501,7 @@ describe('Phase 5a fix — encounter rolls only on real moves + post-battle grac
       spawn: 'default',
       spawnAt: { x: 2, y: 4, facing: 'down' },
       inputState: input,
-      flags: mockFlags(),
+      flags: route31Flags(),
       onWarp: () => {},
       onEncounter: () => {
         encounters += 1;
@@ -566,6 +575,82 @@ describe('trainer line-of-sight (F2) — GYM gauntlet', () => {
     tickStep(scene, 2.5);
     scene.input?.('a');
     expect(calls.some((c) => c.winFlag === 'gym_trainer_2_beaten')).toBe(false);
+  });
+});
+
+describe('JAY the robber — the opening bond hook is UNMISSABLE (forced on entry)', () => {
+  // JAY at (7,4) on Route 31 is `approachOnEnter`: he walks up to the player
+  // the moment the map loads (if not yet beaten) and forces his theft battle.
+  // Player enters at the default spawn (4,3) heading for the south exit (10,29).
+  function jayScene(preBeaten = false) {
+    const input = mockInput();
+    const flags = mockFlags();
+    if (preBeaten) flags.set('route31_trainer_beaten');
+    const calls: Array<{ winFlag: string }> = [];
+    let warpTarget: string | null = null;
+    const scene = createOverworldScene({
+      map: 'ROUTE31',
+      spawn: 'default', // (4,3), facing down toward the south exit
+      inputState: input,
+      flags,
+      onWarp: (t) => {
+        warpTarget = t;
+      },
+      onEncounter: () => {},
+      onTrainerBattle: (_foe, winFlag) => {
+        calls.push({ winFlag });
+      },
+      onBossBattle: () => {},
+    });
+    return { scene, input, calls, flags, getWarp: () => warpTarget };
+  }
+
+  test('JAY walks up on entry and forces his theft battle — no input needed', () => {
+    const { scene, input, calls } = jayScene();
+    // Let the entry-approach play: alert beat + walk-up from (7,4) to the
+    // tile beside the player, then his dialog opens.
+    tickStep(scene, 3);
+    expect(calls.length).toBe(0); // dialog ("…hand it over, or I TAKE it!") is up first
+    // Drain JAY's multi-page dialog → the queued start-trainer-battle fires.
+    for (let i = 0; i < 8 && calls.length === 0; i += 1) scene.input?.('a');
+    expect(calls.map((c) => c.winFlag)).toContain('route31_trainer_beaten');
+    // The player never had to move — JAY came to them.
+    expect(scene.currentPosition()).toMatchObject({ x: 4, y: 3 });
+    void input;
+  });
+
+  test('the player CANNOT slip past JAY to the south exit', () => {
+    const { scene, input, calls, getWarp } = jayScene();
+    // Try to bolt straight south for the Violet exit. The forced-entry
+    // approach freezes movement, so every step attempt is a no-op.
+    for (let i = 0; i < 30; i += 1) walkOne(scene, input, 'down');
+    // Never reached the south gap → never warped out of Route 31.
+    expect(getWarp()).toBeNull();
+    // Still pinned at the entry tile, intercepted by JAY.
+    expect(scene.currentPosition()).toMatchObject({ x: 4, y: 3 });
+    // And his battle is queued — draining the dialog fires it.
+    for (let i = 0; i < 8 && calls.length === 0; i += 1) scene.input?.('a');
+    expect(calls.map((c) => c.winFlag)).toContain('route31_trainer_beaten');
+  });
+
+  test('once beaten, JAY does NOT re-trigger and the path south is open', () => {
+    const { scene, input, calls } = jayScene(true);
+    tickStep(scene, 3); // no approach should start
+    scene.input?.('a');
+    expect(calls.length).toBe(0); // no forced battle
+    // Movement is free again: a southward step actually moves the player.
+    const before = scene.currentPosition();
+    walkOne(scene, input, 'down');
+    const after = scene.currentPosition();
+    expect(after.y).toBeGreaterThan(before.y);
+  });
+
+  test('JAY still relents — the "…Keep it" follow-up is intact and auto-plays', () => {
+    const { scene } = jayScene(true);
+    scene.runNpcFollowup('route31_trainer_beaten');
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.some((t) => t.includes('Keep it') || t.includes('Took the hit'))).toBe(true);
   });
 });
 

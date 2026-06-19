@@ -516,10 +516,12 @@ describe('DEMO-COMPLETE GATE — cold spine intro → Violet → gym → Falkner
     h.run.party = [createSide(CH1.KINDRAKE!)];
     h.flags.set('player_has_starter');
     // Pre-mark Route 31's step-on flavor (the warning + the two hidden
-    // ground items) as already triggered, so their one-shot dialogs don't
+    // ground items) + the JAY robber as already handled, so they don't
     // interrupt the spine walk. This gate tests TRAVERSAL; route content
-    // (events, items, the lost-mon vignette) is covered by firstRoad.test.ts.
-    for (const f of ['route31_warning', 'route31_item_forest', 'route31_item_pond']) h.flags.set(f);
+    // (events, items, the lost-mon vignette, JAY's forced theft encounter)
+    // is covered by firstRoad.test.ts / the JAY unmissability test.
+    for (const f of ['route31_warning', 'route31_item_forest', 'route31_item_pond', 'route31_trainer_beaten'])
+      h.flags.set(f);
 
     // Intro flags present (the audit's "intro flags" precondition).
     expect(h.flags.has('player_has_starter')).toBe(true);

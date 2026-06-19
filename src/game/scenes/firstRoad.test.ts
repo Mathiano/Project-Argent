@@ -121,6 +121,7 @@ describe('Sprint 1 — the seed event (lost mon) flag chain', () => {
   });
   test('interacting with the lost mon FIRES the found flag', () => {
     const flags = mockFlags();
+    flags.set('route31_trainer_beaten'); // skip JAY's forced-entry approach (own test)
     const input = mockInput();
     // Stand just below the lost-mon NPC (16,21) and face up to talk.
     const scene = createOverworldScene({
@@ -138,6 +139,7 @@ describe('Sprint 1 — the seed event (lost mon) flag chain', () => {
 describe('Sprint 1 — give-item verb works', () => {
   test('walking onto a hidden forest item fires onGiveItem', () => {
     const flags = mockFlags();
+    flags.set('route31_trainer_beaten'); // skip JAY's forced-entry approach (own test)
     const input = mockInput();
     let granted: { id: string; qty: number } | null = null;
     const scene = createOverworldScene({

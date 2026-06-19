@@ -10,6 +10,9 @@ import type { InputKey } from '../scene';
 
 function mockFlags() {
   const set = new Set<string>();
+  // Pre-mark JAY (the forced-entry robber) beaten so his unmissable approach
+  // doesn't hijack this encounter-RNG walk. JAY's forced trigger has its own test.
+  set.add('route31_trainer_beaten');
   return { has: (f: string) => set.has(f), set: (f: string) => set.add(f), unset: (f: string) => set.delete(f) };
 }
 function mockInput() {

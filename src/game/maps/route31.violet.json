@@ -435,6 +435,7 @@
       "y": 4,
       "color": "#c2491a",
       "blockedUntilFlag": "route31_trainer_beaten",
+      "approachOnEnter": true,
       "interact": [
         {
           "kind": "dialog",

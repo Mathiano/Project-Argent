@@ -157,19 +157,24 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         px: number;
         py: number;
         t: number;
-        stepDir: Facing;
         stopX: number;
         stopY: number;
         alertT: number;
       }
     | null = null;
 
+  // Begin a trainer's walk-up cutscene: the NPC paces from its tile to
+  // (stopX, stopY) (adjacent to the player), then fires its interact. Used by
+  // both line-of-sight (straight line) and forced-entry (greedy path).
+  function startApproach(npc: NpcObj, stopX: number, stopY: number): void {
+    approach = { npc, x: npc.x, y: npc.y, px: npc.x, py: npc.y, t: 1, stopX, stopY, alertT: SIGHT_ALERT_SEC };
+  }
+
   // Scan for a sight-trainer whose straight-ahead line (along its facing,
   // unobstructed by solids/other NPCs) lands on the player's tile. Returns
   // the trainer + the tile it should stop on (adjacent to the player).
   function trainerSightingAt(playerX: number, playerY: number): {
     npc: NpcObj;
-    stepDir: Facing;
     stopX: number;
     stopY: number;
   } | null {
@@ -184,12 +189,34 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         const sy = obj.y + dy * step;
         if (!isWalkable(map, sx, sy)) break; // a wall blocks the sight line
         if (sx === playerX && sy === playerY) {
-          return { npc: obj, stepDir: obj.facing, stopX: obj.x + dx * (step - 1), stopY: obj.y + dy * (step - 1) };
+          return { npc: obj, stopX: obj.x + dx * (step - 1), stopY: obj.y + dy * (step - 1) };
         }
         if (npcAt(sx, sy)) break; // another NPC blocks the line of sight
       }
     }
     return null;
+  }
+
+  // The walkable tile adjacent to the player nearest `(fromX, fromY)` — where
+  // a forced-entry trainer halts (so it never steps onto the player).
+  function adjacentStopToward(px: number, py: number, fromX: number, fromY: number): { x: number; y: number } {
+    const cands: ReadonlyArray<[number, number]> = [
+      [px + 1, py],
+      [px - 1, py],
+      [px, py + 1],
+      [px, py - 1],
+    ];
+    let best: { x: number; y: number } | null = null;
+    let bestD = Infinity;
+    for (const [cx, cy] of cands) {
+      if (!isWalkable(map, cx, cy) || npcBlocksAt(cx, cy)) continue;
+      const d = Math.abs(cx - fromX) + Math.abs(cy - fromY);
+      if (d < bestD) {
+        bestD = d;
+        best = { x: cx, y: cy };
+      }
+    }
+    return best ?? { x: px, y: py };
   }
 
   function updateApproach(dt: number): void {
@@ -213,11 +240,12 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
       if (atStop) {
         approach.t = 1; // halt; fire next tick
       } else {
-        const { dx, dy } = facingDelta(approach.stepDir);
+        // Greedy Manhattan step toward the stop tile (x first, then y) — works
+        // for a straight-line LoS approach AND a forced-entry diagonal walk.
         approach.px = approach.x;
         approach.py = approach.y;
-        approach.x += dx;
-        approach.y += dy;
+        if (approach.x !== approach.stopX) approach.x += Math.sign(approach.stopX - approach.x);
+        else if (approach.y !== approach.stopY) approach.y += Math.sign(approach.stopY - approach.y);
         approach.t = 0;
       }
     }
@@ -511,18 +539,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
     // wild encounter on this tile).
     const sighting = trainerSightingAt(tx, ty);
     if (sighting) {
-      approach = {
-        npc: sighting.npc,
-        x: sighting.npc.x,
-        y: sighting.npc.y,
-        px: sighting.npc.x,
-        py: sighting.npc.y,
-        t: 1,
-        stepDir: sighting.stepDir,
-        stopX: sighting.stopX,
-        stopY: sighting.stopY,
-        alertT: SIGHT_ALERT_SEC,
-      };
+      startApproach(sighting.npc, sighting.stopX, sighting.stopY);
       return;
     }
 
@@ -619,6 +636,19 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
           if (obj.type !== 'script' || obj.trigger !== 'auto') continue;
           fireScript(obj);
           break;
+        }
+        // FORCED-ENTRY confrontation (JAY): once the map is in, a not-yet-
+        // beaten approachOnEnter trainer walks up to the player and starts
+        // its battle — unmissable, no walk-around. (Runs after auto-scripts;
+        // skipped if one already opened a dialog this entry.)
+        if (dialogLines === null && !approach) {
+          for (const obj of map.objects) {
+            if (obj.type !== 'npc' || !obj.approachOnEnter) continue;
+            if (obj.blockedUntilFlag && opts.flags.has(obj.blockedUntilFlag)) continue; // already beaten
+            const stop = adjacentStopToward(tx, ty, obj.x, obj.y);
+            startApproach(obj, stop.x, stop.y);
+            break;
+          }
         }
       }
 

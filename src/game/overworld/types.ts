@@ -119,6 +119,11 @@ export type MapObject =
       // Absent on every existing NPC, so behaviour is unchanged.
       readonly facing?: Facing;
       readonly sightRange?: number;
+      // FORCED ENTRY confrontation (JAY the robber — the opening bond hook).
+      // When true, this trainer WALKS UP to the player the moment they enter
+      // the map (if not yet beaten) and starts its `interact` — unmissable,
+      // no walk-around. Used where line-of-sight can't cover open terrain.
+      readonly approachOnEnter?: boolean;
     }
   | {
       readonly type: 'gust_pulse';
