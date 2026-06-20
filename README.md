@@ -2,7 +2,7 @@
 
 A from-scratch monster-battler in the body of Pokémon Silver and the soul of a fighting game: every battle is a read, every boss is a puzzle, and preparation is gameplay. 320×180 pixel art, TypeScript + Vite + Canvas, headless-simulable combat engine, ~42-hour content plan, 200 original species.
 
-**Status capsule — Falkner seam sprint close (2026-06-13). Slice cold-walkable.**
+**Status capsule — CH1 combat + content slice playable cold (Phase 0 gate green). Combat Layers 1, 2, 3.5-foundation, 4 + KAMON v2 shipped, sim-gated (2026-06-20).**
 
 ## How this project runs
 
@@ -16,14 +16,12 @@ Dex content is commissioned from Gemini against `docs/mon-manifest.csv` (200 pre
 
 ## Build state
 
-- `src/engine` — Combat 2.0 v0.3 ported, pure TS, no DOM (compiler-enforced), seeded RNG. 21 edge-case tests.
-- `src/sim` — 4 canonical bot archetypes + rival AI, 15-cell n=2000 regression baseline locked.
-- `src/game` — Sprint 1 closed: 320×180 renderer replaying engine events; playable title → starter pick → wild → prep → rival → end loop.
-- Overworld kernel sprint closed (`KICKOFF-overworld.md`): JSON map pipeline, tile-locked grid movement with held-key dispatch, camera follow, warps with fade, interactables (A on faced sign → dialog), encounter zones pushing wild battles that pop back, step-on + auto script triggers with a session flag store.
-- Falkner vertical slice sprint closed (`KICKOFF-falkner.md`): engine hooks A1–A6 all landed (type chart injection, dex/move loaders, species traits + GUSTBORNE, arena rhythm, break bar, boss-card AI). Sim gates B1 (Falkner ladder, 15-cell lock at gust=1.4 hp=1.15 — 4/15 cells in target band, the rest reported) and B2 (CH1 batch sim audit). Game layer C1 (KINDRAKE/GRUBLEAF/SILTSKIP starter pick) + C2 (Route 31 FLITPECK grass + GRITHOAX cave) + C5 partial (Falkner fight reachable via `?skip=falkner` with all engine mechanics live, prep+gym-puzzle+trainer flow + Break-bar UI deferred).
-- Falkner seam sprint closed (`KICKOFF-falkner-seam.md`): graybox Violet gym map with two phased gust lanes that push the player, gym trainer NPC blocking the rear lane (one-shot fight via start-trainer-battle), gym door warp on Route 31, Falkner-specific prep card (scout report from the v2 boss card), Break-bar 2-pip widget + gust-telegraph banner + Break flash on the foe panel, data-driven NATURE-without-TERRA signpost via the new if-flag script command.
-- Follow-up backlog: team-battle engine hook (the Sprint-2 KO-stamina memo applies — FLITPECK lead, GALEHAWK ace can't be expressed end-to-end yet), GALEHAWK + SILTSKIP + FLITPECK production sprites, Catching 2.0 to replace the demo-grade "defeat = adds type to party" shortcut feeding the signpost.
-- Next sprint: overworld kernel (`KICKOFF-overworld.md`). Then: Falkner vertical slice.
+- `src/engine` — Combat 2.0 (stances, stamina, the **A>F>G>A** triangle, counters/openings/punish/clash, ★ Momentum + Calls), pure TS, DOM-excluded (compiler-enforced), seeded RNG. **Layer 1** (triangle fix — Aggressive punishes Fluid; thrice-repeat self-daze). **Layer 2 FOCUS two-step** (R1 generic focus → R2 hidden release; rotation + flipped triangles; F.4 timing mismatch). **Layer 4 trainer profiles** (`trainerAI.ts` — 8 knobs, release variability, stamina-aware focusing, unified info level + shared decision tree). Global TTK `hpScale` 1.30. Bond growth, Catching 2.0, evolution. Boss cards (Falkner: GUSTBORNE, arena rhythm, break bar — and now FOCUSes on his signature gust).
+- `src/sim` — canonical bots + the **`reader`** fair-fight yardstick. Sim gates: focus-balance (no dominant strategy), trainer-profiles (fair-but-distinct), KAMON rival-card (per-pick fairness), + the rival / Falkner / bond regression ladders (n≥2000, re-baselined as intended through each layer build; bond ladder bit-identical).
+- `src/game` — 320×180 renderer replaying engine events. **Full CH1 loop, cold-walkable end to end:** title → bedroom → house → Hearthwick → lab (starter pick) → KAMON theft → Route 31 → Violet City (hub) → gym → Falkner → ZEPHYR badge. Graduated **Foe-Intent tells** (Layer 3.5 foundation — stance tell + phase-aware focus tell: "is charging to…" wind-up vs "focuses to…" release). PC box, dex, bag, mart, party, prep cards, bond/evolution beats, black-out + instant boss retry.
+- **CH1 content wired (data-driven, sim-gated):** starter trio KINDRAKE/GRUBLEAF/SILTSKIP; Route 31 + Violet generic trainers stamped from the floor profiles (Greenhorn / Bruiser / Skirmisher) + **JAY** (fixed-Heavy Charger) + the gym chaff (Skirmisher); **KAMON v2** rival (type-triangle steal at bond-factor 0.85 + the RIVAL profile); **Concord seed** (kiosk + billboard, flavor-only set-dressing in Violet).
+- **Phase 0 gate: GREEN** — cold-start → end of first battle with no skip flags (coldstart/spine/intro/battle-input suites, 118 tests); full suite 559 green; `npm run typecheck` clean.
+- Next: the move-type-vocab fix (see open threads), then the starter-trio bulk rebalance (on hold behind it), then Layer 4 Stage 2 (bond-gated Calls, adaptivity) / Layer 3 (environments).
 
 ## Locked decisions (the short list)
 
@@ -38,10 +36,12 @@ Dex content is commissioned from Gemini against `docs/mon-manifest.csv` (200 pre
 
 ## Open threads
 
-1. Gemini returns: fortress-drake line, mudskipper line, gust-dancer entry rewrites → CH1 batch sheet (stats derived, collision-scanned) → Mathias veto → sprite generations
-2. Falkner boss card v2 (on the new ace + starters), then the Falkner sprint
-3. Full 13×13 type chart (due before CH2 commissioning)
-4. Naming debt: leader/town names are Silver placeholders; 1:1 rename pass required before anything goes public — repo stays private until then
+1. **Move-type-vocab collision (engine bug, found 2026-06-20):** the CH1 mid moves EMBER SNAP / LEAF LASH / BUBBLE JET share names with the legacy fixture moves, and `lookupMove = MOVES ?? REGISTERED_MOVES` prefers the legacy Mixed-case (`Flame`/`Sprout`/`Splash`) version — so the starters' STAB type interaction silently no-ops in live CH1 play (the type triangle is inert). Fix **CH1-side** (rename/namespace the CH1 moves) to keep the fixture ladders bit-identical. **Blocks #2.**
+2. **Starter-trio bulk rebalance — ON HOLD behind #1.** The mirror-sim showed the 98/49/100 KAMON split is mostly the *inert* triangle (type-on collapses it to ~44–56% RPS); fix the vocab, re-measure, then decide if stat budgets need touching. KAMON's per-pick ace levels (0.95–1.37) are the working baseline meanwhile.
+3. Production sprites: CH1 batch is stat-derived + wired (`ch1-batch.json`), but several entries still need generated sprites (`spriteRef: null` — SILTSKIP, etc.).
+4. Naming debt: leader/town/trainer names are placeholders (Rourke/Wren/Pax/Dell/Skye/Gust + Silver-derived leaders); 1:1 rename pass required before public — repo stays private until then.
+
+*(Resolved since the freeze: Falkner boss-card v2 + the gym sprint shipped; the type chart is now 17×17 complete — see CLAUDE.md.)*
 
 ## Doc map
 
@@ -54,13 +54,19 @@ Dex content is commissioned from Gemini against `docs/mon-manifest.csv` (200 pre
 | **`docs/combat-focus-redesign.md`** | The FOCUS two-step DESIGN (R1 generic focus → R2 hidden release, rotation triangle) — current two-step model |
 | **`docs/combat-focus-AS-BUILT.md`** | The FOCUS model AS IMPLEMENTED (code-truth: live config knobs, events, sim result) |
 | **`docs/combat-system-candidates-decision.md`** | Decision record: B (distinct wind-ups) vs Focus vs Candidate C |
-| **`docs/trainer-combat-profiles.md`** | Layer 4 DESIGN — trainer-AI variety (profiles, decision tree); build gated on Focus feel sign-off |
+| **`docs/trainer-combat-profiles.md`** | Layer 4 — trainer-AI dimension defs + the IF-THEN tree (SHIPPED; in-doc AS-BUILT notes track the engine) |
+| **`docs/trainer-archetype-catalog.md`** | Layer 4 — the reusable profile library (Greenhorn/Bruiser/Skirmisher floor → Duelist/Warden/Bluffer elites); the stamp source |
+| **`docs/trainer-sets-ch1.md`** | CH1 trainer data — floor stamps onto Route 31 + Violet classes (SHIPPED) |
+| **`docs/kamon-rival-card-v2.md`** | KAMON rival card — type-triangle steal + bond-factor 0.85 + the RIVAL profile (SHIPPED) |
+| `docs/starter-trio-rebalance.md` | Starter bulk-rebalance spec (ON HOLD — see open thread #2) |
 | **`docs/combat-depth-types-status.md`** | The 17-type mechanical identities + combat depth status |
+| `docs/main-story.md` + `docs/opening-design.md` | Story arc + the CH1 opening beats (theft, the bond thesis) |
+| `docs/the-concord.md` + `docs/concord-seed-ch1.md` | The Concord antagonist (Phase 8+) + its Ch1 flavor seed (SHIPPED) |
 | `docs/content-progression-scope.md` | 42-hour plan, boss ladder, read-rate ramp |
 | `docs/pilot-exit-decisions.md` | Art direction, dex pipeline, overworld architecture |
 | `docs/feature-ambition-scope.md` | Feature map with tiers; anti-scope |
 | `docs/type-chart.md` + `docs/catching-2-0.md` + `docs/mon-design-template.md` | Type chart, catching params, dex/species schema + style bible (replaces the old `chapter-1-dex.md`) |
 | `docs/mon-manifest.csv` + `docs/mon-commission-kit.md` | The 200-slot commission system |
-| `docs/sim-archetypes.md` | Canonical bots + rival AI + design debt |
+| `docs/sim-archetypes.md` | Canonical bots + the `reader` fair-fight yardstick + rival AI + design debt |
 | `docs/falkner-boss-card.md` | v2 — Falkner gym kit on the new ace + starters |
 | `docs/argent-demo.html`, `docs/*-sim.py` | POC + methodology reference |
