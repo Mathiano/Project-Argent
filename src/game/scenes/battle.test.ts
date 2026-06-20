@@ -932,6 +932,51 @@ describe('FOCUS outcome callouts (combat-focus-rebuild)', () => {
     // R2 HEAVY vs the brace → the rotation win callout.
     expect(text).toContain('CRUSHES THE BRACE');
   });
+
+  // KICKOFF-focus-damage-bugfix.md, Bug 2: a HEAVY-release KO must fire the
+  // normal KO reaction — the held "fainted!" beat — not vanish the foe with no
+  // acknowledgment. (The faint event always fired; the bug was the readout —
+  // the faint never set the prominent center callout, so a flashy one-shot left
+  // the callout stuck on the strike verb.) Lock the end-to-end KO flow here.
+  test('a Focus→HEAVY release KO fires the held "fainted!" beat and reaches the win', () => {
+    let state = createBattleState(
+      createTeam([createSide(CH1.GRUBLEAF!)]),
+      createTeam([createSide(CH1.FLITPECK!)]),
+    );
+    // Drop the foe to near-zero so the HEAVY release reliably KOs it.
+    const lowFoe: SideState = { ...activeMon(state.foe), hp: 2 };
+    state = { ...state, foe: setActiveMember(state.foe, lowFoe) };
+    const scene = createBattleScene({
+      state,
+      rng: mulberry32(1),
+      chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'G' }), // brace → HEAVY crushes
+      intro: [],
+      catchBreathUnlocked: false,
+      canRun: true,
+      onResolve: () => {},
+    });
+    scene.update?.(0.01);
+    scene.input?.('a'); // FIGHT
+    scene.input?.('left'); // toggle COMMIT → FOCUS
+    scene.input?.('a'); // commit FOCUS (R1)
+
+    let sawFaint = false;
+    let reachedWin = false;
+    for (let i = 0; i < 400; i += 1) {
+      scene.update?.(0.1);
+      const c = stubCtx();
+      scene.draw(c);
+      const s = c.texts.join('|');
+      if (s.includes('fainted!')) sawFaint = true;
+      if (/won the battle|team fell/.test(s)) {
+        reachedWin = true;
+        break;
+      }
+      scene.input?.('a'); // advance held beats / confirm the (HEAVY) release
+    }
+    expect(sawFaint).toBe(true);
+    expect(reachedWin).toBe(true);
+  });
 });
 
 describe('momentum visibility (playtest-polish-3)', () => {

@@ -935,6 +935,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
     if (ev.kind === 'faint') {
       const who = ev.side === 'player' ? ev.species : `Foe ${ev.species}`;
+      // The KO reaction must LAND prominently — set the big center callout, not
+      // just the log line. Without this, a one-shot (esp. a flashy HEAVY-release
+      // KO) left the callout stuck on the strike verb ("HEAVY CRUSHES THE
+      // BRACE!") while the faint only whispered in the log — it read as "no
+      // reaction that round" (KICKOFF-focus-damage-bugfix.md, Bug 2). Every
+      // other consequential beat sets calloutLine; the faint must too.
+      calloutLine = `${who} fainted!`;
       pushLog(`${who} fainted!`);
       return;
     }
@@ -1789,18 +1796,25 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   }
 
   // FOCUS R2 — the release picker (the hidden release is chosen NOW).
+  // Layout (KICKOFF-focus-damage-bugfix.md, Bug 3): the "RELEASE:" header sits
+  // on its own line; the three release rows start BELOW it (left column) and the
+  // selected release's rotation hint sits in the RIGHT column, aligned with the
+  // rows. Previously the header (y+4) and the first row (y+5) drew on the same
+  // line at the same x — "RELEASE:" collided with ">HEAVY" and its hint.
   function drawBottomRelease(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
-    drawText(ctx, 'RELEASE:', BOTTOM.x + 8, BOTTOM.y + 4, PALETTE.paperShadow);
+    drawText(ctx, 'RELEASE:', BOTTOM.x + 8, BOTTOM.y + 5, PALETTE.paperShadow);
     RELEASES.forEach((r, i) => {
-      const y = BOTTOM.y + 5 + i * 10;
+      const y = BOTTOM.y + 16 + i * 10; // rows below the header (16/26/36)
       const marker = releaseCursor === i ? '>' : ' ';
-      drawText(ctx, `${marker}${r.name}`, BOTTOM.x + 8, y);
+      const color = releaseCursor === i ? PALETTE.ink : PALETTE.paperShadow;
+      drawText(ctx, `${marker}${r.name}`, BOTTOM.x + 8, y, color);
     });
-    // The selected release's rotation hint.
+    // The selected release's rotation hint — right column, aligned with the
+    // first row (clear of the left-column move names).
     const sel = RELEASES[releaseCursor]!;
-    drawText(ctx, sel.beats, BOTTOM.x + 90, BOTTOM.y + 8, PALETTE.paperShadow);
-    drawText(ctx, 'A=release', BOTTOM.x + 90, BOTTOM.y + BOTTOM.h - 12, PALETTE.paperDim);
+    drawText(ctx, `${sel.name} ${sel.beats}`, BOTTOM.x + 96, BOTTOM.y + 16, PALETTE.paperShadow);
+    drawText(ctx, 'A=release', BOTTOM.x + 96, BOTTOM.y + BOTTOM.h - 12, PALETTE.paperDim);
   }
 
   function drawBottomCall(ctx: CanvasRenderingContext2D): void {
