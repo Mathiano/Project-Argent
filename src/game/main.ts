@@ -13,8 +13,11 @@ import {
   mulberry32,
   registerMoves,
   trainerPolicy,
+  TRAINER_PROFILES,
   foeProfileForFlag,
   possibleReleases,
+  buildKamonTeam,
+  kamonStolenStarter,
 } from '../engine';
 import type {
   Action,
@@ -33,7 +36,6 @@ import type {
 import ch1BatchData from '../../docs/ch1-batch.json';
 import movesData from '../../docs/moves.json';
 import typechartData from '../../docs/typechart.json';
-import { rivalAI } from '../sim/archetypes';
 import { mountCanvas } from './canvas';
 import { createInputDispatcher } from './input';
 import { SceneStack } from './scene';
@@ -927,13 +929,19 @@ function showWildBattle(): void {
   );
 }
 
+// KAMON v2 — the stolen starter is the COUNTER-type to the player's pick (CH1
+// triangle), else the fixture counter map (the ?skip demo path / EMBERCUB).
+function kamonStolenSpecies(player: Species): Species {
+  const stolenName = kamonStolenStarter(player.name) ?? COUNTER_MAP[player.name];
+  return resolveSpecies(stolenName!);
+}
+
 function showPrep(): void {
   const player = partyLead();
-  const foe = SPECIES[COUNTER_MAP[player.name]!]!;
   scenes.replace(
     createPrepScene({
       playerSpecies: player,
-      foeSpecies: foe,
+      foeSpecies: kamonStolenSpecies(player),
       foeTrainerName: 'KAMON',
       onContinue: showRivalBattle,
     }),
@@ -942,19 +950,27 @@ function showPrep(): void {
 
 function showRivalBattle(): void {
   const player = partyLead();
-  const foe = SPECIES[COUNTER_MAP[player.name]!]!;
+  const stolen = kamonStolenSpecies(player);
+  // First fight = the stolen starter SOLO (the purest thesis demo), at
+  // bond-factor 0.85. CH1 leads use the CH1 type chart; the fixture demo path
+  // keeps the legacy chart.
+  const foeTeam = buildKamonTeam(stolen);
+  const isCh1 = CH1_DEX[player.name] !== undefined;
   const state = createBattleState(
     buildPlayerTeam(),
-    createSide(foe, { atk: 0.85, dfn: 0.85 }),
+    foeTeam,
+    isCh1 ? { typeChart: TYPECHART_CH1 } : {},
   );
   scenes.replace(
     createBattleScene({
       state,
       rng: run.rng,
-      chooseFoeAction: (s, r) => rivalAI.chooseAction(s, 'foe', r),
+      // KAMON's AI = the RIVAL profile's earliest rung (Aggressor/Single-only/
+      // Fixed/no-Calls). He leans Aggressive and CAN'T Get Away — commit freely.
+      chooseFoeAction: (s, r) => trainerPolicy(TRAINER_PROFILES.kamon!)(s, 'foe', r),
       intro: [
         'KAMON sent out',
-        `the stolen ${foe.name}!`,
+        `the stolen ${stolen.name}!`,
         'It has the type edge',
         '— but it hesitates.',
         'Out-read them.',

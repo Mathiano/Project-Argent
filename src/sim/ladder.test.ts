@@ -2,8 +2,8 @@ import { describe, expect, test } from 'vitest';
 import {
   brute,
   humanIsh,
+  kamonRivalBot,
   naiveTriangle,
-  rivalAI,
   staminaReader,
   staticGuard,
 } from './archetypes';
@@ -34,27 +34,37 @@ const SEED = 1;
 // stamina-reader's stance logic was updated to the live triangle (it used to
 // counter Aggressive with Fluid — the old dodge — which now LOSES). Cells
 // are exact + deterministic at seed=1.
+//
+// ── INTENTIONAL KAMON-RIVAL-CARD-v2 RE-BASELINE (2026-06-20) ──────────────────
+// The rival fight's foe AI is now the v2 RIVAL profile's earliest rung
+// (`kamonRivalBot` = Aggressor/Single-only/Fixed/no-Calls via the trainer tree),
+// replacing the bespoke `rivalAI` here (docs/kamon-rival-card-v2.md). Player vs
+// their COUNTER-type at 0.85 is unchanged (the triangle steal + bond-factor).
+// All 15 cells shifted — INTENDED, not drift. `rivalAI` is unchanged and still
+// used by the BOND ladders (which stay bit-identical). The thesis shows in the
+// hardest cell (EMBERCUB into its AQUAFIN counter): the READERS land ~40–53% —
+// fair-but-tense, the bond/read offsetting the type edge. Exact at seed=1.
 const BASELINE: ReadonlyArray<{
   player: string;
   foe: string;
   archetype: BotArchetype;
   wins: number;
 }> = [
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: staticGuard, wins: 1280 },
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: brute, wins: 341 },
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: naiveTriangle, wins: 1807 },
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: staminaReader, wins: 1783 },
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: humanIsh, wins: 1299 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: staticGuard, wins: 473 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: brute, wins: 265 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: naiveTriangle, wins: 1016 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: staminaReader, wins: 841 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: humanIsh, wins: 553 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: staticGuard, wins: 1371 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: brute, wins: 330 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: naiveTriangle, wins: 1852 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: staminaReader, wins: 1845 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: humanIsh, wins: 1324 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: staticGuard, wins: 1253 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: brute, wins: 362 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: naiveTriangle, wins: 1921 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: staminaReader, wins: 1912 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: humanIsh, wins: 1338 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: staticGuard, wins: 144 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: brute, wins: 275 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: naiveTriangle, wins: 1066 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: staminaReader, wins: 805 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: humanIsh, wins: 468 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: staticGuard, wins: 1184 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: brute, wins: 343 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: naiveTriangle, wins: 1938 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: staminaReader, wins: 1914 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: humanIsh, wins: 1333 },
 ];
 
 describe('rival ladder regressions (n=2000, seed=1)', () => {
@@ -63,7 +73,7 @@ describe('rival ladder regressions (n=2000, seed=1)', () => {
       const stats = runLadder(
         {
           player: { archetype: cell.archetype, species: cell.player },
-          foe: { archetype: rivalAI, species: cell.foe, scale: RIVAL_SCALE },
+          foe: { archetype: kamonRivalBot, species: cell.foe, scale: RIVAL_SCALE },
         },
         N,
         SEED,

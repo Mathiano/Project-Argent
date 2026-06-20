@@ -248,6 +248,13 @@ export const TRAINER_PROFILES: { readonly [id: string]: TrainerProfile } = {
   // SKIRMISHER — Evader floor: Fluid initiative first-strikes; catch it with
   // Aggressive. Low-bond → can't punish you back.
   skirmisher: { name: 'SKIRMISHER', stance: 'evader', twoStep: 'single-only', infoLevel: 'open' },
+  // KAMON — the RIVAL profile at its EARLIEST rung (fight 1; docs/kamon-rival-
+  // card-v2.md). Aggressor (raw strength is his creed), Single-only, no-bond
+  // (he CAN'T Call — his ideology is his mechanical weakness), Open, Fixed. His
+  // arc climbs this profile later (→ two-step, Reactive); his stolen starter's
+  // bond-factor 0.85 is the bespoke team modifier (applied at team build, not
+  // here). Knobs match the floor Aggressor today; kept distinct for the arc.
+  kamon: { name: 'KAMON', stance: 'aggressor', twoStep: 'single-only', infoLevel: 'open' },
 };
 
 // Which trainer (by its overworld win-flag) gets which profile. The game maps a

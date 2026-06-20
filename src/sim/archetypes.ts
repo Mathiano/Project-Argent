@@ -1,7 +1,7 @@
 // Canonical sim archetypes — see docs/sim-archetypes.md.
 // These are measurement instruments; do not "improve" without a design ruling.
 
-import { activeMon, affordableMoves, forcedAction, lookupMove } from '../engine';
+import { activeMon, affordableMoves, forcedAction, lookupMove, trainerPolicy, TRAINER_PROFILES } from '../engine';
 import type { Action, BattleState, RNG, Side, SideState, Stance } from '../engine';
 
 export interface BotArchetype {
@@ -223,6 +223,18 @@ export const reader: BotArchetype = {
       stance = stance === 'A' ? 'G' : stance === 'G' ? 'F' : 'A';
     }
     return { kind: 'move', move: pickMidOrLight(me), stance };
+  },
+};
+
+// KAMON v2 (rival fight 1) as a ladder foe — the RIVAL profile's earliest rung
+// (Aggressor/Single-only/Fixed/no-Calls) via the shared trainer tree. This is
+// the rival ladder's foe AI as of the v2 card (docs/kamon-rival-card-v2.md);
+// it replaced the bespoke `rivalAI` there (an INTENDED re-baseline). `rivalAI`
+// stays the documented reference rival used by the bond ladders (unchanged).
+export const kamonRivalBot: BotArchetype = {
+  name: 'kamon',
+  chooseAction(state, side, rng) {
+    return trainerPolicy(TRAINER_PROFILES.kamon!)(state, side, rng);
   },
 };
 

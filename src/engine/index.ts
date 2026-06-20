@@ -33,6 +33,14 @@ export {
   loadMoves,
 } from './dexLoader';
 export type { DexEntryJson, MoveJson } from './dexLoader';
+export {
+  KAMON_BOND_FACTOR,
+  KAMON_STEAL,
+  KAMON_ACE_LEVEL,
+  kamonStolenStarter,
+  kamonAceScale,
+  buildKamonTeam,
+} from './rivalCard';
 export { falknerBossAI } from './bossAI';
 export type { BossPolicy } from './bossAI';
 export {
