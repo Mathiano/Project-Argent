@@ -154,6 +154,35 @@
           ]
         }
       ]
+    },
+    {
+      "type": "npc",
+      "x": 12,
+      "y": 7,
+      "color": "#6a8f3a",
+      "blockedUntilFlag": "violet_schoolkid_beaten",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "DELL: I study battles after",
+            "class. No fancy tricks yet —",
+            "just a clean read. Quiz me!"
+          ]
+        },
+        {
+          "kind": "start-trainer-battle",
+          "foeSpecies": "GRITHOAX",
+          "winFlag": "violet_schoolkid_beaten",
+          "reward": 400
+        }
+      ],
+      "interactAfterFlag": [
+        {
+          "kind": "dialog",
+          "lines": ["DELL: Textbook. I'll note", "that down."]
+        }
+      ]
     }
   ],
   "spawns": {

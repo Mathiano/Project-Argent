@@ -464,6 +464,93 @@
           ]
         }
       ]
+    },
+    {
+      "type": "npc",
+      "x": 5,
+      "y": 3,
+      "color": "#c2491a",
+      "blockedUntilFlag": "route31_camper_beaten",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "ROURKE: No backing up out",
+            "here — I come straight at",
+            "you. Keep up!"
+          ]
+        },
+        {
+          "kind": "start-trainer-battle",
+          "foeSpecies": "MARSHMASH",
+          "winFlag": "route31_camper_beaten",
+          "reward": 350
+        }
+      ],
+      "interactAfterFlag": [
+        {
+          "kind": "dialog",
+          "lines": ["ROURKE: You didn't flinch.", "Respect."]
+        }
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 15,
+      "y": 7,
+      "color": "#3a7fbe",
+      "blockedUntilFlag": "route31_birdkeeper_beaten",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "WREN: My FLITPECK never sits",
+            "still — too quick to pin.",
+            "Try and catch it!"
+          ]
+        },
+        {
+          "kind": "start-trainer-battle",
+          "foeSpecies": "FLITPECK",
+          "winFlag": "route31_birdkeeper_beaten",
+          "reward": 350
+        }
+      ],
+      "interactAfterFlag": [
+        {
+          "kind": "dialog",
+          "lines": ["WREN: You read its feints.", "Sharp eyes."]
+        }
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 11,
+      "y": 8,
+      "color": "#b14e9c",
+      "blockedUntilFlag": "route31_youngster2_beaten",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "PAX: I've got two now! No",
+            "tricks — just a clean,",
+            "honest battle. Ready?"
+          ]
+        },
+        {
+          "kind": "start-trainer-battle",
+          "foeSpecies": ["GRITHOAX", "MARSHMASH"],
+          "winFlag": "route31_youngster2_beaten",
+          "reward": 400
+        }
+      ],
+      "interactAfterFlag": [
+        {
+          "kind": "dialog",
+          "lines": ["PAX: Two in a row — wow!", "Good reads."]
+        }
+      ]
     }
   ],
   "spawns": {

@@ -139,6 +139,41 @@ describe('profile-vs-wildAI routing (profiled → new AI; wild/unprofiled → st
   });
 });
 
+describe('CH1 floor stamps — BRUISER / SKIRMISHER (docs/trainer-sets-ch1.md)', () => {
+  test('BRUISER leans Aggressive, never Focuses (Single-only floor)', () => {
+    const d = stanceDist(TRAINER_PROFILES.bruiser!);
+    expect(d.A).toBeGreaterThan(d.G);
+    expect(d.A).toBeGreaterThan(d.F);
+    expect(d.focus).toBe(0);
+  });
+  test('SKIRMISHER leans Fluid, never Focuses (Single-only floor)', () => {
+    const d = stanceDist(TRAINER_PROFILES.skirmisher!);
+    expect(d.F).toBeGreaterThan(d.A);
+    expect(d.F).toBeGreaterThan(d.G);
+    expect(d.focus).toBe(0);
+  });
+  test('both new stamps are Single-only floor — no two-step, no release model, open info', () => {
+    for (const id of ['bruiser', 'skirmisher'] as const) {
+      const p = TRAINER_PROFILES[id]!;
+      expect(p.twoStep).toBe('single-only');
+      expect(p.release).toBeUndefined(); // nothing mixes Feint at the floor
+      expect(p.infoLevel).toBe('open');
+      expect(p.bond).toBeUndefined(); // no-bond (no Calls)
+    }
+  });
+  test('CH1 routing: new flags → right profiles; gym chaff → skirmisher; existing untouched', () => {
+    expect(foeProfileForFlag('route31_camper_beaten')).toBe(TRAINER_PROFILES.bruiser);
+    expect(foeProfileForFlag('route31_birdkeeper_beaten')).toBe(TRAINER_PROFILES.skirmisher);
+    expect(foeProfileForFlag('route31_youngster2_beaten')).toBe(TRAINER_PROFILES.youngster);
+    expect(foeProfileForFlag('violet_schoolkid_beaten')).toBe(TRAINER_PROFILES.youngster);
+    expect(foeProfileForFlag('gym_trainer_beaten')).toBe(TRAINER_PROFILES.skirmisher);
+    expect(foeProfileForFlag('gym_trainer_4_beaten')).toBe(TRAINER_PROFILES.skirmisher);
+    // unchanged anchors
+    expect(foeProfileForFlag('route31_trainer_beaten')).toBe(TRAINER_PROFILES.jay);
+    expect(foeProfileForFlag('route31_lass_beaten')).toBe(TRAINER_PROFILES.lass);
+  });
+});
+
 describe('release variability (kickoff knob) — fixed-Heavy vs variable feint-mix', () => {
   function midFocus(profile: TrainerProfile, seed: number): Action {
     let s = freshState();

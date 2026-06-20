@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { runTrainerProfiles } from './trainerProfiles';
+import { TRAINER_PROFILES } from '../engine';
 import type { TrainerProfile } from '../engine';
 
 // ── Trainer-profile sim-gate (Combat Layer 4 — Stage 1) ──────────────────────
@@ -9,7 +10,14 @@ import type { TrainerProfile } from '../engine';
 // are measurably DISTINCT (stance leans differ; only the Charger Focuses).
 
 describe('trainer profiles — fair-but-distinct (Stage 1)', () => {
-  const rows = runTrainerProfiles('reading', 'SPROUTLE', 800, 7);
+  // Pinned to the original three (the registry now also holds the CH1 floor
+  // stamps, gated in their own block below).
+  const stage1 = {
+    youngster: TRAINER_PROFILES.youngster!,
+    jay: TRAINER_PROFILES.jay!,
+    lass: TRAINER_PROFILES.lass!,
+  };
+  const rows = runTrainerProfiles('reading', 'SPROUTLE', 800, 7, stage1);
   const by = Object.fromEntries(rows.map((r) => [r.id, r]));
   const youngster = by.youngster!;
   const jay = by.jay!;
@@ -126,5 +134,55 @@ describe('new-knob profiles — fair-but-distinct (release variability + stamina
 
   test('mixing FEINT does not break balance (variable is not wildly easier/harder)', () => {
     expect(Math.abs(varc.foeWinPct - fixc.foeWinPct)).toBeLessThan(25);
+  });
+});
+
+// ── CH1 generic floor roster (docs/trainer-sets-ch1.md) ──────────────────────
+// The three floor stamps used across Route 31 / Violet / gym chaff, gated vs the
+// same reader. Fair AND floor-appropriate (in line with the existing floor
+// cells ~38–58% foeWin), and the profiles READ distinctly.
+describe('CH1 floor roster — fair-but-distinct (GREENHORN / BRUISER / SKIRMISHER)', () => {
+  const reps: { readonly [id: string]: TrainerProfile } = {
+    greenhorn: TRAINER_PROFILES.youngster!, // GREENHORN reuses the youngster profile
+    bruiser: TRAINER_PROFILES.bruiser!,
+    skirmisher: TRAINER_PROFILES.skirmisher!,
+  };
+  const rows = runTrainerProfiles('reading', 'SPROUTLE', 800, 7, reps);
+  const by = Object.fromEntries(rows.map((r) => [r.id, r]));
+  const greenhorn = by.greenhorn!;
+  const bruiser = by.bruiser!;
+  const skirmisher = by.skirmisher!;
+
+  test('reports (logged for the audit)', () => {
+    for (const r of rows) {
+      const u = r.usagePct;
+      // eslint-disable-next-line no-console
+      console.log(
+        `  ${r.id.padEnd(11)} foeWin ${r.foeWinPct.toFixed(1)}% | A${u.A.toFixed(0)} G${u.G.toFixed(0)} F${u.F.toFixed(0)} | focus${u.focus.toFixed(0)} | other${u.other.toFixed(0)}`,
+      );
+    }
+    expect(rows.length).toBe(3);
+  });
+
+  test('every floor stamp is a FAIR, floor-appropriate fight vs the reader', () => {
+    // The floor SPREADS by readability vs a strict counter-reader (not a single
+    // number): Bulwark walls the reader (~58), Balanced is mid (~39), the pure
+    // Aggressor is the reader's prey (~18 — the triangle's "bait the commit with
+    // Guard" lesson made literal, same principle as FluidSpam flooring ~20 in
+    // the stance gate). All BEATABLE, none unbeatable; vs a human (imperfect
+    // counter-reader) the Aggressor is a fair pressure fight.
+    for (const r of rows) {
+      expect(r.foeWinPct).toBeGreaterThan(12);
+      expect(r.foeWinPct).toBeLessThan(75);
+      expect(r.usagePct.focus).toBe(0); // Single-only floor — never two-steps
+    }
+  });
+
+  test('the three read DISTINCTLY (Bruiser=Aggressive, Skirmisher=Fluid, Greenhorn=balanced)', () => {
+    expect(bruiser.usagePct.A).toBeGreaterThan(skirmisher.usagePct.A + 5); // Aggressor
+    expect(skirmisher.usagePct.F).toBeGreaterThan(bruiser.usagePct.F + 5); // Evader
+    // Greenhorn: no stance dominates.
+    const g = greenhorn.usagePct;
+    expect(Math.max(g.A, g.G, g.F) - Math.min(g.A, g.G, g.F)).toBeLessThan(8);
   });
 });

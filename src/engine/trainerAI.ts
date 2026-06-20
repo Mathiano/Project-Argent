@@ -238,6 +238,16 @@ export const TRAINER_PROFILES: { readonly [id: string]: TrainerProfile } = {
   jay: { name: 'JAY', stance: 'aggressor', twoStep: 'occasional', release: 'fixed-Heavy', infoLevel: 'open' },
   // TURTLE floor: Guard-heavy wall — slip it with Fluid. No focus.
   lass: { name: 'LASS BRYN', stance: 'bulwark', twoStep: 'single-only', infoLevel: 'open' },
+  // ── CH1 floor stamps (docs/trainer-sets-ch1.md) — shared class templates ──
+  // Single-only floor: no two-step, no Calls, OPEN info, Fixed, no terrain.
+  // Nothing here mixes Feint (variable release is Gym 2). GREENHORN reuses the
+  // `youngster` profile above.
+  // BRUISER — Aggressor floor: leans Aggressive (punishes passivity); bait the
+  // commit with Guard. Low-bond → locked in (can't escape your counter).
+  bruiser: { name: 'BRUISER', stance: 'aggressor', twoStep: 'single-only', infoLevel: 'open' },
+  // SKIRMISHER — Evader floor: Fluid initiative first-strikes; catch it with
+  // Aggressive. Low-bond → can't punish you back.
+  skirmisher: { name: 'SKIRMISHER', stance: 'evader', twoStep: 'single-only', infoLevel: 'open' },
 };
 
 // Which trainer (by its overworld win-flag) gets which profile. The game maps a
@@ -246,9 +256,21 @@ export const TRAINER_PROFILES: { readonly [id: string]: TrainerProfile } = {
 // wildFoeAI — so unprofiled trainers + wild battles stay bit-identical. Both
 // Route 31 map variants reuse these flags. (Falkner is a boss → falknerBossAI.)
 export const TRAINER_PROFILE_BY_FLAG: { readonly [winFlag: string]: string } = {
+  // Stage-1 originals (unchanged — JAY is the bespoke fixed-Heavy focuser).
   route31_youngster_beaten: 'youngster',
   route31_trainer_beaten: 'jay',
   route31_lass_beaten: 'lass',
+  // ── CH1 generic roster (docs/trainer-sets-ch1.md) ──
+  route31_camper_beaten: 'bruiser', // ⟨Rourke⟩ Camper
+  route31_birdkeeper_beaten: 'skirmisher', // ⟨Wren⟩ Bird Keeper
+  route31_youngster2_beaten: 'youngster', // ⟨Pax⟩ Youngster (GREENHORN)
+  violet_schoolkid_beaten: 'youngster', // ⟨Dell⟩ Schoolkid (GREENHORN) — optional
+  // Violet Gym chaff — Bird Keeper / SKIRMISHER (the NPCs already exist in
+  // gym.json; routing their flags is pure data — they were on wildFoeAI before).
+  gym_trainer_beaten: 'skirmisher',
+  gym_trainer_2_beaten: 'skirmisher',
+  gym_trainer_3_beaten: 'skirmisher',
+  gym_trainer_4_beaten: 'skirmisher',
 };
 
 // The routing primitive: a trainer's profile, or undefined → caller uses
