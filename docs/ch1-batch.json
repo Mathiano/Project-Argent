@@ -8,10 +8,10 @@
    "FLAME"
   ],
   "stats": {
-   "hp": 64,
+   "hp": 66,
    "atk": 86,
    "dfn": 119,
-   "spd": 57
+   "spd": 59
   },
   "archetype": "Wall",
   "rarity": "starter",
@@ -180,10 +180,10 @@
    "NATURE"
   ],
   "stats": {
-   "hp": 54,
-   "atk": 94,
-   "dfn": 69,
-   "spd": 125
+   "hp": 68,
+   "atk": 88,
+   "dfn": 84,
+   "spd": 90
   },
   "archetype": "Dodger",
   "rarity": "starter",
@@ -347,10 +347,10 @@
    "AQUA"
   ],
   "stats": {
-   "hp": 67,
-   "atk": 90,
-   "dfn": 106,
-   "spd": 67
+   "hp": 66,
+   "atk": 88,
+   "dfn": 98,
+   "spd": 78
   },
   "archetype": "Counter-tank",
   "rarity": "starter",

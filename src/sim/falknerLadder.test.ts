@@ -59,22 +59,28 @@ function tierOf(player: string): Tier {
 // Acceptance bands [loInclusive, hiInclusive] in win%, re-locked to the
 // TTK-1.30 measured values (each comfortably contains its exact, deterministic
 // seed=0x1f result).
-// ── INTENTIONAL TYPE-VOCAB-FIX RE-BASELINE (2026-06-21) — GRUBLEAF hard cells.
-// The move-vocab collision fix (legacy FX-namespacing + the registerMoves guard)
-// brought CH1 type effectiveness ALIVE. GRUBLEAF (NATURE) into Falkner's GALE
-// gym now takes its REAL type disadvantage (it was accidentally neutral while
-// LEAF LASH resolved to the legacy `Sprout` with no CH1-chart key), so the hard
-// GRUBLEAF cells dropped from ~20-30% to ~2-3%. This CORRECTS an accidental
-// easiness — GRUBLEAF-solo-vs-Falkner is the designated hard run whose answer is
-// a GALE counter via catching, not the solo grass starter (see tierOf). The
-// FAIR cells (KINDRAKE/SILTSKIP) are unaffected (their FLAME/AQUA vs GALE was
-// already ~neutral). Bands re-locked to the seed=0x1f values.
+// ── INTENTIONAL STARTER-TRIO REBALANCE RE-BASELINE (2026-06-21) ────────────
+// starter-trio-rebalance.md RESOLUTION: the trio was re-shaped to a shared
+// budget 330 (GRUBLEAF softened Dodger→fast-bruiser hp54→68/dfn69→84/spd125→90;
+// SILTSKIP's bulk reined dfn106→98/spd67→78; KINDRAKE held, hp64→66/spd57→59),
+// landing ~50% RPS in the mirror-sim. Because KINDRAKE *and* SILTSKIP stats
+// moved, ALL cells shifted — not just GRUBLEAF:
+//   · GRUBLEAF (hard) ROSE off its ~2-3% type-disadvantage floor (it now has
+//     real bulk): mashers ~7-11, readers ~19-27. Still clearly the HARD run
+//     (every cell well under its fair counterpart; the answer is still a GALE
+//     counter via catching, not a GRUBLEAF solo buff — see tierOf).
+//   · SILTSKIP (fair) DROPPED on the no-read masher cells (button 65→54, brute
+//     72→63) — reining its bulk means it no longer free-walls a mindless masher
+//     (on-thesis). Its reading cells hold (naive 100, stamina 97, human 82).
+//   · KINDRAKE (fair, the held anchor) essentially unchanged (~71/72/100/100/92).
+// The FAIR-vs-HARD contract is intact for every reading archetype. Bands
+// re-locked to the seed=0x1f measured values.
 const BANDS: { readonly [a: string]: { readonly [t in Tier]: readonly [number, number] } } = {
-  'button-masher': { fair: [58, 74], hard: [1, 8] }, // 66.5/65.1 fair · 2.9 hard
-  brute: { fair: [64, 80], hard: [1, 8] }, // 71.6/72.5 fair · 2.1 hard
-  'naive-triangle': { fair: [94, 100], hard: [1, 8] }, // 100/100 fair · 2.6 hard
-  'stamina-reader': { fair: [92, 100], hard: [1, 8] }, // 100/99.4 fair · 2.6 hard
-  'human-ish': { fair: [82, 98], hard: [1, 8] }, // 89.8/88.0 fair · 2.6 hard
+  'button-masher': { fair: [50, 76], hard: [6, 16] }, // KIND 71.5 / SILT 54.5 fair · 10.9 hard
+  brute: { fair: [57, 79], hard: [3, 13] }, // KIND 72.4 / SILT 63.0 fair · 7.3 hard
+  'naive-triangle': { fair: [94, 100], hard: [20, 33] }, // 100 / 100 fair · 26.7 hard
+  'stamina-reader': { fair: [92, 100], hard: [13, 25] }, // KIND 100 / SILT 97.2 fair · 18.7 hard
+  'human-ish': { fair: [78, 97], hard: [8, 18] }, // KIND 91.8 / SILT 82.3 fair · 12.8 hard
 };
 
 describe('Falkner ladder regression (n=2000, seed=0x1f, gust=1.4 hp=1.15) — designed bands', () => {

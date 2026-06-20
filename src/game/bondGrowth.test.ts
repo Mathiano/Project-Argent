@@ -144,14 +144,15 @@ describe('renewable fuel — STILL holds (at the new, slower rate)', () => {
 
 describe('goal check — the gym gauntlet brings a devoted starter into Warming', () => {
   // Real CH1 powers (stat-sums, verified from docs/ch1-batch.json):
-  //   KINDRAKE starter 326 · FLITPECK 286 · GALEHAWK 354.
+  //   KINDRAKE starter 330 · FLITPECK 286 · GALEHAWK 354.
+  //   (KINDRAKE 326→330 in the starter-trio rebalance — shared budget 330.)
   // The Violet gym is now a gauntlet: the existing talk-trainer + three
   // line-of-sight trainers + Falkner. We sim a devoted starter (bond 10)
   // fighting all five, PESSIMISTICALLY (every fight a near-untouched sweep,
   // strain 0.6 — the lowest bond payoff) to prove the floor: even then it
   // crosses into stage 2 (Warming), which arms the Tier-I jumpstart. Real
   // play (pressured multi-mon fights + route trainers/wilds) lands higher.
-  const KINDRAKE = 326;
+  const KINDRAKE = 330;
   const FLITPECK = 286;
   const GALEHAWK = 354;
   // Each gym fight: foePower = toughest mon faced. hpFrac 0.95 → strain 0.6.
