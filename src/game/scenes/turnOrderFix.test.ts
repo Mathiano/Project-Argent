@@ -59,7 +59,7 @@ describe('Symptom 1 — the order indicator matches the engine resolution order'
     ['faster acts first', 'EMBERCUB', 'AQUAFIN', 'TACKLE', 'G', 'TACKLE', 'G', 'player'],
     ['foe faster acts first', 'AQUAFIN', 'EMBERCUB', 'TACKLE', 'G', 'TACKLE', 'G', 'foe'],
     // raw-slower SPROUTLE (84) + light move out-initiatives EMBERCUB (108) + heavy
-    ['raw-slower first via lighter move', 'SPROUTLE', 'EMBERCUB', 'TACKLE', 'G', 'FLAME RUSH', 'G', 'player'],
+    ['raw-slower first via lighter move', 'SPROUTLE', 'EMBERCUB', 'TACKLE', 'G', 'FX FLAME RUSH', 'G', 'player'],
     // Fluid-vs-Guard overrides speed entirely
     ['Fluid acts first vs faster Guard', 'AQUAFIN', 'EMBERCUB', 'TACKLE', 'F', 'TACKLE', 'G', 'player'],
   ];

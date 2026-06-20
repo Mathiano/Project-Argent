@@ -118,7 +118,7 @@ describe('arena rhythm + GUSTBORNE trait (A3 + A4)', () => {
   });
 
   test('heavies cost +8 ST on rhythm rounds (both sides)', () => {
-    // EMBERCUB FLAME RUSH (heavy, cost 35) at G stance on a rhythm round.
+    // EMBERCUB FX FLAME RUSH (heavy, cost 35) at G stance on a rhythm round.
     // Baseline: 35 cost, 14 regen (G), net -21 stamina shift.
     // Rhythm: 35 + 8 = 43 cost, 14 regen, net -29 stamina shift.
     const card: BossCard = { species: SPECIES.EMBERCUB!, arenaSchedule: ARENA };
@@ -130,14 +130,14 @@ describe('arena rhythm + GUSTBORNE trait (A3 + A4)', () => {
 
     const off = resolveRound(
       setup,
-      { kind: 'move', move: 'FLAME RUSH', stance: 'G' },
+      { kind: 'move', move: 'FX FLAME RUSH', stance: 'G' },
       { kind: 'move', move: 'TACKLE', stance: 'G' },
       fixedRng([0.5]),
     );
 
     const on = resolveRound(
       setRound(setup, 3),
-      { kind: 'move', move: 'FLAME RUSH', stance: 'G' },
+      { kind: 'move', move: 'FX FLAME RUSH', stance: 'G' },
       { kind: 'move', move: 'TACKLE', stance: 'G' },
       fixedRng([0.5]),
     );

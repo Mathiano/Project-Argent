@@ -781,7 +781,7 @@ describe('battle move list — cursor wrap + rejection paths + B-back', () => {
 
   test('A on a heavy move while winded (ST ≤ 25) surfaces "Too winded" — dismissable', () => {
     // CH1 starters at lvl 13 don't have heavies yet, so we test the
-    // winded-locks-heavy rule with the legacy EMBERCUB (FLAME RUSH = heavy).
+    // winded-locks-heavy rule with the legacy EMBERCUB (FX FLAME RUSH = heavy).
     let state = createBattleState(
       createTeam([createSide(SPECIES.EMBERCUB!)]),
       createTeam([createSide(SPECIES.AQUAFIN!)]),
@@ -798,10 +798,10 @@ describe('battle move list — cursor wrap + rejection paths + B-back', () => {
       onResolve: () => {},
     });
     scene.input?.('a'); // FIGHT → move list
-    // EMBERCUB moves: TACKLE, EMBER SNAP, FLAME RUSH (heavy at index 2).
+    // EMBERCUB moves: TACKLE, FX EMBER SNAP, FX FLAME RUSH (heavy at index 2).
     scene.input?.('down');
     scene.input?.('down');
-    scene.input?.('a'); // confirm FLAME RUSH while winded → "Too winded"
+    scene.input?.('a'); // confirm FX FLAME RUSH while winded → "Too winded"
     const ctx = stubCtx();
     scene.draw(ctx);
     expect(ctx.texts.join('|')).toContain('Too winded');
@@ -809,7 +809,7 @@ describe('battle move list — cursor wrap + rejection paths + B-back', () => {
     scene.input?.('b');
     ctx.reset();
     scene.draw(ctx);
-    expect(ctx.texts.some((t) => t.startsWith('>FLAME RUSH'))).toBe(true);
+    expect(ctx.texts.some((t) => t.startsWith('>FX FLAME RUSH'))).toBe(true);
   });
 
   test('A on an unaffordable move surfaces "Not enough stamina!" — dismissable', () => {

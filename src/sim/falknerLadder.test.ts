@@ -59,14 +59,22 @@ function tierOf(player: string): Tier {
 // Acceptance bands [loInclusive, hiInclusive] in win%, re-locked to the
 // TTK-1.30 measured values (each comfortably contains its exact, deterministic
 // seed=0x1f result).
-// Re-locked to the reliable-gust-charge values (rate 0.7; Falkner Focuses on
-// his signature beats; seed=0x1f).
+// ── INTENTIONAL TYPE-VOCAB-FIX RE-BASELINE (2026-06-21) — GRUBLEAF hard cells.
+// The move-vocab collision fix (legacy FX-namespacing + the registerMoves guard)
+// brought CH1 type effectiveness ALIVE. GRUBLEAF (NATURE) into Falkner's GALE
+// gym now takes its REAL type disadvantage (it was accidentally neutral while
+// LEAF LASH resolved to the legacy `Sprout` with no CH1-chart key), so the hard
+// GRUBLEAF cells dropped from ~20-30% to ~2-3%. This CORRECTS an accidental
+// easiness — GRUBLEAF-solo-vs-Falkner is the designated hard run whose answer is
+// a GALE counter via catching, not the solo grass starter (see tierOf). The
+// FAIR cells (KINDRAKE/SILTSKIP) are unaffected (their FLAME/AQUA vs GALE was
+// already ~neutral). Bands re-locked to the seed=0x1f values.
 const BANDS: { readonly [a: string]: { readonly [t in Tier]: readonly [number, number] } } = {
-  'button-masher': { fair: [58, 74], hard: [1, 13] }, // 66.5/65.1 fair · 5.3 hard
-  brute: { fair: [64, 80], hard: [16, 34] }, // 71.6/72.5 fair · 25.1 hard
-  'naive-triangle': { fair: [94, 100], hard: [22, 40] }, // 100/100 fair · 30.4 hard (unchanged)
-  'stamina-reader': { fair: [92, 100], hard: [18, 36] }, // 100/99.4 fair · 26.7 hard (unchanged)
-  'human-ish': { fair: [82, 98], hard: [13, 31] }, // 89.8/88.0 fair · 20.2 hard
+  'button-masher': { fair: [58, 74], hard: [1, 8] }, // 66.5/65.1 fair · 2.9 hard
+  brute: { fair: [64, 80], hard: [1, 8] }, // 71.6/72.5 fair · 2.1 hard
+  'naive-triangle': { fair: [94, 100], hard: [1, 8] }, // 100/100 fair · 2.6 hard
+  'stamina-reader': { fair: [92, 100], hard: [1, 8] }, // 100/99.4 fair · 2.6 hard
+  'human-ish': { fair: [82, 98], hard: [1, 8] }, // 89.8/88.0 fair · 2.6 hard
 };
 
 describe('Falkner ladder regression (n=2000, seed=0x1f, gust=1.4 hp=1.15) — designed bands', () => {

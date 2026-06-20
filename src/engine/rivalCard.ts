@@ -23,18 +23,19 @@ export const KAMON_STEAL: { readonly [playerPick: string]: string } = {
   SILTSKIP: 'GRUBLEAF', // NATURE beats AQUA
 };
 
-// Per-ace LEVEL (the fairness knob, sim-gated) — keyed by the STOLEN species. It
-// compensates the CH1 starter trio's BULK ASYMMETRY (GRUBLEAF is a frail Dodger;
-// KINDRAKE/SILTSKIP are bulky Wall/Counter-tank), which otherwise makes the
-// matchups swing from free-win to wall. Applied AS A LEVEL (all stats) — the
-// 0.85 hesitation then multiplies atk/dfn on top, so the constant is untouched.
-// Tuned so each pick lands ~70-74% player-win vs the `reader` yardstick (see
-// src/sim/rivalCard.test.ts). NOTE: the reader hard-counters KAMON's Aggressor
-// stance, so these are reader-WORST-CASE levels (vs a human he's gentler).
+// Per-ace LEVEL (the fairness knob) — keyed by the STOLEN species. Reset to a
+// flat 1.0 (2026-06-21). The old per-pick spread (0.95–1.37) was tuned against
+// the type-INERT engine (the move-vocab collision no-op'd CH1 type) and was
+// silently compensating the starter BULK ASYMMETRY. With the type fix live that
+// spread now stacks on top of REAL type advantage → over-strong KAMON. The
+// honest baseline is 1.0; KAMON cannot be re-converged to a fair per-pick band
+// until the starter-trio rebalance lands — the mirror-sim shows the residual
+// imbalance is starter-bulk, not the triangle. **PENDING starter rebalance**
+// (src/sim/rivalCard.test.ts — fairness assertions skipped until then).
 export const KAMON_ACE_LEVEL: { readonly [stolen: string]: number } = {
-  SILTSKIP: 1.14, // player picked KINDRAKE
-  KINDRAKE: 0.95, // player picked GRUBLEAF
-  GRUBLEAF: 1.37, // player picked SILTSKIP
+  SILTSKIP: 1.0,
+  KINDRAKE: 1.0,
+  GRUBLEAF: 1.0,
 };
 
 // The starter KAMON steals, given the player's pick. Returns undefined for a

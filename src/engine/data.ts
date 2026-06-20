@@ -1,14 +1,23 @@
 import type { ElementType, Move, Species, TraitTable, TypeChart } from './types';
 
+// LEGACY fixture moves (for the permanent EMBERCUB/SPROUTLE/AQUAFIN trio only).
+// Their type vocabulary is Mixed-case (Flame/Sprout/Splash) for `LEGACY_TYPE_CHART`.
+// The typed mids/heavies are NAMESPACED with an `FX ` prefix so they can NEVER
+// collide with CH1's same-flavoured moves (EMBER SNAP/FLAME RUSH/… in
+// docs/moves.json, UPPERCASE FLAME/NATURE/AQUA) — the collision silently no-op'd
+// CH1 type effectiveness because `lookupMove` resolves this table first. Pure
+// key rename: identical tier/type/power → the fixture ladders stay bit-identical.
+// `registerMoves` now THROWS if a CH1 move re-introduces a shadow (never-mix).
+// TACKLE/SCRATCH are shared, null-typed, identical both sides — safe.
 export const MOVES: { readonly [name: string]: Move } = {
   TACKLE: { name: 'TACKLE', tier: 'light', type: null },
   SCRATCH: { name: 'SCRATCH', tier: 'light', type: null },
-  'EMBER SNAP': { name: 'EMBER SNAP', tier: 'mid', type: 'Flame' },
-  'FLAME RUSH': { name: 'FLAME RUSH', tier: 'heavy', type: 'Flame' },
-  'LEAF LASH': { name: 'LEAF LASH', tier: 'mid', type: 'Sprout' },
-  'VINE SLAM': { name: 'VINE SLAM', tier: 'heavy', type: 'Sprout' },
-  'BUBBLE JET': { name: 'BUBBLE JET', tier: 'mid', type: 'Splash' },
-  'TIDE CRASH': { name: 'TIDE CRASH', tier: 'heavy', type: 'Splash' },
+  'FX EMBER SNAP': { name: 'FX EMBER SNAP', tier: 'mid', type: 'Flame' },
+  'FX FLAME RUSH': { name: 'FX FLAME RUSH', tier: 'heavy', type: 'Flame' },
+  'FX LEAF LASH': { name: 'FX LEAF LASH', tier: 'mid', type: 'Sprout' },
+  'FX VINE SLAM': { name: 'FX VINE SLAM', tier: 'heavy', type: 'Sprout' },
+  'FX BUBBLE JET': { name: 'FX BUBBLE JET', tier: 'mid', type: 'Splash' },
+  'FX TIDE CRASH': { name: 'FX TIDE CRASH', tier: 'heavy', type: 'Splash' },
 };
 
 export const SPECIES: { readonly [name: string]: Species } = {
@@ -19,7 +28,7 @@ export const SPECIES: { readonly [name: string]: Species } = {
     atk: 100,
     dfn: 86,
     spd: 108,
-    moves: ['TACKLE', 'EMBER SNAP', 'FLAME RUSH'],
+    moves: ['TACKLE', 'FX EMBER SNAP', 'FX FLAME RUSH'],
     spr: 'EMBERCUB',
   },
   SPROUTLE: {
@@ -29,7 +38,7 @@ export const SPECIES: { readonly [name: string]: Species } = {
     atk: 96,
     dfn: 100,
     spd: 84,
-    moves: ['TACKLE', 'LEAF LASH', 'VINE SLAM'],
+    moves: ['TACKLE', 'FX LEAF LASH', 'FX VINE SLAM'],
     spr: 'SPROUTLE',
   },
   AQUAFIN: {
@@ -39,7 +48,7 @@ export const SPECIES: { readonly [name: string]: Species } = {
     atk: 92,
     dfn: 108,
     spd: 72,
-    moves: ['TACKLE', 'BUBBLE JET', 'TIDE CRASH'],
+    moves: ['TACKLE', 'FX BUBBLE JET', 'FX TIDE CRASH'],
     spr: 'AQUAFIN',
   },
   FUZZLET: {

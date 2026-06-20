@@ -101,14 +101,14 @@ describe('turn order — initiative (speed ÷ move weight) + the Fluid exception
 
   test('SYMPTOM 1: a raw-SLOWER mon acts first with a LIGHTER move (init = spd ÷ weight)', () => {
     // SPROUTLE spd 84 + TACKLE (light, w0.85) → init 98.8.
-    // EMBERCUB spd 108 + FLAME RUSH (heavy, w1.15) → init 93.9.
+    // EMBERCUB spd 108 + FX FLAME RUSH (heavy, w1.15) → init 93.9.
     // The slower-by-raw-speed SPROUTLE out-initiatives → acts FIRST. This
     // is CORRECT by the spec (Initiative: speed / move weight) — the
     // "SLOWER acted first" the player saw is the design, not a bug.
     const r = resolveRound(
       makeState('SPROUTLE', 'EMBERCUB'),
       { kind: 'move', move: 'TACKLE', stance: 'G' },
-      { kind: 'move', move: 'FLAME RUSH', stance: 'G' },
+      { kind: 'move', move: 'FX FLAME RUSH', stance: 'G' },
       mulberry32(7),
     );
     expect(pl(makeState('SPROUTLE', 'EMBERCUB')).species.spd).toBeLessThan(
@@ -253,14 +253,14 @@ describe('winded lock', () => {
   test('heavy moves are blocked while winded', () => {
     const state = patchPlayer(makeState(), { st: COMBAT.winded });
     expect(() =>
-      validateAction(pl(state), { kind: 'move', move: 'FLAME RUSH', stance: 'A' }),
+      validateAction(pl(state), { kind: 'move', move: 'FX FLAME RUSH', stance: 'A' }),
     ).toThrow();
   });
 
   test('mid moves are still allowed while winded', () => {
     const state = patchPlayer(makeState(), { st: COMBAT.winded });
     expect(() =>
-      validateAction(pl(state), { kind: 'move', move: 'EMBER SNAP', stance: 'A' }),
+      validateAction(pl(state), { kind: 'move', move: 'FX EMBER SNAP', stance: 'A' }),
     ).not.toThrow();
   });
 });
@@ -415,15 +415,15 @@ describe('Catch Breath call', () => {
 
 describe('injected type chart (A1)', () => {
   test('a custom chart applied at battle setup changes effectiveness', () => {
-    // Both EMBERCUB (Flame) so the foe's EMBER SNAP fires Flame-into-Flame.
+    // Both EMBERCUB (Flame) so the foe's FX EMBER SNAP fires Flame-into-Flame.
     const mirror = createBattleState(createSide(SPECIES.EMBERCUB!), createSide(SPECIES.EMBERCUB!));
     const baseline = resolveRound(
       mirror,
       { kind: 'move', move: 'TACKLE', stance: 'A' },
-      { kind: 'move', move: 'EMBER SNAP', stance: 'G' },
+      { kind: 'move', move: 'FX EMBER SNAP', stance: 'G' },
       fixedRng([0.5, 0.5]),
     );
-    // Foe EMBER SNAP is type 'Flame'; defender (player EMBERCUB) is also 'Flame'.
+    // Foe FX EMBER SNAP is type 'Flame'; defender (player EMBERCUB) is also 'Flame'.
     // Legacy chart has no Flame->Flame entry so effectiveness should be 1.
     const baselineStrike = baseline.events.find(
       (e): e is Extract<typeof e, { kind: 'strike' }> => e.kind === 'strike' && e.side === 'foe',
@@ -442,7 +442,7 @@ describe('injected type chart (A1)', () => {
     const result = resolveRound(
       stateWithChart,
       { kind: 'move', move: 'TACKLE', stance: 'A' },
-      { kind: 'move', move: 'EMBER SNAP', stance: 'G' },
+      { kind: 'move', move: 'FX EMBER SNAP', stance: 'G' },
       fixedRng([0.5, 0.5]),
     );
     const struck = result.events.find(

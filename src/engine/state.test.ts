@@ -42,16 +42,16 @@ describe('validateAction throw paths', () => {
     // EMBERCUB at ST=25 (the winded threshold inclusive) cannot use heavy.
     const side = patched({ st: 25 });
     expect(() =>
-      validateAction(side, { kind: 'move', move: 'FLAME RUSH', stance: 'A' }),
+      validateAction(side, { kind: 'move', move: 'FX FLAME RUSH', stance: 'A' }),
     ).toThrow(/heavy locked/);
   });
 
   test('throws when a move cannot be afforded', () => {
-    // EMBER SNAP costs 22; at ST=5 it should be unaffordable but not winded
+    // FX EMBER SNAP costs 22; at ST=5 it should be unaffordable but not winded
     // (winded threshold is ≤25; affordability throws before winded would).
     const side = patched({ st: 5 });
     expect(() =>
-      validateAction(side, { kind: 'move', move: 'EMBER SNAP', stance: 'A' }),
+      validateAction(side, { kind: 'move', move: 'FX EMBER SNAP', stance: 'A' }),
     ).toThrow(/Cannot afford/);
   });
 });

@@ -100,6 +100,24 @@ export { activeMon };
 const REGISTERED_MOVES: { [name: string]: Move } = {};
 
 export function registerMoves(extras: { readonly [name: string]: Move }): void {
+  // NEVER-MIX guard (load-time, throws). `lookupMove` resolves the legacy
+  // `MOVES` table FIRST, so a registered move sharing a name with a legacy
+  // fixture move would be silently shadowed — which previously no-op'd CH1 type
+  // effectiveness (the legacy Mixed-case type has no key in the CH1 chart). Fail
+  // LOUD instead: a name may only be shared if it's mechanically identical
+  // (e.g., TACKLE/SCRATCH — null-typed both sides). Fixture moves are namespaced
+  // (`FX …`) precisely so this never trips in normal content.
+  for (const [name, mv] of Object.entries(extras)) {
+    const legacy = MOVES[name];
+    if (legacy && (legacy.type !== mv.type || legacy.tier !== mv.tier)) {
+      throw new Error(
+        `registerMoves: "${name}" collides with a legacy fixture move ` +
+          `(legacy ${String(legacy.type)}/${legacy.tier} vs ${String(mv.type)}/${mv.tier}) — ` +
+          `lookupMove resolves the legacy table first, so this would silently shadow. ` +
+          `Namespace the fixture key or rename the new move; never share a name across vocabularies.`,
+      );
+    }
+  }
   Object.assign(REGISTERED_MOVES, extras);
 }
 
