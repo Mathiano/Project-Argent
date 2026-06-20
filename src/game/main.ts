@@ -12,6 +12,8 @@ import {
   loadMoves,
   mulberry32,
   registerMoves,
+  trainerPolicy,
+  foeProfileForFlag,
 } from '../engine';
 import type {
   Action,
@@ -1577,15 +1579,15 @@ function pushTrainerFight(
   const state = createBattleState(buildPlayerTeam(), foeTeam, {
     typeChart: TYPECHART_CH1,
   });
+  // Combat Layer 4 (Stage 1): a profiled trainer fights with its distinct
+  // policy; an unprofiled one keeps the generic wildFoeAI (bit-identical).
+  const profile = foeProfileForFlag(winFlag);
+  const foePolicy = profile ? trainerPolicy(profile) : null;
   scenes.push(
     createBattleScene({
       state,
       rng: run.rng,
-      // Demo-complete S5 (log): named trainers currently run the generic
-      // wildFoeAI (uniform-random move + stance) — fine for the demo,
-      // but post-demo they should get distinct AI so they fight like
-      // people, not wild mons (a per-trainer policy, like the boss cards).
-      chooseFoeAction: (s, r) => wildFoeAI(s, r),
+      chooseFoeAction: (s, r) => (foePolicy ? foePolicy(s, 'foe', r) : wildFoeAI(s, r)),
       intro: ['Gym trainer sent out', `${leadName}!`],
       catchBreathUnlocked: callsUnlocked(),
       canRun: false,

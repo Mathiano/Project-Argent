@@ -101,11 +101,24 @@ function worstIncoming(
   return worst;
 }
 
+// Combat Layer 4 (Stage 1) — Falkner's SIGNATURE two-step: his "gust" is now a
+// telegraphed FOCUS→HEAVY. On a gust (rhythm) round he sometimes gathers (deals
+// 0, the wind-up) instead of DIVE BOMBing, then crashes down HEAVY next round —
+// the gym fight's first two-step read (Brace it / slip it / both-Focus into the
+// flip). Evader stance + this Occasional signature = his profile, expressed
+// through his bespoke boss AI rather than the generic trainerPolicy (his
+// rhythm/phase/gust identity stays intact). Bounded so he stays Occasional, not
+// a focus-spammer.
+const FALKNER_GUST_FOCUS_RATE = 0.5;
+
 export const falknerBossAI: BossPolicy = (state, side, rng) => {
   const myTeam = state[side];
   const me = activeMon(myTeam);
   const forced = forcedAction(me);
   if (forced) return forced;
+
+  // RELEASE CHECK — mid-gust (winding) → release the gust HEAVY (locked in).
+  if (me.focus !== undefined) return { kind: 'release', release: 'heavy' };
 
   // Switch on hard type disadvantage. Skips when team is single-mon
   // (bestSwitchTarget returns null) so 1-mon bosses are unaffected.
@@ -126,6 +139,15 @@ export const falknerBossAI: BossPolicy = (state, side, rng) => {
   const rhythm = arena
     ? isRhythmRound(arena, state.round, state.rhythmAnchor ?? 0)
     : false;
+
+  // ESCALATION — the signature gust-Focus. On a gust round, sometimes FOCUS
+  // (Aggressive base → HEAVY release next round) instead of the single-step
+  // DIVE BOMB. Needs a heavy move affordable to be worth the wind-up.
+  if (rhythm && rng.next() < FALKNER_GUST_FOCUS_RATE) {
+    const aff = affordableMoves(me);
+    const heavy = aff.find((n) => lookupMove(n).tier === 'heavy');
+    if (heavy) return { kind: 'move', move: heavy, stance: 'A', commit: true };
+  }
 
   const move = pickFalknerMove(state, side, rhythm, rng);
 

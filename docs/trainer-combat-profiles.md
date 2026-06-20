@@ -111,6 +111,41 @@ Stance: Aggressor · Two-step: Frequent · Bond: Manufactured (pseudo-Calls, NO 
 - **Late / Concord / Elite:** Bluffers, full information denial, Reactive, manufactured-loyalty juggernauts. The read-war at its deepest.
 Difficulty scales by COMBINING the dimensions (more two-steps + better Calls + more hidden info + reactivity), NOT by new mechanics. Leak-cap-safe.
 
+## STAGE 1 — AS BUILT (2026-06-20, KICKOFF-trainer-ai-layer4-stage1.md)
+The trainer-AI CORE is shipped: the profile data structure + the shared
+decision tree, with the FIRST TWO dimensions live — **stance tendency** +
+**two-step tendency**. The other dimensions (Calls/bond, Call behavior, info
+discipline, terrain, adaptivity) are deferred to later stages; their hook
+points are marked inline in `src/engine/trainerAI.ts`.
+
+- **Where:** `src/engine/trainerAI.ts` — pure policy (`trainerPolicy(profile)`),
+  the `TrainerProfile` type, the `TRAINER_PROFILES` registry, and the win-flag
+  routing (`TRAINER_PROFILE_BY_FLAG` / `foeProfileForFlag`). Wired in
+  `src/game/main.ts` (`pushTrainerFight`): a PROFILED trainer fights via
+  `trainerPolicy`; an UNPROFILED trainer (and every wild encounter) keeps
+  `wildFoeAI` unchanged → wild battles stay bit-identical.
+- **The headline:** trainers can now **FOCUS** — the player faces a trainer's
+  hidden release + the flipped (both-focus) triangle for the first time. Reuses
+  the player's focus/release machinery (no engine-math change).
+- **Stage-1 roster (clearly distinct):** YOUNGSTER MILO (`route31_youngster_beaten`)
+  = Balanced / Single-only (teaching baseline); JAY (`route31_trainer_beaten`)
+  = Aggressor / Occasional **Charger** (focuses into HEAVY); LASS BRYN
+  (`route31_lass_beaten`) = Bulwark / Single-only (slip it with Fluid).
+- **FALKNER** (boss, `falknerBossAI`): upgraded to Focus on his signature gust
+  (Evader / Occasional / signature) — his gust round sometimes winds up a
+  FOCUS→HEAVY two-step. His bespoke rhythm/phase identity is intact.
+- **Sim-gate** (`src/sim/trainerProfiles.test.ts`, SPROUTLE mirror vs a
+  competent reading player, n=800): fair-but-distinct — foe win% youngster
+  38.9 / jay 38.1 / lass 58.0 (competitive, none unbeatable/trivial); action
+  distributions distinct (jay leans A + focuses ~19% into HEAVY; lass leans G
+  ~45%; youngster even, never focuses). Falkner ladder re-baselined (he Focuses
+  now; readers unchanged, mashers rose — see falknerLadder.test.ts). Rival/bond/
+  wild ladders bit-identical.
+- **Unit tests:** `src/engine/trainerAI.test.ts` (decision tree per stance
+  tendency, two-step rates, mid-focus release, anti-self-daze, forced rest, a
+  trainer focus→release through the engine, the both-focus flip vs a trainer,
+  profile-vs-wildAI routing).
+
 ## BUILD NOTES
 - The AI currently single-steps only (never commits) — that's the "Single-only / Low-bond / Open / Fixed" baseline already in code. Layer 4 = adding the OTHER dimension values + the shared IF-THEN tree + per-trainer parameter sets.
 - Start small: give a FEW trainers Occasional two-steps + the first Reactive behavior; verify it feels like a different fight; expand.

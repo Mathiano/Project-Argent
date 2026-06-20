@@ -35,5 +35,12 @@ export {
 export type { DexEntryJson, MoveJson } from './dexLoader';
 export { falknerBossAI } from './bossAI';
 export type { BossPolicy } from './bossAI';
+export { trainerPolicy, TRAINER_PROFILES, TRAINER_PROFILE_BY_FLAG, foeProfileForFlag } from './trainerAI';
+export type {
+  TrainerPolicy,
+  TrainerProfile,
+  StanceTendency,
+  TwoStepTendency,
+} from './trainerAI';
 export { resolveRound } from './resolveRound';
 export type { RoundResult } from './resolveRound';
