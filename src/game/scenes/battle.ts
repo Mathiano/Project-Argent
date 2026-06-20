@@ -2,7 +2,6 @@ import {
   COMBAT,
   TIERS,
   activeMon,
-  defaultReleaseForStance,
   forcedAction,
   hasBenchSurvivor,
   isTeamWiped,
@@ -14,6 +13,7 @@ import type {
   Action,
   BattleEvent,
   BattleState,
+  InfoLevel,
   RNG,
   ReleaseKind,
   Side,
@@ -288,13 +288,17 @@ const NARROW_HINTS: readonly { readonly text: string; readonly pair: readonly St
 // WHICH phase they're in — and the wind-up verb is a tactical invitation (the
 // foe is mid-charge → interruptible with Aggressive). See KICKOFF-focus-tell-
 // phase-clarity.md.
-export type FocusDiscipline = 'open' | 'vague' | 'opaque';
 // The two phases of a foe Focus: the WIND-UP (R1, committed but not releasing —
 // the foe's vulnerability window) and the RELEASE (R2, resolving this round).
 export type FocusPhase = 'windup' | 'release';
 export interface FocusIntentInfo {
-  readonly discipline: FocusDiscipline;
-  readonly favoredRelease?: ReleaseKind;
+  // The focus-axis info level (open/veiled/opaque) — usually the profile's
+  // unified infoLevel, possibly per-axis overridden (Bluffer).
+  readonly discipline: InfoLevel;
+  // The SET of releases this trainer's Focus can produce (1 for fixed-Heavy, 2
+  // for a variable feint-mix). The 'open' tell narrows to the lens that
+  // truthfully contains EVERY possible release → a genuine, consistent 50/50.
+  readonly releases?: readonly ReleaseKind[];
   readonly salt?: string;
 }
 const FOCUS_LENSES: readonly { readonly lens: string; readonly pair: readonly ReleaseKind[] }[] = [
@@ -302,6 +306,13 @@ const FOCUS_LENSES: readonly { readonly lens: string; readonly pair: readonly Re
   { lens: 'outwit', pair: ['hide', 'feint'] }, // both DECEIVE
   { lens: 'move fast', pair: ['heavy', 'hide'] }, // both SPEED-of-commit
 ];
+
+// One unified info level drives BOTH tells (kickoff call #2). The STANCE tell
+// uses IntentReliability; map the level onto it (open→honest, veiled→ambiguous,
+// opaque→opaque). The FOCUS tell uses the level directly (open/veiled/opaque).
+export function infoLevelToReliability(level: InfoLevel): IntentReliability {
+  return level === 'open' ? 'honest' : level === 'veiled' ? 'ambiguous' : 'opaque';
+}
 
 // A tiny stable hash → an index, so an 'open' trainer's narrowing is CONSISTENT
 // across the fight (learnable) yet can differ between trainers for the same
@@ -312,34 +323,28 @@ function saltIndex(salt: string, mod: number): number {
   return mod <= 0 ? 0 : h % mod;
 }
 
-// The Foe Intent line for a FOCUS, graduated by the trainer's discipline AND
-// phase. R2 (release) phrases are the existing ones (unchanged); R1 (wind-up)
-// uses the new "charging / gathering" verbs over the SAME lens/discipline.
+// The Foe Intent line for a FOCUS, graduated by the trainer's info level AND
+// phase. R2 (release) phrases are the existing ones; R1 (wind-up) uses the
+// "charging / gathering" verbs over the SAME lens. `releases` is the possible
+// set (truthful for ALL of them → a real 50/50 for a variable release).
 export function focusIntentTell(
-  release: ReleaseKind,
+  releases: readonly ReleaseKind[],
   name: string,
   info: FocusIntentInfo,
   phase: FocusPhase = 'release',
 ): string {
   const windup = phase === 'windup';
   if (info.discipline === 'opaque') return windup ? `${name} is gathering...` : `${name} is FOCUSING`;
-  if (info.discipline === 'vague') return windup ? `${name} is gathering intently` : `${name} is focusing intently`;
-  // 'open' — a truthful narrowing that INCLUDES this release. Pick the lens
-  // consistently per trainer (salt) among the two valid lenses → learnable, not
-  // a tell. The lens is identical across phases (same release + salt); only the
-  // verb differs, so "JAY is charging to attack" → "JAY focuses to attack".
-  const valid = FOCUS_LENSES.filter((h) => h.pair.includes(release));
-  const lens = (valid[saltIndex(info.salt ?? name, valid.length)] ?? valid[0]!).lens;
+  if (info.discipline === 'veiled') return windup ? `${name} is gathering intently` : `${name} is focusing intently`;
+  // 'open' — the lens whose pair contains EVERY possible release (so it's
+  // truthful whichever fires). A 2-release set → exactly one lens (a real
+  // 50/50). A 1-release set → two valid lenses → salt-pick (consistent per
+  // trainer, never a perfect tell). The lens is identical across phases; only
+  // the verb changes ("JAY is charging to attack" → "JAY focuses to attack").
+  const set = releases.length > 0 ? releases : (['heavy'] as const);
+  const valid = FOCUS_LENSES.filter((h) => set.every((r) => h.pair.includes(r)));
+  const lens = (valid[saltIndex(info.salt ?? name, valid.length)] ?? valid[0] ?? FOCUS_LENSES[0]!).lens;
   return windup ? `${name} is charging to ${lens}` : `${name} focuses to ${lens}`;
-}
-
-// The release a FOCUS will become, known at focus time: the trainer's favored
-// release, else the default for the focus's base stance (A→HEAVY/F→HIDE/G→FEINT).
-function focusReleaseOf(action: Action, info: FocusIntentInfo): ReleaseKind {
-  if (action.kind === 'release') return action.release; // mid-focus (R2)
-  if (info.favoredRelease) return info.favoredRelease;
-  if (action.kind === 'move' && action.commit === true) return defaultReleaseForStance(action.stance);
-  return 'heavy';
 }
 
 // Honest, full-clarity plain-language line for any foe action.
@@ -385,7 +390,8 @@ export function degradeIntent(
     const isRelease = action.kind === 'release';
     if (isFocusCommit || isRelease) {
       const phase: FocusPhase = isRelease ? 'release' : 'windup';
-      return { line: focusIntentTell(focusReleaseOf(action, foeFocusInfo), name, foeFocusInfo, phase) };
+      const releases = foeFocusInfo.releases ?? ['heavy'];
+      return { line: focusIntentTell(releases, name, foeFocusInfo, phase) };
     }
   }
   const honest = foeActionLine(action, name);

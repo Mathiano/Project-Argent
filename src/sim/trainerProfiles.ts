@@ -12,9 +12,6 @@
 import {
   SPECIES,
   activeMon,
-  affordableMoves,
-  forcedAction,
-  lookupMove,
   createBattleState,
   createSide,
   isTeamWiped,
@@ -23,57 +20,15 @@ import {
   trainerPolicy,
   TRAINER_PROFILES,
 } from '../engine';
-import type { Action, BattleState, RNG, Side, Stance } from '../engine';
+import type { Action, BattleState, RNG, Side, TrainerProfile } from '../engine';
 import { POLICIES } from './focusBalance';
 import type { ActionPolicy } from './focusBalance';
+import { reader } from './archetypes';
 
-// A COMPETENT reading player — the "balanced play" the fair-fight target means.
-// It reads the foe's modal recent stance and counters it on the live triangle
-// (A>F>G>A: counter A→G, G→F, F→A), avoids its OWN thrice-repeat daze, escapes
-// a feared focus with a ★-Call, and picks a sustainable mid/light move. This is
-// the yardstick: a profile a competent reader can't beat ~half the time would
-// be unfair; one a reader stomps would be trivial.
-function counter(stance: Stance): Stance {
-  return stance === 'A' ? 'G' : stance === 'G' ? 'F' : 'A';
-}
-function modalStance(state: BattleState, side: Side): Stance | null {
-  const recent = state.history.map((h) => h[side]).filter((s): s is Stance => s !== null).slice(-3);
-  if (recent.length === 0) return null;
-  const cnt: Record<Stance, number> = { A: 0, G: 0, F: 0 };
-  for (const s of recent) cnt[s] += 1;
-  let modal: Stance = 'A';
-  for (const s of ['A', 'G', 'F'] as Stance[]) if (cnt[s] > cnt[modal]) modal = s;
-  return modal;
-}
-function sustainableMove(side: ReturnType<typeof activeMon>): string {
-  const aff = affordableMoves(side);
-  return (
-    aff.find((n) => lookupMove(n).tier === 'mid') ??
-    aff.find((n) => lookupMove(n).tier === 'light') ??
-    aff[0] ?? side.species.moves[0]!
-  );
-}
-export const readingPlayer: ActionPolicy = (state, side, _rng) => {
-  const me = activeMon(state[side]);
-  const forced = forcedAction(me);
-  if (forced) return forced;
-  if (me.focus !== undefined) return { kind: 'release', release: 'heavy' };
-  const foe = activeMon(state[side === 'player' ? 'foe' : 'player']);
-  // Escape a feared focus: the foe is winding up → ★-Call to dodge the release.
-  if (foe.focus !== undefined && me.momentum >= 1) return { kind: 'call', call: 'getAway' };
-  const aff = affordableMoves(me);
-  if (aff.length === 0) return { kind: 'rest' };
-  // Read the foe's pattern and counter; no pattern yet → Guard (safe default).
-  const modal = modalStance(state, side === 'player' ? 'foe' : 'player');
-  let stance: Stance = modal ? counter(modal) : 'G';
-  if (stance === 'F' && me.st < 40) stance = 'G'; // can't afford Fluid → brace
-  // Avoid our OWN thrice-repeat self-daze.
-  const mine = state.history.map((h) => h[side]).filter((s): s is Stance => s !== null).slice(-2);
-  if (mine.length === 2 && mine[0] === stance && mine[1] === stance) {
-    stance = stance === 'A' ? 'G' : stance === 'G' ? 'F' : 'A';
-  }
-  return { kind: 'move', move: sustainableMove(me), stance };
-};
+// The fair-fight yardstick is the shared `reader` bot (docs/sim-archetypes.md) —
+// a competent Layer-2-aware player. A profile a reader can't beat ~half the time
+// is unfair; one a reader stomps is trivial. Adapter to the ActionPolicy shape.
+export const readingPlayer: ActionPolicy = (state, side, rng) => reader.chooseAction(state, side, rng);
 
 export type UsageKey = 'A' | 'G' | 'F' | 'focus' | 'heavy' | 'feint' | 'hide' | 'other';
 
@@ -95,13 +50,13 @@ function classify(state: BattleState, side: Side, action: Action): UsageKey {
 
 function battle(
   playerPol: ActionPolicy,
-  foeProfileId: string,
+  foeProfile: TrainerProfile,
   speciesName: string,
   rng: RNG,
   usage: Record<UsageKey, number>,
   maxRounds = 80,
 ): number {
-  const foePol = trainerPolicy(TRAINER_PROFILES[foeProfileId]!);
+  const foePol = trainerPolicy(foeProfile);
   let state = createBattleState(
     createSide(SPECIES[speciesName]!),
     createSide(SPECIES[speciesName]!),
@@ -131,9 +86,10 @@ export function runTrainerProfiles(
   speciesName = 'SPROUTLE',
   nPerProfile = 800,
   seed = 7,
+  profiles: { readonly [id: string]: TrainerProfile } = TRAINER_PROFILES,
 ): TrainerProfileResult[] {
   const playerPol: ActionPolicy = playerPolicyName === 'reading' ? readingPlayer : POLICIES[playerPolicyName]!;
-  const ids = Object.keys(TRAINER_PROFILES);
+  const ids = Object.keys(profiles);
   const out: TrainerProfileResult[] = [];
   let s = seed;
   for (const id of ids) {
@@ -142,7 +98,7 @@ export function runTrainerProfiles(
       A: 0, G: 0, F: 0, focus: 0, heavy: 0, feint: 0, hide: 0, other: 0,
     };
     for (let i = 0; i < nPerProfile; i += 1) {
-      foeWins += battle(playerPol, id, speciesName, mulberry32(s), usage);
+      foeWins += battle(playerPol, profiles[id]!, speciesName, mulberry32(s), usage);
       s += 1;
     }
     const totalUse = (Object.values(usage) as number[]).reduce((a, b) => a + b, 0) || 1;

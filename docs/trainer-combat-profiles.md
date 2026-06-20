@@ -129,9 +129,14 @@ fair-vs-hard intact); no-read mashers rose modestly (brute ~64→72 fair) but ar
 still punished on the hard skill path — capped at 0.7 (always-charge spiked
 brute to ~85). `FALKNER_GUST_FOCUS_RATE` in `bossAI.ts`.
 
-### Focus Foe-Intent tell (Item 2 — info-discipline)
-A profiled trainer's Focus narrows which release is coming, per its `info`
-discipline (`'open'`/`'vague'`/`'opaque'` on `TrainerProfile`) AND its PHASE
+### Focus Foe-Intent tell (Item 2 — info level)
+> Vocab note (archetype-engine build, 2026-06-20): the profile field is now the
+> unified `infoLevel: open | veiled | opaque` (one knob drives BOTH tells;
+> 'vague' → 'veiled'). The release prediction now uses the profile's release
+> SET (`possibleReleases`) so a VARIABLE release's tell stays truthful.
+
+A profiled trainer's Focus narrows which release is coming, per its `infoLevel`
+(`'open'`/`'veiled'`/`'opaque'` on `TrainerProfile`) AND its PHASE
 (wind-up R1 vs release R2 — KICKOFF-focus-tell-phase-clarity.md). The LENS
 (attack/outwit/move fast) is the learned vocabulary and is consistent across
 both phases; only the VERB changes, so the player can tell which phase they're
@@ -141,7 +146,7 @@ punishable with Aggressive):
   (HEAVY/FEINT) / "…to outwit" (HIDE/FEINT) / "…to move fast" (HEAVY/HIDE).
   Release: "focuses to attack/outwit/move fast". A learnable 50/50, consistent
   per trainer (salted by name), never collapsing. Stage-1 trainers = open.
-- **vague** → "is gathering intently" (R1) → "is focusing intently" (R2)
+- **veiled** → "is gathering intently" (R1) → "is focusing intently" (R2)
   (FALKNER). **opaque** → "is gathering..." (R1) → "is FOCUSING" (R2)
   (elites/Concord, later). No-info fallback: "is gathering" (R1) → "is
   focusing" (R2).

@@ -14,6 +14,7 @@ import {
   registerMoves,
   trainerPolicy,
   foeProfileForFlag,
+  possibleReleases,
 } from '../engine';
 import type {
   Action,
@@ -36,7 +37,7 @@ import { rivalAI } from '../sim/archetypes';
 import { mountCanvas } from './canvas';
 import { createInputDispatcher } from './input';
 import { SceneStack } from './scene';
-import { createBattleScene } from './scenes/battle';
+import { createBattleScene, infoLevelToReliability } from './scenes/battle';
 import { createEndScene } from './scenes/end';
 import { createBagMenuScene } from './scenes/bagMenu';
 import { createMartMenuScene } from './scenes/martMenu';
@@ -1012,7 +1013,7 @@ function showFalknerFight(): void {
       intentReliability: 'ambiguous',
       // Layer 4 Stage 1 — Falkner's gust-Focus tell is VAGUE (a gym leader
       // hints but doesn't narrow to two): "is focusing intently".
-      foeFocusInfo: { discipline: 'vague' },
+      foeFocusInfo: { discipline: 'veiled', releases: ['heavy'] },
       intro: [
         'FALKNER: Welcome to my',
         'rooftop. Read the wind!',
@@ -1582,16 +1583,18 @@ function pushTrainerFight(
   const state = createBattleState(buildPlayerTeam(), foeTeam, {
     typeChart: TYPECHART_CH1,
   });
-  // Combat Layer 4 (Stage 1): a profiled trainer fights with its distinct
-  // policy; an unprofiled one keeps the generic wildFoeAI (bit-identical).
+  // Combat Layer 4: a profiled trainer fights with its distinct policy; an
+  // unprofiled one keeps the generic wildFoeAI (bit-identical).
   const profile = foeProfileForFlag(winFlag);
   const foePolicy = profile ? trainerPolicy(profile) : null;
-  // Focus tell (info-discipline): a profiled trainer's Focus narrows its
-  // release per its discipline (Stage-1 trainers = 'open'). Unprofiled → none.
+  // Unified info legibility (one infoLevel drives BOTH tells; per-axis override
+  // reserved for the Bluffer). The focus tell narrows to the truthful lens over
+  // the trainer's possible release SET (1 for fixed-Heavy, 2 for variable).
+  const level = profile?.infoLevel ?? 'open';
   const foeFocusInfo = profile
     ? {
-        discipline: profile.info ?? 'open',
-        ...(profile.favoredRelease ? { favoredRelease: profile.favoredRelease } : {}),
+        discipline: profile.infoOverride?.focus ?? level,
+        releases: possibleReleases(profile.release),
         salt: profile.name,
       }
     : undefined;
@@ -1600,6 +1603,7 @@ function pushTrainerFight(
       state,
       rng: run.rng,
       chooseFoeAction: (s, r) => (foePolicy ? foePolicy(s, 'foe', r) : wildFoeAI(s, r)),
+      ...(profile ? { intentReliability: infoLevelToReliability(profile.infoOverride?.stance ?? level) } : {}),
       ...(foeFocusInfo ? { foeFocusInfo } : {}),
       intro: ['Gym trainer sent out', `${leadName}!`],
       catchBreathUnlocked: callsUnlocked(),
@@ -1669,7 +1673,7 @@ function pushFalknerBattle(): void {
       // Phase 6.7-A — gym leader reads AMBIGUOUS (the ?skip=falkner path).
       intentReliability: 'ambiguous',
       // Layer 4 Stage 1 — Falkner's gust-Focus tell is VAGUE.
-      foeFocusInfo: { discipline: 'vague' },
+      foeFocusInfo: { discipline: 'veiled', releases: ['heavy'] },
       intro: [
         'FALKNER: Welcome to my',
         'rooftop. Read the wind!',

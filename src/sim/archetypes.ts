@@ -190,6 +190,42 @@ export const rivalAI: BotArchetype = {
   },
 };
 
+// --- READER (the Layer-4 fair-fight yardstick) ----------------------------
+// The canonical "competent player" every trainer profile is gated against
+// ("fair-but-distinct"). UNLIKE the v1 single-step archetypes above, the reader
+// is Layer-2-aware: it reads the foe's modal recent stance and counters it on
+// the live triangle (A>F>G>A), avoids its OWN thrice-repeat daze, ESCAPES a
+// feared focus with a ★-Call (Get Away), and RELEASES if caught mid-focus. It
+// reads PATTERNS from history (not a per-round telegraph), so it judges a
+// FIXED-policy trainer fairly. Graduated from the in-line reader that lived in
+// sim/trainerProfiles.ts (KICKOFF-trainer-archetype-engine.md). See
+// docs/sim-archetypes.md. A measurement instrument — don't "improve" it.
+export const reader: BotArchetype = {
+  name: 'reader',
+  chooseAction(state, side) {
+    const me = activeMon(state[side]);
+    const forced = forcedAction(me);
+    if (forced) return forced;
+    // Caught mid-focus → release (locked in). The yardstick doesn't itself
+    // open Focuses; it only resolves one if forced into it.
+    if (me.focus !== undefined) return { kind: 'release', release: 'heavy' };
+    const foe = activeMon(state[side === 'player' ? 'foe' : 'player']);
+    // Escape a feared focus: the foe is winding up → ★-Call to dodge the release.
+    if (foe.focus !== undefined && me.momentum >= 1) return { kind: 'call', call: 'getAway' };
+    const aff = affordableMoves(me);
+    if (aff.length === 0) return { kind: 'rest' };
+    // Read the foe's pattern and counter; no pattern yet → Guard (safe default).
+    let stance: Stance = modalCounter(enemyStancesFromHistory(state, side).slice(-3)) ?? 'G';
+    if (stance === 'F' && me.st < 40) stance = 'G'; // can't afford Fluid → brace
+    // Avoid our OWN thrice-repeat self-daze.
+    const mine = state.history.map((h) => h[side]).filter((s): s is Stance => s !== null).slice(-2);
+    if (mine.length === 2 && mine[0] === stance && mine[1] === stance) {
+      stance = stance === 'A' ? 'G' : stance === 'G' ? 'F' : 'A';
+    }
+    return { kind: 'move', move: pickMidOrLight(me), stance };
+  },
+};
+
 export const PLAYER_ARCHETYPES: readonly BotArchetype[] = [
   staticGuard,
   brute,

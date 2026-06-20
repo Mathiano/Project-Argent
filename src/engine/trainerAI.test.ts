@@ -6,8 +6,10 @@ import {
   createSide,
   foeProfileForFlag,
   mulberry32,
+  possibleReleases,
   resolveRound,
   setActiveMember,
+  signatureRelease,
   trainerPolicy,
   TRAINER_PROFILES,
 } from './index';
@@ -63,7 +65,7 @@ describe('trainer decision tree — two-step tendency', () => {
     expect(d.focus).toBe(0);
   });
   test('Occasional focuses sometimes — sensibly (~25%, not spam)', () => {
-    const d = stanceDist({ name: 'O', stance: 'aggressor', twoStep: 'occasional', favoredRelease: 'heavy' });
+    const d = stanceDist({ name: 'O', stance: 'aggressor', twoStep: 'occasional', release: 'fixed-Heavy' });
     const rate = d.focus / 4000;
     expect(rate).toBeGreaterThan(0.15);
     expect(rate).toBeLessThan(0.35);
@@ -74,7 +76,7 @@ describe('trainer decision tree — two-step tendency', () => {
     expect(freq).toBeGreaterThan(occ);
   });
   test('a Charger Focuses with the Aggressive base tied to its HEAVY release', () => {
-    const pol = trainerPolicy({ name: 'C', stance: 'aggressor', twoStep: 'frequent', favoredRelease: 'heavy' });
+    const pol = trainerPolicy({ name: 'C', stance: 'aggressor', twoStep: 'frequent', release: 'fixed-Heavy' });
     // Find a focus action across seeds; its base stance must be 'A' (→ HEAVY).
     let sawFocus = false;
     for (let i = 0; i < 200 && !sawFocus; i += 1) {
@@ -89,8 +91,8 @@ describe('trainer decision tree — two-step tendency', () => {
 });
 
 describe('trainer decision tree — release + forced + anti-daze', () => {
-  test('a mid-focus trainer RELEASES its favored release', () => {
-    const charger = trainerPolicy({ name: 'C', stance: 'aggressor', twoStep: 'occasional', favoredRelease: 'heavy' });
+  test('a mid-focus trainer RELEASES its signature release', () => {
+    const charger = trainerPolicy({ name: 'C', stance: 'aggressor', twoStep: 'occasional', release: 'fixed-Heavy' });
     let state = freshState();
     // Put the foe mid-focus (winding up an Aggressive base).
     const winding = { ...activeMon(state.foe), focus: { stance: 'A' as Stance, move: 'TACKLE' } };
@@ -137,9 +139,61 @@ describe('profile-vs-wildAI routing (profiled → new AI; wild/unprofiled → st
   });
 });
 
+describe('release variability (kickoff knob) — fixed-Heavy vs variable feint-mix', () => {
+  function midFocus(profile: TrainerProfile, seed: number): Action {
+    let s = freshState();
+    s = { ...s, foe: setActiveMember(s.foe, { ...activeMon(s.foe), focus: { stance: 'A' as Stance, move: 'TACKLE' } }) };
+    return trainerPolicy(profile)(s, 'foe', mulberry32(seed));
+  }
+  test('fixed-Heavy ALWAYS releases HEAVY', () => {
+    const p: TrainerProfile = { name: 'F', stance: 'aggressor', twoStep: 'occasional', release: 'fixed-Heavy' };
+    for (let i = 0; i < 60; i += 1) {
+      const a = midFocus(p, i);
+      expect(a.kind === 'release' && a.release).toBe('heavy');
+    }
+  });
+  test('variable MIXES FEINT (beats Aggressive → bounds the masher) into the signature', () => {
+    const p: TrainerProfile = { name: 'V', stance: 'aggressor', twoStep: 'signature', release: { feintRate: 0.5, signature: 'heavy' } };
+    const seen = new Set<string>();
+    for (let i = 0; i < 120; i += 1) {
+      const a = midFocus(p, i);
+      if (a.kind === 'release') seen.add(a.release);
+    }
+    expect(seen.has('heavy')).toBe(true);
+    expect(seen.has('feint')).toBe(true);
+  });
+  test('possibleReleases + signatureRelease', () => {
+    expect(possibleReleases('fixed-Heavy')).toEqual(['heavy']);
+    expect([...possibleReleases({ feintRate: 0.3 })].sort()).toEqual(['feint', 'heavy']);
+    expect(possibleReleases({ feintRate: 0 })).toEqual(['heavy']); // feintRate 0 → fixed
+    expect(signatureRelease('fixed-Heavy')).toBe('heavy');
+    expect(signatureRelease({ feintRate: 0.3, signature: 'hide' })).toBe('hide');
+  });
+});
+
+describe('stamina-aware focusing (kickoff) — bank to fuel the signature', () => {
+  // st 20 = winded (heavy locked) but a light is still affordable, so the side
+  // is NOT force-rested — the stamina-aware branch can act.
+  function windedFoe(momentum: number): BattleState {
+    const s = freshState();
+    return { ...s, foe: setActiveMember(s.foe, { ...activeMon(s.foe), st: 20, momentum }) };
+  }
+  const charger: TrainerProfile = { name: 'C', stance: 'aggressor', twoStep: 'occasional', release: 'fixed-Heavy' };
+  test('a winded two-stepper WITH ★ banks stamina (Catch Breath)', () => {
+    expect(trainerPolicy(charger)(windedFoe(1), 'foe', mulberry32(1)).kind).toBe('catchBreath');
+  });
+  test('WITHOUT ★ it cannot Catch Breath → does not bank', () => {
+    expect(trainerPolicy(charger)(windedFoe(0), 'foe', mulberry32(1)).kind).not.toBe('catchBreath');
+  });
+  test('a single-only trainer never banks (not a focuser)', () => {
+    const turtle: TrainerProfile = { name: 'S', stance: 'bulwark', twoStep: 'single-only' };
+    expect(trainerPolicy(turtle)(windedFoe(2), 'foe', mulberry32(1)).kind).not.toBe('catchBreath');
+  });
+});
+
 describe('the engine resolves a TRAINER focus/release the same as the player', () => {
   test('a trainer Focuses (R1 deals 0) then releases (R2 emits a release event)', () => {
-    const charger = trainerPolicy({ name: 'C', stance: 'aggressor', twoStep: 'frequent', favoredRelease: 'heavy' });
+    const charger = trainerPolicy({ name: 'C', stance: 'aggressor', twoStep: 'frequent', release: 'fixed-Heavy' });
     let state = freshState();
     // R1: drive the foe until it chooses a focus (commit), player single-steps.
     let foeAct: Action = { kind: 'rest' };

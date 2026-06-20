@@ -1,23 +1,20 @@
-// Trainer combat-profile AI (Combat Layer 4 — STAGE 1). docs/trainer-combat-
-// profiles.md. A PURE POLICY layer (deterministic given the RNG; no engine-
-// math change): a PROFILED trainer picks its foe action from a stance-tendency
-// + two-step-tendency profile via the shared decision tree below. The same
-// `focus`/`release` machinery the player uses resolves the foe's choice — so a
-// trainer can now FOCUS (the player faces a hidden release + the flipped
-// triangle for the first time).
+// Trainer combat-profile AI (Combat Layer 4 — the ARCHETYPE ENGINE).
+// docs/trainer-archetype-catalog.md + docs/trainer-combat-profiles.md. A PURE
+// POLICY layer (deterministic given the RNG; no engine-math change): a PROFILED
+// trainer picks its foe action from the 8-knob profile via the shared decision
+// tree below. The same `focus`/`release` machinery the player uses resolves the
+// foe's choice. Wild encounters (and any UNPROFILED trainer) keep `wildFoeAI`,
+// so wild battles stay bit-identical.
 //
-// Wild encounters (and any UNPROFILED trainer) keep `wildFoeAI` — this module
-// is wired ONLY for profiled trainers, so wild battles stay bit-identical.
-//
-// STAGE 1 = exactly TWO dimensions: stance tendency + two-step tendency. The
-// other profile dimensions from the design doc are deferred; their hook points
-// are marked inline so later stages slot in without restructuring:
-//   - Bond-gated Calls + Call behavior  → STAGE 2 (THREAT CHECK, step 1)
-//   - Reading the player back (Reactive) → STAGE 2/3 (READ THE PLAYER, step 3)
-//   - Information discipline (veiled/bluff) → STAGE 3 (presentation layer)
-//   - Terrain affinity → Layer 3 (biases the stance mix)
+// The TREE expresses all 8 knobs as DATA so trainers are pure data; a bespoke
+// MECHANIC the knobs can't express sits on top as a thin overlay (Falkner =
+// Duelist-ish profile + rhythm-gust overlay in bossAI.ts). LIVE knobs: stance,
+// two-step, release(variability), info, + stamina-aware focusing. The others
+// (bond→Calls, call-use, terrain, adaptivity) are declared as forward-compatible
+// DATA with hooks in the tree — their behavior lands in later stages (per the
+// catalog's mid/elite tiers).
 
-import { affordableMoves, forcedAction, lookupMove } from './state';
+import { affordableMoves, forcedAction, isWinded, lookupMove } from './state';
 import type { RNG } from './rng';
 import type { Action, BattleState, ReleaseKind, Side, SideState, Stance } from './types';
 import { activeMon, defaultReleaseForStance } from './types';
@@ -27,37 +24,56 @@ import { activeMon, defaultReleaseForStance } from './types';
 // to avoid a bossAI ↔ trainerAI import edge.)
 export type TrainerPolicy = (state: BattleState, side: Side, rng: RNG) => Action;
 
-// ── The Stage-1 dimensions ─────────────────────────────────────────────────
+// ── The 8 profile knobs (as data) ──────────────────────────────────────────
 export type StanceTendency = 'aggressor' | 'bulwark' | 'evader' | 'balanced';
 export type TwoStepTendency = 'single-only' | 'occasional' | 'frequent' | 'signature';
-// Information discipline (Layer 3.5, simplest form) — how much a trainer LEAKS
-// about a Focus's hidden release. 'open' → a truthful 2-of-3 narrowing (a
-// learnable 50/50); 'vague' → a non-specific tell; 'opaque' → nothing (just
-// "FOCUSING"). Difficulty scales by tightening this. The TELL PHRASES live in
-// the game layer (battle scene) with the other intent tells; this is the data.
-export type InfoDiscipline = 'open' | 'vague' | 'opaque';
+
+// Release variability (kickoff call #1). 'fixed-Heavy' = always HEAVY (the
+// teaching floor + Falkner — D8's tell is learnable-to-certainty, deliberate).
+// variable = the signature (default HEAVY) MOSTLY, FEINT mixed in at feintRate
+// — FEINT beats Aggressive, so it punishes a blind masher and makes the 50/50
+// real. Gym-2+ standard two-steppers. (signature lets a future Trickster/
+// Ambusher set feint/hide; the catalog ships those later.)
+export type ReleaseModel =
+  | 'fixed-Heavy'
+  | { readonly feintRate: number; readonly signature?: ReleaseKind };
+
+// Unified information legibility (kickoff call #2). ONE level drives BOTH the
+// stance-tell and the focus-tell (mapped at the game wiring layer). 'open' →
+// truthful narrowing; 'veiled' → non-specific; 'opaque' → nothing. Per-axis
+// override (InfoOverride) is reserved for the BLUFFER elite.
+export type InfoLevel = 'open' | 'veiled' | 'opaque';
+export interface InfoOverride {
+  readonly stance?: InfoLevel;
+  readonly focus?: InfoLevel;
+}
+
+// Later-stage knob value types — declared as DATA now (forward-compatible);
+// their tree behavior lands in Stage 2/3 / Layer 3.
+export type BondLevel = 'none' | 'mid' | 'high'; // → the Call toolkit (Stage 2)
+export type CallUse = 'never' | 'clutch' | 'liberal' | 'defensive'; // (Stage 2)
 
 export interface TrainerProfile {
   readonly name: string;
-  // Base-triangle preference when single-stepping.
+  // 1. STANCE — base-triangle preference when single-stepping. [LIVE]
   readonly stance: StanceTendency;
-  // Whether & how often the trainer FOCUSES (two-steps).
+  // 2. TWO-STEP — whether/how often it FOCUSES. [LIVE]
   readonly twoStep: TwoStepTendency;
-  // The release this trainer FOCUSES into (a Charger → 'heavy', a Trickster →
-  // 'feint', an Ambusher → 'hide'). Omitted → a focus releases the default for
-  // its drawn base stance. A 'signature' two-step should always set this.
-  readonly favoredRelease?: ReleaseKind;
-  // Information discipline for the FOCUS tell (Stage-1 info-warfare seam).
-  // Omitted → treated as 'open' (early trainers leak). Only the Focus tell uses
-  // this in Stage 1; single-stance intent is unchanged.
-  readonly info?: InfoDiscipline;
-  // --- Later-stage hooks (NOT read in Stage 1; documented so the data shape
-  // is forward-compatible) ---
-  // bond?: 'none' | 'mid' | 'high';        // STAGE 2 — gates the Call toolkit
-  // callBehavior?: 'clutch' | 'liberal' | 'defensive';  // STAGE 2
-  // bluffs?: boolean;                       // STAGE 3 — info 'bluffer' (lying tells)
-  // terrain?: string;                       // Layer 3 — home-turf bias
-  // adaptive?: boolean;                     // STAGE 2/3 — read the player back
+  // 3. RELEASE — the R2 release model for two-steppers. [LIVE] Omitted → the
+  //    default-for-stance (legacy). Two-steppers should set it.
+  readonly release?: ReleaseModel;
+  // 6. INFO — one level driving both tells (set at the wiring layer). [LIVE]
+  //    Omitted → 'open'. infoOverride is the per-axis Bluffer hook. [hook]
+  readonly infoLevel?: InfoLevel;
+  readonly infoOverride?: InfoOverride;
+  // 4. BOND → Calls — gates the Call toolkit. [DATA; behavior Stage 2]
+  readonly bond?: BondLevel;
+  // 5. CALL-USE — how it spends Calls. [DATA; behavior Stage 2]
+  readonly callUse?: CallUse;
+  // 7. TERRAIN — home-turf stance bias. [DATA; behavior Layer 3]
+  readonly terrain?: string;
+  // 8. ADAPTIVITY — reads the player back. [DATA; behavior Stage 2/3]
+  readonly adaptive?: boolean;
 }
 
 // Base-stance weights [A, G, F] per stance tendency.
@@ -84,6 +100,30 @@ const STANCE_FOR_RELEASE: { readonly [k in ReleaseKind]: Stance } = {
   hide: 'F',
   feint: 'G',
 };
+
+// The SIGNATURE release of a model (what its wind-up base stance is keyed to).
+export function signatureRelease(model: ReleaseModel | undefined): ReleaseKind {
+  if (model === undefined || model === 'fixed-Heavy') return 'heavy';
+  return model.signature ?? 'heavy';
+}
+
+// The R2 release pick — honors release variability (kickoff knob #1). fixed →
+// always the signature; variable → FEINT at feintRate (beats Aggressive →
+// bounds the masher), else the signature. Omitted → default-for-stance (legacy).
+function pickRelease(model: ReleaseModel | undefined, focusStance: Stance, rng: RNG): ReleaseKind {
+  if (model === undefined) return defaultReleaseForStance(focusStance);
+  if (model === 'fixed-Heavy') return 'heavy';
+  return rng.next() < model.feintRate ? 'feint' : (model.signature ?? 'heavy');
+}
+
+// The SET of releases a model can produce — for the focus TELL's lens, which
+// must stay truthful across BOTH phases (a {signature,feint} variable set maps
+// to the lens that contains both → a genuine, consistent 50/50). Distinct only.
+export function possibleReleases(model: ReleaseModel | undefined): readonly ReleaseKind[] {
+  if (model === undefined || model === 'fixed-Heavy') return ['heavy'];
+  const sig = model.signature ?? 'heavy';
+  return model.feintRate > 0 && sig !== 'feint' ? [sig, 'feint'] : [sig];
+}
 
 function drawStance(mix: readonly [number, number, number], rng: RNG): Stance {
   const total = mix[0] + mix[1] + mix[2];
@@ -137,27 +177,38 @@ export function trainerPolicy(profile: TrainerProfile): TrainerPolicy {
     const forced = forcedAction(me);
     if (forced) return forced;
 
-    // 2. RELEASE CHECK — mid-two-step → release this round (locked in). The
-    //    favored release (or the focus's default for its base stance).
+    // 2. RELEASE CHECK — mid-two-step → release this round (locked in), honoring
+    //    the release model (fixed-Heavy or variable feint-mix).
     if (me.focus !== undefined) {
-      const release = profile.favoredRelease ?? defaultReleaseForStance(me.focus.stance);
-      return { kind: 'release', release };
+      return { kind: 'release', release: pickRelease(profile.release, me.focus.stance, rng) };
     }
 
-    // 1. THREAT CHECK (Call) — STAGE 2 hook: bond-gated Calls go here, BEFORE
-    //    escalation (escape a feared player Charge). Stage-1 trainers cannot Call.
-    // 3. READ THE PLAYER — STAGE 2/3 hook: Reactive trainers bias toward the
-    //    counter of the player's recent pattern here. Stage-1 trainers are Fixed.
+    // 1. THREAT CHECK (Call) — STAGE 2 hook: bond-gated Calls (escape a feared
+    //    player Charge) go here, gated on profile.bond + profile.callUse.
+    // 3. READ THE PLAYER — STAGE 2/3 hook: a profile.adaptive trainer biases
+    //    toward the counter of the player's recent pattern here.
+
+    const focusRate = FOCUS_RATE[profile.twoStep];
+    const twoSteps = focusRate > 0;
+
+    // STAMINA-AWARE FOCUSING (kickoff): a two-stepper too winded to fuel its
+    // signature charge (heavy is winded-locked) banks stamina with Catch Breath
+    // so the charge fires reliably next round. Catch Breath needs ≥1 ★ (the
+    // engine doesn't validate foe actions, so self-gate). Distinct from the
+    // banked gust-stamina-TAX (a Layer-3 environment mechanic, not this).
+    if (twoSteps && isWinded(me) && me.momentum >= 1 && !me.exhausted) {
+      return { kind: 'catchBreath' };
+    }
 
     const aff = affordableMoves(me);
     if (aff.length === 0) return { kind: 'rest' };
 
     // 4. ESCALATION CHECK — two-step roll per tendency. A focus commits a base
-    //    stance tied to the release we intend (favored, or a drawn one).
-    const focusRate = FOCUS_RATE[profile.twoStep];
-    if (focusRate > 0 && rng.next() < focusRate) {
-      const baseStance = profile.favoredRelease
-        ? STANCE_FOR_RELEASE[profile.favoredRelease]
+    //    stance tied to the release model's SIGNATURE (or a drawn stance when
+    //    no model is set); the actual R2 release is picked above on release.
+    if (twoSteps && rng.next() < focusRate) {
+      const baseStance = profile.release
+        ? STANCE_FOR_RELEASE[signatureRelease(profile.release)]
         : drawStance(STANCE_MIX[profile.stance], rng);
       return { kind: 'move', move: pickFocusMove(aff), stance: baseStance, commit: true };
     }
@@ -174,16 +225,19 @@ export function trainerPolicy(profile: TrainerProfile): TrainerPolicy {
 // is felt. Keyed by a stable profile id (the game maps each trainer's win-flag
 // to one of these). Falkner is NOT here — he keeps his bespoke boss AI, upgraded
 // in bossAI.ts to FOCUS on his signature gust (Evader / Occasional / signature).
+// The shipped CH1 FLOOR trainers (stamped from the catalog's floor profiles).
+// All: single-only or fixed-Heavy, low-bond, OPEN info, area-locked — they
+// teach the base triangle. No NEW trainers here until the CH1 trainer-data
+// hand-off (per kickoff scope); the mid/elite catalog profiles stamp later.
 export const TRAINER_PROFILES: { readonly [id: string]: TrainerProfile } = {
-  // The teaching baseline: a clean base-triangle read, never focuses.
-  youngster: { name: 'YOUNGSTER MILO', stance: 'balanced', twoStep: 'single-only', info: 'open' },
-  // The Charger: pressures with Aggressive and sometimes FOCUSES into HEAVY —
-  // the player's first lesson in reading a trainer's hidden release. Open info:
-  // his Focus leaks a learnable narrowing ("focuses to attack" → HEAVY/FEINT).
-  jay: { name: 'JAY', stance: 'aggressor', twoStep: 'occasional', favoredRelease: 'heavy', info: 'open' },
-  // The Bulwark: Guard-heavy wall — the player slips it with Fluid. A distinct
-  // third read (no focus), rounding out the stance-tendency spread.
-  lass: { name: 'LASS BRYN', stance: 'bulwark', twoStep: 'single-only', info: 'open' },
+  // GREENHORN floor: a clean base-triangle read, never focuses.
+  youngster: { name: 'YOUNGSTER MILO', stance: 'balanced', twoStep: 'single-only', infoLevel: 'open' },
+  // BRUISER→Charger floor: pressures Aggressive + sometimes FOCUSES into HEAVY
+  // (fixed-Heavy — the Gym-1 teaching tell). The player's first hidden-release
+  // read; open info leaks a learnable narrowing.
+  jay: { name: 'JAY', stance: 'aggressor', twoStep: 'occasional', release: 'fixed-Heavy', infoLevel: 'open' },
+  // TURTLE floor: Guard-heavy wall — slip it with Fluid. No focus.
+  lass: { name: 'LASS BRYN', stance: 'bulwark', twoStep: 'single-only', infoLevel: 'open' },
 };
 
 // Which trainer (by its overworld win-flag) gets which profile. The game maps a
