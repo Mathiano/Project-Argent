@@ -54,13 +54,14 @@ All 16×16. **R** = reusable temperate foundation (shared by every later town), 
 | `academy` | `A` | yes | ancient weathered-stone wall, sky/wind motif carved in (the centerpiece) | **V** |
 | `academy_door` | `C` | no | stone archway (enterable core) | **V** |
 
-### 1e. The gym (Falkner set-piece) — BESPOKE NOW, promotable to a reusable gym-kit
+### 1e. The gym — REUSABLE GYM-KIT (ruled 2026-06-21; rides to every gym)
+Author once; Falkner's gym is just the first instance. Per-gym identity later is a tint/banner pass, not a re-author.
 | Tile id | char | solid | role | split |
 |---|---|---|---|---|
-| `gym_facade_l` | `h` | yes | gym wall, left edge | V (gym-kit) |
-| `gym_facade_m` | `g` | yes | gym wall, mid | V (gym-kit) |
-| `gym_facade_r` | `j` | yes | gym wall, right edge | V (gym-kit) |
-| `gym_door` | `G` | no | gym entrance | V (gym-kit) |
+| `gym_facade_l` | `h` | yes | gym wall, left edge | **R** (gym-kit) |
+| `gym_facade_m` | `g` | yes | gym wall, mid | **R** (gym-kit) |
+| `gym_facade_r` | `j` | yes | gym wall, right edge | **R** (gym-kit) |
+| `gym_door` | `G` | no | gym entrance | **R** (gym-kit) |
 
 ### 1f. Detail / props (as tiles) — mixed
 | Tile id | char | solid | role | split |
@@ -81,7 +82,7 @@ Violet currently **inlines** its buildings via `tileMap` footprints (not via the
 | Building | Footprint (W×H) | Door / anchor | Tiles used | split |
 |---|---|---|---|---|
 | **Academy** | **9×6** (cols 9–17, rows 22–27) | `academy_door` at (13,22), north face | `academy`, `academy_door` | **V** — the largest structure, the centerpiece |
-| **Gym (Falkner)** | 5×2 (cols 7–11, rows 12–13) | `gym_door` at (9,12) | `gym_facade_l/m/r`, `gym_door` | V (gym-kit) — set-piece |
+| **Gym (Falkner)** | 5×2 (cols 7–11, rows 12–13) | `gym_door` at (9,12) | `gym_facade_l/m/r`, `gym_door` | **R (gym-kit)** — rides to every gym |
 | **Center** | 3×2 (cols 3–5, rows 3–4) | `wall_door` at (4,4) | `roof_l/m/r`, `plaster`, `wall_door` | R shell + **V** plaster |
 | **Mart** | 3×2 (cols 16–18, rows 3–4) | `wall_door` at (17,4) | `roof_l/m/r`, `plaster`, `wall_door` | R shell + **V** plaster |
 | **House NW** | 3×2 (cols 2–4, rows 15–16) | `wall_door` at (3,16) | `roof_*`, `plaster`, `wall_door` | R shell + **V** plaster |
@@ -136,18 +137,21 @@ Currently a **graybox inline tileset** (4 colors: `W` stone wall, `.` floor, `P`
 
 ---
 
-## 4. Reusable vs Violet-bespoke — the split at a glance
+## 4. Reusable vs Violet-bespoke — the split + batching priority
 
-**REUSABLE temperate foundation (build once, every town reuses):**
-`grass · path · water · tree · tall_grass · forest_floor · wall_brick · cave_rock · cave_mouth` · the **roof/door building shell kit** · `fence` · `sign_post` · **flowers (to-add)** · the **townsfolk character archetypes** · the **player** · the **Concord rep + kiosk** (faction-reusable).
+Three buckets, ruled 2026-06-21. **Author in this order** (biggest carry-over first):
 
-**VIOLET-BESPOKE (this city's identity — author for the proof):**
+### Batch 1 — REUSABLE temperate foundation (biggest carry-over; every town reuses)
+`grass · path · water · tree · tall_grass · forest_floor · wall_brick · cave_rock · cave_mouth` · the **roof/door building shell kit** · `fence` · `sign_post` · **flowers (to-add)** · the **townsfolk character archetypes** · the **player**.
+
+### Batch 2 — REUSABLE KITS (author once, ride to every instance of their type)
+- **Gym-kit:** `gym_facade_l/m/r` + `gym_door` — rides to every gym (Falkner = first instance; per-gym identity = a later tint/banner pass).
+- **Faction (Concord) props:** the **kiosk** + the **rep** — ride to every Concord seed (not Violet-bound).
+
+### Batch 3 — VIOLET-BESPOKE (last; the smaller, high-identity set that makes the proof read as *Violet*)
 `plaster` (the material skin) · the **Academy set** (`academy`, `academy_door`, `statue`, `bell`, + the ancient-stone interior) · the **wind life** flavor (banners/vanes/chimes) · the signature NPC reads (keeper, gust-dancer kid).
 
-**SET-PIECE (bespoke now, promote to a shared gym-kit later):**
-`gym_facade_l/m/r` + `gym_door`.
-
-> Sequencing implication: doing the reusable foundation well **once** (terrain + shell kit + townsfolk) pays off across all of Chapter 1; the Violet-bespoke set is the smaller, higher-identity batch that makes the *proof* read as Violet specifically.
+> **Why this order:** Batch 1 pays off across all of Chapter 1 and is the bulk of what makes Violet stop reading as graybox; Batch 2 is build-once leverage that every later gym/Concord beat inherits for free; Batch 3 is the identity layer — smallest in count, highest in "this is unmistakably Violet."
 
 ---
 
@@ -168,13 +172,14 @@ All ship as the optional `frames` array in the tile JSON (same format as `water`
 ## 6. Swap checklist (when the art is authored — NOT this pass)
 
 1. **Author the cohesive Violet palette** (≤64, master-aligned); declare it in `outdoor_violet.tileset.json` (and a new `indoor_violet.tileset.json` for the Academy core).
-2. **Re-skin the reusable foundation tiles** first (`grass/path/water/tree/roof_*/wall_door/fence/sign_post`) — same tile ids, new `rows`/`pixels`. → re-run the suite (tileset-format validation is load-time; `firstRoad.test.ts` loads the tileset).
-3. **Author the Violet-bespoke set** (`plaster`, `academy`, `academy_door`, `statue`, `bell`) — same ids.
-4. **Add new detail tiles** (flowers, banners/vanes) → add ids to the tileset AND to `violet.json` `tileMap` only if placed (placement = a reviewed map edit, not a pure swap).
-5. **Add `frames`** to the Layer-3 animated candidates (§5) — pure tile-JSON additions.
-6. **Author overworld character sheets** (player + townsfolk archetypes) as 16×48 frame sheets; wire NPC `sprite` ids (a map edit per NPC — reviewed).
-7. **(Optional structural) migrate buildings to prefabs** — author `house_violet` in **plaster**, the Academy as a prefab; swap `violet.json` inline footprints for `prefabs[]`. Separately reviewed (changes `cells`).
-8. **Migrate the Academy interior** to `indoor_violet` (graybox → data-driven tileset).
-9. **GATES (every step):** `npm run typecheck` clean · full vitest suite green (esp. `firstRoad` / `firstRoadFixes` / `overworld` / `spine` / `intro`) · BFS walkability unchanged (no `cells` solidity drift unless intended) · **bit-identical** to engine/combat/save/gym.json.
+2. **Batch 1 — re-skin the reusable foundation tiles** (`grass/path/water/tree/roof_*/wall_door/fence/sign_post`) — same tile ids, new `rows`/`pixels`. → re-run the suite (tileset-format validation is load-time; `firstRoad.test.ts` loads the tileset).
+3. **Batch 2 — author the reusable kits** (build-once, not Violet-bound): the **gym-kit** (`gym_facade_l/m/r`, `gym_door`) + the **Concord faction props** (kiosk, rep) — same ids.
+4. **Batch 3 — author the Violet-bespoke set** (`plaster`, `academy`, `academy_door`, `statue`, `bell`) — same ids.
+5. **Add new detail tiles** (flowers, banners/vanes) → add ids to the tileset AND to `violet.json` `tileMap` only if placed (placement = a reviewed map edit, not a pure swap).
+6. **Add `frames`** to the Layer-3 animated candidates (§5) — pure tile-JSON additions.
+7. **Author overworld character sheets** (player + townsfolk archetypes) as 16×48 frame sheets; wire NPC `sprite` ids (a map edit per NPC — reviewed).
+8. **(Optional structural) migrate buildings to prefabs** — author `house_violet` in **plaster**, the Academy as a prefab; swap `violet.json` inline footprints for `prefabs[]`. Separately reviewed (changes `cells`).
+9. **Migrate the Academy interior** to `indoor_violet` (graybox → data-driven tileset).
+10. **GATES (every step):** `npm run typecheck` clean · full vitest suite green (esp. `firstRoad` / `firstRoadFixes` / `overworld` / `spine` / `intro`) · BFS walkability unchanged (no `cells` solidity drift unless intended) · **bit-identical** to engine/combat/save/gym.json.
 
 **Invariants the swap must never break:** tile **ids**, the map **footprints/warps/spawns/objects**, the spine anchors (north exit `(9,0)`, gym door `(9,12)`), and tile **solidity** (re-skinning must preserve each tile's `solid` flag, or walkability shifts).
