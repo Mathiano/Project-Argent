@@ -47,6 +47,16 @@ When code and docs conflict: **docs win**. Flag conflicts; never silently change
 - `src/sim/` — bot archetypes + ladder runner. Archetypes (`archetypes.ts`): button-masher, static-guard, brute, naive-triangle, stamina-reader, human-ish (30% error rate) — plus **`reader`**, the canonical fair-fight yardstick every trainer profile is sim-gated against (`docs/sim-archetypes.md`).
 - Boss AIs are data-driven boss cards in the engine (Whitney card = the format; FALKNER = the shipped boss). Trainer AIs (Combat Layer 4) are data-driven **profiles** — `src/engine/trainerAI.ts` (`TRAINER_PROFILES` + the shared decision tree); wild + any unprofiled trainer keep `wildFoeAI` (bit-identical).
 
+## Game-layer systems (`src/game`; pointers, not canon — design lives in the linked docs)
+
+- Foe-Intent tells — info-discipline + phase-aware focus tells (`battle.ts`; `docs/intent-tells-design-note.md`)
+- Catching 2.0 — read-window catches (`docs/catching-2-0.md`)
+- Evolution — bond + badge gated (`docs/evolution-design.md`)
+- Bond growth — challenge-scaled XP; gates the JUMPSTART ★ (`docs/bond-track-v2.md`)
+- PC box + Pokédex — `src/game/scenes/{boxMenu,dexMenu}.ts`
+- Black-out + instant boss retry — `src/game/main.ts`
+- **DESIGNED, NOT BUILT — do not canonize:** RESOLVE (the bond ceiling-breaker / desperate comeback) is design-only (`docs/bond-track-v2.md`, `docs/the-concord.md`); the engine has no Resolve mechanic (only a deferred-unlock note in `bond.ts`). The Calls toolkit today is GET AWAY / HANG IN THERE / Catch Breath only.
+
 ## The sim gate (non-negotiable)
 
 Any change to combat numbers, AI behavior, or a boss kit must re-run the relevant ladder before merging. Ladders are vitest regression tests with seeded RNG and tolerance bands (n ≥ 2000). A boss ships only when its archetype win rates land on its boss card's targets. Never commit failing ladders.
