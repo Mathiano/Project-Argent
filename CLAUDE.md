@@ -31,14 +31,16 @@ When code and docs conflict: **docs win**. Flag conflicts; never silently change
 - Thrice-repeat self-daze: the same move stance 3 rounds running → the repeater takes ×1.30 (dazeTaken) that round (anti-spam; symmetric)
 - Tier weights (move): light 0.85 / mid 1.00 / heavy 1.15 / nuke 1.30
 - Initiative: speed / move weight; stagger halves it
-- ★ Momentum: +1 on read-wins (counter landed, opening landed, **punish landed (A>F)**, clash won), cap 2. Calls spend ★ (Catch Breath = rest action, +35 ST)
+- ★ Momentum: +1 on read-wins (counter landed, opening landed, **punish landed (A>F)**, clash won), cap 2. Calls spend ★ (Catch Breath = rest action, **+50 ST** — `catchBreathRestorePct` 0.5 = 50% of the 100-ST cap; was +35, re-baselined Phase 6b)
+- Global TTK: `hpScale` **1.30** — every mon's maxHp ×this at battle creation (a length lever, not power; both ladders re-baselined)
+- Type chart: canonical = `docs/typechart.json` (CH1 content — UPPERCASE types, ×1.3 super / ×0.7 resist, 17 types, **complete: all 17×17 pairs defined**). The permanent fixture trio uses the separate `LEGACY_TYPE_CHART` in `data.ts` (Mixed-case `Flame`/`Sprout`/`Splash`, ×1.5 / ×0.67). **Never mix the two vocabularies** — a CH1 mon/move must use UPPERCASE or its type interaction silently no-ops.
 
 ## Architecture rules
 
 - `src/engine/` — pure TS. Zero DOM/browser imports — its tsconfig excludes DOM libs, so the headless rule is compiler-enforced. Deterministic given an injected RNG (seedable; never `Math.random` here). Everything must run headless in Node.
 - `src/game/` — rendering, input, scenes, audio. Consumes the engine only through its public API. Battles render by replaying engine events.
-- `src/sim/` — bot archetypes + ladder runner. Archetypes: static-guard, naive-triangle, stamina-reader, human-ish (30% error rate).
-- Boss AIs are data-driven boss cards in the engine (Whitney card = the format).
+- `src/sim/` — bot archetypes + ladder runner. Archetypes (`archetypes.ts`): button-masher, static-guard, brute, naive-triangle, stamina-reader, human-ish (30% error rate) — plus **`reader`**, the canonical fair-fight yardstick every trainer profile is sim-gated against (`docs/sim-archetypes.md`).
+- Boss AIs are data-driven boss cards in the engine (Whitney card = the format; FALKNER = the shipped boss). Trainer AIs (Combat Layer 4) are data-driven **profiles** — `src/engine/trainerAI.ts` (`TRAINER_PROFILES` + the shared decision tree); wild + any unprofiled trainer keep `wildFoeAI` (bit-identical).
 
 ## The sim gate (non-negotiable)
 
@@ -50,6 +52,7 @@ The original starter trio (EMBERCUB / SPROUTLE / AQUAFIN) and their movesets are
 
 - `npm run dev` — game in browser
 - `npm test` — unit tests + ladder regressions
+- `npm run typecheck` — `tsc --build` (strict; the engine project excludes DOM libs)
 - `npm run sim` — full ladder table to stdout
 
 ## Pillars (reject features that violate these)
