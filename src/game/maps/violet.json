@@ -183,6 +183,105 @@
           "lines": ["DELL: Textbook. I'll note", "that down."]
         }
       ]
+    },
+    {
+      "_note": "CONCORD SEED (Ch1 set-dressing, docs/concord-seed-ch1.md). Flavor ONLY — no battle/quest/plot trigger. Fully ignorable. The kiosk's clean cyan color is placeholder branding (out-of-place vs the warm town); art deferred per Phase 7.",
+      "type": "npc",
+      "x": 13,
+      "y": 7,
+      "color": "#7fd4e0",
+      "blockedUntilFlag": "concord_kiosk_read",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "A polished kiosk hums in the",
+            "square — soft light, clean",
+            "lines, the CONCORD mark above.",
+            "Out of place in the warm town.",
+            "",
+            "\"Training is a beautiful",
+            "tradition — and a slow,",
+            "uncertain one. Years of hoping",
+            "a partner learns to trust you.",
+            "The risk it never does.",
+            "",
+            "The CONCORDANCE offers another",
+            "way: strength on the first day,",
+            "loyalty without the decade of",
+            "doubt. We don't ask you to earn",
+            "a bond you may never live to",
+            "see — we make it obsolete.",
+            "",
+            "The Concordance between human",
+            "and mon, perfected. Ask us how.\""
+          ]
+        },
+        { "kind": "set-flag", "flag": "concord_kiosk_read" }
+      ],
+      "interactAfterFlag": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "The CONCORD kiosk hums softly.",
+            "\"Strength on the first day.",
+            "The Concordance, perfected.",
+            "Ask us how.\""
+          ]
+        }
+      ]
+    },
+    {
+      "_note": "CONCORD SEED — billboard (static slogan).",
+      "type": "sign",
+      "x": 14,
+      "y": 7,
+      "lines": [
+        "CONCORD billboard:",
+        "\"A partner takes ten years to",
+        "trust you. The Concordance",
+        "takes ten minutes.\""
+      ]
+    },
+    {
+      "_note": "CONCORD SEED — rep NPC (calm true believer; warm, not a villain).",
+      "type": "npc",
+      "x": 13,
+      "y": 8,
+      "color": "#bfe6ee",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "CONCORD REP: Welcome! No",
+            "pressure at all. I used to",
+            "train the old way too — years",
+            "of waiting, hoping.",
+            "CONCORD REP: We just think",
+            "people deserve to skip the",
+            "heartbreak. Strength, today.",
+            "Have a wonderful afternoon."
+          ]
+        }
+      ]
+    },
+    {
+      "_note": "CONCORD SEED — one Violet townsperson dismissal (old-world pride).",
+      "type": "npc",
+      "x": 7,
+      "y": 7,
+      "color": "#a8743a",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "TOWNSPERSON: Don't know why",
+            "they bother setting that up",
+            "here. We still do it the real",
+            "way in Violet."
+          ]
+        }
+      ]
     }
   ],
   "spawns": {
