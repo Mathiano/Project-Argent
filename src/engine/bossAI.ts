@@ -101,15 +101,22 @@ function worstIncoming(
   return worst;
 }
 
-// Combat Layer 4 (Stage 1) — Falkner's SIGNATURE two-step: his "gust" is now a
-// telegraphed FOCUS→HEAVY. On a gust (rhythm) round he sometimes gathers (deals
-// 0, the wind-up) instead of DIVE BOMBing, then crashes down HEAVY next round —
-// the gym fight's first two-step read (Brace it / slip it / both-Focus into the
-// flip). Evader stance + this Occasional signature = his profile, expressed
-// through his bespoke boss AI rather than the generic trainerPolicy (his
-// rhythm/phase/gust identity stays intact). Bounded so he stays Occasional, not
-// a focus-spammer.
-const FALKNER_GUST_FOCUS_RATE = 0.5;
+// Combat Layer 4 (Stage 1) — Falkner's SIGNATURE two-step: his "gust" is a
+// telegraphed FOCUS→HEAVY (a CHARGED GUST). His 3/6/9 rhythm beat is a forced
+// COMMITMENT — either a charged gust (FOCUS→HEAVY) or a hard AGGRESSIVE
+// single-step (DIVE BOMB). The player reads "every 3rd round he commits hard";
+// the commitment now ADMITS the Focus on his signature beats (KICKOFF-falkner-
+// tune-+-focus-intent.md Item 1 — previously his Focus could only fire on a
+// gust round via a 50/50 that, with stamina drain locking the heavy on later
+// gusts, often left his signature absent for a whole fight).
+//
+// He CHARGES at this rate on a gust round when a heavy is affordable, else
+// DIVE BOMBs. Tuned UP from 0.5 so the charged gust reliably appears (most
+// battles, on the first gust beat while he has stamina) WITHOUT every gust
+// feeding an aggressive masher a free wind-up hit (a pure always-charge spiked
+// no-read brute to ~85% on type-favored paths — "mashing punished" wants it
+// lower). When winded the heavy is locked → he single-steps → natural variety.
+const FALKNER_GUST_FOCUS_RATE = 0.7;
 
 export const falknerBossAI: BossPolicy = (state, side, rng) => {
   const myTeam = state[side];
@@ -140,9 +147,10 @@ export const falknerBossAI: BossPolicy = (state, side, rng) => {
     ? isRhythmRound(arena, state.round, state.rhythmAnchor ?? 0)
     : false;
 
-  // ESCALATION — the signature gust-Focus. On a gust round, sometimes FOCUS
-  // (Aggressive base → HEAVY release next round) instead of the single-step
-  // DIVE BOMB. Needs a heavy move affordable to be worth the wind-up.
+  // GUST BEAT (3/6/9) — the forced COMMITMENT: charge the gust (FOCUS→HEAVY)
+  // when a heavy is affordable, else fall through to the hard AGGRESSIVE
+  // single-step (DIVE BOMB) below. (Pure policy; the engine math is untouched,
+  // so the ladder shift here is an intended re-baseline, not a regression.)
   if (rhythm && rng.next() < FALKNER_GUST_FOCUS_RATE) {
     const aff = affordableMoves(me);
     const heavy = aff.find((n) => lookupMove(n).tier === 'heavy');

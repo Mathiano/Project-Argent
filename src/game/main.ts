@@ -1010,6 +1010,9 @@ function showFalknerFight(): void {
       // Phase 6.7-A — a gym leader reads AMBIGUOUS: his stance intent can't
       // be blind-countered. Engine still commits the true stance.
       intentReliability: 'ambiguous',
+      // Layer 4 Stage 1 — Falkner's gust-Focus tell is VAGUE (a gym leader
+      // hints but doesn't narrow to two): "is focusing intently".
+      foeFocusInfo: { discipline: 'vague' },
       intro: [
         'FALKNER: Welcome to my',
         'rooftop. Read the wind!',
@@ -1583,11 +1586,21 @@ function pushTrainerFight(
   // policy; an unprofiled one keeps the generic wildFoeAI (bit-identical).
   const profile = foeProfileForFlag(winFlag);
   const foePolicy = profile ? trainerPolicy(profile) : null;
+  // Focus tell (info-discipline): a profiled trainer's Focus narrows its
+  // release per its discipline (Stage-1 trainers = 'open'). Unprofiled → none.
+  const foeFocusInfo = profile
+    ? {
+        discipline: profile.info ?? 'open',
+        ...(profile.favoredRelease ? { favoredRelease: profile.favoredRelease } : {}),
+        salt: profile.name,
+      }
+    : undefined;
   scenes.push(
     createBattleScene({
       state,
       rng: run.rng,
       chooseFoeAction: (s, r) => (foePolicy ? foePolicy(s, 'foe', r) : wildFoeAI(s, r)),
+      ...(foeFocusInfo ? { foeFocusInfo } : {}),
       intro: ['Gym trainer sent out', `${leadName}!`],
       catchBreathUnlocked: callsUnlocked(),
       canRun: false,
@@ -1655,6 +1668,8 @@ function pushFalknerBattle(): void {
       chooseFoeAction: (s, r) => falknerBossAI(s, 'foe', r),
       // Phase 6.7-A — gym leader reads AMBIGUOUS (the ?skip=falkner path).
       intentReliability: 'ambiguous',
+      // Layer 4 Stage 1 — Falkner's gust-Focus tell is VAGUE.
+      foeFocusInfo: { discipline: 'vague' },
       intro: [
         'FALKNER: Welcome to my',
         'rooftop. Read the wind!',

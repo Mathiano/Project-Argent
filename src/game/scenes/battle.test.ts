@@ -28,7 +28,8 @@ import type {
 } from '../../engine';
 import ch1BatchData from '../../../docs/ch1-batch.json';
 import movesData from '../../../docs/moves.json';
-import { createBattleScene, degradeIntent, speedLabel, stanceCallout } from './battle';
+import { createBattleScene, degradeIntent, focusIntentTell, speedLabel, stanceCallout } from './battle';
+import type { FocusIntentInfo } from './battle';
 
 // Stub CanvasRenderingContext2D — records every fillText so tests can
 // assert what's on screen. Everything else is a no-op; we don't render
@@ -1244,5 +1245,76 @@ describe('B-on-dialog: dismissable backs out; forced is a no-op', () => {
     scene.draw(ctx);
     expect(ctx.texts.join('|')).toContain('Catch Breath');
     expect(ctx.texts.join('|')).not.toContain('Not enough ★');
+  });
+});
+
+// ── Combat Layer 4 Stage 1 — trainer FOCUS Foe-Intent tells (info-discipline) ──
+// KICKOFF-falkner-tune-+-focus-intent.md Item 2: a profiled trainer's Focus
+// narrows which release is coming per its information discipline, so an easy
+// trainer's Focus is a learnable 50/50, not a blind 1/3 guess.
+describe('FOCUS foe-intent tells (graduated by info-discipline)', () => {
+  // The truthful 2-of-3 narrowings: each phrase pairs exactly two releases.
+  const PAIR: Record<string, readonly string[]> = {
+    'focuses to attack': ['heavy', 'feint'],
+    'focuses to outwit': ['hide', 'feint'],
+    'focuses to move fast': ['heavy', 'hide'],
+  };
+
+  test('OPEN: each release narrows to a phrase whose pair CONTAINS that release', () => {
+    for (const release of ['heavy', 'feint', 'hide'] as const) {
+      const info: FocusIntentInfo = { discipline: 'open', salt: 'JAY' };
+      const line = focusIntentTell(release, 'FOE', info);
+      const phrase = line.slice('FOE '.length);
+      expect(PAIR[phrase]).toBeDefined(); // it's one of the three narrowings
+      expect(PAIR[phrase]).toContain(release); // and it's TRUTHFUL for this release
+    }
+  });
+
+  test('OPEN narrowing is CONSISTENT per trainer (learnable) across calls', () => {
+    const info: FocusIntentInfo = { discipline: 'open', salt: 'JAY' };
+    const a = focusIntentTell('heavy', 'JAY', info);
+    const b = focusIntentTell('heavy', 'JAY', info);
+    expect(a).toBe(b);
+  });
+
+  test('OPEN: HEAVY stays a genuine 50/50 — its phrase also pairs a second release', () => {
+    // JAY (always HEAVY) leaks "to attack" or "to move fast"; either also covers
+    // FEINT or HIDE respectively → information without certainty.
+    const line = focusIntentTell('heavy', 'JAY', { discipline: 'open', salt: 'JAY' });
+    const phrase = line.slice('JAY '.length);
+    expect(['focuses to attack', 'focuses to move fast']).toContain(phrase);
+    expect(PAIR[phrase]!.length).toBe(2);
+  });
+
+  test('VAGUE: a non-specific tell (no narrowing)', () => {
+    expect(focusIntentTell('heavy', 'FALKNER', { discipline: 'vague' })).toBe('FALKNER is focusing intently');
+  });
+
+  test('OPAQUE: just FOCUSING (no information)', () => {
+    expect(focusIntentTell('heavy', 'X', { discipline: 'opaque' })).toBe('X is FOCUSING');
+  });
+
+  test('degradeIntent routes a FOCUS COMMIT through the tell (predicting the release)', () => {
+    const rng = mulberry32(1);
+    // An aggressor charging (commit, base A → HEAVY) with open discipline.
+    const commit = { kind: 'move' as const, move: 'TACKLE', stance: 'A' as const, commit: true };
+    const open = degradeIntent(commit, 'JAY', 'honest', rng, { discipline: 'open', favoredRelease: 'heavy', salt: 'JAY' });
+    expect(open.line).toMatch(/JAY focuses to /);
+    const vague = degradeIntent(commit, 'FALKNER', 'ambiguous', rng, { discipline: 'vague' });
+    expect(vague.line).toBe('FALKNER is focusing intently');
+  });
+
+  test('degradeIntent routes the MID-FOCUS RELEASE through the tell too', () => {
+    const rng = mulberry32(1);
+    const release = { kind: 'release' as const, release: 'hide' as const };
+    const line = degradeIntent(release, 'AMBU', 'honest', rng, { discipline: 'open', salt: 'AMBU' }).line!;
+    const phrase = line.slice('AMBU '.length);
+    expect(PAIR[phrase]).toContain('hide'); // truthful for HIDE
+  });
+
+  test('no focus info (wild / unprofiled) → the legacy generic "is focusing"', () => {
+    const rng = mulberry32(1);
+    const commit = { kind: 'move' as const, move: 'TACKLE', stance: 'A' as const, commit: true };
+    expect(degradeIntent(commit, 'WILD', 'honest', rng).line).toBe('WILD is focusing');
   });
 });

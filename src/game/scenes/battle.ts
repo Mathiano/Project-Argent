@@ -2,6 +2,7 @@ import {
   COMBAT,
   TIERS,
   activeMon,
+  defaultReleaseForStance,
   forcedAction,
   hasBenchSurvivor,
   isTeamWiped,
@@ -85,6 +86,16 @@ export interface BattleSceneOpts {
   // caller). Trainers/leaders are AMBIGUOUS; late bosses OPAQUE. This is
   // PRESENTATION only — the engine always commits the true stance.
   readonly intentReliability?: IntentReliability;
+  // Combat Layer 4 Stage 1 — the FOE's information discipline for a FOCUS tell
+  // (graduated, Layer 3.5 seam). When a PROFILED trainer Focuses, the Foe
+  // Intent narrows which release is coming per this discipline: 'open' → a
+  // learnable 2-of-3 narrowing ("focuses to attack/outwit/move fast"); 'vague'
+  // → a non-specific tell; 'opaque' → just "FOCUSING". Omitted (wild /
+  // unprofiled) → the legacy generic "is focusing". `favoredRelease` predicts
+  // the release at focus time (else derived from the focus stance); `salt`
+  // (the trainer's name) keeps the 'open' narrowing CONSISTENT per trainer so
+  // tells are learnable. PRESENTATION only — no engine effect.
+  readonly foeFocusInfo?: FocusIntentInfo;
   // Final BattleState is handed back so the caller can write party
   // hp/st/momentum forward (the Phase 2 writeback). 1v1 callers can
   // ignore `finalState`; team callers extract state.player.members.
@@ -268,6 +279,52 @@ const NARROW_HINTS: readonly { readonly text: string; readonly pair: readonly St
   { text: 'is hard to read', pair: ['A', 'G'] }, // rules out Fluid
 ];
 
+// Combat Layer 4 Stage 1 — the FOCUS tell vocabulary (info-warfare, Layer 3.5).
+// Three 2-of-3 NARROWINGS, each pairing two releases by a different lens, so an
+// 'open' trainer's Focus leaks a learnable 50/50 (information without
+// certainty) instead of a blind 1/3 guess. The categories are LEARNED — the
+// phrase is the tell; the player memorizes what each pairs.
+export type FocusDiscipline = 'open' | 'vague' | 'opaque';
+export interface FocusIntentInfo {
+  readonly discipline: FocusDiscipline;
+  readonly favoredRelease?: ReleaseKind;
+  readonly salt?: string;
+}
+const FOCUS_NARROW_HINTS: readonly { readonly text: string; readonly pair: readonly ReleaseKind[] }[] = [
+  { text: 'focuses to attack', pair: ['heavy', 'feint'] }, // both HIT you
+  { text: 'focuses to outwit', pair: ['hide', 'feint'] }, // both DECEIVE
+  { text: 'focuses to move fast', pair: ['heavy', 'hide'] }, // both SPEED-of-commit
+];
+
+// A tiny stable hash → an index, so an 'open' trainer's narrowing is CONSISTENT
+// across the fight (learnable) yet can differ between trainers for the same
+// release (so a phrase never collapses into a perfect tell). No engine RNG.
+function saltIndex(salt: string, mod: number): number {
+  let h = 0;
+  for (let i = 0; i < salt.length; i += 1) h = (h * 31 + salt.charCodeAt(i)) >>> 0;
+  return mod <= 0 ? 0 : h % mod;
+}
+
+// The Foe Intent line for a FOCUS, graduated by the trainer's discipline.
+export function focusIntentTell(release: ReleaseKind, name: string, info: FocusIntentInfo): string {
+  if (info.discipline === 'opaque') return `${name} is FOCUSING`;
+  if (info.discipline === 'vague') return `${name} is focusing intently`;
+  // 'open' — a truthful narrowing that INCLUDES this release. Pick consistently
+  // per trainer (salt) among the two valid narrowings → learnable, not a tell.
+  const valid = FOCUS_NARROW_HINTS.filter((h) => h.pair.includes(release));
+  const hint = valid[saltIndex(info.salt ?? name, valid.length)] ?? valid[0]!;
+  return `${name} ${hint.text}`;
+}
+
+// The release a FOCUS will become, known at focus time: the trainer's favored
+// release, else the default for the focus's base stance (A→HEAVY/F→HIDE/G→FEINT).
+function focusReleaseOf(action: Action, info: FocusIntentInfo): ReleaseKind {
+  if (action.kind === 'release') return action.release; // mid-focus (R2)
+  if (info.favoredRelease) return info.favoredRelease;
+  if (action.kind === 'move' && action.commit === true) return defaultReleaseForStance(action.stance);
+  return 'heavy';
+}
+
 // Honest, full-clarity plain-language line for any foe action.
 //
 // SEAM (forward design, do not build): an "intent" is "an action being
@@ -296,9 +353,21 @@ export function degradeIntent(
   name: string,
   reliability: IntentReliability,
   rng: RNG,
+  foeFocusInfo?: FocusIntentInfo,
 ): ShownIntent {
   // OPAQUE (Elite Four / Champion) — no indicator at all. Pure cold read.
   if (reliability === 'opaque') return { line: null };
+  // FOCUS tell (Layer 4 Stage 1) — a profiled trainer's Focus narrows which
+  // release is coming per its info-discipline. Fires both on the focus COMMIT
+  // (R1, telegraphing next round's release) and while MID-FOCUS (R2, the
+  // imminent release) — the player needs the read when they pick their defense.
+  if (foeFocusInfo) {
+    const isFocusCommit = action.kind === 'move' && action.commit === true;
+    const isRelease = action.kind === 'release';
+    if (isFocusCommit || isRelease) {
+      return { line: focusIntentTell(focusReleaseOf(action, foeFocusInfo), name, foeFocusInfo) };
+    }
+  }
   const honest = foeActionLine(action, name);
   // HONEST tier, or a stance-less action (nothing to narrow): full clarity.
   if (reliability === 'honest' || honest.stance === null) return { line: honest.line };
@@ -388,6 +457,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     activeMon(state.foe).species.name,
     reliability,
     intentRng,
+    opts.foeFocusInfo,
   );
   let display: Display = {
     player: snapshot(activeMon(state.player)),
@@ -529,6 +599,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       activeMon(state.foe).species.name,
       reliability,
       intentRng,
+      opts.foeFocusInfo,
     );
     const forced = forcedAction(activeMon(state.player));
     if (forced) {

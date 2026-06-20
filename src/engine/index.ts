@@ -41,6 +41,7 @@ export type {
   TrainerProfile,
   StanceTendency,
   TwoStepTendency,
+  InfoDiscipline,
 } from './trainerAI';
 export { resolveRound } from './resolveRound';
 export type { RoundResult } from './resolveRound';

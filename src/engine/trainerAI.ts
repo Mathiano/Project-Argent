@@ -27,9 +27,15 @@ import { activeMon, defaultReleaseForStance } from './types';
 // to avoid a bossAI ↔ trainerAI import edge.)
 export type TrainerPolicy = (state: BattleState, side: Side, rng: RNG) => Action;
 
-// ── The two Stage-1 dimensions ─────────────────────────────────────────────
+// ── The Stage-1 dimensions ─────────────────────────────────────────────────
 export type StanceTendency = 'aggressor' | 'bulwark' | 'evader' | 'balanced';
 export type TwoStepTendency = 'single-only' | 'occasional' | 'frequent' | 'signature';
+// Information discipline (Layer 3.5, simplest form) — how much a trainer LEAKS
+// about a Focus's hidden release. 'open' → a truthful 2-of-3 narrowing (a
+// learnable 50/50); 'vague' → a non-specific tell; 'opaque' → nothing (just
+// "FOCUSING"). Difficulty scales by tightening this. The TELL PHRASES live in
+// the game layer (battle scene) with the other intent tells; this is the data.
+export type InfoDiscipline = 'open' | 'vague' | 'opaque';
 
 export interface TrainerProfile {
   readonly name: string;
@@ -41,11 +47,15 @@ export interface TrainerProfile {
   // 'feint', an Ambusher → 'hide'). Omitted → a focus releases the default for
   // its drawn base stance. A 'signature' two-step should always set this.
   readonly favoredRelease?: ReleaseKind;
+  // Information discipline for the FOCUS tell (Stage-1 info-warfare seam).
+  // Omitted → treated as 'open' (early trainers leak). Only the Focus tell uses
+  // this in Stage 1; single-stance intent is unchanged.
+  readonly info?: InfoDiscipline;
   // --- Later-stage hooks (NOT read in Stage 1; documented so the data shape
   // is forward-compatible) ---
   // bond?: 'none' | 'mid' | 'high';        // STAGE 2 — gates the Call toolkit
   // callBehavior?: 'clutch' | 'liberal' | 'defensive';  // STAGE 2
-  // info?: 'open' | 'veiled' | 'bluffer';  // STAGE 3
+  // bluffs?: boolean;                       // STAGE 3 — info 'bluffer' (lying tells)
   // terrain?: string;                       // Layer 3 — home-turf bias
   // adaptive?: boolean;                     // STAGE 2/3 — read the player back
 }
@@ -166,13 +176,14 @@ export function trainerPolicy(profile: TrainerProfile): TrainerPolicy {
 // in bossAI.ts to FOCUS on his signature gust (Evader / Occasional / signature).
 export const TRAINER_PROFILES: { readonly [id: string]: TrainerProfile } = {
   // The teaching baseline: a clean base-triangle read, never focuses.
-  youngster: { name: 'YOUNGSTER MILO', stance: 'balanced', twoStep: 'single-only' },
+  youngster: { name: 'YOUNGSTER MILO', stance: 'balanced', twoStep: 'single-only', info: 'open' },
   // The Charger: pressures with Aggressive and sometimes FOCUSES into HEAVY —
-  // the player's first lesson in reading a trainer's hidden release.
-  jay: { name: 'JAY', stance: 'aggressor', twoStep: 'occasional', favoredRelease: 'heavy' },
+  // the player's first lesson in reading a trainer's hidden release. Open info:
+  // his Focus leaks a learnable narrowing ("focuses to attack" → HEAVY/FEINT).
+  jay: { name: 'JAY', stance: 'aggressor', twoStep: 'occasional', favoredRelease: 'heavy', info: 'open' },
   // The Bulwark: Guard-heavy wall — the player slips it with Fluid. A distinct
   // third read (no focus), rounding out the stance-tendency spread.
-  lass: { name: 'LASS BRYN', stance: 'bulwark', twoStep: 'single-only' },
+  lass: { name: 'LASS BRYN', stance: 'bulwark', twoStep: 'single-only', info: 'open' },
 };
 
 // Which trainer (by its overworld win-flag) gets which profile. The game maps a

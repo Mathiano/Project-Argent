@@ -111,12 +111,38 @@ Stance: Aggressor · Two-step: Frequent · Bond: Manufactured (pseudo-Calls, NO 
 - **Late / Concord / Elite:** Bluffers, full information denial, Reactive, manufactured-loyalty juggernauts. The read-war at its deepest.
 Difficulty scales by COMBINING the dimensions (more two-steps + better Calls + more hidden info + reactivity), NOT by new mechanics. Leak-cap-safe.
 
-## STAGE 1 — AS BUILT (2026-06-20, KICKOFF-trainer-ai-layer4-stage1.md)
+## STAGE 1 — AS BUILT (2026-06-20, KICKOFF-trainer-ai-layer4-stage1.md +
+## KICKOFF-falkner-tune-+-focus-intent.md)
 The trainer-AI CORE is shipped: the profile data structure + the shared
-decision tree, with the FIRST TWO dimensions live — **stance tendency** +
-**two-step tendency**. The other dimensions (Calls/bond, Call behavior, info
-discipline, terrain, adaptivity) are deferred to later stages; their hook
-points are marked inline in `src/engine/trainerAI.ts`.
+decision tree, with THREE Stage-1 dimensions live — **stance tendency**,
+**two-step tendency**, and **information discipline (for the Focus tell)**. The
+remaining dimensions (Calls/bond, Call behavior, terrain, adaptivity, bluffing)
+are deferred; hook points are marked inline in `src/engine/trainerAI.ts`.
+
+### Falkner gust tune (Item 1)
+Falkner's 3/6/9 rhythm beat is now a forced **COMMITMENT**: a charged gust
+(FOCUS→HEAVY) at rate 0.7 when a heavy is affordable, else a hard Aggressive
+DIVE BOMB (and when winded, a lighter single-step). His signature now reliably
+lands ON his signature beats (was a 50/50 that stamina-drain often skipped).
+Ladder re-baselined (rate 0.7): readers unchanged (100% fair · 30/27 hard,
+fair-vs-hard intact); no-read mashers rose modestly (brute ~64→72 fair) but are
+still punished on the hard skill path — capped at 0.7 (always-charge spiked
+brute to ~85). `FALKNER_GUST_FOCUS_RATE` in `bossAI.ts`.
+
+### Focus Foe-Intent tell (Item 2 — info-discipline)
+A profiled trainer's Focus narrows which release is coming, per its `info`
+discipline (`'open'`/`'vague'`/`'opaque'` on `TrainerProfile`):
+- **open** → a truthful 2-of-3 narrowing — "focuses to attack" (HEAVY/FEINT),
+  "focuses to outwit" (HIDE/FEINT), "focuses to move fast" (HEAVY/HIDE). A
+  learnable 50/50, consistent per trainer (salted by name), never collapsing
+  into a perfect tell. Stage-1 trainers (Youngster/JAY/Lass) = open.
+- **vague** → "is focusing intently" (FALKNER — a gym leader hints, doesn't
+  narrow). **opaque** → just "FOCUSING" (elites/Concord, later).
+The tell PHRASES live in `src/game/scenes/battle.ts` (`focusIntentTell`,
+`FOCUS_NARROW_HINTS`) with the other intent tells; `degradeIntent` routes a
+focus commit (predicting the release) AND the mid-focus release through it.
+Wired via the `foeFocusInfo` scene option. PRESENTATION only — no engine
+effect, ladders unperturbed. Bluffing (lying tells) is the later 'bluffer' tier.
 
 - **Where:** `src/engine/trainerAI.ts` — pure policy (`trainerPolicy(profile)`),
   the `TrainerProfile` type, the `TRAINER_PROFILES` registry, and the win-flag

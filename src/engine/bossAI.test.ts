@@ -61,21 +61,55 @@ describe('Falkner boss AI (A6)', () => {
     expect(offRhythm.kind === 'move' && offRhythm.move).not.toBe('DIVE BOMB');
   });
 
-  test('phase 1: gust round goes Aggressive (attack hard)', () => {
+  test('phase 1: gust round goes Aggressive (attack hard — charged or single)', () => {
+    // Whether he charges (FOCUS→HEAVY) or single-steps DIVE BOMB, the gust beat
+    // is Aggressive-based (a focus commits its Aggressive base stance).
     const action = falknerBossAI(atRound(makeState(), 3, 1), 'foe', mulberry32(1));
     expect(action.kind === 'move' && action.stance).toBe('A');
   });
 
-  test('phase 2: on rhythm baits with WING CUT 50% of the time', () => {
-    let baits = 0;
-    let bombs = 0;
+  // Item 1 (KICKOFF-falkner-tune-+-focus-intent.md): the 3/6/9 gust beat now
+  // ADMITS the charged Focus — his signature lands ON his signature beats. A
+  // gust round (heavy affordable) mostly FOCUSES (commit) into a HEAVY release.
+  test('the 3/6/9 gust beat admits FOCUS→HEAVY (his signature charged gust)', () => {
+    let focuses = 0;
+    let singleBombs = 0;
     for (let seed = 0; seed < 200; seed += 1) {
-      const action = falknerBossAI(atRound(makeState(), 3, 2), 'foe', mulberry32(seed));
-      if (action.kind === 'move' && action.move === 'WING CUT') baits += 1;
-      else if (action.kind === 'move' && action.move === 'DIVE BOMB') bombs += 1;
+      const action = falknerBossAI(atRound(makeState(), 3, 1), 'foe', mulberry32(seed));
+      if (action.kind === 'move' && action.commit === true) {
+        focuses += 1;
+        expect(action.move).toBe('DIVE BOMB'); // charges WITH his heavy
+        expect(action.stance).toBe('A');
+      } else if (action.kind === 'move' && action.move === 'DIVE BOMB') {
+        singleBombs += 1;
+      }
     }
-    expect(baits).toBeGreaterThan(50);
-    expect(bombs).toBeGreaterThan(50);
+    expect(focuses).toBeGreaterThan(100); // ~70% charge — reliably his signature
+    expect(singleBombs).toBeGreaterThan(10); // but still single-steps sometimes (variety)
+  });
+
+  // Mid-gust he RELEASES the charged HEAVY (locked in).
+  test('mid-focus (winding the gust) releases HEAVY', () => {
+    let s = makeState();
+    const winding = { ...activeMon(s.foe), focus: { stance: 'A' as const, move: 'DIVE BOMB' } };
+    s = { ...s, foe: setActiveMember(s.foe, winding) };
+    const action = falknerBossAI(s, 'foe', mulberry32(1));
+    expect(action.kind).toBe('release');
+    if (action.kind === 'release') expect(action.release).toBe('heavy');
+  });
+
+  test('phase 2: on a NON-charge gust round he still baits WING CUT vs DIVE BOMB', () => {
+    let baits = 0;
+    let singles = 0;
+    for (let seed = 0; seed < 400; seed += 1) {
+      const action = falknerBossAI(atRound(makeState(), 3, 2), 'foe', mulberry32(seed));
+      if (action.kind === 'move' && action.commit !== true && action.move === 'WING CUT') baits += 1;
+      else if (action.kind === 'move' && action.commit !== true && action.move === 'DIVE BOMB') singles += 1;
+    }
+    // ~30% of gust rounds don't charge → split between the WING CUT bait and a
+    // straight DIVE BOMB (his phase-2 syncopation survives alongside the gust).
+    expect(baits).toBeGreaterThan(15);
+    expect(singles).toBeGreaterThan(15);
   });
 
   test('low ST + momentum + phase 1 triggers Catch Breath', () => {

@@ -38,6 +38,17 @@ const N = 2000;
 // of scope for Stage 1 (the reading fight, which the pillar is about, is intact
 // and now RICHER — it gains the two-step read). Bands re-locked to the measured
 // seed=0x1f values.
+//
+// ── INTENTIONAL RE-BASELINE (2026-06-20, KICKOFF-falkner-tune-+-focus-intent) —
+// Item 1: the 3/6/9 gust beat now reliably CHARGES (FOCUS→HEAVY at rate 0.7
+// when a heavy is affordable, else DIVE BOMB), so his signature lands ON his
+// signature beats instead of a coin-flip that stamina-drain often skipped. The
+// READING archetypes are STILL essentially unchanged (naive/stamina 100% fair ·
+// 30/27 hard) — fair-vs-hard intact. The no-read mashers rise a little more
+// (brute fair ~64→72, button-masher ~63→66) as the more-reliable gust exposes
+// more free wind-up hits; capped at 0.7 (a pure always-charge spiked brute to
+// ~85 — too far). On the HARD skill path mashing is still punished (button 5 /
+// brute 25 < readers 30/27). Bands re-locked to the seed=0x1f values.
 type Tier = 'fair' | 'hard';
 function tierOf(player: string): Tier {
   // GALE walls KINDRAKE and SILTSKIP counters the dive — the fair demo
@@ -48,13 +59,14 @@ function tierOf(player: string): Tier {
 // Acceptance bands [loInclusive, hiInclusive] in win%, re-locked to the
 // TTK-1.30 measured values (each comfortably contains its exact, deterministic
 // seed=0x1f result).
-// Re-locked to the Layer-4-Stage-1 measured values (Falkner Focuses; seed=0x1f).
+// Re-locked to the reliable-gust-charge values (rate 0.7; Falkner Focuses on
+// his signature beats; seed=0x1f).
 const BANDS: { readonly [a: string]: { readonly [t in Tier]: readonly [number, number] } } = {
-  'button-masher': { fair: [55, 70], hard: [1, 13] }, // 63.1/62.6 fair · 5.7 hard
-  brute: { fair: [54, 72], hard: [14, 32] }, // 62.5/64.3 fair · 23.4 hard
+  'button-masher': { fair: [58, 74], hard: [1, 13] }, // 66.5/65.1 fair · 5.3 hard
+  brute: { fair: [64, 80], hard: [16, 34] }, // 71.6/72.5 fair · 25.1 hard
   'naive-triangle': { fair: [94, 100], hard: [22, 40] }, // 100/100 fair · 30.4 hard (unchanged)
-  'stamina-reader': { fair: [92, 100], hard: [18, 36] }, // 100/99.6 fair · 26.7 hard (unchanged)
-  'human-ish': { fair: [84, 100], hard: [13, 31] }, // 92.3/90.9 fair · 20.5 hard
+  'stamina-reader': { fair: [92, 100], hard: [18, 36] }, // 100/99.4 fair · 26.7 hard (unchanged)
+  'human-ish': { fair: [82, 98], hard: [13, 31] }, // 89.8/88.0 fair · 20.2 hard
 };
 
 describe('Falkner ladder regression (n=2000, seed=0x1f, gust=1.4 hp=1.15) — designed bands', () => {
