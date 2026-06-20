@@ -36,12 +36,12 @@ Dex content is commissioned from Gemini against `docs/mon-manifest.csv` (200 pre
 
 ## Open threads
 
-1. **Move-type-vocab collision (engine bug, found 2026-06-20):** the CH1 mid moves EMBER SNAP / LEAF LASH / BUBBLE JET share names with the legacy fixture moves, and `lookupMove = MOVES ?? REGISTERED_MOVES` prefers the legacy Mixed-case (`Flame`/`Sprout`/`Splash`) version — so the starters' STAB type interaction silently no-ops in live CH1 play (the type triangle is inert). Fix **CH1-side** (rename/namespace the CH1 moves) to keep the fixture ladders bit-identical. **Blocks #2.**
-2. **Starter-trio bulk rebalance — ON HOLD behind #1.** The mirror-sim showed the 98/49/100 KAMON split is mostly the *inert* triangle (type-on collapses it to ~44–56% RPS); fix the vocab, re-measure, then decide if stat budgets need touching. KAMON's per-pick ace levels (0.95–1.37) are the working baseline meanwhile.
+1. **Starter-trio bulk rebalance — NOW UNBLOCKED + CONFIRMED REQUIRED.** With the move-vocab collision fixed (2026-06-21; the type triangle is live), the clean starter mirror-sim on the CH1 chart still spreads **GRUBLEAF 21% / KINDRAKE 50% / SILTSKIP 79%** — the residual imbalance is the **bulk-vs-offense exchange rate** (the frail Dodger underperforms even with its type edge + highest stat total), NOT the triangle. KAMON's per-pick fairness is **parked at flat ace-level 1.0** (its fairness sim-gates skipped pending this); at 1.0 the GRUBLEAF pick is an unwinnable ~3% wall. Rebalance per `docs/starter-trio-rebalance.md` (pillar #2: shape, not total), then re-converge KAMON + re-baseline the Falkner GRUBLEAF cells.
+2. Falkner GRUBLEAF (hard) ladder cells dropped to ~2-3% — GRUBLEAF (NATURE) into the GALE gym now takes its real type disadvantage (the fix corrected an accidental neutrality). On-thesis (the hard-run answer is a GALE counter via catching), but worth a look once the starter rebalance lands.
 3. Production sprites: CH1 batch is stat-derived + wired (`ch1-batch.json`), but several entries still need generated sprites (`spriteRef: null` — SILTSKIP, etc.).
 4. Naming debt: leader/town/trainer names are placeholders (Rourke/Wren/Pax/Dell/Skye/Gust + Silver-derived leaders); 1:1 rename pass required before public — repo stays private until then.
 
-*(Resolved since the freeze: Falkner boss-card v2 + the gym sprint shipped; the type chart is now 17×17 complete — see CLAUDE.md.)*
+*(Resolved since the freeze: Falkner boss-card v2 + the gym sprint shipped; the type chart is now 17×17 complete; the move-vocab collision is fixed — legacy fixture moves namespaced `FX …` + a throwing `registerMoves` guard, fixtures bit-identical. See CLAUDE.md.)*
 
 ## Doc map
 
