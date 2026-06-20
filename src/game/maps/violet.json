@@ -1,194 +1,260 @@
 {
   "name": "VIOLET CITY",
-  "_note": "Phase 7 Sprint 1 (+firstroad-fixes S3) — data-driven Violet, PLASTER material identity, entered from the NORTH (player walks south down Route 31 into the city). Gym south end, Center + Mart enterable; full population deferred.",
+  "_note": "Phase 7 build (docs/violet-city-design.md) — a lived-in highland town that winds. Entered from the NORTH (walk south down Route 31). The ACADEMY (ancient stone, enterable) is the elevated centerpiece at the heart; the SQUARE + founding STATUE sit before it, with the Concord kiosk/billboard/rep re-homed into that same square (the old way and the shortcut side by side). Center/Mart/Gym sit organically off winding paths; 3 flavor houses at varied angles; a LOOKOUT over the valley at the southwest edge. PLACEHOLDER ART (HGSS pass is Phase 7 polish). Anchors fixed for the spine/tests: north exit (9,0), gym door (9,12), spawns. Existing verbs only; one-time lines flag-gated.",
   "tilesetRef": "outdoor_violet",
-  "width": 20,
-  "height": 17,
+  "width": 26,
+  "height": 30,
   "tilesize": 16,
   "baseTile": "grass",
   "tileMap": {
     "p": "path",
     "T": "tree",
+    "w": "water",
     "B": "plaster",
     "D": "wall_door",
+    "N": "roof_l",
+    "M": "roof_m",
+    "O": "roof_r",
+    "h": "gym_facade_l",
     "g": "gym_facade_m",
-    "G": "gym_door"
+    "j": "gym_facade_r",
+    "G": "gym_door",
+    "A": "academy",
+    "C": "academy_door",
+    "S": "statue",
+    "E": "bell",
+    "F": "fence"
   },
   "cells": [
-    "TTTTTTTTTpTTTTTTTTTT",
-    "T........p.........T",
-    "T........p.........T",
-    "T..BBB...p....BBB..T",
-    "T..BDB...p....BDB..T",
-    "T...p....p.....p...T",
-    "T...pppppppppppp...T",
-    "T........p.........T",
-    "T..BBB...p....BBB..T",
-    "T..BBB...p....BBB..T",
-    "T........p.........T",
-    "T........p.........T",
-    "T......ggGgg.......T",
-    "T......ggggg.......T",
-    "T..................T",
-    "T..................T",
-    "TTTTTTTTTTTTTTTTTTTT"
+    "TTTTTTTTTpTTTTTTTTTTTTTTTT",
+    "T........p...............T",
+    "T........p...............T",
+    "T..NMO...p......NMO......T",
+    "T..BDB...p......BDB......T",
+    "T..pppppppppppppppp......T",
+    "T........p...............T",
+    "T........p...............T",
+    "T........p...............T",
+    "T........p...............T",
+    "T........ppppp...........T",
+    "T........p...p...........T",
+    "T......hgGgj.p...........T",
+    "T......hgggj.p...........T",
+    "T............p...........T",
+    "T.NMO........p...........T",
+    "T.BDB........p......NMO..T",
+    "T.........ppppppp...BDB..T",
+    "T.........pppSppp........T",
+    "T.........ppppppp........T",
+    "T.........ppppppp........T",
+    "T.........ppppppE........T",
+    "T........AAAACAAAA.......T",
+    "T........AAAAAAAAA.......T",
+    "T........AAAAAAAAA.NMO...T",
+    "T........AAAAAAAAA.BDB...T",
+    "T........AAAAAAAAA.......T",
+    "TFFFF....AAAAAAAAA.......T",
+    "Twwww....................T",
+    "TTTTTTTTTTTTTTTTTTTTTTTTTT"
   ],
   "objects": [
+    { "type": "warp", "x": 9, "y": 0, "target": "ROUTE31:fromViolet" },
+    { "type": "warp", "x": 4, "y": 4, "target": "VIOLET_CENTER:fromViolet" },
+    { "type": "warp", "x": 17, "y": 4, "target": "VIOLET_MART:fromViolet" },
+    { "type": "warp", "x": 9, "y": 12, "target": "GYM:fromRoute" },
     {
+      "_note": "ACADEMY — enterable ancient core (docs/violet-city-design.md). The interior stub is VIOLET_ACADEMY; the full grounds/training-hall interior is a Phase-7 follow-up.",
       "type": "warp",
-      "x": 9,
-      "y": 0,
-      "target": "ROUTE31:fromViolet"
+      "x": 13,
+      "y": 22,
+      "target": "VIOLET_ACADEMY:fromViolet"
     },
-    {
-      "type": "warp",
-      "x": 4,
-      "y": 4,
-      "target": "VIOLET_CENTER:fromViolet"
-    },
-    {
-      "type": "warp",
-      "x": 15,
-      "y": 4,
-      "target": "VIOLET_MART:fromViolet"
-    },
-    {
-      "type": "warp",
-      "x": 9,
-      "y": 12,
-      "target": "GYM:fromRoute"
-    },
+
     {
       "type": "sign",
-      "x": 8,
+      "x": 10,
       "y": 2,
       "lines": [
         "VIOLET CITY",
-        "Welcome from the north road.",
-        "FALKNER's gym stands south."
+        "A highland town, grown up",
+        "around an ancient Academy.",
+        "Mind the wind."
       ]
     },
     {
       "type": "sign",
-      "x": 5,
-      "y": 3,
-      "lines": [
-        "POKÉMON CENTER",
-        "Rest your team —",
-        "free for trainers."
-      ]
+      "x": 6,
+      "y": 4,
+      "lines": ["POKÉMON CENTER", "Rest your team — free", "for trainers."]
     },
     {
       "type": "sign",
-      "x": 16,
-      "y": 3,
+      "x": 15,
+      "y": 4,
+      "lines": ["POKÉ MART", "Supplies for the climb."]
+    },
+    {
+      "_note": "Wind-vane flavor interaction (docs: the town's vibe).",
+      "type": "sign",
+      "x": 6,
+      "y": 7,
       "lines": [
-        "POKÉ MART",
-        "Supplies for the climb."
+        "A copper wind-vane, shaped",
+        "like a gust-dancer. It swings,",
+        "settles north.",
+        "Wind's always been good here."
       ]
     },
     {
-      "type": "npc",
+      "_note": "STATUE — the founding pair; examine → the founding lore (the bond thesis, quietly in stone).",
+      "type": "sign",
+      "x": 13,
+      "y": 18,
+      "lines": [
+        "THE FOUNDING PAIR — Violet's",
+        "first master and their",
+        "gust-dancer, caught mid-launch",
+        "into the wind.",
+        "",
+        "The plaque is worn nearly",
+        "smooth: \"Before the Academy,",
+        "before the name — there was a",
+        "girl who learned to read the",
+        "wind, and a creature that",
+        "chose to ride it with her.",
+        "",
+        "Everything here grew from that",
+        "one understanding. Strength",
+        "was never the lesson. Trust",
+        "was.\""
+      ]
+    },
+    {
+      "_note": "NOTICE BOARD — town news + the ignored Concord flyer.",
+      "type": "sign",
+      "x": 17,
+      "y": 18,
+      "lines": [
+        "VIOLET NOTICE BOARD",
+        "• Gym challenge: FALKNER waits",
+        "  atop the gym.",
+        "• Academy open day — all are",
+        "  welcome to the grounds.",
+        "",
+        "(A glossy CONCORD flyer is",
+        "pinned in the corner. Nobody",
+        "has so much as creased it.)"
+      ]
+    },
+    {
+      "_note": "CONCORD SEED — billboard (static slogan), re-homed into the square beside the statue.",
+      "type": "sign",
       "x": 11,
-      "y": 2,
+      "y": 21,
+      "lines": [
+        "CONCORD billboard:",
+        "\"A partner takes ten years to",
+        "trust you. The Concordance",
+        "takes ten minutes.\""
+      ]
+    },
+    {
+      "_note": "LOOKOUT — the highland payoff over the valley.",
+      "type": "sign",
+      "x": 2,
+      "y": 27,
+      "lines": [
+        "THE LOOKOUT",
+        "The whole valley opens below —",
+        "Route 31 winding back the way",
+        "you came, the lowlands hazy",
+        "beyond.",
+        "Up here, the wind never stops."
+      ]
+    },
+
+    {
+      "_note": "Gym guide (kept) — points the way + foreshadows the gym's wind.",
+      "type": "npc",
+      "x": 12,
+      "y": 11,
       "color": "#3a7fbe",
       "interact": [
         {
           "kind": "dialog",
           "lines": [
             "GYM GUIDE: Down the lane is",
-            "FALKNER's gym. Says the wind",
-            "is the third fighter up there.",
-            "Beat his trainer first —",
+            "FALKNER's gym. The wind is the",
+            "third fighter up there.",
+            "Beat his trainers first —",
             "they hand out a scout report."
           ]
         }
       ]
     },
     {
+      "_note": "THEMED NPC 1 — the Academy keeper (the old man), the lore-keeper by the statue.",
       "type": "npc",
-      "x": 6,
-      "y": 7,
+      "x": 12,
+      "y": 19,
       "color": "#caa148",
       "interact": [
         {
           "kind": "dialog",
           "lines": [
-            "TRAVELLER: Heal before you",
-            "climb — no Center on the roof.",
-            "The one here is just west."
+            "OLD MAN: This Academy's older",
+            "than the cobblestones, older",
+            "than the name. The town grew",
+            "up around it, not the other",
+            "way round.",
+            "Folks forget that."
           ]
         }
       ]
     },
     {
+      "_note": "THEMED NPC 2 — the gust-dancer kid (foreshadows the gym + the GALE ecosystem).",
       "type": "npc",
-      "x": 13,
-      "y": 10,
-      "color": "#7c4fa8",
+      "x": 15,
+      "y": 19,
+      "color": "#88c0e8",
       "interact": [
         {
           "kind": "dialog",
           "lines": [
-            "CITIZEN: The plasterwork here",
-            "is older than the gym.",
-            "Whole city the colour of",
-            "morning, my gran used to say."
+            "KID: See the gust-dancers",
+            "riding the updraft this",
+            "morning?",
+            "One day I'll read the wind",
+            "like FALKNER does."
           ]
         }
       ]
     },
     {
+      "_note": "THEMED NPC 3 — the unbothered local (the town's relaxed defiance; merges the old Concord-dismissal townsperson).",
       "type": "npc",
-      "x": 5,
-      "y": 11,
-      "color": "#b14e9c",
+      "x": 11,
+      "y": 20,
+      "color": "#a8743a",
       "interact": [
         {
           "kind": "dialog",
           "lines": [
-            "KID: One day the pond on the",
-            "route will have a bridge,",
-            "my dad says. Then we can",
-            "reach the far bank!"
+            "LOCAL: Concord folks set up",
+            "their booth. We waved.",
+            "Then we went back to it the",
+            "way we always have.",
+            "No hurry."
           ]
         }
       ]
     },
     {
+      "_note": "CONCORD SEED — kiosk (re-homed into the square; flavor ONLY, fully ignorable, one-time set-flag). docs/concord-seed-ch1.md.",
       "type": "npc",
-      "x": 12,
-      "y": 7,
-      "color": "#6a8f3a",
-      "blockedUntilFlag": "violet_schoolkid_beaten",
-      "interact": [
-        {
-          "kind": "dialog",
-          "lines": [
-            "DELL: I study battles after",
-            "class. No fancy tricks yet —",
-            "just a clean read. Quiz me!"
-          ]
-        },
-        {
-          "kind": "start-trainer-battle",
-          "foeSpecies": "GRITHOAX",
-          "winFlag": "violet_schoolkid_beaten",
-          "reward": 400
-        }
-      ],
-      "interactAfterFlag": [
-        {
-          "kind": "dialog",
-          "lines": ["DELL: Textbook. I'll note", "that down."]
-        }
-      ]
-    },
-    {
-      "_note": "CONCORD SEED (Ch1 set-dressing, docs/concord-seed-ch1.md). Flavor ONLY — no battle/quest/plot trigger. Fully ignorable. The kiosk's clean cyan color is placeholder branding (out-of-place vs the warm town); art deferred per Phase 7.",
-      "type": "npc",
-      "x": 13,
-      "y": 7,
+      "x": 10,
+      "y": 20,
       "color": "#7fd4e0",
       "blockedUntilFlag": "concord_kiosk_read",
       "interact": [
@@ -232,22 +298,10 @@
       ]
     },
     {
-      "_note": "CONCORD SEED — billboard (static slogan).",
-      "type": "sign",
-      "x": 14,
-      "y": 7,
-      "lines": [
-        "CONCORD billboard:",
-        "\"A partner takes ten years to",
-        "trust you. The Concordance",
-        "takes ten minutes.\""
-      ]
-    },
-    {
-      "_note": "CONCORD SEED — rep NPC (calm true believer; warm, not a villain).",
+      "_note": "CONCORD SEED — rep NPC (calm true believer; warm, not a villain), re-homed into the square.",
       "type": "npc",
-      "x": 13,
-      "y": 8,
+      "x": 10,
+      "y": 21,
       "color": "#bfe6ee",
       "interact": [
         {
@@ -266,44 +320,152 @@
       ]
     },
     {
-      "_note": "CONCORD SEED — one Violet townsperson dismissal (old-world pride).",
+      "_note": "Living-world — a kid flying a kite in the square.",
       "type": "npc",
-      "x": 7,
-      "y": 7,
-      "color": "#a8743a",
+      "x": 11,
+      "y": 18,
+      "color": "#b14e9c",
       "interact": [
         {
           "kind": "dialog",
           "lines": [
-            "TOWNSPERSON: Don't know why",
-            "they bother setting that up",
-            "here. We still do it the real",
-            "way in Violet."
+            "KITE KID: Up, up — there she",
+            "goes! The thermals off the",
+            "Academy tower are the best in",
+            "town for kites."
           ]
+        }
+      ]
+    },
+    {
+      "_note": "Living-world — an NPC who feeds the gust-dancers wheeling over the rooftops.",
+      "type": "npc",
+      "x": 19,
+      "y": 18,
+      "color": "#6c5a48",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "FEEDER: Here they come — the",
+            "FLITPECK know my whistle.",
+            "Wild gust-dancers, but they",
+            "trust a steady hand.",
+            "Everything here works that way."
+          ]
+        }
+      ]
+    },
+    {
+      "_note": "Living-world — the shopkeeper outside the Mart, local flavor.",
+      "type": "npc",
+      "x": 17,
+      "y": 6,
+      "color": "#8c6240",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "SHOPKEEPER: Heading up to the",
+            "gym? Pack potions. The wind",
+            "up there doesn't care how",
+            "ready you feel."
+          ]
+        }
+      ]
+    },
+    {
+      "_note": "Living-world — an old couple on a bench by the lookout (quiet life).",
+      "type": "npc",
+      "x": 4,
+      "y": 26,
+      "color": "#9c8a78",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "OLD WOMAN: We come up here",
+            "most evenings. Watch the light",
+            "go off the valley.",
+            "OLD MAN: Sixty years. The wind",
+            "hasn't run out yet."
+          ]
+        }
+      ]
+    },
+    {
+      "_note": "Living-world — sparring students in the Academy yard (flavor).",
+      "type": "npc",
+      "x": 3,
+      "y": 24,
+      "color": "#6a8f3a",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "STUDENT: Read first, THEN move.",
+            "That's the whole craft. The",
+            "Academy drills it into you",
+            "before they let you near the",
+            "gym."
+          ]
+        }
+      ]
+    },
+    {
+      "_note": "Living-world — a second student crossing to the yard.",
+      "type": "npc",
+      "x": 4,
+      "y": 25,
+      "color": "#9ad470",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "STUDENT: The Concord says skip",
+            "the decade. But you can't",
+            "shortcut a read. You either",
+            "see it coming or you don't."
+          ]
+        }
+      ]
+    },
+    {
+      "_note": "DELL (kept) — the spar-able Academy student, re-homed to the yard. Existing trainer battle (GRITHOAX); one-time win flag + reward.",
+      "type": "npc",
+      "x": 5,
+      "y": 24,
+      "color": "#7c4fa8",
+      "blockedUntilFlag": "violet_schoolkid_beaten",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "DELL: I study battles after",
+            "class. No fancy tricks yet —",
+            "just a clean read. Quiz me!"
+          ]
+        },
+        {
+          "kind": "start-trainer-battle",
+          "foeSpecies": "GRITHOAX",
+          "winFlag": "violet_schoolkid_beaten",
+          "reward": 400
+        }
+      ],
+      "interactAfterFlag": [
+        {
+          "kind": "dialog",
+          "lines": ["DELL: Textbook. I'll note", "that down."]
         }
       ]
     }
   ],
   "spawns": {
-    "fromRoute": {
-      "x": 9,
-      "y": 1,
-      "facing": "down"
-    },
-    "fromGym": {
-      "x": 9,
-      "y": 11,
-      "facing": "up"
-    },
-    "fromCenter": {
-      "x": 4,
-      "y": 5,
-      "facing": "down"
-    },
-    "fromMart": {
-      "x": 15,
-      "y": 5,
-      "facing": "down"
-    }
+    "fromRoute": { "x": 9, "y": 1, "facing": "down" },
+    "fromGym": { "x": 9, "y": 11, "facing": "up" },
+    "fromCenter": { "x": 4, "y": 5, "facing": "up" },
+    "fromMart": { "x": 17, "y": 5, "facing": "up" },
+    "fromAcademy": { "x": 13, "y": 21, "facing": "up" }
   }
 }

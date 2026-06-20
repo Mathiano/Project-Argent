@@ -487,6 +487,116 @@
         "4446666666664444",
         "4444444444444444"
       ]
+    },
+    "academy": {
+      "label": "academy ancient-stone wall (Violet centerpiece)",
+      "solid": true,
+      "rows": [
+        "9999999999999999",
+        "9bbbbbbbbbbbbbb9",
+        "9baaaaaaaaaaaab9",
+        "9baeaaaaaaaaeab9",
+        "9baaaaaeeaaaaab9",
+        "9baaaaeaaeaaaab9",
+        "9baaaaaaaaaaaab9",
+        "9baaaaaaaaaaaab9",
+        "9baaaaeaaeaaaab9",
+        "9baaaaaeeaaaaab9",
+        "9baaaaaaaaaaaab9",
+        "9bbbbbbbbbbbbbb9",
+        "9aaaaaaaaaaaaaa9",
+        "9999999999999999",
+        "9aaaaaaaaaaaaaa9",
+        "9999999999999999"
+      ]
+    },
+    "academy_door": {
+      "label": "academy stone archway (enterable)",
+      "solid": false,
+      "rows": [
+        "9999999999999999",
+        "9bbbbbbbbbbbbbb9",
+        "9baaaaaaaaaaaab9",
+        "9baaaa9999aaaab9",
+        "9baaa999999aaab9",
+        "9baa99jjjjjj99ab",
+        "9ba99jjjjjjjj99b",
+        "9ba9jjjjjjjjjj9b",
+        "9ba9jjjjjjjjjj9b",
+        "9ba9jjjjjjjjjj9b",
+        "9ba9jjjjjjjjjj9b",
+        "9ba9jjjjjjjjjj9b",
+        "9999jjjjjjjj9999",
+        "aaaajjjjjjjjaaaa",
+        "aaaajjjjjjjjaaaa",
+        "aaaajjjjjjjjaaaa"
+      ]
+    },
+    "statue": {
+      "label": "founding-pair statue (gust-dancer mid-launch)",
+      "solid": true,
+      "rows": [
+        "3333333333333333",
+        "3333333bb3333333",
+        "333333babab33333",
+        "33333baaaaeb3333",
+        "3333ebaaaaabe333",
+        "333eebaaaaabee33",
+        "3333baaaaaab3333",
+        "33333baaaab33333",
+        "333333aaaa333333",
+        "33333aaaaaa33333",
+        "3333999999993333",
+        "333b99999999b333",
+        "333b99999999b333",
+        "333bbbbbbbbbb333",
+        "333aaaaaaaaaa333",
+        "3333333333333333"
+      ]
+    },
+    "bell": {
+      "label": "old academy bell (bronze, on a frame)",
+      "solid": true,
+      "rows": [
+        "3666666666666663",
+        "3660000000000663",
+        "3663336ff6333663",
+        "36633ffffff33663",
+        "3663ffffffff3663",
+        "366ffffffffff663",
+        "366ffffffffff663",
+        "366ffffffffff663",
+        "366ffffffffff663",
+        "366ffffffffff663",
+        "3663ffffffff3663",
+        "36633ffffff33663",
+        "366333ffff333663",
+        "3663336666333663",
+        "3663333gg3333663",
+        "3666666666666663"
+      ]
+    },
+    "fence": {
+      "label": "lookout railing (low stone balustrade)",
+      "solid": true,
+      "rows": [
+        "3333333333333333",
+        "3333333333333333",
+        "3333333333333333",
+        "3333333333333333",
+        "bbbbbbbbbbbbbbbb",
+        "9999999999999999",
+        "b3b3b3b3b3b3b3b3",
+        "b3b3b3b3b3b3b3b3",
+        "bbbbbbbbbbbbbbbb",
+        "9999999999999999",
+        "3333333333333333",
+        "3333333333333333",
+        "3333333333333333",
+        "3333333333333333",
+        "3333333333333333",
+        "3333333333333333"
+      ]
     }
   }
 }

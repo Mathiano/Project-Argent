@@ -15,6 +15,7 @@ import route31Data from '../maps/route31.json';
 import violetData from '../maps/violet.json';
 import violetCenterData from '../maps/violet_center.json';
 import violetMartData from '../maps/violet_mart.json';
+import violetAcademyData from '../maps/violet_academy.json';
 import gymData from '../maps/gym.json';
 import route31VioletData from '../maps/route31.violet.json';
 import outdoorVioletTileset from '../../../assets/tilesets/outdoor_violet.tileset.json';
@@ -54,6 +55,8 @@ const REGISTRY: { [name: string]: () => MapData } = {
   VIOLET: () => loadMap(violetData as DataDrivenMapJson),
   VIOLET_CENTER: () => loadMap(violetCenterData as GrayboxMapJson),
   VIOLET_MART: () => loadMap(violetMartData as GrayboxMapJson),
+  // Phase 7 (violet-city-design.md): the Academy core — an enterable stub.
+  VIOLET_ACADEMY: () => loadMap(violetAcademyData as GrayboxMapJson),
   GYM: () => loadMap(gymData as GrayboxMapJson),
 };
 

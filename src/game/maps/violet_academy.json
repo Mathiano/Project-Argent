@@ -1,0 +1,80 @@
+{
+  "name": "VIOLET ACADEMY",
+  "_layout": "10x8 enterable Academy core (docs/violet-city-design.md) — the ancient stone hall: the living answer to the Concord's 'skip the decade'. Ancient pillars (P, solid), an instructor + a student, and a wall inscription (the teaching). Door (d) south back to Violet's square. STUB this pass — the full grounds (training yard, bell room) is a Phase-7 follow-up.",
+  "width": 10,
+  "height": 8,
+  "tilesize": 16,
+  "tiles": "WWWWWWWWWW\nW........W\nW.P....P.W\nW........W\nW........W\nW.P....P.W\nW........W\nWWWWdWWWWW",
+  "tileset": {
+    "W": { "color": "#6c5a48", "solid": true, "label": "ancient stone wall" },
+    ".": { "color": "#cabfa6", "solid": false, "label": "stone floor" },
+    "P": { "color": "#3a302a", "solid": true, "label": "ancient pillar" },
+    "d": { "color": "#9c8a78", "solid": false, "label": "archway" }
+  },
+  "objects": [
+    { "type": "warp", "x": 4, "y": 7, "target": "VIOLET:fromAcademy" },
+    {
+      "_note": "The teaching inscription on the back wall — the bond thesis as the Academy's whole purpose.",
+      "type": "sign",
+      "x": 5,
+      "y": 0,
+      "lines": [
+        "Carved deep into the old stone:",
+        "",
+        "\"THE ACADEMY TEACHES.",
+        " THE GYM TESTS.",
+        "",
+        " We do not sell strength here.",
+        " We teach you to be worth",
+        " trusting — and to know a",
+        " partner worth trusting back.",
+        "",
+        " It takes years. That is not",
+        " the flaw. That is the point.\""
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 3,
+      "y": 3,
+      "color": "#caa148",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "INSTRUCTOR: Welcome to the old",
+            "hall. Every leader this region",
+            "ever raised started on these",
+            "floors — FALKNER included.",
+            "INSTRUCTOR: We don't make them",
+            "strong. We make them ready to",
+            "earn it. There's a difference.",
+            "The Concord never learned it."
+          ]
+        }
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 6,
+      "y": 4,
+      "color": "#88c0e8",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "STUDENT: I've been here three",
+            "years and I still can't read",
+            "the wind like the masters.",
+            "STUDENT: But my partner waits",
+            "for me to try. That's worth",
+            "more than any shortcut."
+          ]
+        }
+      ]
+    }
+  ],
+  "spawns": {
+    "fromViolet": { "x": 4, "y": 6, "facing": "up" }
+  }
+}
