@@ -131,18 +131,26 @@ brute to ~85). `FALKNER_GUST_FOCUS_RATE` in `bossAI.ts`.
 
 ### Focus Foe-Intent tell (Item 2 — info-discipline)
 A profiled trainer's Focus narrows which release is coming, per its `info`
-discipline (`'open'`/`'vague'`/`'opaque'` on `TrainerProfile`):
-- **open** → a truthful 2-of-3 narrowing — "focuses to attack" (HEAVY/FEINT),
-  "focuses to outwit" (HIDE/FEINT), "focuses to move fast" (HEAVY/HIDE). A
-  learnable 50/50, consistent per trainer (salted by name), never collapsing
-  into a perfect tell. Stage-1 trainers (Youngster/JAY/Lass) = open.
-- **vague** → "is focusing intently" (FALKNER — a gym leader hints, doesn't
-  narrow). **opaque** → just "FOCUSING" (elites/Concord, later).
+discipline (`'open'`/`'vague'`/`'opaque'` on `TrainerProfile`) AND its PHASE
+(wind-up R1 vs release R2 — KICKOFF-focus-tell-phase-clarity.md). The LENS
+(attack/outwit/move fast) is the learned vocabulary and is consistent across
+both phases; only the VERB changes, so the player can tell which phase they're
+in — and the wind-up verb flags the foe's interrupt window (mid-charge →
+punishable with Aggressive):
+- **open** → a truthful 2-of-3 narrowing. Wind-up: "is charging to attack"
+  (HEAVY/FEINT) / "…to outwit" (HIDE/FEINT) / "…to move fast" (HEAVY/HIDE).
+  Release: "focuses to attack/outwit/move fast". A learnable 50/50, consistent
+  per trainer (salted by name), never collapsing. Stage-1 trainers = open.
+- **vague** → "is gathering intently" (R1) → "is focusing intently" (R2)
+  (FALKNER). **opaque** → "is gathering..." (R1) → "is FOCUSING" (R2)
+  (elites/Concord, later). No-info fallback: "is gathering" (R1) → "is
+  focusing" (R2).
 The tell PHRASES live in `src/game/scenes/battle.ts` (`focusIntentTell`,
-`FOCUS_NARROW_HINTS`) with the other intent tells; `degradeIntent` routes a
-focus commit (predicting the release) AND the mid-focus release through it.
-Wired via the `foeFocusInfo` scene option. PRESENTATION only — no engine
-effect, ladders unperturbed. Bluffing (lying tells) is the later 'bluffer' tier.
+`FOCUS_LENSES`, `FocusPhase`) with the other intent tells; `degradeIntent`
+routes the focus commit (R1 wind-up, predicting the release) AND the mid-focus
+release (R2) through it, phase-aware. Wired via the `foeFocusInfo` scene
+option. PRESENTATION only — no engine effect, ladders unperturbed. Bluffing
+(lying tells) is the later 'bluffer' tier.
 
 - **Where:** `src/engine/trainerAI.ts` — pure policy (`trainerPolicy(profile)`),
   the `TrainerProfile` type, the `TRAINER_PROFILES` registry, and the win-flag

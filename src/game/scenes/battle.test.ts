@@ -1294,27 +1294,87 @@ describe('FOCUS foe-intent tells (graduated by info-discipline)', () => {
     expect(focusIntentTell('heavy', 'X', { discipline: 'opaque' })).toBe('X is FOCUSING');
   });
 
-  test('degradeIntent routes a FOCUS COMMIT through the tell (predicting the release)', () => {
+  test('degradeIntent routes a FOCUS COMMIT (WIND-UP) through the charging tell', () => {
     const rng = mulberry32(1);
     // An aggressor charging (commit, base A → HEAVY) with open discipline.
     const commit = { kind: 'move' as const, move: 'TACKLE', stance: 'A' as const, commit: true };
     const open = degradeIntent(commit, 'JAY', 'honest', rng, { discipline: 'open', favoredRelease: 'heavy', salt: 'JAY' });
-    expect(open.line).toMatch(/JAY focuses to /);
+    expect(open.line).toMatch(/JAY is charging to /); // WIND-UP verb, not "focuses to"
     const vague = degradeIntent(commit, 'FALKNER', 'ambiguous', rng, { discipline: 'vague' });
-    expect(vague.line).toBe('FALKNER is focusing intently');
+    expect(vague.line).toBe('FALKNER is gathering intently'); // wind-up vague
   });
 
-  test('degradeIntent routes the MID-FOCUS RELEASE through the tell too', () => {
+  test('degradeIntent routes the MID-FOCUS RELEASE through the focuses tell', () => {
     const rng = mulberry32(1);
     const release = { kind: 'release' as const, release: 'hide' as const };
     const line = degradeIntent(release, 'AMBU', 'honest', rng, { discipline: 'open', salt: 'AMBU' }).line!;
+    expect(line).toMatch(/AMBU focuses to /); // RELEASE verb
     const phrase = line.slice('AMBU '.length);
     expect(PAIR[phrase]).toContain('hide'); // truthful for HIDE
   });
 
-  test('no focus info (wild / unprofiled) → the legacy generic "is focusing"', () => {
+  test('no focus info (wild / unprofiled): wind-up → "is gathering", release → "is focusing"', () => {
     const rng = mulberry32(1);
     const commit = { kind: 'move' as const, move: 'TACKLE', stance: 'A' as const, commit: true };
-    expect(degradeIntent(commit, 'WILD', 'honest', rng).line).toBe('WILD is focusing');
+    expect(degradeIntent(commit, 'WILD', 'honest', rng).line).toBe('WILD is gathering');
+    const release = { kind: 'release' as const, release: 'heavy' as const };
+    expect(degradeIntent(release, 'WILD', 'honest', rng).line).toBe('WILD is focusing');
+  });
+});
+
+// ── Focus-tell PHASE clarity (KICKOFF-focus-tell-phase-clarity.md) ───────────
+// The wind-up (R1) and release (R2) of one Focus must read as DIFFERENT phases
+// (different verb) while keeping the SAME learned lens (open tier). The wind-up
+// verb also flags the interrupt window.
+describe('FOCUS tell — phase-aware verbs, consistent lens', () => {
+  // Reverse-map each lens noun → the release pair it truthfully narrows.
+  const LENS_PAIR: Record<string, readonly string[]> = {
+    attack: ['heavy', 'feint'],
+    outwit: ['hide', 'feint'],
+    'move fast': ['heavy', 'hide'],
+  };
+  const lensOf = (line: string, name: string): string =>
+    line.slice(`${name} `.length).replace(/^is charging to /, '').replace(/^focuses to /, '');
+
+  test('OPEN: wind-up says "is charging to X", release says "focuses to X"', () => {
+    const info: FocusIntentInfo = { discipline: 'open', salt: 'JAY' };
+    const windup = focusIntentTell('heavy', 'JAY', info, 'windup');
+    const release = focusIntentTell('heavy', 'JAY', info, 'release');
+    expect(windup).toMatch(/^JAY is charging to /);
+    expect(release).toMatch(/^JAY focuses to /);
+    expect(windup).not.toBe(release); // the two phases read differently
+  });
+
+  test('OPEN: the LENS is identical across both phases of one Focus (learnable)', () => {
+    for (const release of ['heavy', 'feint', 'hide'] as const) {
+      const info: FocusIntentInfo = { discipline: 'open', salt: 'JAY' };
+      const w = lensOf(focusIntentTell(release, 'JAY', info, 'windup'), 'JAY');
+      const r = lensOf(focusIntentTell(release, 'JAY', info, 'release'), 'JAY');
+      expect(w).toBe(r); // same lens, only the verb changed
+    }
+  });
+
+  test('OPEN: the WIND-UP phrase truthfully CONTAINS the chosen release', () => {
+    for (const release of ['heavy', 'feint', 'hide'] as const) {
+      const line = focusIntentTell(release, 'FOE', { discipline: 'open', salt: 'FOE' }, 'windup');
+      const lens = lensOf(line, 'FOE');
+      expect(LENS_PAIR[lens]).toBeDefined();
+      expect(LENS_PAIR[lens]).toContain(release);
+    }
+  });
+
+  test('VAGUE: "is gathering intently" (wind-up) → "is focusing intently" (release)', () => {
+    expect(focusIntentTell('heavy', 'FALKNER', { discipline: 'vague' }, 'windup')).toBe('FALKNER is gathering intently');
+    expect(focusIntentTell('heavy', 'FALKNER', { discipline: 'vague' }, 'release')).toBe('FALKNER is focusing intently');
+  });
+
+  test('OPAQUE: "is gathering..." (wind-up) → "is FOCUSING" (release)', () => {
+    expect(focusIntentTell('heavy', 'X', { discipline: 'opaque' }, 'windup')).toBe('X is gathering...');
+    expect(focusIntentTell('heavy', 'X', { discipline: 'opaque' }, 'release')).toBe('X is FOCUSING');
+  });
+
+  test('phase defaults to RELEASE (the existing 3-arg phrases are unchanged)', () => {
+    expect(focusIntentTell('heavy', 'FALKNER', { discipline: 'vague' })).toBe('FALKNER is focusing intently');
+    expect(focusIntentTell('heavy', 'X', { discipline: 'opaque' })).toBe('X is FOCUSING');
   });
 });

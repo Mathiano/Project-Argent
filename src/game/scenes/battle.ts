@@ -280,20 +280,27 @@ const NARROW_HINTS: readonly { readonly text: string; readonly pair: readonly St
 ];
 
 // Combat Layer 4 Stage 1 — the FOCUS tell vocabulary (info-warfare, Layer 3.5).
-// Three 2-of-3 NARROWINGS, each pairing two releases by a different lens, so an
-// 'open' trainer's Focus leaks a learnable 50/50 (information without
-// certainty) instead of a blind 1/3 guess. The categories are LEARNED — the
-// phrase is the tell; the player memorizes what each pairs.
+// Three 2-of-3 LENSES, each pairing two releases, so an 'open' trainer's Focus
+// leaks a learnable 50/50 (information without certainty) instead of a blind
+// 1/3 guess. The LENS (attack/outwit/move fast) is the learned vocabulary; it
+// stays constant across both phases of a Focus. Only the VERB changes per phase
+// (wind-up "is charging to…" vs release "focuses to…") so the player can tell
+// WHICH phase they're in — and the wind-up verb is a tactical invitation (the
+// foe is mid-charge → interruptible with Aggressive). See KICKOFF-focus-tell-
+// phase-clarity.md.
 export type FocusDiscipline = 'open' | 'vague' | 'opaque';
+// The two phases of a foe Focus: the WIND-UP (R1, committed but not releasing —
+// the foe's vulnerability window) and the RELEASE (R2, resolving this round).
+export type FocusPhase = 'windup' | 'release';
 export interface FocusIntentInfo {
   readonly discipline: FocusDiscipline;
   readonly favoredRelease?: ReleaseKind;
   readonly salt?: string;
 }
-const FOCUS_NARROW_HINTS: readonly { readonly text: string; readonly pair: readonly ReleaseKind[] }[] = [
-  { text: 'focuses to attack', pair: ['heavy', 'feint'] }, // both HIT you
-  { text: 'focuses to outwit', pair: ['hide', 'feint'] }, // both DECEIVE
-  { text: 'focuses to move fast', pair: ['heavy', 'hide'] }, // both SPEED-of-commit
+const FOCUS_LENSES: readonly { readonly lens: string; readonly pair: readonly ReleaseKind[] }[] = [
+  { lens: 'attack', pair: ['heavy', 'feint'] }, // both HIT you
+  { lens: 'outwit', pair: ['hide', 'feint'] }, // both DECEIVE
+  { lens: 'move fast', pair: ['heavy', 'hide'] }, // both SPEED-of-commit
 ];
 
 // A tiny stable hash → an index, so an 'open' trainer's narrowing is CONSISTENT
@@ -305,15 +312,25 @@ function saltIndex(salt: string, mod: number): number {
   return mod <= 0 ? 0 : h % mod;
 }
 
-// The Foe Intent line for a FOCUS, graduated by the trainer's discipline.
-export function focusIntentTell(release: ReleaseKind, name: string, info: FocusIntentInfo): string {
-  if (info.discipline === 'opaque') return `${name} is FOCUSING`;
-  if (info.discipline === 'vague') return `${name} is focusing intently`;
-  // 'open' — a truthful narrowing that INCLUDES this release. Pick consistently
-  // per trainer (salt) among the two valid narrowings → learnable, not a tell.
-  const valid = FOCUS_NARROW_HINTS.filter((h) => h.pair.includes(release));
-  const hint = valid[saltIndex(info.salt ?? name, valid.length)] ?? valid[0]!;
-  return `${name} ${hint.text}`;
+// The Foe Intent line for a FOCUS, graduated by the trainer's discipline AND
+// phase. R2 (release) phrases are the existing ones (unchanged); R1 (wind-up)
+// uses the new "charging / gathering" verbs over the SAME lens/discipline.
+export function focusIntentTell(
+  release: ReleaseKind,
+  name: string,
+  info: FocusIntentInfo,
+  phase: FocusPhase = 'release',
+): string {
+  const windup = phase === 'windup';
+  if (info.discipline === 'opaque') return windup ? `${name} is gathering...` : `${name} is FOCUSING`;
+  if (info.discipline === 'vague') return windup ? `${name} is gathering intently` : `${name} is focusing intently`;
+  // 'open' — a truthful narrowing that INCLUDES this release. Pick the lens
+  // consistently per trainer (salt) among the two valid lenses → learnable, not
+  // a tell. The lens is identical across phases (same release + salt); only the
+  // verb differs, so "JAY is charging to attack" → "JAY focuses to attack".
+  const valid = FOCUS_LENSES.filter((h) => h.pair.includes(release));
+  const lens = (valid[saltIndex(info.salt ?? name, valid.length)] ?? valid[0]!).lens;
+  return windup ? `${name} is charging to ${lens}` : `${name} focuses to ${lens}`;
 }
 
 // The release a FOCUS will become, known at focus time: the trainer's favored
@@ -339,12 +356,13 @@ function foeActionLine(action: Action, name: string): { stance: Stance | null; l
   if (action.kind === 'switch') return { stance: null, line: `${name} is switching` };
   if (action.kind === 'throwBall') return { stance: null, line: `${name} readies a ball` };
   if (action.kind === 'call') return { stance: null, line: `${name} calls out` };
-  // FOCUS R2 — a release is hidden (no stance to read; the focus telegraphed
-  // only that A release is coming).
-  if (action.kind === 'release') return { stance: null, line: `${name} unleashes its focus` };
-  // A committing move (R1 focus) still telegraphs only "focusing"; a normal
-  // single-step reads off its stance.
-  if (action.commit === true) return { stance: null, line: `${name} is focusing` };
+  // FOCUS R2 (no-info fallback) — releasing this round. (Profiled focusers go
+  // through focusIntentTell with a discipline; this is the wild/unprofiled
+  // generic, phase-distinguished from the wind-up below.)
+  if (action.kind === 'release') return { stance: null, line: `${name} is focusing` };
+  // FOCUS R1 (no-info fallback) — winding up. "gathering" mirrors the wind-up
+  // verb of the disciplined tells so the phase reads even with no narrowing.
+  if (action.commit === true) return { stance: null, line: `${name} is gathering` };
   return { stance: action.stance, line: `${name} ${stanceIntentVerb(action.stance)}` };
 }
 
@@ -358,14 +376,16 @@ export function degradeIntent(
   // OPAQUE (Elite Four / Champion) — no indicator at all. Pure cold read.
   if (reliability === 'opaque') return { line: null };
   // FOCUS tell (Layer 4 Stage 1) — a profiled trainer's Focus narrows which
-  // release is coming per its info-discipline. Fires both on the focus COMMIT
-  // (R1, telegraphing next round's release) and while MID-FOCUS (R2, the
-  // imminent release) — the player needs the read when they pick their defense.
+  // release is coming per its info-discipline, PHASE-aware: the focus COMMIT
+  // (R1 wind-up, "is charging to…" — telegraphs next round's release AND flags
+  // the interrupt window) vs MID-FOCUS (R2 release, "focuses to…" — resolving
+  // this round). The lens is consistent across both phases.
   if (foeFocusInfo) {
     const isFocusCommit = action.kind === 'move' && action.commit === true;
     const isRelease = action.kind === 'release';
     if (isFocusCommit || isRelease) {
-      return { line: focusIntentTell(focusReleaseOf(action, foeFocusInfo), name, foeFocusInfo) };
+      const phase: FocusPhase = isRelease ? 'release' : 'windup';
+      return { line: focusIntentTell(focusReleaseOf(action, foeFocusInfo), name, foeFocusInfo, phase) };
     }
   }
   const honest = foeActionLine(action, name);
