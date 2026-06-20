@@ -38,9 +38,9 @@ A defender facing a feared release spends ★ on a Call (unchanged from the prio
 
 | Knob | Value | Meaning |
 |---|---|---|
-| `focusCost` | **1.0** | R1: the focuser deals 0 and takes the opponent's strike ×this. **THE master balance lever** (design sweet spot ~1.0–1.2). |
-| `releaseBase` | 1.7 | R2 release base damage multiplier (the payoff). |
-| `winDmg` / `winFoe` | 1.8 / 0.35 | rotation WIN: releaser ×1.8, opponent's counter ×0.35. |
+| `focusCost` | **0.6** | R1: the focuser deals 0 and takes the opponent's strike ×this. **THE master balance lever.** RE-TUNED from 1.0 (2026-06-20, KICKOFF-focus-damage-bugfix.md): the Bug-1 release-reward cut required a matching cost cut to keep focusing worthwhile (else non-focusing single-step play dominates and focus-spam falls below mindless spam). At 0.6 the gate's documented shape is restored. |
+| `releaseBase` | **1.3** | R2 release base damage multiplier (the payoff). FEEL-TUNED DOWN from 1.7 (2026-06-20, KICKOFF-focus-damage-bugfix.md): at 1.7 a landed HEAVY one-shot foes. At 1.3 a landed HEAVY does ~40% (neutral) / ~60% (crush) / ~20% (dodged) of a full-HP target — strong but the foe survives one landed Heavy at full HP. Uniform scale → strategy balance preserved (re-gated). |
+| `winDmg` / `winFoe` | **1.45** / 0.35 | rotation WIN: releaser ×1.45 (the HEAVY crush, down from 1.8 so a crush is a big chunk above neutral but not a one-shot), opponent's counter ×0.35. |
 | `loseDmg` / `loseFoe` | 0.5 / 1.15 | rotation LOSE: releaser ×0.5, opponent's counter ×1.15. |
 | `neutralDmg` / `neutralFoe` | 1.0 / 1.0 | rotation NEUTRAL: a straight trade. |
 | `flipWin` / `flipLose` | 1.45 / 0.62 | both-release FLIP: winner / loser release multipliers. |
@@ -50,7 +50,7 @@ A defender facing a feared release spends ★ on a Call (unchanged from the prio
 The base single-step triangle (AGGRESSIVE > FLUID > GUARD, Fluid acts first), the thrice-repeat self-daze, and the Call escapes are untouched. The single-step resolution path is RNG- and event-identical to before, so the AI ladders are **bit-identical** (the bot archetypes never focus).
 
 ## Sim gate (`src/sim/focusBalance.test.ts`, SPROUTLE mirror, n=400/pair, as built)
-Adaptive (reading + occasional focus + clutch calls) **tops (~67%)**; BaseBalanced (pure single-step reading) ~62%; the focus-spammers (FocusLover/Heavy/Feint/Hide) cluster **46–55%, all below balanced**; FluidSpam (predictable single-spam) floors (~22%, base triangle preserved). The **three releases are used ~equally** (~12% each — no dominant release). Full spread ~45pp / competitive (excl. the FluidSpam strawman) ~21pp — wider than the design's abstract ~10pp because the engine's hard counters are decisive (FluidSpam's deserved collapse + pool stance-skew); the structural relationships (reading tops, focus-spam below balanced, releases equal, no dominant strategy) all hold. FOCUS_COST is the lever to re-tune if feel demands it.
+Re-gated 2026-06-20 at `releaseBase` 1.3 / `winDmg` 1.45 / `focusCost` 0.6 (KICKOFF-focus-damage-bugfix.md). Adaptive (reading + occasional focus + clutch calls) **tops (~69%)**; BaseBalanced (pure single-step reading) ~66%; the focus-spammers (FocusLover/Heavy/Feint/Hide) cluster **45–53%, all below balanced**; FluidSpam (predictable single-spam) floors (~21%, base triangle preserved — and loses hardest). The **three releases are used ~equally** (~12% each — no dominant release). Full spread ~48pp / competitive (excl. the FluidSpam strawman) ~24pp; the structural relationships (reading tops, focus-spam below balanced, releases equal, no dominant strategy) all hold. The damage feel-tune (lower release reward) was offset by a matching `focusCost` cut, so the shape matches the original build's. FOCUS_COST remains the lever to re-tune if feel demands it.
 
 ## Game-layer behavior (`src/game/scenes/battle.ts`)
 - R1: the commit-modifier shows `▶FOCUS` in the move preview; the HUD shows a generic **FOCUS** tag on the focusing mon (the foe's view reveals only that it's focusing, never the release).

@@ -65,15 +65,31 @@ export const COMBAT = {
 export const FOCUS = {
   // R1 FOCUS COST (master knob): the focuser DEALS 0 and TAKES the opponent's
   // single-step strike ×this — the guaranteed cost of gathering energy.
-  focusCost: 1.0,
+  // RE-TUNED 1.0→0.6 (KICKOFF-focus-damage-bugfix.md, 2026-06-20): the Bug-1
+  // releaseBase cut (1.7→1.3) lowered the release REWARD, so the R1 COST had to
+  // follow to keep focusing worthwhile — else non-focusing single-step play
+  // (BaseBalanced/FluidSpam) dominates and focus-spam falls BELOW mindless
+  // spam, inverting the gate. At 0.6 the focusBalance sim's documented shape is
+  // restored (Adaptive tops, focus-spam below balanced, FluidSpam loses
+  // hardest, releases used ~equally). This is the master lever per design.
+  focusCost: 0.6,
   // R2 release base damage multiplier (the payoff strike, before the rotation
-  // outcome tilt).
-  releaseBase: 1.7,
+  // outcome tilt). FEEL-TUNED DOWN 1.7→1.3 (KICKOFF-focus-damage-bugfix.md,
+  // 2026-06-20): at 1.7 a landed HEAVY (esp. a super-effective one, or a crush
+  // vs a Brace) one-shot foes — the sim validated STRATEGY balance but never
+  // ABSOLUTE magnitude. At 1.3 a landed HEAVY is STRONG but proportionate
+  // (~40% neutral / ~60% crush / ~20% dodged of a full-HP target), so the foe
+  // survives a single landed Heavy at full HP in the normal case. Uniformly
+  // scales every release outcome (rotation tilts unchanged) so the focus-
+  // balance sim's strategy relationships hold; re-gated at this value.
+  releaseBase: 1.3,
   // ROTATION outcome (R2 release vs the opponent's single-step):
   //   win  — releaser ×winDmg + its effect; the opponent's strike ×winFoe.
   //   lose — releaser ×loseDmg (blunted); the opponent's strike ×loseFoe.
   //   neutral — a trade: releaser ×neutralDmg, opponent normal.
-  winDmg: 1.8,
+  // winDmg (the HEAVY-crush reward) tuned 1.8→1.45 with the releaseBase cut so
+  // a CRUSH is a big chunk (~60%) above neutral but not a one-shot.
+  winDmg: 1.45,
   winFoe: 0.35,
   loseDmg: 0.5,
   loseFoe: 1.15,
