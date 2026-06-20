@@ -140,7 +140,7 @@ function createHarness(): Harness {
   function showOverworld(map: string, spawn: string, faded: boolean): void {
     setTop(
       'overworld',
-      createOverworldScene({
+      createOverworldScene({ random: () => 0,
         map,
         spawn,
         inputState: input,
@@ -332,7 +332,7 @@ describe('Phase 0 GATE — cold-start integration', () => {
     for (const map of ['LAB', 'HOUSE', 'ROUTE31', 'GYM']) {
       const spawn = map === 'LAB' ? 'default' : 'fromRoute';
       expect(() =>
-        createOverworldScene({
+        createOverworldScene({ random: () => 0,
           map,
           spawn,
           inputState: input,

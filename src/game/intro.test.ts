@@ -204,7 +204,7 @@ describe('Phase 3 polish — Hearthwick south exit is HARD-gated by player_has_s
     const input = mockInput();
     const flags = mockFlags();
     // No player_has_starter set.
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'HEARTHWICK',
       spawn: 'fromHouse',
       inputState: input,
@@ -291,7 +291,7 @@ describe('Phase 3 — script-runner support for show-starter-pick + requiresFlag
   test('show-starter-pick in a script invokes the onStarterPick callback', () => {
     let calls = 0;
     const input = mockInput();
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'LAB',
       spawn: 'default',
       inputState: input,
@@ -323,7 +323,7 @@ describe('Phase 3 — script-runner support for show-starter-pick + requiresFlag
     const flags = mockFlags();
     // Lab's KAMON theft script requires player_has_starter. Without
     // the flag, walking onto its tile must NOT burn its flag marker.
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'LAB',
       spawn: 'default',
       inputState: mockInput(),

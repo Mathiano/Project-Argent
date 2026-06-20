@@ -147,7 +147,7 @@ describe('overworld cold-start warp round-trip', () => {
     // when the lab was on the route).
     let warpTarget: string | null = null;
     const input = mockInput();
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'LAB',
       spawn: 'default',
       inputState: input,
@@ -176,7 +176,7 @@ describe('overworld cold-start warp round-trip', () => {
     // HEARTHWICK:fromRoute (lab is inside Hearthwick town).
     let warpTarget: string | null = null;
     const input = mockInput();
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'ROUTE31',
       spawn: 'fromHearthwick',
       inputState: input,
@@ -206,7 +206,7 @@ describe('overworld cold-start warp round-trip', () => {
   test('GYM:fromRoute spawn loads + the gym door at (7,15) warps back to VIOLET:fromGym', () => {
     let warpTarget: string | null = null;
     const input = mockInput();
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'GYM',
       spawn: 'fromRoute',
       inputState: input,
@@ -235,7 +235,7 @@ describe('Demo-complete — Violet City hub wires Route 31 → Violet → gym', 
   test('Route 31 south exit — a gap in the tree line — warps INTO Violet City', () => {
     let warpTarget: string | null = null;
     const input = mockInput();
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'ROUTE31',
       spawn: 'fromViolet', // one tile north of the bottom-edge gap (Phase 7 route)
       inputState: input,
@@ -260,7 +260,7 @@ describe('Demo-complete — Violet City hub wires Route 31 → Violet → gym', 
     // DOWN onto its door); the route exit is the NORTH-edge gap (walk UP).
     let gymWarp: string | null = null;
     const input = mockInput();
-    const gymScene = createOverworldScene({
+    const gymScene = createOverworldScene({ random: () => 0,
       map: 'VIOLET',
       spawn: 'fromGym', // (9,11), one tile above the gym door at (9,12)
       inputState: input,
@@ -282,7 +282,7 @@ describe('Demo-complete — Violet City hub wires Route 31 → Violet → gym', 
     // UP onto the north-edge gap (9,0) warps back to Route 31.
     let routeWarp: string | null = null;
     const input2 = mockInput();
-    const exitScene = createOverworldScene({
+    const exitScene = createOverworldScene({ random: () => 0,
       map: 'VIOLET',
       spawn: 'fromRoute',
       inputState: input2,
@@ -306,7 +306,7 @@ describe('Phase 5a fix — Hearthwick Pokémon Center door round-trip', () => {
   test('Hearthwick door tile (3, 11) warps INTO the Pokémon Center', () => {
     let warpTarget: string | null = null;
     const input = mockInput();
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'HEARTHWICK',
       // Spawn close to the door so the test isn't sensitive to layout
       // drift on the rest of the map.
@@ -334,7 +334,7 @@ describe('Phase 5a fix — Hearthwick Pokémon Center door round-trip', () => {
   test('CENTER door tile warps BACK to Hearthwick — completing the round-trip', () => {
     let warpTarget: string | null = null;
     const input = mockInput();
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'HEARTHWICK_CENTER',
       spawn: 'fromHearthwick',
       inputState: input,
@@ -361,7 +361,7 @@ describe('Phase 5a fix — Hearthwick Pokémon Center door round-trip', () => {
 describe('Phase 5a fix — Gen-2 input model (tap turns, hold walks)', () => {
   test('tap of a new direction TURNS the player but does NOT move them', () => {
     const input = mockInput();
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'LAB',
       spawn: 'default',
       inputState: input,
@@ -385,7 +385,7 @@ describe('Phase 5a fix — Gen-2 input model (tap turns, hold walks)', () => {
 
   test('hold of a new direction TURNS then WALKS (single step on the press)', () => {
     const input = mockInput();
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'LAB',
       spawn: 'default',
       inputState: input,
@@ -410,7 +410,7 @@ describe('Phase 5a fix — Gen-2 input model (tap turns, hold walks)', () => {
     // on the same tick as the rising edge — distinct from the
     // turn-then-walk case above.
     const input = mockInput();
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'LAB',
       spawn: 'default',
       inputState: input,
@@ -431,7 +431,7 @@ describe('Phase 5a fix — Gen-2 input model (tap turns, hold walks)', () => {
 
   test('continuous hold WALKS tile after tile (Gen-2 hold-to-walk)', () => {
     const input = mockInput();
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'LAB',
       spawn: 'default',
       inputState: input,
@@ -471,7 +471,7 @@ describe('Phase 5a fix — encounter rolls only on real moves + post-battle grac
   test('turning in place while standing on a grass tile does NOT roll an encounter', () => {
     let encounters = 0;
     const input = mockInput();
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'ROUTE31',
       // Drop the player onto a tall-grass encounter tile directly (the
       // left grass column, encounter_zone cols 2-3 rows 5-9).
@@ -501,7 +501,7 @@ describe('Phase 5a fix — encounter rolls only on real moves + post-battle grac
   test('post-battle grace: armPostBattleGrace skips exactly ONE encounter roll', () => {
     let encounters = 0;
     const input = mockInput();
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'ROUTE31',
       // Start ABOVE the left grass column (encounter_zone cols 2-3 rows
       // 5-9) and walk DOWN into it twice.
@@ -543,7 +543,7 @@ describe('trainer line-of-sight (F2) — GYM gauntlet', () => {
     flags.set('gym_trainer_beaten'); // clear the blocking talk-trainer at (7,12)
     for (const f of preBeaten) flags.set(f);
     const calls: Array<{ winFlag: string }> = [];
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'GYM',
       spawn: 'fromRoute', // (7,14) facing up
       inputState: input,
@@ -595,7 +595,7 @@ describe('JAY the robber — the opening bond hook is UNMISSABLE (forced on entr
     if (preBeaten) flags.set('route31_trainer_beaten');
     const calls: Array<{ winFlag: string }> = [];
     let warpTarget: string | null = null;
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'ROUTE31',
       spawn: 'default', // (4,3), facing down toward the south exit
       inputState: input,
@@ -702,7 +702,7 @@ describe('post-battle NPC follow-up auto-starts (FLOW 1)', () => {
     const input = mockInput();
     const flags = mockFlags();
     flags.set('gym_trainer_2_beaten'); // the BIRDKEEPER (LoS trainer) is beaten
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'GYM',
       spawn: 'fromRoute',
       inputState: input,
@@ -722,7 +722,7 @@ describe('post-battle NPC follow-up auto-starts (FLOW 1)', () => {
 
   test('runNpcFollowup is a no-op for an unknown / follow-up-less flag', () => {
     const input = mockInput();
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'GYM',
       spawn: 'fromRoute',
       inputState: input,

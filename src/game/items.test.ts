@@ -291,7 +291,7 @@ describe('Phase 5a GATE — Pokémon Center heal-party script verb wires through
   test('interacting with the NURSE fires onHealParty after the opening dialog', () => {
     let healCalls = 0;
     const input = mockInput();
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'HEARTHWICK_CENTER',
       spawn: 'fromHearthwick',
       inputState: input,
@@ -353,7 +353,7 @@ describe('Phase 5b GATE — Poké Mart open-mart verb wires through the CLERK NP
   test('interacting with the CLERK fires onOpenMart with the shop stock', () => {
     let martStock: readonly string[] | null = null;
     const input = mockInput();
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0,
       map: 'HEARTHWICK_MART',
       spawn: 'fromHearthwick',
       inputState: input,

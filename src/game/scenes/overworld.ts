@@ -69,10 +69,11 @@ export interface OverworldSceneOpts {
   // no-op (maps without item grants don't need it).
   readonly onGiveItem?: (itemId: string, qty: number) => void;
   // Encounter RNG source (risks/gaps #2). Returns [0,1) like Math.random.
-  // main.ts passes the run's SEEDED rng so encounter sequences are
-  // deterministic + testable, consistent with the combat engine. Defaults
-  // to Math.random when omitted (legacy/test callers without a seed).
-  readonly random?: () => number;
+  // REQUIRED — main.ts passes the run's SEEDED rng so encounter sequences
+  // are deterministic + testable, consistent with the combat engine. No
+  // Math.random fallback: a caller without a seed must fail to compile
+  // rather than silently going non-deterministic.
+  readonly random: () => number;
 }
 
 // Richer Scene the autosave reads — currentPosition() lets main.ts
@@ -566,7 +567,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
       } else {
         // Seeded encounter roll (risks/gaps #2) — through opts.random (the
         // run's seeded rng) so sequences are deterministic + testable.
-        const rand = opts.random ?? Math.random;
+        const rand = opts.random;
         if (rand() < zone.rate) {
           const foe = zone.species[Math.floor(rand() * zone.species.length)]!;
           opts.onEncounter(foe);

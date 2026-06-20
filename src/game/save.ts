@@ -24,8 +24,9 @@ export interface SaveState {
   readonly position: SavedPosition;
   readonly flags: readonly string[];
   readonly catchBreathUnlocked: boolean;
-  // RNG: fresh mulberry32(seed) on load. Overworld encounter rolls
-  // still use raw Math.random() — see backlog in BUILD-ROADMAP.
+  // RNG: fresh mulberry32(seed) on load. Overworld encounter rolls run
+  // through this seeded rng too (overworld's required `random` opt), so
+  // encounter sequences are deterministic — not raw Math.random.
   readonly rngSeed: number;
   // Phase 5a bag. Additive — pre-Phase-5a saves don't carry this
   // field; applySave treats missing as []. Keeps version=1 since

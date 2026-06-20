@@ -17,8 +17,8 @@
 // intro.test.ts; this composes from the overworld start, the same line
 // coldstart.test.ts draws. Determinism: foe mons are built at 1 HP and
 // spd 1 so the player always strikes first and KOs (spd 1 also zeroes
-// the A-vs-F dodge), and Math.random is pinned high so the Route 31
-// grass can't roll a wild encounter mid-walk.
+// the A-vs-F dodge), and the overworld's seeded `random` is pinned high
+// (() => 0.999) so the Route 31 grass can't roll a wild encounter mid-walk.
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import ch1BatchData from '../../docs/ch1-batch.json';
@@ -323,7 +323,7 @@ function createHarness(
   }
 
   function showOverworld(map: string, spawn: string, spawnAt?: { x: number; y: number; facing: Facing }): void {
-    const scene = createOverworldScene({
+    const scene = createOverworldScene({ random: () => 0.999, // pinned high → grass can't roll an encounter mid-walk
       map,
       spawn,
       inputState: input,
@@ -495,8 +495,9 @@ function climbResolvingTrainers(h: Harness, tx: number, ty: number): void {
 
 describe('DEMO-COMPLETE GATE — cold spine intro → Violet → gym → Falkner → badge (one continuous run)', () => {
   beforeEach(() => {
-    // Pin the Route 31 grass: Math.random() ≥ rate → no wild encounter
-    // can interrupt the spine walk.
+    // Belt-and-suspenders: the overworld's encounter roll is the injected
+    // seeded `random` (pinned to 0.999 in showOverworld). This spy covers any
+    // residual Math.random consumer so nothing can interrupt the spine walk.
     vi.spyOn(Math, 'random').mockReturnValue(0.999);
   });
   afterEach(() => {
