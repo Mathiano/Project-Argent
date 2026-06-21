@@ -11,6 +11,10 @@ const dist2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) 
 
 // merged palette starts as the old palette (indices stable -> building tiles untouched)
 const merged = old.palette.slice();
+// Preserve the exact HC grass base green: it's a near-dupe of the placeholder
+// #6cad4f (~11 apart) and would otherwise dedupe away, but the grass base must
+// land EXACT. Seed it so synth grass maps to it; other tiles keep #6cad4f.
+if (!merged.includes('#68b549')) merged.push('#68b549');
 const mergedRgb = merged.map(hex2rgb);
 const synthRgb = synth.palette.map(hex2rgb);
 // map each synth palette index -> merged index (reuse near-dupe, else append)
