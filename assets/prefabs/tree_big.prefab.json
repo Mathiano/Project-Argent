@@ -1,0 +1,17 @@
+{
+  "name": "tree_big",
+  "_note": "2x3 Y-sorted tree prop: 2x2 canopy (non-solid overlay the player walks behind) over a 2-wide trunk (solid). anchor = the trunk/feet row, so a placement (x,y) puts the trunk at (x,y)-(x+1,y) and the canopy above.",
+  "width": 2,
+  "height": 3,
+  "anchor": { "x": 0, "y": 2 },
+  "tiles": [
+    ["canopy", "canopy"],
+    ["canopy", "canopy"],
+    ["trunk_l", "trunk_r"]
+  ],
+  "collision": [
+    [false, false],
+    [false, false],
+    [true, true]
+  ]
+}

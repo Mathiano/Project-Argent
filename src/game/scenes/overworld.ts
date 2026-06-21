@@ -3,8 +3,9 @@ import type { InputState } from '../input';
 import { getMap } from '../overworld/maps';
 import type { Tile, Tileset } from '../overworld/tileset';
 import { getTileset } from '../overworld/tilesetCatalog';
-import type { Facing, MapData, MapObject, ScriptCommand } from '../overworld/types';
+import type { Facing, MapData, MapObject, PlacedProp, ScriptCommand } from '../overworld/types';
 import { findObjectAt, isWalkable } from '../overworld/types';
+import { ySortOrder } from '../overworld/ysort';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
 import { drawPanel, drawText } from '../ui';
@@ -732,6 +733,11 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
       } else {
         drawTiles(ctx, map, rows, camX, camY);
       }
+      // Layer 1 — fringe overlay (decals / ledges / edge decoration): above the
+      // base, below props + player.
+      if (map.fringe !== undefined && tileset !== null) {
+        drawFringeCells(ctx, map, tileset, tileCache, camX, camY, tick);
+      }
       const gustState = drawGustOverlay(ctx, map, camX, camY, tick);
       // The confronting trainer is drawn separately (mid-walk-up OR parked at
       // its walked-up tile), so skip its static marker to avoid a double-draw
@@ -771,7 +777,26 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         : moveT > 0.2 && moveT < 0.8
           ? stride
           : 0;
-      drawPlayer(ctx, px - camX, py - camY, map.tilesize, facing, walkPhase);
+      // Layer 2 — Y-sorted depth pass: interleave the player with the props by
+      // base-Y so the player walks BEHIND tree-tops/roofs (occluded) when north
+      // of their base, and IN FRONT when south. No props → player draws as before.
+      const drawPlayerSprite = (): void =>
+        drawPlayer(ctx, px - camX, py - camY, map.tilesize, facing, walkPhase);
+      if (map.props !== undefined && map.props.length > 0 && tileset !== null) {
+        type Drawable = { readonly sortY: number; readonly render: () => void };
+        const layer2: Drawable[] = [
+          { sortY: py + ts, render: drawPlayerSprite },
+          ...map.props.map(
+            (p): Drawable => ({
+              sortY: p.sortY,
+              render: () => drawPropCells(ctx, p, tileset, tileCache, camX, camY, tick),
+            }),
+          ),
+        ];
+        for (const d of ySortOrder(layer2)) d.render();
+      } else {
+        drawPlayerSprite();
+      }
 
       ctx.fillStyle = 'rgba(32, 32, 44, 0.85)';
       ctx.fillRect(0, 0, LOGICAL_W, 10);
@@ -929,6 +954,76 @@ function drawTilesetCells(
         drawTilePixels(ctx, tile.frames[f] ?? tile.pixels, x * ts - camX, y * ts - camY, ts);
       }
     }
+  }
+}
+
+// Draw a single tile id at a screen position (baked bitmap, or per-pixel
+// fallback in tests). Shared by the fringe + prop layers.
+function drawOneTile(
+  ctx: CanvasRenderingContext2D,
+  tileset: Tileset,
+  cache: Map<string, (HTMLCanvasElement | OffscreenCanvas)[]> | null,
+  id: string,
+  sx: number,
+  sy: number,
+  tick: number,
+): void {
+  const tile = tileset.tiles[id];
+  if (!tile) return;
+  const f = frameIndex(tile, tick);
+  const baked = cache?.get(id);
+  if (baked && baked.length > 0) {
+    ctx.drawImage((baked[f] ?? baked[0]) as CanvasImageSource, sx, sy);
+  } else {
+    drawTilePixels(ctx, tile.frames[f] ?? tile.pixels, sx, sy, tileset.tilesize);
+  }
+}
+
+// Layer 1 — fringe overlay grid (transparent where null). Same viewport cull as
+// the base layer; drawn over the base, under props/player.
+function drawFringeCells(
+  ctx: CanvasRenderingContext2D,
+  map: MapData,
+  tileset: Tileset,
+  cache: Map<string, (HTMLCanvasElement | OffscreenCanvas)[]> | null,
+  camX: number,
+  camY: number,
+  tick: number,
+): void {
+  const ts = map.tilesize;
+  const fringe = map.fringe!;
+  const minX = Math.max(0, Math.floor(camX / ts));
+  const maxX = Math.min(map.width, Math.ceil((camX + LOGICAL_W) / ts) + 1);
+  const minY = Math.max(0, Math.floor(camY / ts));
+  const maxY = Math.min(map.height, Math.ceil((camY + LOGICAL_H) / ts) + 1);
+  for (let y = minY; y < maxY; y += 1) {
+    const row = fringe[y];
+    if (!row) continue;
+    for (let x = minX; x < maxX; x += 1) {
+      const id = row[x];
+      if (id === null || id === undefined) continue;
+      drawOneTile(ctx, tileset, cache, id, x * ts - camX, y * ts - camY, tick);
+    }
+  }
+}
+
+// Layer 2 — draw one prop's cells (already in world tile coords). Off-screen
+// cells are culled. Called in the Y-sorted depth pass.
+function drawPropCells(
+  ctx: CanvasRenderingContext2D,
+  prop: PlacedProp,
+  tileset: Tileset,
+  cache: Map<string, (HTMLCanvasElement | OffscreenCanvas)[]> | null,
+  camX: number,
+  camY: number,
+  tick: number,
+): void {
+  const ts = tileset.tilesize;
+  for (const c of prop.cells) {
+    const sx = c.tx * ts - camX;
+    const sy = c.ty * ts - camY;
+    if (sx <= -ts || sy <= -ts || sx >= LOGICAL_W || sy >= LOGICAL_H) continue;
+    drawOneTile(ctx, tileset, cache, c.tile, sx, sy, tick);
   }
 }
 

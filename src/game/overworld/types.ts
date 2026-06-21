@@ -25,6 +25,17 @@ export interface PrefabPlacement {
   readonly y: number;
 }
 
+// Layered renderer (Phase 7) — a Y-sorted multi-tile prop (tree / roof / awning).
+// Rendered in the depth pass interleaved with the player by `sortY` (the pixel Y
+// of its base/feet row's bottom edge): a prop with sortY <= the player's draws
+// FIRST (behind the player); sortY > the player's draws AFTER (occluding it — the
+// player walks behind tree-tops/roofs). The prop's lower cells register collision
+// (solidOverrides); its upper cells are non-solid overlays the player stands behind.
+export interface PlacedProp {
+  readonly cells: ReadonlyArray<{ readonly tx: number; readonly ty: number; readonly tile: string }>;
+  readonly sortY: number;
+}
+
 export type ScriptCommand =
   | { readonly kind: 'dialog'; readonly lines: readonly string[] }
   | { readonly kind: 'warp'; readonly target: string }
@@ -156,6 +167,13 @@ export interface MapData {
   readonly cells?: ReadonlyArray<ReadonlyArray<string>>;
   readonly solidOverrides?: ReadonlyArray<ReadonlyArray<boolean | null>>;
   readonly tilesetRef?: string;
+  // Layered renderer (Phase 7). `fringe` = the layer-1 overlay grid drawn ABOVE
+  // the base cells and BELOW props/player (decals, ledges, edge decoration);
+  // null = empty (transparent). `props` = layer-2 Y-sorted multi-tile structures
+  // (trees/roofs) interleaved with the player for depth occlusion. Both optional
+  // so every legacy + current map loads and renders exactly as before.
+  readonly fringe?: ReadonlyArray<ReadonlyArray<string | null>>;
+  readonly props?: readonly PlacedProp[];
 }
 
 export function tileAt(map: MapData, x: number, y: number): TileDef | null {

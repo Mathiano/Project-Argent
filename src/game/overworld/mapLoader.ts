@@ -16,7 +16,7 @@
 // returns a unified MapData. Existing scenes read the same shape either
 // way; the renderer branches on `cells` to pick its draw path.
 
-import type { MapData, MapObject, Spawn, TileDef } from './types';
+import type { MapData, MapObject, PlacedProp, Spawn, TileDef } from './types';
 import type { PrefabPlacement } from './types';
 import { getPrefab, getTileset } from './tilesetCatalog';
 import { stampPrefab } from './tileset';
@@ -55,6 +55,13 @@ export interface DataDrivenMapJson {
   // should resolve to the transition set (e.g. ["path","water"]). Skipped per
   // material when the tileset has no transition tiles for it. See autotile.ts.
   readonly autotile?: readonly string[];
+  // Layer 1 — fringe overlay grid (same shorthand as `cells`, but '.' = EMPTY
+  // (transparent), not baseTile). Drawn above the base, below props/player.
+  readonly fringe?: ReadonlyArray<string | ReadonlyArray<string>>;
+  // Layer 2 — Y-sorted multi-tile props (trees/roofs). Each placement stamps a
+  // prefab by its anchor (the feet/base row); the prefab's lower cells carry
+  // collision, upper cells are non-solid overlays. Rendered in the depth pass.
+  readonly props?: readonly PrefabPlacement[];
   readonly objects?: readonly MapObject[];
   readonly spawns: { readonly [id: string]: Spawn };
 }
@@ -135,6 +142,56 @@ function loadDataDrivenMap(j: DataDrivenMapJson): MapData {
     }
   }
 
+  // Layer 1 — fringe overlay grid (optional). '.' = empty (transparent).
+  let fringe: (string | null)[][] | undefined;
+  if (j.fringe !== undefined) {
+    if (j.fringe.length !== j.height) {
+      throw new Error(`Map "${j.name}": fringe rows=${j.fringe.length} != height=${j.height}`);
+    }
+    fringe = [];
+    for (let y = 0; y < j.height; y += 1) {
+      const ids = expandFringeRow(j, j.fringe[y]!, y);
+      for (const id of ids) {
+        if (id !== null && tileset.tiles[id] === undefined) {
+          throw new Error(`Map "${j.name}" fringe row ${y}: tile id "${id}" not in tileset "${j.tilesetRef}"`);
+        }
+      }
+      fringe.push(ids);
+    }
+  }
+
+  // Layer 2 — Y-sorted props (optional). Stamp each prefab by its anchor (the
+  // feet/base row): record draw cells + sortY, and write the SOLID cells into
+  // solidOverrides so the trunk/base blocks while the canopy stays walkable.
+  let props: PlacedProp[] | undefined;
+  if (j.props !== undefined) {
+    props = [];
+    for (const place of j.props) {
+      const prefab = getPrefab(place.name);
+      const ox = place.x - prefab.anchor.x;
+      const oy = place.y - prefab.anchor.y;
+      const drawCells: { tx: number; ty: number; tile: string }[] = [];
+      for (let py = 0; py < prefab.height; py += 1) {
+        for (let px = 0; px < prefab.width; px += 1) {
+          const cell = prefab.cells[py]![px]!;
+          if (cell.tile === null) continue;
+          if (tileset.tiles[cell.tile] === undefined) {
+            throw new Error(`Map "${j.name}" prop "${place.name}": tile "${cell.tile}" not in tileset "${j.tilesetRef}"`);
+          }
+          const wx = ox + px;
+          const wy = oy + py;
+          drawCells.push({ tx: wx, ty: wy, tile: cell.tile });
+          const solid = cell.solid !== null ? cell.solid : tileset.tiles[cell.tile]!.solid;
+          if (solid && wx >= 0 && wy >= 0 && wx < j.width && wy < j.height) {
+            solidOverrides[wy]![wx] = true;
+          }
+        }
+      }
+      // sortY = bottom edge of the anchor (feet) row, in pixels.
+      props.push({ cells: drawCells, sortY: (place.y + 1) * j.tilesize });
+    }
+  }
+
   // Synthesize a flat-color tileset keyed by tile id, so the data-driven
   // path still satisfies tileAt() (it returns one TileDef per id with the
   // solid flag — used by isWalkable's fallback when solidOverrides is null).
@@ -163,6 +220,8 @@ function loadDataDrivenMap(j: DataDrivenMapJson): MapData {
     cells,
     solidOverrides,
     tilesetRef: j.tilesetRef,
+    ...(fringe !== undefined ? { fringe } : {}),
+    ...(props !== undefined ? { props } : {}),
   };
 }
 
@@ -191,6 +250,36 @@ function expandCellsRow(
     }
     const id = j.tileMap?.[ch];
     if (!id) throw new Error(`Map "${j.name}" row ${y} col ${x}: char "${ch}" not in tileMap`);
+    out[x] = id;
+  }
+  return out;
+}
+
+// Fringe rows expand like cells, but '.' (and ' ') = EMPTY (transparent null),
+// not the baseTile — the fringe is a sparse overlay over the base layer.
+function expandFringeRow(
+  j: DataDrivenMapJson,
+  row: string | ReadonlyArray<string>,
+  y: number,
+): (string | null)[] {
+  if (typeof row !== 'string') {
+    if (row.length !== j.width) {
+      throw new Error(`Map "${j.name}" fringe row ${y}: width=${row.length} != ${j.width}`);
+    }
+    return row.map((id) => (id === '' || id === '.' ? null : id));
+  }
+  if (row.length !== j.width) {
+    throw new Error(`Map "${j.name}" fringe row ${y}: string length=${row.length} != ${j.width}`);
+  }
+  const out: (string | null)[] = new Array(j.width);
+  for (let x = 0; x < j.width; x += 1) {
+    const ch = row[x]!;
+    if (ch === '.' || ch === ' ') {
+      out[x] = null;
+      continue;
+    }
+    const id = j.tileMap?.[ch];
+    if (!id) throw new Error(`Map "${j.name}" fringe row ${y} col ${x}: char "${ch}" not in tileMap`);
     out[x] = id;
   }
   return out;

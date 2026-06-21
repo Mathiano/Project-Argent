@@ -1,0 +1,25 @@
+{
+  "name": "PROPTEST",
+  "_note": "Demo/test fixture for the layered renderer: layer0 grass, layer1 flower fringe, layer2 a Y-sorted tree prop. Loaded directly by layers.test.ts + the walk-behind render; NOT in the live map registry.",
+  "width": 12,
+  "height": 10,
+  "tilesize": 16,
+  "tilesetRef": "demo_layers",
+  "baseTile": "grass",
+  "tileMap": { "f": "flower" },
+  "fringe": [
+    "............",
+    "..f......f..",
+    "............",
+    "............",
+    "............",
+    "............",
+    "............",
+    ".f........f.",
+    "............",
+    "............"
+  ],
+  "props": [{ "name": "tree_big", "x": 5, "y": 5 }],
+  "objects": [],
+  "spawns": { "default": { "x": 5, "y": 7, "facing": "up" } }
+}
