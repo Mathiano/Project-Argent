@@ -4,6 +4,8 @@
 
 **The discipline (why this is safe):** every item below is a **data swap** on the existing data-driven engine — tileset JSON, prefab JSON, sprite sheets. No engine edits, no layout change. The map's tile *ids*, footprints, warps, spawns, and objects stay byte-stable; only the *pixels behind the ids* change. The current set is placeholder art that already proves the pipeline end-to-end (`tileset-format.md`).
 
+**VALIDATED PIPELINE (2026-06-21) — terrain transitions are SOLVED by rotation synthesis.** AI-drawn full transition sets don't tile (organic curves don't edge-match; orientations duplicate — see batch-01/02). The working method (`tools/tile_rotate_synth.mjs`, seam-test clean, 0 fallback): the **AI delivers ~1 flat-boundary N-edge master + base per material** (quantized to the locked palette); **CC rotates** the edge to E/S/W and **derives** the corners — `outer = union(N-grass, W-grass)`, `inner = intersect(N-grass, W-grass)` over the fill — so corners are seam-consistent with edges by construction; the second material is a **recolour** of the first. So the AI terrain ask shrinks from "24 transitions" to "**~3 flat-edged masters per material**" (realistically just edge + base). Palette frozen: `assets/palettes/argent-master.palette.json` (21 colours; per-tileset cap 36 keys).
+
 ---
 
 ## 0. The authoring format contract (what EVERY replacement must match)
