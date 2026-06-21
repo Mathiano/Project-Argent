@@ -1,7 +1,8 @@
 import { PNG } from 'pngjs'; import fs from 'fs';
 import { getMap } from '../src/game/overworld/maps.ts';
 import { getTileset } from '../src/game/overworld/tilesetCatalog.ts';
-const map = getMap('VIOLET');
+const NAME = process.argv[2] || 'VIOLET';
+const map = getMap(NAME);
 const ts = getTileset('outdoor_violet');
 const T = ts.tilesize, Z = 4;
 const grass = ts.tiles['grass'].frames[0];
@@ -15,8 +16,9 @@ for (let cy=0; cy<map.height; cy++) for (let cx=0; cx<map.width; cx++) {
     for (let zy=0;zy<Z;zy++) for (let zx=0;zx<Z;zx++) { const di=(((cy*T+y)*Z+zy)*img.width + ((cx*T+x)*Z+zx))*4; img.data[di]=c[0];img.data[di+1]=c[1];img.data[di+2]=c[2];img.data[di+3]=255; }
   }
 }
-fs.writeFileSync('docs/art-reference/violet-rendered.png', PNG.sync.write(img));
-console.log('rendered VIOLET', map.width+'x'+map.height, 'tiles ->', img.width+'x'+img.height, 'px');
+const outName = 'docs/art-reference/' + NAME.toLowerCase() + '-rendered.png';
+fs.writeFileSync(outName, PNG.sync.write(img));
+console.log('rendered', NAME, map.width+'x'+map.height, 'tiles ->', img.width+'x'+img.height, 'px ->', outName);
 // quick tally of which terrain transition ids got placed
 const tally={}; for (const row of map.cells) for (const id of row) if(/_(n|e|s|w|out_|in_)/.test(id)) tally[id]=(tally[id]||0)+1;
 console.log('transition cells:', Object.keys(tally).length?JSON.stringify(tally):'(none)');
