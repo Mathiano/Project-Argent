@@ -6,6 +6,7 @@
   "height": 30,
   "tilesize": 16,
   "baseTile": "grass",
+  "autotile": ["path", "water"],
   "tileMap": {
     "p": "path",
     "T": "tree",

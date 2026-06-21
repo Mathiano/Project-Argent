@@ -20,6 +20,7 @@ import type { MapData, MapObject, Spawn, TileDef } from './types';
 import type { PrefabPlacement } from './types';
 import { getPrefab, getTileset } from './tilesetCatalog';
 import { stampPrefab } from './tileset';
+import { autotileTerrain } from './autotile';
 
 export interface GrayboxMapJson {
   readonly name: string;
@@ -50,6 +51,10 @@ export interface DataDrivenMapJson {
   // prefabs lean on this; explicit arrays don't need it.
   readonly tileMap?: { readonly [char: string]: string };
   readonly prefabs?: readonly PrefabPlacement[];
+  // Opt-in terrain autotiling: material base-ids whose region edges/corners
+  // should resolve to the transition set (e.g. ["path","water"]). Skipped per
+  // material when the tileset has no transition tiles for it. See autotile.ts.
+  readonly autotile?: readonly string[];
   readonly objects?: readonly MapObject[];
   readonly spawns: { readonly [id: string]: Spawn };
 }
@@ -111,6 +116,12 @@ function loadDataDrivenMap(j: DataDrivenMapJson): MapData {
       cells[y]![x] = tile;
       if (solidOverride !== null) solidOverrides[y]![x] = solidOverride;
     });
+  }
+
+  // Terrain autotiling (opt-in): rewrite material region cells to the
+  // transition set before validation, so the new ids are validated too.
+  if (j.autotile !== undefined && j.autotile.length > 0) {
+    autotileTerrain(cells, j.width, j.height, tileset, j.autotile);
   }
 
   // Validate every cell id resolves to a real tile, so a typo in the map
