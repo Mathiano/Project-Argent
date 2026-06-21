@@ -1,0 +1,91 @@
+{
+  "name": "argent-master",
+  "note": "Canonical palette seeded from violet-batch-01 (foundation). Tileset rows encode <=36 single-char keys (0-9a-z); 64 is the project ceiling across tilesets.",
+  "size": 21,
+  "colors": [
+    {
+      "key": "0",
+      "hex": "#092626"
+    },
+    {
+      "key": "1",
+      "hex": "#202525"
+    },
+    {
+      "key": "2",
+      "hex": "#1d402a"
+    },
+    {
+      "key": "3",
+      "hex": "#283751"
+    },
+    {
+      "key": "4",
+      "hex": "#2e5831"
+    },
+    {
+      "key": "5",
+      "hex": "#134182"
+    },
+    {
+      "key": "6",
+      "hex": "#402a25"
+    },
+    {
+      "key": "7",
+      "hex": "#3d343a"
+    },
+    {
+      "key": "8",
+      "hex": "#3d5937"
+    },
+    {
+      "key": "9",
+      "hex": "#514434"
+    },
+    {
+      "key": "a",
+      "hex": "#825437"
+    },
+    {
+      "key": "b",
+      "hex": "#945d38"
+    },
+    {
+      "key": "c",
+      "hex": "#406a31"
+    },
+    {
+      "key": "d",
+      "hex": "#557c23"
+    },
+    {
+      "key": "e",
+      "hex": "#a1683a"
+    },
+    {
+      "key": "f",
+      "hex": "#648054"
+    },
+    {
+      "key": "g",
+      "hex": "#718a63"
+    },
+    {
+      "key": "h",
+      "hex": "#98784a"
+    },
+    {
+      "key": "i",
+      "hex": "#8f9c75"
+    },
+    {
+      "key": "j",
+      "hex": "#ac743f"
+    },
+    {
+      "key": "k",
+      "hex": "#a9af8b"
+    }
+  ]
+}
