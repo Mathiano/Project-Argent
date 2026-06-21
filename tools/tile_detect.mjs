@@ -1,6 +1,7 @@
 import { PNG } from 'pngjs';
 import fs from 'fs';
-const png = PNG.sync.read(fs.readFileSync('docs/art-reference/violet-batch-01.png'));
+const SRC = process.argv[2] || 'docs/art-reference/violet-batch-01.png';
+const png = PNG.sync.read(fs.readFileSync(SRC));
 const { width:W, height:H, data:D } = png;
 const at = (x,y)=>{const i=(y*W+x)*4; return [D[i],D[i+1],D[i+2]];};
 // sample corners + center bg
