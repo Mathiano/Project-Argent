@@ -60,6 +60,33 @@ describe('Y-sort order (depth occlusion)', () => {
   });
 });
 
+describe('live migration — Route 31 + Violet use the layered format', () => {
+  // getMap registers outdoor_violet + the tree_big prefab at module load.
+  test('Route 31 has tree props; trunk blocks, canopy is walkable (walk-behind)', async () => {
+    const { getMap } = await import('./maps');
+    const r = getMap('ROUTE31');
+    expect(r.props && r.props.length).toBeGreaterThanOrEqual(1);
+    expect(r.fringe).toBeDefined();
+    expect(isWalkable(r, 16, 4)).toBe(false); // trunk_l — blocks
+    expect(isWalkable(r, 17, 4)).toBe(false); // trunk_r — blocks
+    expect(isWalkable(r, 16, 2)).toBe(true); // canopy — walk behind it
+    expect(isWalkable(r, 16, 3)).toBe(true);
+  });
+
+  test('Violet has tree props; trunk blocks, canopy walkable; spine anchors intact', async () => {
+    const { getMap } = await import('./maps');
+    const v = getMap('VIOLET');
+    expect(v.props && v.props.length).toBeGreaterThanOrEqual(1);
+    expect(v.fringe).toBeDefined();
+    expect(isWalkable(v, 21, 9)).toBe(false); // trunk — blocks
+    expect(isWalkable(v, 22, 9)).toBe(false);
+    expect(isWalkable(v, 21, 7)).toBe(true); // canopy — walk behind it
+    // spine anchors must remain clear (no tree dropped on the route)
+    expect(isWalkable(v, 9, 1)).toBe(true); // north entry
+    expect(isWalkable(v, 9, 11)).toBe(true); // fromGym (above the gym door)
+  });
+});
+
 describe('back-compat — maps without layers are unaffected', () => {
   test('a map with no fringe/props leaves both undefined', () => {
     const plain = loadMap({

@@ -6,7 +6,10 @@
   "height": 30,
   "tilesize": 16,
   "baseTile": "grass",
-  "autotile": ["path", "water"],
+  "autotile": [
+    "path",
+    "water"
+  ],
   "tileMap": {
     "p": "path",
     "T": "tree",
@@ -24,7 +27,8 @@
     "C": "academy_door",
     "S": "statue",
     "E": "bell",
-    "F": "fence"
+    "F": "fence",
+    "x": "flower"
   },
   "cells": [
     "TTTTTTTTTpTTTTTTTTTTTTTTTT",
@@ -59,10 +63,30 @@
     "TTTTTTTTTTTTTTTTTTTTTTTTTT"
   ],
   "objects": [
-    { "type": "warp", "x": 9, "y": 0, "target": "ROUTE31:fromViolet" },
-    { "type": "warp", "x": 4, "y": 4, "target": "VIOLET_CENTER:fromViolet" },
-    { "type": "warp", "x": 17, "y": 4, "target": "VIOLET_MART:fromViolet" },
-    { "type": "warp", "x": 9, "y": 12, "target": "GYM:fromRoute" },
+    {
+      "type": "warp",
+      "x": 9,
+      "y": 0,
+      "target": "ROUTE31:fromViolet"
+    },
+    {
+      "type": "warp",
+      "x": 4,
+      "y": 4,
+      "target": "VIOLET_CENTER:fromViolet"
+    },
+    {
+      "type": "warp",
+      "x": 17,
+      "y": 4,
+      "target": "VIOLET_MART:fromViolet"
+    },
+    {
+      "type": "warp",
+      "x": 9,
+      "y": 12,
+      "target": "GYM:fromRoute"
+    },
     {
       "_note": "ACADEMY — enterable ancient core (docs/violet-city-design.md). The interior stub is VIOLET_ACADEMY; the full grounds/training-hall interior is a Phase-7 follow-up.",
       "type": "warp",
@@ -70,7 +94,6 @@
       "y": 22,
       "target": "VIOLET_ACADEMY:fromViolet"
     },
-
     {
       "type": "sign",
       "x": 10,
@@ -86,13 +109,20 @@
       "type": "sign",
       "x": 6,
       "y": 4,
-      "lines": ["POKÉMON CENTER", "Rest your team — free", "for trainers."]
+      "lines": [
+        "POKÉMON CENTER",
+        "Rest your team — free",
+        "for trainers."
+      ]
     },
     {
       "type": "sign",
       "x": 15,
       "y": 4,
-      "lines": ["POKÉ MART", "Supplies for the climb."]
+      "lines": [
+        "POKÉ MART",
+        "Supplies for the climb."
+      ]
     },
     {
       "_note": "Wind-vane flavor interaction (docs: the town's vibe).",
@@ -173,7 +203,6 @@
         "Up here, the wind never stops."
       ]
     },
-
     {
       "_note": "Gym guide (kept) — points the way + foreshadows the gym's wind.",
       "type": "npc",
@@ -284,7 +313,10 @@
             "and mon, perfected. Ask us how.\""
           ]
         },
-        { "kind": "set-flag", "flag": "concord_kiosk_read" }
+        {
+          "kind": "set-flag",
+          "flag": "concord_kiosk_read"
+        }
       ],
       "interactAfterFlag": [
         {
@@ -457,16 +489,93 @@
       "interactAfterFlag": [
         {
           "kind": "dialog",
-          "lines": ["DELL: Textbook. I'll note", "that down."]
+          "lines": [
+            "DELL: Textbook. I'll note",
+            "that down."
+          ]
         }
       ]
     }
   ],
   "spawns": {
-    "fromRoute": { "x": 9, "y": 1, "facing": "down" },
-    "fromGym": { "x": 9, "y": 11, "facing": "up" },
-    "fromCenter": { "x": 4, "y": 5, "facing": "up" },
-    "fromMart": { "x": 17, "y": 5, "facing": "up" },
-    "fromAcademy": { "x": 13, "y": 21, "facing": "up" }
-  }
+    "fromRoute": {
+      "x": 9,
+      "y": 1,
+      "facing": "down"
+    },
+    "fromGym": {
+      "x": 9,
+      "y": 11,
+      "facing": "up"
+    },
+    "fromCenter": {
+      "x": 4,
+      "y": 5,
+      "facing": "up"
+    },
+    "fromMart": {
+      "x": 17,
+      "y": 5,
+      "facing": "up"
+    },
+    "fromAcademy": {
+      "x": 13,
+      "y": 21,
+      "facing": "up"
+    }
+  },
+  "fringe": [
+    "..........................",
+    "..........................",
+    "..........................",
+    "..........................",
+    "..........................",
+    "..........................",
+    "...x................x.....",
+    "..........................",
+    "......x.................x.",
+    "..x.......................",
+    "..........................",
+    ".......................x..",
+    "..........................",
+    ".....x....................",
+    "..........................",
+    "..........................",
+    "..................x.......",
+    "..........................",
+    "..........................",
+    "..........................",
+    "..........................",
+    "..........................",
+    "..........................",
+    "..........................",
+    "..........................",
+    "..........................",
+    "..........................",
+    "..........................",
+    "..........................",
+    ".........................."
+  ],
+  "props": [
+    {
+      "name": "tree_big",
+      "x": 21,
+      "y": 9
+    },
+    {
+      "name": "tree_big",
+      "x": 22,
+      "y": 13
+    },
+    {
+      "name": "tree_big",
+      "x": 3,
+      "y": 8
+    },
+    {
+      "name": "tree_big",
+      "x": 19,
+      "y": 14
+    }
+  ]
 }

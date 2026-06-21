@@ -21,6 +21,7 @@ import route31VioletData from '../maps/route31.violet.json';
 import outdoorVioletTileset from '../../../assets/tilesets/outdoor_violet.tileset.json';
 import houseVioletPrefab from '../../../assets/prefabs/house_violet.prefab.json';
 import gymVioletPrefab from '../../../assets/prefabs/gym_violet.prefab.json';
+import treeBigPrefab from '../../../assets/prefabs/tree_big.prefab.json';
 import { loadMap } from './mapLoader';
 import type { GrayboxMapJson, DataDrivenMapJson } from './mapLoader';
 import { registerPrefab, registerTileset } from './tilesetCatalog';
@@ -31,6 +32,7 @@ import type { MapData } from './types';
 registerTileset(outdoorVioletTileset as TilesetJson);
 registerPrefab(houseVioletPrefab as PrefabJson);
 registerPrefab(gymVioletPrefab as PrefabJson);
+registerPrefab(treeBigPrefab as PrefabJson);
 
 function isGrayboxForced(): boolean {
   if (typeof window === 'undefined') return false;

@@ -13,7 +13,8 @@
     "F": "forest_floor",
     "W": "water",
     "M": "cave_rock",
-    "c": "cave_mouth"
+    "c": "cave_mouth",
+    "x": "flower"
   },
   "cells": [
     "TTTTTTTTTTTTTTTTTTTT",
@@ -490,7 +491,10 @@
       "interactAfterFlag": [
         {
           "kind": "dialog",
-          "lines": ["ROURKE: You didn't flinch.", "Respect."]
+          "lines": [
+            "ROURKE: You didn't flinch.",
+            "Respect."
+          ]
         }
       ]
     },
@@ -519,7 +523,10 @@
       "interactAfterFlag": [
         {
           "kind": "dialog",
-          "lines": ["WREN: You read its feints.", "Sharp eyes."]
+          "lines": [
+            "WREN: You read its feints.",
+            "Sharp eyes."
+          ]
         }
       ]
     },
@@ -540,7 +547,10 @@
         },
         {
           "kind": "start-trainer-battle",
-          "foeSpecies": ["GRITHOAX", "MARSHMASH"],
+          "foeSpecies": [
+            "GRITHOAX",
+            "MARSHMASH"
+          ],
           "winFlag": "route31_youngster2_beaten",
           "reward": 400
         }
@@ -548,7 +558,10 @@
       "interactAfterFlag": [
         {
           "kind": "dialog",
-          "lines": ["PAX: Two in a row — wow!", "Good reads."]
+          "lines": [
+            "PAX: Two in a row — wow!",
+            "Good reads."
+          ]
         }
       ]
     }
@@ -579,5 +592,49 @@
       "y": 28,
       "facing": "up"
     }
-  }
+  },
+  "fringe": [
+    "....................",
+    "....................",
+    "........x...........",
+    "...............x....",
+    "....................",
+    ".................x..",
+    "....................",
+    "....................",
+    "....................",
+    "....................",
+    "....................",
+    "....................",
+    "....................",
+    "....................",
+    "....................",
+    "....................",
+    "..............x.....",
+    "....................",
+    "....................",
+    "....................",
+    "....................",
+    "....................",
+    "....................",
+    "....................",
+    "..x.................",
+    ".......x............",
+    "....................",
+    "....................",
+    "....................",
+    "...................."
+  ],
+  "props": [
+    {
+      "name": "tree_big",
+      "x": 16,
+      "y": 4
+    },
+    {
+      "name": "tree_big",
+      "x": 3,
+      "y": 26
+    }
+  ]
 }
