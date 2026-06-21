@@ -5,7 +5,7 @@
 import fs from 'fs';
 const KEYS = '0123456789abcdefghijklmnopqrstuvwxyz';
 const old = JSON.parse(fs.readFileSync('assets/tilesets/outdoor_violet.tileset.json'));
-const synth = JSON.parse(fs.readFileSync('assets/tilesets/violet_transitions_synth.tileset.json'));
+const synth = JSON.parse(fs.readFileSync('assets/tilesets/violet_terrain_v2.tileset.json'));
 const hex2rgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const dist2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
 

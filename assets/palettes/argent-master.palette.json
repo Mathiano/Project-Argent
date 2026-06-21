@@ -1,7 +1,7 @@
 {
   "name": "argent-master",
-  "note": "Canonical palette seeded from violet-batch-01 (foundation). Tileset rows encode <=36 single-char keys (0-9a-z); 64 is the project ceiling across tilesets.",
-  "size": 21,
+  "note": "Canonical palette seeded from violet-batch-01 (foundation). Tileset rows encode <=36 single-char keys (0-9a-z); 64 is the project ceiling across tilesets. Extended 21->29 for the SoulSilver-grade terrain masters (2026-06-21).",
+  "size": 29,
   "colors": [
     {
       "key": "0",
@@ -86,6 +86,38 @@
     {
       "key": "k",
       "hex": "#a9af8b"
+    },
+    {
+      "key": "l",
+      "hex": "#82b969"
+    },
+    {
+      "key": "m",
+      "hex": "#85c069"
+    },
+    {
+      "key": "n",
+      "hex": "#86c16a"
+    },
+    {
+      "key": "o",
+      "hex": "#86be69"
+    },
+    {
+      "key": "p",
+      "hex": "#889563"
+    },
+    {
+      "key": "q",
+      "hex": "#bca06e"
+    },
+    {
+      "key": "r",
+      "hex": "#cea773"
+    },
+    {
+      "key": "s",
+      "hex": "#d5af7b"
     }
   ]
 }
