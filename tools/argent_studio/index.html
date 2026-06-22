@@ -129,9 +129,30 @@ const $ = (id) => document.getElementById(id);
 const toast = (m) => { const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1400); };
 
 async function loadPalette() {
-  try { const r = await fetch('../../assets/palettes/argent-master.palette.json',{cache:'no-store'}); if(!r.ok) throw 0;
-    palette = (await r.json()).colors; $('palSrc').textContent = 'argent-master (live)';
-  } catch { palette = FALLBACK; $('palSrc').textContent = 'embedded fallback (serve over http for live)'; }
+  // Local-workspace ingestion: only fetch when served over http(s) by the dev
+  // server (vite serves the repo root, so these are SAME-ORIGIN — no CORS, no
+  // remote URL). Under file:// the browser blocks fetch of local files (the
+  // "CORS policy" error), so we skip the doomed request and use the embedded
+  // snapshot — zero console errors either way.
+  const served = location.protocol === 'http:' || location.protocol === 'https:';
+  if (served) {
+    // absolute first (robust at any studio URL depth under the dev root), then relative
+    for (const url of ['/assets/palettes/argent-master.palette.json', '../../assets/palettes/argent-master.palette.json']) {
+      try {
+        const r = await fetch(url, { cache: 'no-store' });
+        if (!r.ok) continue;
+        palette = (await r.json()).colors;
+        $('palSrc').textContent = 'argent-master (live · ' + url + ')';
+        $('palCount').textContent = palette.length; renderSwatches(); draw();
+        return;
+      } catch { /* try next candidate */ }
+    }
+    palette = FALLBACK;
+    $('palSrc').textContent = 'embedded fallback (asset 404 — is the dev server serving /assets?)';
+  } else {
+    palette = FALLBACK;
+    $('palSrc').textContent = 'embedded fallback — open via `npm run dev` → localhost:5173/tools/argent_studio/ for the live palette';
+  }
   $('palCount').textContent = palette.length; renderSwatches(); draw();
 }
 function renderSwatches() {
