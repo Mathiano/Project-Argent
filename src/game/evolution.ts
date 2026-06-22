@@ -20,12 +20,17 @@ export interface EvoEntry {
 // Badge ids: ZEPHYR = Gym 1 (Falkner), HIVE = Gym 2 (Bugsy, not built —
 // so those stage-2→3 evos are correctly blocked in the demo).
 export const CH1_EVOLUTIONS: readonly EvoEntry[] = [
-  // Starters — stage 1→2 at Companions + Gym 1; stage 2→3 at Partners + Gym 2.
-  { from: 'KINDRAKE', evolvesTo: 'KILNDRAKE', bondStage: 3, progressGate: 'ZEPHYR' },
+  // STARTERS — stage 1→2 at Companions + Gym 2 (HIVE), stage 2→3 at Partners +
+  // Gym 2. The first-evo PROGRESS gate is HIVE (badge 2), NOT ZEPHYR (badge 1):
+  // the KAMON first-fight sits at the Violet→Route 32 gate (after ZEPHYR, before
+  // HIVE), and its fairness is sim-gated on a STILL-STAGE-1 starter lead — so the
+  // starter must not evolve until badge 2 (rivalCard sim; main-story §7). The
+  // bond gate is unchanged (stage 3). OTHER CH1 lines keep their ZEPHYR gate.
+  { from: 'KINDRAKE', evolvesTo: 'KILNDRAKE', bondStage: 3, progressGate: 'HIVE' },
   { from: 'KILNDRAKE', evolvesTo: 'FORTDRAKE', bondStage: 5, progressGate: 'HIVE' },
-  { from: 'GRUBLEAF', evolvesTo: 'VINESNAP', bondStage: 3, progressGate: 'ZEPHYR' },
+  { from: 'GRUBLEAF', evolvesTo: 'VINESNAP', bondStage: 3, progressGate: 'HIVE' },
   { from: 'VINESNAP', evolvesTo: 'WYRMFERN', bondStage: 5, progressGate: 'HIVE' },
-  { from: 'SILTSKIP', evolvesTo: 'BRACKSLAP', bondStage: 3, progressGate: 'ZEPHYR' },
+  { from: 'SILTSKIP', evolvesTo: 'BRACKSLAP', bondStage: 3, progressGate: 'HIVE' },
   { from: 'BRACKSLAP', evolvesTo: 'CRASHMAW', bondStage: 5, progressGate: 'HIVE' },
   // Route bird — FLITPECK → GALEHAWK (Gym 1).
   { from: 'FLITPECK', evolvesTo: 'GALEHAWK', bondStage: 3, progressGate: 'ZEPHYR' },

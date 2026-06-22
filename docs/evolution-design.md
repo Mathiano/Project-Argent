@@ -35,6 +35,15 @@ A mon evolves when **BOTH** are true:
 
 You catch FLITPECK, bond through real fights, and once you've *also* beaten Falkner, it evolves. It physically cannot reach stage 3 until Gym 2 is beaten — the level-cap-in-disguise.
 
+## Worked example — the STARTERS (first evo gates on Gym 2, not Gym 1)
+
+| Stage | Evolves to | Bond gate | Progress gate (cap) |
+|---|---|---|---|
+| KINDRAKE/GRUBLEAF/SILTSKIP (1) | → stage 2 | ~Stage 3 (Companions) | **Gym 2 (Bugsy) beaten** |
+| stage 2 | → stage 3 | ~Stage 5 (Partners in Kind) | Gym 2 (Bugsy) beaten |
+
+The starters' **first** evolution gates on **Gym 2 (HIVE)** — one badge *later* than the route mons' first evo. This is deliberate: anime-accurate late-evolving starters (line 41), and load-bearing for the **KAMON first-fight** at the Violet→Route 32 gate. That gate sits *after* ZEPHYR (Gym 1) but *before* HIVE (Gym 2), and its fairness is sim-gated on a **still-stage-1 starter lead** (`docs/kamon-rival-card-v2.md`, `src/sim/rivalCard.test.ts`). If the starter evolved at Gym 1 the gate would face a stage-2 lead and the authored 2-mon card would be mis-tuned — so the starter must hold at stage 1 until badge 2. (Only the starter lines moved; every other CH1 line keeps its Gym-1 first-evo gate.)
+
 ## Per-mon data
 
 Every mon's evolution entry carries, per stage: **`evolvesTo`, `bondStage` (the gate), and `progressGate` (which boss/badge caps it).** Tunable per mon:

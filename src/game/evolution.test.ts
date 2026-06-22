@@ -43,6 +43,24 @@ describe('S2 — CH1 evolution data (bond+badge, not levels)', () => {
     expect(evolutionFor('GRUBLEAF')).toMatchObject({ evolvesTo: 'VINESNAP' });
     expect(evolutionFor('SILTSKIP')).toMatchObject({ evolvesTo: 'BRACKSLAP' });
   });
+  test('STARTER first-evos gate on HIVE (badge 2), NOT ZEPHYR (badge 1)', () => {
+    // The KAMON first-fight (Violet→Route 32) sits after ZEPHYR but before HIVE,
+    // and is sim-gated on a still-stage-1 starter lead — so the starter must not
+    // evolve until badge 2. Bond gate stays stage 3.
+    for (const from of ['KINDRAKE', 'GRUBLEAF', 'SILTSKIP']) {
+      expect(evolutionFor(from)).toMatchObject({ bondStage: 3, progressGate: 'HIVE' });
+    }
+    // Bond stage 3 + ZEPHYR alone (badge 1) is NOT enough now — needs HIVE.
+    expect(evolutionReady({ speciesName: 'KINDRAKE', bondValue: BOND_STAGE3, badges: ['ZEPHYR'] })).toBeNull();
+    // Bond stage 3 + HIVE evolves.
+    expect(evolutionReady({ speciesName: 'KINDRAKE', bondValue: BOND_STAGE3, badges: ['ZEPHYR', 'HIVE'] }))
+      .toMatchObject({ evolvesTo: 'KILNDRAKE' });
+  });
+  test('NON-starter CH1 lines keep their ZEPHYR (badge 1) gate', () => {
+    // Only the starter brief moved; the route bird + cave line are untouched.
+    expect(evolutionFor('FLITPECK')).toMatchObject({ progressGate: 'ZEPHYR' });
+    expect(evolutionFor('GRITHOAX')).toMatchObject({ progressGate: 'ZEPHYR' });
+  });
   test('single-stage / final forms have no evolution', () => {
     expect(evolutionFor('MARSHMASH')).toBeNull();
     expect(evolutionFor('GALEHAWK')).toBeNull();
