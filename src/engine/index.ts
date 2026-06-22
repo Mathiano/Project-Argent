@@ -37,8 +37,11 @@ export {
   KAMON_BOND_FACTOR,
   KAMON_STEAL,
   KAMON_ACE_LEVEL,
+  KAMON_CHAFF_SPECIES,
+  KAMON_CHAFF_LEVEL,
   kamonStolenStarter,
   kamonAceScale,
+  kamonChaffScale,
   buildKamonTeam,
 } from './rivalCard';
 export { falknerBossAI } from './bossAI';

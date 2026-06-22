@@ -18,6 +18,7 @@ import {
   possibleReleases,
   buildKamonTeam,
   kamonStolenStarter,
+  KAMON_CHAFF_SPECIES,
 } from '../engine';
 import type {
   Action,
@@ -944,6 +945,12 @@ function kamonStolenSpecies(player: Species): Species {
   return resolveSpecies(stolenName!);
 }
 
+// KAMON's leading CHAFF (the 2-mon card) — only for a CH1 lead. The fixture/demo
+// path (EMBERCUB / ?skip, no CH1 dex entry) has no chaff → KAMON fights solo.
+function kamonChaffFor(player: Species): Species | undefined {
+  return CH1_DEX[player.name] !== undefined ? CH1_DEX[KAMON_CHAFF_SPECIES] : undefined;
+}
+
 function showPrep(): void {
   const player = partyLead();
   scenes.replace(
@@ -959,10 +966,11 @@ function showPrep(): void {
 function showRivalBattle(): void {
   const player = partyLead();
   const stolen = kamonStolenSpecies(player);
-  // First fight = the stolen starter SOLO (the purest thesis demo), at
+  // KAMON's 2-mon card: a leading CHAFF (CH1 only) + the stolen starter ACE at
   // bond-factor 0.85. CH1 leads use the CH1 type chart; the fixture demo path
-  // keeps the legacy chart.
-  const foeTeam = buildKamonTeam(stolen);
+  // keeps the legacy chart and fights solo (no CH1 chaff).
+  const chaff = kamonChaffFor(player);
+  const foeTeam = buildKamonTeam(stolen, chaff);
   const isCh1 = CH1_DEX[player.name] !== undefined;
   const state = createBattleState(
     buildPlayerTeam(),
@@ -976,13 +984,21 @@ function showRivalBattle(): void {
       // KAMON's AI = the RIVAL profile's earliest rung (Aggressor/Single-only/
       // Fixed/no-Calls). He leans Aggressive and CAN'T Get Away — commit freely.
       chooseFoeAction: (s, r) => trainerPolicy(TRAINER_PROFILES.kamon!)(s, 'foe', r),
-      intro: [
-        'KAMON sent out',
-        `the stolen ${stolen.name}!`,
-        'It has the type edge',
-        '— but it hesitates.',
-        'Out-read them.',
-      ],
+      intro: chaff
+        ? [
+            'KAMON leads with a',
+            `crudely-caught ${chaff.name}.`,
+            'Behind it waits',
+            `the stolen ${stolen.name}.`,
+            'Out-read them both.',
+          ]
+        : [
+            'KAMON sent out',
+            `the stolen ${stolen.name}!`,
+            'It has the type edge',
+            '— but it hesitates.',
+            'Out-read them.',
+          ],
       catchBreathUnlocked: callsUnlocked(),
       canRun: false,
       onResolve: (winner, finalState) => {
@@ -1004,7 +1020,12 @@ function showRivalBattle(): void {
 function pushRivalGateFight(): void {
   const player = partyLead();
   const stolen = kamonStolenSpecies(player);
-  const foeTeam = buildKamonTeam(stolen);
+  // The 2-mon card: KAMON leads with a crudely-caught chaff, the stolen starter
+  // ace finishes (CH1 only; the fixture path stays solo). Sim-gated stage-1:
+  // src/sim/rivalCard. The starter's evo gates on HIVE (badge 2), so the lead is
+  // still stage-1 here even though this is post-ZEPHYR.
+  const chaff = kamonChaffFor(player);
+  const foeTeam = buildKamonTeam(stolen, chaff);
   const isCh1 = CH1_DEX[player.name] !== undefined;
   const state = createBattleState(
     buildPlayerTeam(),
@@ -1016,11 +1037,17 @@ function pushRivalGateFight(): void {
       state,
       rng: run.rng,
       chooseFoeAction: (s, r) => trainerPolicy(TRAINER_PROFILES.kamon!)(s, 'foe', r),
-      intro: [
-        'KAMON blocks the road south.',
-        'KAMON: So you earned the badge.',
-        `Then prove it — ${stolen.name}, go!`,
-      ],
+      intro: chaff
+        ? [
+            'KAMON blocks the road south.',
+            'KAMON: So you earned the badge.',
+            `Then prove it — ${chaff.name}, soften them up!`,
+          ]
+        : [
+            'KAMON blocks the road south.',
+            'KAMON: So you earned the badge.',
+            `Then prove it — ${stolen.name}, go!`,
+          ],
       catchBreathUnlocked: callsUnlocked(),
       canRun: false,
       onResolve: (winner, finalState, participants) => {

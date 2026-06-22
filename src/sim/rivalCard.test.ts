@@ -1,32 +1,36 @@
 import { describe, expect, test } from 'vitest';
-import { runRivalCard, runRivalCardPostFalkner } from './rivalCard';
+import { runRivalCardGate, runRivalCardSolo } from './rivalCard';
 
-// ── KAMON Rival Card v2 — POST-FALKNER fairness gate (docs/kamon-rival-card-v2)
-// The fight is now the Violet→Route 32 gate, AFTER the ZEPHYR badge — which is
-// also the badge that GATES the starter's evolution (evolution.ts: bond stage 3
-// + ZEPHYR). So the EXPECTED developed team's lead is the STAGE-2 EVOLVED form.
-// The GATE sims that: the evolved lead (the canonical `reader`) vs KAMON's solo
-// stolen counter-starter at the 0.85 hesitation.
+// ── KAMON Rival Card v2 — the TWO-MON STAGE-1 fairness GATE (docs/kamon-rival-
+// card-v2). The fight is the Violet→Route 32 gate, AFTER ZEPHYR. The starter's
+// first evolution now gates on HIVE/badge 2 (evolution.ts), so the developed
+// player's lead is STILL STAGE 1 — "developed" = a fuller stage-1 bench, not
+// bigger stats (bond is horizontal, there is no leveling). KAMON answers with a
+// 2-mon card: a leading crudely-caught CHAFF + the stolen counter-starter ACE at
+// the 0.85 hesitation.
 //
-// RE-TUNED 2026-06-22 (kamon-first-fight integration). At the OLD early-route
-// levels (~1.0) the post-Falkner fight was trivial — evolved win% 99.7 / 81.8 /
-// 99.8 (two near auto-wins). KAMON_ACE_LEVEL was raised (engine/rivalCard.ts) so
-// the evolved matchup is winnable-but-tense again: ~67%, tight.
-describe('KAMON rival card — post-Falkner gate (the EVOLVED lead)', () => {
-  const rows = runRivalCardPostFalkner(2000, 1);
+// RE-BASELINED 2026-06-22 (kamon-2mon-stage1). Supersedes the prior evolved-lead
+// re-tune: the card-shape fix (a 2nd KAMON mon + the badge-2 evo gate) is the
+// proper fairness fix the earlier commit flagged as Mathias's call. KAMON_ACE_
+// LEVEL returned toward its original early-route band (~0.9–1.0) once the chaff
+// carries part of the threat. The fairness knobs are KAMON_ACE_LEVEL + KAMON_
+// CHAFF_LEVEL (engine/rivalCard.ts); the 0.85 bond-factor + the kamon AI/profile
+// are untouched.
+describe('KAMON rival card — the two-mon stage-1 gate', () => {
+  const rows = runRivalCardGate(2000, 1);
 
   test('reports (logged for the audit)', () => {
     for (const r of rows) {
       // eslint-disable-next-line no-console
-      console.log(`  evolved lead vs KAMON's ${r.stolen.padEnd(9)} (pick ${r.pick.padEnd(9)}) → ${r.playerWinPct.toFixed(1)}%`);
+      console.log(`  stage-1 team (pick ${r.pick.padEnd(9)}) vs KAMON chaff+${r.stolen.padEnd(9)} → ${r.playerWinPct.toFixed(1)}%`);
     }
     expect(rows.length).toBe(3);
   });
 
-  test('every pick is WINNABLE-BUT-TENSE for the developed (evolved) team', () => {
+  test('every pick is WINNABLE-BUT-TENSE (~65–70%) for the stage-1 team', () => {
     for (const r of rows) {
-      expect(r.playerWinPct).toBeGreaterThan(55);
-      expect(r.playerWinPct).toBeLessThan(80);
+      expect(r.playerWinPct).toBeGreaterThan(62);
+      expect(r.playerWinPct).toBeLessThan(73);
     }
   });
 
@@ -36,17 +40,14 @@ describe('KAMON rival card — post-Falkner gate (the EVOLVED lead)', () => {
   });
 });
 
-// Reference DIAGNOSTIC (not a gate) — the UNEVOLVED lead. ⚠️ Tuning the card for
-// the expected (evolved) team makes an under-developed lead near-unwinnable for
-// 2/3 picks (a solo stage-1 ace can't be fair for both leads — flagged in
-// engine/rivalCard.ts). Logged so the consequence stays visible; the gate's
-// BOTH-ADVANCE design (a loss still opens the exit, no soft-lock) is what keeps
-// the under-developed player non-blocked. A fuller fix is a card-shape change.
-describe('KAMON rival card — unevolved-lead reference (diagnostic, NOT a gate)', () => {
+// Reference DIAGNOSTIC (not a gate) — the SOLO 1v1 (stage-1 starter vs the ace
+// alone, no chaff, no bench). Logged as a contrast to the bare duel: the gate
+// adds KAMON's chaff AND the player's common, so the win% shifts per pick.
+describe('KAMON rival card — solo 1v1 reference (diagnostic, NOT a gate)', () => {
   test('reports (logged)', () => {
-    for (const r of runRivalCard(2000, 1)) {
+    for (const r of runRivalCardSolo(2000, 1)) {
       // eslint-disable-next-line no-console
-      console.log(`  unevolved lead vs KAMON's ${r.stolen.padEnd(9)} (pick ${r.pick.padEnd(9)}) → ${r.playerWinPct.toFixed(1)}%`);
+      console.log(`  solo starter (pick ${r.pick.padEnd(9)}) vs KAMON ${r.stolen.padEnd(9)} → ${r.playerWinPct.toFixed(1)}%`);
     }
     expect(true).toBe(true);
   });

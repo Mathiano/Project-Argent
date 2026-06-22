@@ -2,6 +2,8 @@ import { describe, expect, test } from 'vitest';
 import {
   KAMON_BOND_FACTOR,
   KAMON_ACE_LEVEL,
+  KAMON_CHAFF_LEVEL,
+  KAMON_CHAFF_SPECIES,
   KAMON_STEAL,
   buildKamonTeam,
   kamonAceScale,
@@ -52,23 +54,25 @@ describe('KAMON rival card v2 — bond-factor 0.85 on the stolen starter ONLY', 
     }
   });
 
-  test('buildKamonTeam scales the ACE; an added chaff fights at NORMAL bond (unscaled)', () => {
+  test('buildKamonTeam = the 2-mon card: CHAFF leads (level, NO bond-factor), ACE second (level × 0.85)', () => {
     const stolen = CH1.SILTSKIP!; // player picked KINDRAKE
-    const chaff = CH1.MARSHMASH!;
+    const chaff = CH1[KAMON_CHAFF_SPECIES]!; // the crudely-caught route bird
     const team = buildKamonTeam(stolen, chaff);
-    const ace = team.members[0]!;
-    const chaffSide = team.members[1]!;
-    // Ace atk reflects level × 0.85 (SILTSKIP level 1.14 → 0.969×).
+    // The chaff LEADS (index 0); the starter duel finishes (ace at index 1).
+    const chaffSide = team.members[0]!;
+    const ace = team.members[1]!;
+    // Ace atk reflects level × 0.85 (the bond-factor hesitation).
     const expectedAceAtk = Math.round(stolen.atk * KAMON_ACE_LEVEL.SILTSKIP! * 0.85);
     expect(ace.species.atk).toBe(expectedAceAtk);
     expect(ace.species.atk).not.toBe(stolen.atk); // the ace IS scaled
-    // Chaff is fully unscaled — only the stolen starter carries the bond-factor.
-    expect(chaffSide.species.atk).toBe(chaff.atk);
-    expect(chaffSide.species.dfn).toBe(chaff.dfn);
-    expect(chaffSide.species.hp).toBe(chaff.hp);
+    // Chaff carries the chaff LEVEL on every stat, with NO 0.85 (normal bond —
+    // KAMON caught it himself; the hesitation is the stolen STARTER's alone).
+    expect(chaffSide.species.atk).toBe(Math.round(chaff.atk * KAMON_CHAFF_LEVEL));
+    expect(chaffSide.species.dfn).toBe(Math.round(chaff.dfn * KAMON_CHAFF_LEVEL));
+    expect(chaffSide.species.hp).toBe(Math.round(chaff.hp * KAMON_CHAFF_LEVEL));
   });
 
-  test('solo ace (first fight) = a 1-mon KAMON team', () => {
+  test('solo ace (first fight / fixture path) = a 1-mon KAMON team', () => {
     const team = buildKamonTeam(CH1.GRUBLEAF!); // player picked SILTSKIP
     expect(team.members.length).toBe(1);
   });

@@ -24,30 +24,43 @@ export const KAMON_STEAL: { readonly [playerPick: string]: string } = {
 };
 
 // Per-ace LEVEL (the fairness knob) — keyed by the STOLEN species. RE-TUNED for
-// the POST-FALKNER PLACEMENT (2026-06-22, kamon-first-fight integration). The
-// fight moved from "early-route first fight" to the Violet→Route 32 gate, AFTER
-// the ZEPHYR badge — which is also the badge that GATES the starter's evolution
-// (evolution.ts, bond stage 3 + ZEPHYR). The expected developed player's lead
-// is therefore the STAGE-2 EVOLVED form, and at the OLD ~1.0 levels the fight
-// was trivial (evolved player win% 99.7 / 81.8 / 99.8, n=2000 seed=1 — two near
-// auto-wins). Re-converged so the EVOLVED matchup lands winnable-but-tense again
-// (player ~67%, tight): KINDRAKE-pick 67.8% · GRUBLEAF-pick 66.7% · SILTSKIP-
-// pick 67.6%. Sim-gated: src/sim/rivalCard.test.ts (post-Falkner gate).
-//
-// ⚠️ FLAG — STRUCTURAL TENSION (a design call for a fuller fix): a SOLO stage-1
-// ace can't be fair for BOTH an evolved and an unevolved lead at once (they're
-// an evolution of stats apart; the 0.85 bond-factor is locked, so LEVEL is the
-// only knob and the matchup is a cliff). Tuned for the EXPECTED (evolved) team,
-// an UNEVOLVED lead now faces a near-unwinnable KAMON for 2/3 picks (win% 9.6 /
-// 53.9 / 2.4). This is MITIGATED by the gate's both-advance design (no soft-lock
-// — a loss still has KAMON leave + the exit open). The proper long-term fix is a
-// CARD-SHAPE change (give KAMON a 2nd mon — buildKamonTeam already supports a
-// chaff — or an evolved ace), which is Mathias's design call; NOT done here.
+// the TWO-MON STAGE-1 CARD (2026-06-22, kamon-2mon-stage1). The card-shape fix
+// landed: the prior commit's evolved-lead re-tune is SUPERSEDED. The starter's
+// first evolution now gates on HIVE (badge 2 — evolution.ts), and the KAMON gate
+// sits at Violet→Route 32 (after ZEPHYR, before HIVE) — so the developed lead is
+// STILL STAGE 1. KAMON now fields TWO mons: a leading chaff (KAMON_CHAFF_SPECIES,
+// a crudely-caught CH1 common) + the stolen-starter ACE (stage-1). The ace levels
+// returned toward the original early-route band (~0.9–1.0) once the chaff carries
+// part of the threat. Sim-gated against a representative stage-1 player team (the
+// reader + starter + two caught commons): winnable-but-tense ~65–70%, tight across
+// the three picks. See src/sim/rivalCard.test.ts.
 export const KAMON_ACE_LEVEL: { readonly [stolen: string]: number } = {
-  SILTSKIP: 1.21, // stolen when the player picks KINDRAKE (evolved KILNDRAKE → 67.8%)
-  KINDRAKE: 0.94, // stolen when the player picks GRUBLEAF (FLAME>NATURE reined; VINESNAP → 66.7%)
-  GRUBLEAF: 1.24, // stolen when the player picks SILTSKIP (evolved BRACKSLAP → 67.6%)
+  SILTSKIP: 1.05, // stolen when the player picks KINDRAKE → 65.4% (n=2000 seed=1)
+  KINDRAKE: 0.95, // stolen when the player picks GRUBLEAF → 64.8% (FLAME>NATURE reined)
+  GRUBLEAF: 0.95, // stolen when the player picks SILTSKIP → 69.3%
 };
+
+// KAMON's leading CHAFF — a crudely-caught route bird, the thematic foil to the
+// craft the player learned (he grabs power; the player bonds it). FLITPECK is the
+// chaff for a SIM reason as much as a flavour one: its GALE type is the only
+// chaff that yields a TIGHT spread across the three picks (it's neutral both ways
+// vs FLAME/AQUA, and its NATURE edge OFFSETS the player's TERRA common countering
+// the FLAME ace — without it the spread floors at ~14pp). The chaff fights at
+// NORMAL bond (no 0.85 hesitation — KAMON caught it himself); its LEVEL is the
+// second fairness knob (alongside KAMON_ACE_LEVEL). The caller resolves the
+// Species from its dex and passes it to buildKamonTeam.
+//
+// ⚠️ FLAG (deviation from the brief's "CH1-pool COMMON"): FLITPECK is rarity-
+// tagged "uncommon", not "common". It's still a wild route mon (a crude grab),
+// and GALE is the ONLY chaff type that meets the brief's "tight spread" target —
+// so tightness wins over the rarity label. A Mathias call if the label matters.
+export const KAMON_CHAFF_SPECIES = 'FLITPECK';
+
+// The chaff's uniform stat LEVEL (the fairness knob — NO bond-factor; a caught
+// common at normal bond). 1.0 = base species stats; 1.2 gives the lead enough
+// teeth to make the 2-mon card tense without the spread blowing out. Tuned with
+// KAMON_ACE_LEVEL against the stage-1 player team (src/sim/rivalCard.test.ts).
+export const KAMON_CHAFF_LEVEL = 1.2;
 
 // The starter KAMON steals, given the player's pick. Returns undefined for a
 // non-CH1 lead (the fixture/demo path falls back to its own counter map).
@@ -62,11 +75,21 @@ export function kamonAceScale(stolenName: string): StatScale {
   return { hp: lvl, atk: lvl * KAMON_BOND_FACTOR, dfn: lvl * KAMON_BOND_FACTOR };
 }
 
-// Build KAMON's team: the stolen starter (counter-type) at its fairness level ×
-// the 0.85 hesitation is the ACE; an optional caught chaff fights at NORMAL bond
-// (no scale).
+// The chaff's StatScale: a uniform LEVEL on all stats, NO bond-factor (a common
+// KAMON caught himself fights at normal bond — the 0.85 is the stolen STARTER's
+// hesitation alone).
+export function kamonChaffScale(): StatScale {
+  const lvl = KAMON_CHAFF_LEVEL;
+  return { hp: lvl, atk: lvl, dfn: lvl };
+}
+
+// Build KAMON's team. The two-mon CARD = the leading CHAFF (a crudely-caught
+// common at its fairness level, normal bond) + the stolen-starter ACE (counter-
+// type, at its fairness level × the 0.85 hesitation). The CHAFF LEADS — the
+// throwaway softens the player before the starter duel finishes. Omit `chaff`
+// for the SOLO fixture/demo path (the ?skip / EMBERCUB lead has no CH1 chaff).
 export function buildKamonTeam(stolenStarter: Species, chaff?: Species): Team {
   const ace = createSide(stolenStarter, kamonAceScale(stolenStarter.name));
-  const members = chaff ? [ace, createSide(chaff)] : [ace];
+  const members = chaff ? [createSide(chaff, kamonChaffScale()), ace] : [ace];
   return createTeam(members);
 }
