@@ -16,48 +16,56 @@ The spine. This replaces ad-hoc sprint picking. Each phase depends only on what'
 
 ---
 
-## PHASE 0 — Stabilize what exists (NOW, before anything new)
-Prerequisite: none. **We are here.**
+## PHASE 0 — Stabilize what exists ✅ GATE MET
+Prerequisite: none.
+- ✅ **Evidence (repo, 2026-06-22):** `coldstart.test.ts` + `spine.test.ts` walk cold-start → first battle → Falkner → ZEPHYR in one continuous run; battle-input layer covered. Full suite **570 green**.
 - Fix the battle-input layer completely (move-confirm, SELECT-stance, CALL, RUN, B-back) — one pass, fully tested, so it stops surfacing one bug at a time.
 - Confirm the cold-start walk + first battle is playable end to end with no skip flags.
 - **Gate:** a person can start the game, walk, fight a wild mon, win/lose. No new features until this is true.
 
-## PHASE 1 — The keystone refactor: 6v6 team battles
+## PHASE 1 — The keystone refactor: 6v6 team battles ✅ GATE MET
 Prerequisite: Phase 0. **Blocks: every trainer fight, every boss, switching, the bond track.**
+- ✅ **Evidence:** `team-battle.test.ts`, sim `teamBattle.test.ts`, `turnOrderFix.test.ts`; Falkner is a real multi-mon fight (`falknerLadder.test.ts`); KO-stamina settle. Fixture/Falkner ladders bit-identical at team-size 1.
 - Already scoped in `ARCHITECTURE-AUDIT.md` (~800 LOC, 4 engine + 3 sim + 2 game files).
 - The fixture + Falkner ladders must stay bit-identical at team-size 1 (the regression canary).
 - **Gate:** a 2v2 battle works; switching works; Falkner is a real 2-mon fight.
 
-## PHASE 2 — Save / load
+## PHASE 2 — Save / load ✅ GATE MET
 Prerequisite: Phase 1 (you save a party, so the party system must be real first... see note).
+- ✅ **Evidence:** `src/game/save.ts` + `save.test.ts` (party, position, flags, badges; fresh `mulberry32(seed)` reseed on load).
 - *Note:* minimal party state exists once 6v6 lands; full party MENU is Phase 4, but save/load of game state (party, position, flags, badges) is needed before any long playtest.
 - **Gate:** quit mid-game, reload, resume exactly where you were. **This unblocks all real playtesting.**
 
-## PHASE 3 — The opening (intro + context)
+## PHASE 3 — The opening (intro + context) ✅ GATE MET
 Prerequisite: Phase 2 (the intro sets initial save state).
+- ✅ **Evidence:** `intro.test.ts` + the spine (title → bedroom → house → Hearthwick → lab → starter-in-context → KAMON theft); furnished interiors, first NPCs/dialogue, first story beat.
 - **This is the "why am I in an empty house" fix.** Title → new game → intro sequence (the professor/legacy framing from the scope doc) → starter choice in context → furnished starting town → a reason to walk out the door.
 - Furnished interiors (the house gets furniture, an NPC, a purpose), the first NPCs with real dialogue, the first story beat.
 - **Gate:** a new player understands who they are, where they are, and why they're leaving — without us explaining it to them.
 
-## PHASE 4 — The core RPG menus
+## PHASE 4 — The core RPG menus ✅ GATE MET
 Prerequisite: Phase 1 (party) + Phase 2 (save).
+- ✅ **Evidence:** `partyMenu.ts`, `pauseMenu.ts`, `bagMenu.ts`, `boxMenu.ts` + `menu.test.ts`, `box.test.ts`, `items.test.ts`.
 - Party menu (view/reorder/summary), Bag/inventory, the pause menu. Box system (storage).
 - **Gate:** the player can manage their team and items the way any Pokémon game allows.
 
-## PHASE 5 — The town loop: healing + economy
+## PHASE 5 — The town loop: healing + economy ✅ GATE MET
 Prerequisite: Phase 4 (bag/items exist to buy and use).
+- ✅ **Evidence:** `martMenu.ts`, `economy.test.ts`, `martMenu.test.ts`, `items.test.ts`; Center heal, money, trainer payouts. **DEMO structurally complete** — the spine proves route → town → heal → shop → gym → badge.
 - Pokémon Center (heal), Poké Mart (buy/sell), money, trainer payouts.
 - **Gate:** the route → town → heal → shop → next route rhythm works. *This is the heartbeat of Pokémon.* When this is done, **the DEMO is structurally complete.**
 
-## PHASE 6 — Evolution + Catching 2.0
+## PHASE 6 — Evolution + Catching 2.0 ✅ GATE MET (systems)
 Prerequisite: Phase 1 (team) + Phase 5 (the loop).
+- ✅ **Evidence:** `catching.ts` (`catch.test.ts`, `catching.test.ts`, `throwBall.test.ts`) + `evolution.ts` (`evolution.test.ts`). The *mechanics* are built + tested; CH1 *content that exercises them* (a mon that evolves, catch windows in real routes) is authored in Phase 7.
 - Evolution (identity-critical, currently absent) — the **bond-gated, boss-capped** model (NOT level 16/34; Argent has no player-facing levels). Two gates — bond stage + the gating badge, whichever is satisfied second triggers evo; the badge-gate is the anti-power-creep cap, lifted after 8 Johto badges (Kanto = bond-only). Design locked: `docs/evolution-design.md`. Catching 2.0 (replace the placeholder catch with the read-based spec).
 - **Catching 2.0 is now the TWO-PATH system** — Path 1 (read-created windows, catching as skill) + Path 2 (the willing-join mercy path: heal a fainted wild mon → badge/level/bond-gated acceptance roll → joins or refuses-with-a-hint). Balls stay (mons are happy in them). Design locked: `docs/catching-2-0.md` (the Path-2 acceptance formula is settled at this phase's kickoff).
 - **Build order (ruled 2026-06-15): CATCHING FIRST, as its own focused sprint, THEN evolution.** Catching is what the playtest is actively asking for (the GRUBLEAF→Falkner prep path is a dead-end without it), it's the bigger/more novel design, and it earns a focused sprint; evolution (the bond-gated/boss-capped model, `docs/evolution-design.md`) is the cleaner follow-on.
 - **Gate:** starters evolve; catching is the designed mini-game.
 
-## PHASE 6.5 (NEAR-TERM) — Box + Pokédex (mon-record UIs)
+## PHASE 6.5 (NEAR-TERM) — Box + Pokédex (mon-record UIs) ✅ GATE MET
 Prerequisite: Phase 6 (catching makes both necessary). Surfaced by playtest 2026-06-15.
+- ✅ **Evidence:** `boxMenu.ts`/`dexMenu.ts` + `box.test.ts`, `dex.test.ts`, `boxDex.test.ts`, `dexLoader.test.ts`. (Details in the SHIPPED note below.)
 - **Box (PC storage):** the full storage UI (the pause menu's greyed `BOX` row). Catching 2.0 already does a *minimal* box-add when the party is full; this is the real deposit/withdraw/organize screen.
 - **Pokédex:** the game currently has **no Pokédex** — a real gap. A seen/caught registry + per-species entries (the dex-as-journal vision: entries that grow field notes from your history, per `feature-ambition-scope.md`).
 - **Why bundled:** both are mon-record UIs, both made necessary by catching, both lean on the same party/box/species data. **Scope as one box+dex sprint soon.**
@@ -65,14 +73,22 @@ Prerequisite: Phase 6 (catching makes both necessary). Surfaced by playtest 2026
 - ✅ **SHIPPED (2026-06-16)** — `KICKOFF-phase6.5-box-dex.md`. Center PC deposit/withdraw (party keeps ≥1, bond travels), seen/caught registry + status-gated dex UI (caught full / seen partial / unseen `???`), starter marks caught, CH1 entries, all persisted. Engine/ladders bit-identical. **Follow-up shipped:** trainer/boss foes now mark **SEEN** too (dex isn't wild-only — `markSeenAll`).
 - **Forward hook → in-battle SCAN:** the dex becomes a *live combat tool* later — a battle-menu SCAN of the foe, **gated by dex knowledge** (caught → full role + status tendencies; seen → type only; unseen → nothing). Design LOCKED in `combat-depth-types-status.md` **Part 7**; its schema slots (`role`, `statusTendencies`, `habitat`) are **already reserved** in `src/engine/dexLoader.ts` so content isn't retrofitted. Build lands with the status phase (depends on `statusTendencies`).
 
-## PHASE 6.7 (NEAR-TERM) — Combat-depth groundwork (NOT the status build)
+## PHASE 6.7 (NEAR-TERM) — Combat-depth groundwork (NOT the status build) ✅ GATE MET
+- ✅ **Evidence:** all three slivers shipped (A intent ramp in `battle.ts`; B TTK `COMBAT.hpScale 1.30`, ladders re-baselined; C 17-type canon in `typechart.json` 17×17, `types.test.ts`).
 Three items surfaced by the combat-depth design pass (`docs/combat-depth-types-status.md`). The full status/type-identity **build** is Phase 6-8 (see Phase 8); these are the load-bearing-now slivers that ship as their own small sprints first.
 - **(A) Enforce the intent-reliability ramp** ✅ **SHIPPED** (honest-partial model, Falkner AMBIGUOUS) — `docs/intent-tells-design-note.md`.
 - **(B) TTK tuning pass** ✅ **SHIPPED** (global `COMBAT.hpScale` 1.30; both ladders re-baselined) — `KICKOFF-ttk-tuning.md`.
 - **(C) Type-name reconciliation** ✅ **DONE — 17-type canon locked (2026-06-16)**. Rename + 4-type expansion (13→17): **FIELD→BASIC, VOLT→SPARK, SPLASH→AQUA, SPROUT→NATURE**; **4 new types: PSI, INSECT, STONE, UMBRA** (SPIRIT/UMBRA separate). `typechart.json` is 17×17 (existing 13×13 byte-identical under rename). Final rulings locked: new-type move-trio names + Gen-2-mapped matchups **approved**; **no hard immunities** — Gen-2 zeros classified flavor→0.7 / arbitrary→1.0 (2 flips applied: SPIRIT→BASIC, BRAWN→SPIRIT → 1.0); **TERRA→GALE kept 1.3** (GALE is weak to Ground — the load-bearing Falkner prep-loop). Identities in `combat-depth-types-status.md`, chart in `type-chart.md`. Ladders bit-identical throughout. See `KICKOFF-type-system-canon.md`.
 
-## PHASE 7 — Content authoring tools + Chapter 1 content
+## PHASE 7 — Content authoring tools + Chapter 1 content ⚠️ PARTIAL ◀ **WE ARE HERE** (the live frontier, 2026-06-22)
 Prerequisite: Phases 1–6 (the systems all the content sits on).
+
+> **Status (read against the repo):** the systems are all green; this phase is now **content/authoring**, not systems work.
+> - ✅ **Done since Sprint 1:** the layered overworld renderer + 4-way autotiler + Y-sort props (`autotile.ts`, `ysort.ts`, `layers.test.ts`); the asset pipeline + lint + `argent_studio` workbench (`tools/validate_assets.{mjs,py}`, `tileset_rules.md`); trainer archetype catalog + CH1 trainer sets (`trainerAI.ts`, `trainerProfiles.test.ts`); the KAMON v2 rival card (`rivalCard.ts`); the Concord seed (flavor); Falkner gym + ZEPHYR badge; Route 31 + Violet migrated to the 3-layer schema; **Violet Academy = enterable STUB only.**
+> - ⚠️ **Remaining for the CH1-COMPLETE gate (the live checklist):**
+>   1. **Rival-fight integration** — the KAMON v2 card exists + is sim-gated, but the rival's first *battle* is not yet wired into the map/story flow (only the theft beat is).
+>   2. **CH1 story beats + full Violet population** — the chapter's authored beats and Violet's complete NPC/event population (Sprint-1 template proven; later sprints replicate it).
+>   3. **Real Violet Academy hub** — promote the current enterable stub to the designed teaching/training hub (`docs/violet-academy.md`), gated `falkner_beaten`.
 
 > **Per-mon design process:** `docs/mon-design-template.md` — the repeatable spec sheet + 8-point pillar checklist for turning a manifest row into a designed creature (type identity, stat-shape, character, evo, front/back sprites, dex). Use it per-chapter as the roster fills in; CH1 is the first application.
 
@@ -97,6 +113,15 @@ Prerequisite: Phase 7 (the chapter template proven once).
 
 ---
 
+## Parallel track — Combat enrichment / feel-first (OUT of the linear spine)
+This work is **not** a stage on the Foundation→Content spine above — it's a separate "feel-first" lane (combat depth + bond) that landed deliberately out of order. Recording it here so it isn't mis-filed against the numbered phases. Design home: `docs/combat-enrichment-roadmap.md`.
+- ✅ **Combat Layer 1 — base triangle** (AGGRESSIVE>FLUID>GUARD>AGGRESSIVE; thrice-daze). Ladders re-baselined.
+- ✅ **Combat Layer 2 — FOCUS two-step** (R1 generic focus → R2 hidden release; rotation + flipped triangles). `focus.test.ts`, `focusBalance.test.ts`.
+- ✅ **Combat Layer 3 — environments (partial)** — arena rhythm / Falkner's gust beats (`arena.test.ts`, `bossAI.test.ts`); full field-environment system is later.
+- ✅ **Combat Layer 4 — trainer AI profiles** (8-knob data-driven profiles + shared decision tree; wild/unprofiled keep `wildFoeAI`). `trainerAI.ts`, `trainerProfiles.test.ts`.
+- ✅ **Bond track** — built EARLY (roadmap lists bond under Phase 8). Challenge-scaled growth, the JUMPSTART ★, Calls-unlock gate. `bond.ts`, `bondLadder.test.ts`, `bondGrowth.test.ts`. (Sanctioned pull-forward — the risks doc recommended building bond before Phase 8.)
+- **Note:** the Phase-8 *status conditions* + the 17 *type identities*-as-status build is NOT done — only the type **chart** (6.7-C) and these enrichment layers are. Status remains Phase 8.
+
 ## Where ART fits (the deferral you asked for)
 **Art is authored AGAINST this skeleton, not before it, and everything is built visually swappable.**
 - The tileset/prefab/sprite systems are already data-driven — art is a data swap at any time, zero code change. This is the flexibility you asked to preserve; it already exists.
@@ -108,6 +133,11 @@ Prerequisite: Phase 7 (the chapter template proven once).
 - The intro/framing is **Phase 3** (it's foundation — context is not optional polish).
 - Per-chapter story beats are authored in **Phase 7+** alongside each chapter's content.
 - The overarching legacy/time narrative is designed now (it's in the scope doc) but *authored* chapter by chapter.
+
+## Known foundation gaps (named, NOT sequenced — priority is Mathias's call)
+Cross-cutting gaps that aren't stages on the linear spine but are real pre-ship foundation work. Listed, not ranked or ordered:
+- **Mobile touch controls.** The game is phone-first but controls are keyboard-placeholder only — no on-screen D-pad / A-B / tappable stance, and stance cannot stay hidden under SELECT on mobile. (Owns the input-layer rewrite to consume action intents, not raw keys.)
+- **Audio.** Zero plan anywhere — no music/SFX system, spec, or assets. Flagged as the largest uncovered gap in `docs/design-risks-and-gaps.md`.
 
 ## The backlog (ideas captured, NOT built until their phase)
 Anything we think of out of order lands here instead of derailing the critical path: bond track (Phase 8), temperaments/marked (needs the dex schema slice), Phone 2.0 (Phase 8), the Gauntlet (post-launch), day/night (Phase 8), the full art set (post-demo pass), Stance Beasts + cover legendary (Phase 8 content).
