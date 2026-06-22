@@ -37,6 +37,10 @@
   .hint { color:var(--dim); font-size:11px; margin-top:6px; }
   .toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:var(--warn); color:#fff; padding:8px 14px; border-radius:6px; opacity:0; transition:opacity .2s; pointer-events:none; }
   .toast.show { opacity:1; }
+  .drop { margin-top:12px; border:2px dashed var(--line); border-radius:8px; padding:16px 12px; text-align:center; color:var(--dim); cursor:pointer; user-select:none; transition:border-color .15s, background .15s, color .15s; }
+  .drop:hover { border-color:var(--accent); }
+  .drop.hot { border-color:var(--accent); background:#1a2420; color:var(--ink); }
+  .drop b { display:block; color:var(--ink); margin-bottom:2px; }
 </style>
 </head>
 <body>
@@ -58,6 +62,8 @@
         <option value="2,2">2×2</option>
         <option value="2,3">2×3 (tree_big)</option>
         <option value="3,3">3×3</option>
+        <option value="4,4">4×4 macro (64×64)</option>
+        <option value="8,8">8×8 macro (128×128)</option>
         <option value="custom">custom…</option>
       </select>
     </div>
@@ -73,6 +79,24 @@
     <div class="row"><button id="clear">clear</button>
       <button id="loadPalBtn">load .json…</button>
       <input type="file" id="loadPal" accept=".json" hidden></div>
+
+    <div class="drop" id="drop">
+      <b>📁 Drop PNG/JPG to Import &amp; Clamp Palette</b>
+      <span>or click to browse — pixels snap to nearest index; with ≤16/tile on, each 16px tile is reduced to its 16 top colours</span>
+    </div>
+    <input type="file" id="dropFile" accept="image/png,image/jpeg,image/*" hidden>
+
+    <h2 style="margin-top:14px">Active KAMON Reference <span style="color:var(--dim);font-weight:normal">· <span id="monSrc">loading…</span></span></h2>
+    <div class="row">
+      <select id="monPick" style="flex:1" title="species from docs/mon-manifest.csv"><option value="">loading…</option></select>
+    </div>
+    <div class="row">
+      <label class="tog"><input type="checkbox" id="frontGuide"> Front Frame Guide (56×56)</label>
+    </div>
+    <div class="row">
+      <label class="tog"><input type="checkbox" id="backGuide"> Back Frame Guide (40×40)</label>
+    </div>
+    <div class="hint">Battle-sprite frames are fixed (pilot-exit-decisions.md): 56×56 front / 40×40 back, anchored top-left. The guide is a read-only overlay — it never touches the grid or export.</div>
 
     <h2 style="margin-top:14px">Rules</h2>
     <ul class="rules">
@@ -132,6 +156,15 @@ let painting = false, eraseDrag = false;
 const $ = (id) => document.getElementById(id);
 const toast = (m) => { const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1400); };
 
+// palette → RGB cache, kept in sync whenever the palette changes (renderSwatches)
+let palRGB = [];
+const hexToRgb = (hex) => { const h=hex.replace('#',''); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; };
+function syncPalRGB() { palRGB = palette.map(c=>hexToRgb(c.hex)); }
+// mathematically nearest palette index by Euclidean RGB distance
+function nearestPaletteIndex(r,g,b) { let best=-1,bd=Infinity; for (let i=0;i<palRGB.length;i++){ const p=palRGB[i]; const d=(r-p[0])**2+(g-p[1])**2+(b-p[2])**2; if(d<bd){bd=d;best=i;} } return best; }
+// macro workspaces (≥4×4 tiles) export as a sliced 16px tile matrix
+const isMacro = () => TW*TH >= 16;
+
 async function loadPalette() {
   // Local-workspace ingestion: only fetch when served over http(s) by the dev
   // server (vite serves the repo root, so these are SAME-ORIGIN — no CORS, no
@@ -160,12 +193,82 @@ async function loadPalette() {
   $('palCount').textContent = palette.length; renderSwatches(); draw();
 }
 function renderSwatches() {
+  syncPalRGB();
   const el = $('swatches'); el.innerHTML = '';
   const tr = document.createElement('div'); tr.className='sw trans'+(sel===-1?' sel':''); tr.title='transparent / eraser';
   tr.onclick=()=>{ sel=-1; renderSwatches(); }; el.appendChild(tr);
   palette.forEach((c,i)=>{ const d=document.createElement('div'); d.className='sw'+(sel===i?' sel':''); d.style.background=c.hex;
     d.title=c.key+' '+c.hex; d.innerHTML='<span class="k">'+c.key+'</span>'; d.onclick=()=>{ sel=i; renderSwatches(); }; el.appendChild(d); });
 }
+
+// --- KAMON manifest reference: dropdown of real species + battle-frame guides ---
+// Frames are a fixed engine convention (docs/pilot-exit-decisions.md): 56×56 front,
+// 40×40 back, anchored top-left. The guide is a NON-destructive overlay — it never
+// reads or writes `grid` and is absent from every export.
+let manifest = [], selMon = null;
+// minimal CSV line parser — the manifest's `note` column is quoted and holds commas
+function parseCSVLine(line) {
+  const out = []; let cur = '', q = false;
+  for (let i=0;i<line.length;i++){ const c=line[i];
+    if (q) { if (c==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else if (c==='"') q=true; else if (c===',') { out.push(cur); cur=''; } else cur+=c; }
+  out.push(cur); return out;
+}
+function parseManifest(text) {
+  const lines = text.split(/\r?\n/).filter(l=>l.trim()), rows = [];
+  for (let i=1;i<lines.length;i++) {                        // [0] is the header row
+    const f = parseCSVLine(lines[i]), name = (f[2]||'').trim();
+    if (!name) continue;                                    // skip unnamed placeholder lines
+    // columns: 0 line_id,1 stage,2 name,6 type1,7 type2,8 archetype
+    rows.push({ line_id:f[0], stage:f[1], name, type1:f[6]||'', type2:f[7]||'', archetype:f[8]||'' });
+  }
+  return rows;
+}
+function populateMonPick(src) {
+  const pick = $('monPick'); pick.innerHTML = '';
+  const def = document.createElement('option'); def.value = '';
+  def.textContent = manifest.length ? '— select a species —' : 'manifest unavailable (open via dev server)';
+  pick.appendChild(def);
+  manifest.forEach((m,i)=>{ const o=document.createElement('option'); o.value=String(i);
+    o.textContent = m.line_id+' '+m.name+' — '+m.type1+(m.type2?'/'+m.type2:'')+' · '+m.archetype;
+    pick.appendChild(o); });
+  $('monSrc').textContent = src || 'embedded — run via dev server for the live manifest';
+}
+async function loadManifest() {
+  // same same-origin / file:// guard as loadPalette() — fetch only when served
+  const served = location.protocol === 'http:' || location.protocol === 'https:';
+  if (served) {
+    for (const url of ['/docs/mon-manifest.csv', '../../docs/mon-manifest.csv']) {
+      try {
+        const r = await fetch(url, { cache: 'no-store' });
+        if (!r.ok) continue;
+        manifest = parseManifest(await r.text());
+        populateMonPick('mon-manifest.csv (live · ' + url + ')');
+        return;
+      } catch { /* try next candidate */ }
+    }
+  }
+  populateMonPick(null);
+}
+// battle-frame guide overlay, painted on top of the editor each draw() (read-only)
+function drawSpriteGuides(s) {
+  const guides = [];
+  if ($('frontGuide').checked) guides.push({ size:56, color:'#82b969', label:'FRONT 56×56' });
+  if ($('backGuide').checked)  guides.push({ size:40, color:'#e0a44a', label:'BACK 40×40' });
+  if (!guides.length) return;
+  ectx.save();
+  ectx.lineWidth = 2; ectx.setLineDash([5,3]);
+  ectx.font = '10px ui-monospace,monospace'; ectx.textBaseline = 'bottom';
+  for (const g of guides) {
+    ectx.strokeStyle = g.color; ectx.fillStyle = g.color;
+    ectx.strokeRect(1, 1, g.size*s - 2, g.size*s - 2);
+    ectx.fillText((selMon ? selMon.name + ' · ' : '') + g.label, 4, g.size*s - 4);
+  }
+  ectx.restore();
+}
+$('monPick').onchange = (e)=>{ const v=e.target.value; selMon = v===''?null:manifest[+v]; draw(); };
+$('frontGuide').onchange = draw;
+$('backGuide').onchange = draw;
 
 function setSize(tw, th) {
   const old = grid, oW = W, oH = H;
@@ -193,7 +296,7 @@ function draw() {
   ectx.strokeStyle='rgba(130,185,105,.5)'; ectx.lineWidth=2;
   for (let tx=0;tx<=TW;tx++){ ectx.beginPath(); ectx.moveTo(tx*T*s,0); ectx.lineTo(tx*T*s,H*s); ectx.stroke(); }
   for (let ty=0;ty<=TH;ty++){ ectx.beginPath(); ectx.moveTo(0,ty*T*s); ectx.lineTo(W*s,ty*T*s); ectx.stroke(); }
-  updateBudget(); drawPreview(); updateOut();
+  drawSpriteGuides(s); updateBudget(); drawPreview(); updateOut();
 }
 function updateBudget() {
   const el=$('budget'); el.style.gridTemplateColumns='repeat('+TW+',30px)'; el.innerHTML='';
@@ -227,7 +330,18 @@ function tileRows(tx, ty) { const rows=[]; for (let y=0;y<T;y++){ let s=''; for 
 function baseId() { return ($('tileId').value||'tile').replace(/[^a-z0-9_]/gi,'_'); }
 function tileId(tx,ty) { return TW*TH===1 ? baseId() : baseId()+'_'+tx+'_'+ty; }
 function tilesetObj() {
-  const tiles={}; for (let ty=0;ty<TH;ty++) for (let tx=0;tx<TW;tx++) tiles[tileId(tx,ty)] = { solid: $('solid').checked, rows: tileRows(tx,ty) };
+  const solid = $('solid').checked, tiles = {};
+  if (isMacro()) {
+    // slice the macro canvas into a left-to-right, top-to-bottom matrix of 16px
+    // tiles, indexed sequentially so the engine asset loader registers them in order
+    let i = 0;
+    for (let ty=0; ty<TH; ty++) for (let tx=0; tx<TW; tx++) {
+      tiles[baseId()+'_'+String(i).padStart(3,'0')] = { index:i, col:tx, row:ty, solid, rows: tileRows(tx,ty) };
+      i++;
+    }
+    return { name: baseId(), tilesize: T, sheet: baseId()+'.png', cols: TW, rows: TH, count: TW*TH, palette: palette.map(c=>c.hex), tiles };
+  }
+  for (let ty=0; ty<TH; ty++) for (let tx=0; tx<TW; tx++) tiles[tileId(tx,ty)] = { solid, rows: tileRows(tx,ty) };
   return { name: baseId(), tilesize: T, palette: palette.map(c=>c.hex), tiles };
 }
 function prefabObj() {
@@ -274,7 +388,74 @@ $('loadPal').onchange = (e)=>{ const f=e.target.files[0]; if(!f) return; const f
   } catch { toast('bad JSON'); } };
   fr.readAsText(f); };
 
-setSize(1,1); loadPalette();
+// Enforce the ≤BUDGET-colour/16px-tile budget (Rule 1) on the whole grid after
+// an import. Per tile: keep the BUDGET most-used palette indices, remap every
+// other pixel to the nearest KEPT colour by Euclidean RGB. Indexed in/out (no
+// AA), so the result is validate_assets-clean. Returns how many tiles it reduced.
+function clampGridToTileBudget() {
+  let reduced = 0;
+  for (let ty=0; ty<TH; ty++) for (let tx=0; tx<TW; tx++) {
+    const count = new Map();
+    for (let y=0; y<T; y++) for (let x=0; x<T; x++) {
+      const v = grid[(ty*T+y)*W + (tx*T+x)];
+      if (v>=0) count.set(v, (count.get(v)||0)+1);
+    }
+    if (count.size <= BUDGET) continue;
+    reduced++;
+    const keep = [...count.entries()].sort((a,b)=>b[1]-a[1]).slice(0,BUDGET).map(e=>e[0]);
+    const keepRGB = keep.map(i=>palRGB[i]);
+    for (let y=0; y<T; y++) for (let x=0; x<T; x++) {
+      const p = (ty*T+y)*W + (tx*T+x), v = grid[p];
+      if (v<0 || keep.includes(v)) continue;
+      const c = palRGB[v]; let best = keep[0], bd = Infinity;
+      for (let k=0; k<keep.length; k++) { const q=keepRGB[k]; const d=(c[0]-q[0])**2+(c[1]-q[1])**2+(c[2]-q[2])**2; if(d<bd){bd=d;best=keep[k];} }
+      grid[p] = best;
+    }
+  }
+  return reduced;
+}
+
+// --- image import: clamp an arbitrary PNG/JPG to the live palette ---
+function importImageFile(file) {
+  if (!file || !/^image\//.test(file.type)) { toast('drop a PNG or JPG'); return; }
+  if (!palette.length) { toast('palette still loading'); return; }
+  const img = new Image();
+  img.onload = () => {
+    // size the workspace to the image, snapped to 16px tiles (1..8 each axis)
+    const tw = Math.max(1, Math.min(8, Math.round(img.width / T)));
+    const th = Math.max(1, Math.min(8, Math.round(img.height / T)));
+    setSize(tw, th);
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    x.imageSmoothingEnabled = false; x.mozImageSmoothingEnabled = false; x.webkitImageSmoothingEnabled = false;
+    x.clearRect(0,0,W,H);
+    x.drawImage(img, 0, 0, W, H);                       // hard-scale into the workspace (no AA)
+    const data = x.getImageData(0,0,W,H).data;
+    for (let p=0; p<W*H; p++) {
+      grid[p] = data[p*4+3] < 128 ? -1 : nearestPaletteIndex(data[p*4], data[p*4+1], data[p*4+2]);
+    }
+    // Rule 1: honour the ≤BUDGET/tile budget on import (same toggle as painting),
+    // so an arbitrary photo/render can't smuggle 17+ colours/tile past the validator.
+    const reduced = $('enforce').checked ? clampGridToTileBudget() : 0;
+    URL.revokeObjectURL(img.src);
+    draw();
+    toast('imported '+img.width+'×'+img.height+' → '+W+'×'+H+
+      (reduced ? ' · '+reduced+' tile'+(reduced>1?'s':'')+' clamped to ≤'+BUDGET : ' (clamped to palette)'));
+  };
+  img.onerror = () => { toast('could not read image'); URL.revokeObjectURL(img.src); };
+  img.src = URL.createObjectURL(file);
+}
+const drop = $('drop'), dropFile = $('dropFile');
+drop.onclick = () => dropFile.click();
+dropFile.onchange = (e) => { const f=e.target.files[0]; if(f) importImageFile(f); dropFile.value=''; };
+['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('hot'); }));
+['dragleave','dragend'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('hot'); }));
+drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('hot'); const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) importImageFile(f); });
+// don't let a stray miss navigate the page away to the dropped file
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
+
+setSize(1,1); loadPalette(); loadManifest();
 </script>
 </body>
 </html>
