@@ -69,6 +69,10 @@ export interface OverworldSceneOpts {
   // fires this so main.ts can add to the bag + autosave. No callback =
   // no-op (maps without item grants don't need it).
   readonly onGiveItem?: (itemId: string, qty: number) => void;
+  // Phase 7 — opt-in. The start-tutorial-catch verb fires this so main.ts can
+  // push the one-time guided FLITPECK catch (forgiving tutorial layer). No
+  // callback = no-op (maps without the lesson don't need it).
+  readonly onTutorialCatch?: () => void;
   // Encounter RNG source (risks/gaps #2). Returns [0,1) like Math.random.
   // REQUIRED — main.ts passes the run's SEEDED rng so encounter sequences
   // are deterministic + testable, consistent with the combat engine. No
@@ -360,18 +364,32 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         opts.onGiveItem?.(cmd.itemId, cmd.qty);
         continue;
       }
+      if (cmd.kind === 'start-tutorial-catch') {
+        // Phase 7. Terminal — hand control to main.ts to push the guided
+        // FLITPECK catch (the forgiving tutorial layer). Same delegation as
+        // start-battle. Maps without onTutorialCatch no-op silently.
+        opts.onTutorialCatch?.();
+        return;
+      }
     }
   }
 
-  function fireScript(script: Extract<MapObject, { type: 'script' }>): void {
+  // Returns true if the script actually ran (so a step-on trigger can
+  // pre-empt the encounter roll only when it fires). A skipped trigger —
+  // requiresFlag unmet, or an already-fired `once` — returns false so the
+  // caller falls through to the normal encounter roll. This is what lets a
+  // one-time grass trigger (the guided catch) hand the tile BACK to random
+  // encounters once it's done, instead of suppressing them forever.
+  function fireScript(script: Extract<MapObject, { type: 'script' }>): boolean {
     // requiresFlag: skip-fire when the gate flag isn't set. Stops a
     // step-on trigger from burning its `flag`+`once` marker on a
     // no-op (e.g., player wanders out before picking a starter).
-    if (script.requiresFlag && !opts.flags.has(script.requiresFlag)) return;
-    if (script.once && script.flag && opts.flags.has(script.flag)) return;
+    if (script.requiresFlag && !opts.flags.has(script.requiresFlag)) return false;
+    if (script.once && script.flag && opts.flags.has(script.flag)) return false;
     if (script.once && script.flag) opts.flags.set(script.flag);
     scriptQueue = [...script.commands];
     runNextCommand();
+    return true;
   }
   function facingDelta(f: Facing): { dx: number; dy: number } {
     if (f === 'up') return { dx: 0, dy: -1 };
@@ -541,8 +559,9 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
     }
 
     const script = stepOnScriptAt(tx, ty);
-    if (script) {
-      fireScript(script);
+    if (script && fireScript(script)) {
+      // Only pre-empt the encounter roll when the script actually fired; a
+      // spent one-time trigger falls through so encounters resume on this tile.
       return;
     }
 

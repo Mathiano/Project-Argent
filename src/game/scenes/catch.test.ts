@@ -14,6 +14,28 @@ import {
 import type { Action, BattleState, RNG, SideState } from '../../engine';
 import { createBattleScene } from './battle';
 import type { CatchWindow } from '../catching';
+import { TUTORIAL_CORRECTION } from '../tutorialCatch';
+
+// A ctx that records fillText so a test can read the on-screen message.
+function recCtx(): { ctx: CanvasRenderingContext2D; texts: string[] } {
+  const texts: string[] = [];
+  const noop = () => {};
+  const path = { fill: noop, stroke: noop, ellipse: noop };
+  const ctx = new Proxy(
+    {},
+    {
+      get(_t, prop) {
+        if (prop === 'fillText') return (text: string) => texts.push(String(text));
+        if (prop === 'beginPath') return () => path;
+        if (prop === 'measureText') return () => ({ width: 10 });
+        if (prop === 'canvas') return { width: 320, height: 180 };
+        return noop;
+      },
+      set: () => true,
+    },
+  ) as unknown as CanvasRenderingContext2D;
+  return { ctx, texts };
+}
 
 function noopCtx(): CanvasRenderingContext2D {
   const noop = () => {};
@@ -50,6 +72,7 @@ function makeScene(opts: {
   medicine?: number;
   catchResult?: (w: CatchWindow) => boolean;
   joinResult?: boolean;
+  tutorial?: boolean;
   rng?: RNG;
 }): { scene: ReturnType<typeof createBattleScene>; rec: Recorder } {
   const player = createSide(SPECIES.EMBERCUB!);
@@ -66,6 +89,7 @@ function makeScene(opts: {
     catchBreathUnlocked: false,
     canRun: true,
     canCatch: true,
+    ...(opts.tutorial ? { tutorial: true as const } : {}),
     ballCount: () => balls,
     medicineCount: () => medicine,
     onThrowBall: (window) => {
@@ -170,6 +194,53 @@ describe('Phase 6a — caught + Wariness flee', () => {
     scene.input?.('a'); // clear "fled!" → onFoeGone
     expect(rec.windows.every((w) => w === 'none')).toBe(true);
     expect(rec.foeGone).toBe(1);
+  });
+});
+
+describe('Phase 7 — tutorial guard-rails (forgiving values, ISOLATED to scripted catches)', () => {
+  test('an out-of-window throw gives a GENTLE CORRECTION, not the Wariness miss', () => {
+    const { scene } = makeScene({ tutorial: true, catchResult: () => false });
+    throwBall(scene); // down, a → out-of-window throw (fresh foe, no read)
+    const { ctx, texts } = recCtx();
+    scene.draw(ctx);
+    const screen = texts.join('|');
+    expect(screen).toContain(TUTORIAL_CORRECTION);
+    expect(screen).not.toContain("wasn't exposed"); // the wild Wariness miss line
+  });
+
+  test('the practice mon NEVER flees — the full wild-flee sequence yields no escape', () => {
+    const { scene, rec } = makeScene({ tutorial: true, catchResult: () => false });
+    // The SAME 4 out-of-window cycles that make a wild foe flee (see the test
+    // below). No telegraph beats appear at all, because Wariness never rises.
+    outThrowCycle(scene);
+    outThrowCycle(scene);
+    outThrowCycle(scene);
+    outThrowCycle(scene);
+    expect(rec.foeGone).toBe(0); // no-flee guard-rail held
+    expect(rec.windows.every((w) => w === 'none')).toBe(true);
+  });
+
+  test('ISOLATION: a WILD catch (no tutorial) keeps the FULL rules — it still flees', () => {
+    // The identical out-of-window sequence on a wild foe DOES flee, proving the
+    // forgiving values are scoped to tutorial:true and never leak to the wild.
+    const { scene, rec } = makeScene({ catchResult: () => false }); // tutorial absent
+    outThrowCycle(scene); // wariness 1
+    outThrowCycle(scene); // wariness 2
+    outThrowCycle(scene); // wariness 3 → flee telegraph
+    scene.input?.('a'); // clear the telegraph
+    outThrowCycle(scene); // wariness 4 → "fled!"
+    scene.input?.('a'); // clear "fled!" → onFoeGone
+    expect(rec.foeGone).toBe(1); // wild Wariness flee intact
+  });
+
+  test('ISOLATION: a wild out-of-window throw shows the Wariness miss, not the correction', () => {
+    const { scene } = makeScene({ catchResult: () => false }); // tutorial absent
+    throwBall(scene);
+    const { ctx, texts } = recCtx();
+    scene.draw(ctx);
+    const screen = texts.join('|');
+    expect(screen).toContain("wasn't exposed"); // full-rules miss line
+    expect(screen).not.toContain(TUTORIAL_CORRECTION);
   });
 });
 

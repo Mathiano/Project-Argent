@@ -680,6 +680,496 @@
           ]
         }
       ]
+    },
+    {
+      "type": "script",
+      "x": 3,
+      "y": 5,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 4,
+      "y": 5,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 12,
+      "y": 5,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 13,
+      "y": 5,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 3,
+      "y": 6,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 4,
+      "y": 6,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 12,
+      "y": 6,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 13,
+      "y": 6,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 3,
+      "y": 9,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 4,
+      "y": 9,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 5,
+      "y": 9,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 6,
+      "y": 9,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 12,
+      "y": 9,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 13,
+      "y": 9,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 14,
+      "y": 9,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 15,
+      "y": 9,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 6,
+      "y": 21,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 7,
+      "y": 21,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 6,
+      "y": 22,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 7,
+      "y": 22,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 14,
+      "y": 23,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 15,
+      "y": 23,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 16,
+      "y": 23,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 2,
+      "y": 24,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 3,
+      "y": 24,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 4,
+      "y": 24,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 14,
+      "y": 24,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 15,
+      "y": 24,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 16,
+      "y": 24,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 2,
+      "y": 25,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 3,
+      "y": 25,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 4,
+      "y": 25,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 14,
+      "y": 25,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 15,
+      "y": 25,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "x": 16,
+      "y": 25,
+      "trigger": "step-on",
+      "requiresFlag": "catch_lesson_done",
+      "flag": "route31_guided_catch_done",
+      "once": true,
+      "commands": [
+        {
+          "kind": "start-tutorial-catch"
+        }
+      ]
     }
   ],
   "spawns": {

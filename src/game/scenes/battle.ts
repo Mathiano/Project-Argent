@@ -27,6 +27,11 @@ import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
 import { fleeTelegraphed } from '../catching';
 import type { CatchWindow } from '../catching';
+import {
+  TUTORIAL_CORRECTION,
+  TUTORIAL_FOE_PROMPT,
+  TUTORIAL_WINDOW_PROMPT,
+} from '../tutorialCatch';
 import { emitGameEvent } from '../gameEvents';
 import { drawSpeciesInSlot } from '../sprites';
 import {
@@ -118,6 +123,13 @@ export interface BattleSceneOpts {
   // callbacks below (game-side); the scene only tracks windows/Wariness
   // and plays the beats.
   readonly canCatch?: boolean;
+  // TUTORIAL guard-rails (game-layer UX, NOT a mechanics fork) — set ONLY by
+  // the scripted guided catch (the Route 31 first-grass beat). When true the
+  // practice mon can't flee and out-of-window throws give a gentle correction
+  // instead of raising Wariness; live read/throw prompts surface each turn.
+  // Wild/trainer catches leave this undefined and keep the full Catching 2.0
+  // rules. The forgiving values live in tutorialCatch.ts. See docs/catching-2-0.md.
+  readonly tutorial?: boolean;
   readonly ballCount?: () => number;
   readonly medicineCount?: () => number;
   // Path 1 — throw a ball. The scene passes the window it detected + the
@@ -600,8 +612,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function beginTurn(): void {
     // Phase 6a — Wariness flee (wild catch only). One telegraph turn,
-    // then the mon escapes — never instant-poof.
-    if (opts.canCatch) {
+    // then the mon escapes — never instant-poof. The tutorial practice mon
+    // is exempt: it never flees (a forgiving guard-rail, scripted only).
+    if (opts.canCatch && !opts.tutorial) {
       if (fleeWarned) {
         setText([`The wild ${activeMon(state.foe).species.name} fled!`], foeGone);
         return;
@@ -1207,9 +1220,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       return;
     }
     if (window === 'none') {
-      // Out-of-window throw — auto-fail + Wariness. Then the foe acts.
-      wariness += 1;
-      setText([`The ${foe.species.name} wasn't exposed — missed!`], () => commit({ kind: 'throwBall' }));
+      // Out-of-window throw — auto-fail. Wild: raise Wariness (→ flee spiral).
+      // Tutorial: a gentle correction, no Wariness (forgiving, scripted only).
+      if (opts.tutorial) {
+        setText([TUTORIAL_CORRECTION], () => commit({ kind: 'throwBall' }));
+      } else {
+        wariness += 1;
+        setText([`The ${foe.species.name} wasn't exposed — missed!`], () => commit({ kind: 'throwBall' }));
+      }
     } else {
       setText([`Aww — the ${foe.species.name} broke free!`], () => commit({ kind: 'throwBall' }));
     }
@@ -1724,6 +1742,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     const slColor =
       sl === 'YOU FASTER' ? PALETTE.hpOk : sl === 'YOU SLOWER' ? PALETTE.hpCrit : PALETTE.paperShadow;
     drawTextRight(ctx, `BASE SPD: ${sl}`, INTENT.x + INTENT.w - 4, INTENT.y + 2, slColor);
+    // TUTORIAL live prompt — surface the read while the player is deciding.
+    // An opening exists -> "NOW — throw!"; otherwise the read tell ("Brace to
+    // force an opening"). Scripted guided catch only (opts.tutorial); a single
+    // additive line, so wild/trainer battles are untouched.
+    if (opts.tutorial && (phase === 'menu' || phase === 'move')) {
+      const prompt = currentWindow() !== 'none' ? TUTORIAL_WINDOW_PROMPT : TUTORIAL_FOE_PROMPT;
+      drawText(ctx, prompt, INTENT.x + 4, INTENT.y + INTENT.h + 3, PALETTE.hpOk);
+    }
   }
 
   // S1 — the explanatory callout banner. Shown during resolve (the intent

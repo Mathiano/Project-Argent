@@ -133,6 +133,25 @@ const objects = [
     interact: [{ kind: 'dialog', lines: ["PAX: I've got two now! No", 'tricks — just a clean,', 'honest battle. Ready?'] }, { kind: 'start-trainer-battle', foeSpecies: ['GRITHOAX', 'MARSHMASH'], winFlag: 'route31_youngster2_beaten', reward: 400 }],
     interactAfterFlag: [{ kind: 'dialog', lines: ['PAX: Two in a row — wow!', 'Good reads.'] }] },
 ];
+
+// --- Catching 2.0 lesson, DO step: the one-time guided FLITPECK catch.
+// Fires on the FIRST tall-grass tile the player steps on after the lab lesson
+// (requiresFlag catch_lesson_done), exactly once (a shared flag, so whichever
+// grass tile is stepped first wins and the rest no-op). The overworld now
+// hands a SPENT one-time trigger back to the encounter roll, so normal wild
+// encounters resume on these very tiles afterwards. Placed on EVERY reachable
+// tall_grass cell because the path threads BETWEEN the grass — the player
+// chooses when to step in, so any grass tile may be their first.
+const scriptCells = new Set(objects.filter((o) => o.type === 'script').map((o) => `${o.x},${o.y}`));
+let guidedCount = 0;
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  if (rows[y][x] !== 'G') continue;
+  const k = `${x},${y}`;
+  if (scriptCells.has(k) || !seen.has(k)) continue; // skip occupied / unreachable
+  objects.push({ type: 'script', x, y, trigger: 'step-on', requiresFlag: 'catch_lesson_done', flag: 'route31_guided_catch_done', once: true, commands: [{ kind: 'start-tutorial-catch' }] });
+  guidedCount += 1;
+}
+
 for (const o of objects) {
   if (o.type === 'warp' || o.type === 'script' || o.type === 'encounter_zone') {
     const cells = o.type === 'encounter_zone' ? Array.from({ length: o.width }, (_, dx) => Array.from({ length: o.height }, (_, dy) => [o.x+dx, o.y+dy])).flat() : [[o.x, o.y]];
@@ -192,7 +211,7 @@ for (let c = 0; c < 9 && placed < 26; c++) {
 }
 const fringe = Array.from({ length: H }, (_, y) => Array.from({ length: W }, (_, x) => fringeSet.has(`${x},${y}`) ? 'x' : '.').join(''));
 
-console.log(`Validated ${objects.length} objects, ${props.length} tree props, ${placed} fringe flowers.`);
+console.log(`Validated ${objects.length} objects, ${props.length} tree props, ${placed} fringe flowers, ${guidedCount} guided-catch triggers.`);
 
 const map = {
   name: 'ROUTE31',

@@ -79,7 +79,13 @@ export type ScriptCommand =
   // rewards). NON-terminal — the script continues (so a "Found X!" dialog
   // can follow). main.ts wires onGiveItem → bagAdd + autosave. Gate one-
   // time pickups with the script's own `once`+`flag`.
-  | { readonly kind: 'give-item'; readonly itemId: string; readonly qty: number };
+  | { readonly kind: 'give-item'; readonly itemId: string; readonly qty: number }
+  // Phase 7: the scripted Catching 2.0 lesson — launch the one-time guided
+  // FLITPECK catch (the Route 31 first-grass beat) with the forgiving tutorial
+  // layer. TERMINAL (the battle scene takes over). main.ts wires
+  // onTutorialCatch -> a battle built with `tutorial: true`. Gate it with the
+  // script's own `once`+`flag` so it fires exactly once.
+  | { readonly kind: 'start-tutorial-catch' };
 
 export type MapObject =
   | { readonly type: 'warp'; readonly x: number; readonly y: number; readonly target: string }

@@ -68,6 +68,7 @@ import {
   willingJoinChance,
 } from './catching';
 import type { CatchWindow, CatchOrigin } from './catching';
+import { TUTORIAL_CATCH_SPECIES, TUTORIAL_INTRO, tutorialFoeAI } from './tutorialCatch';
 import { emitGameEvent } from './gameEvents';
 import { createBondStageScene } from './scenes/bondStage';
 import {
@@ -1412,6 +1413,9 @@ function showOverworld(
     onEncounter(foeSpecies: string) {
       pushWildEncounter(foeSpecies);
     },
+    onTutorialCatch() {
+      pushTutorialCatch();
+    },
     onTrainerBattle(foeSpecies: string | readonly string[], winFlag: string, reward?: number) {
       pushTrainerFight(foeSpecies, winFlag, reward);
     },
@@ -1562,6 +1566,99 @@ function pushWildEncounter(foeSpeciesName: string): void {
         currentOverworldScene?.armPostBattleGrace();
         autosaveNow();
         showBondBeats(bondCrossings, () => maybeEvolve(() => {})); // bond beat, then evo gates
+      },
+    }),
+  );
+}
+
+// Phase 7 — the scripted guided catch (the Catching 2.0 DO step). Launched
+// once on Route 31's first tall-grass tile (the start-tutorial-catch verb,
+// gated by catch_lesson_done). A normal Path-1 catch on a contained FLITPECK
+// with the FORGIVING tutorial layer: max-legible info (every tell shown), a
+// benign foe that can't punish, and `tutorial: true` so the scene blocks the
+// flee + Wariness spiral and surfaces live read/throw prompts. The real catch
+// MATH is unchanged (same callbacks as pushWildEncounter). The trigger's
+// once-flag is already set when this fires, so normal encounters resume after.
+function pushTutorialCatch(): void {
+  const foe = CH1_DEX[TUTORIAL_CATCH_SPECIES] ?? SPECIES[TUTORIAL_CATCH_SPECIES];
+  if (!foe) {
+    console.warn(`Argent: tutorial-catch species not found: ${TUTORIAL_CATCH_SPECIES}`);
+    return;
+  }
+  markSeen(run.dex, foe.name);
+  const state = createBattleState(buildPlayerTeam(), createSide(foe), {
+    typeChart: TYPECHART_CH1,
+  });
+  const popBack = () => {
+    scenes.pop();
+    currentOverworldScene?.armPostBattleGrace();
+    autosaveNow();
+  };
+  scenes.push(
+    createBattleScene({
+      state,
+      rng: run.rng,
+      // Benign, predictable practice foe (can't punish) — see tutorialCatch.ts.
+      chooseFoeAction: (s, r) => tutorialFoeAI(s, r),
+      // Maximally legible — open info-discipline, every tell shown.
+      intentReliability: infoLevelToReliability('open'),
+      intro: [...TUTORIAL_INTRO],
+      catchBreathUnlocked: callsUnlocked(),
+      canRun: true,
+      canCatch: true,
+      // The forgiving guard-rails (no flee, no Wariness, gentle correction,
+      // live prompts) — isolated to this scripted encounter.
+      tutorial: true,
+      ballCount,
+      medicineCount,
+      // Real Path-1 math (unchanged) — the window opens reliably because the
+      // benign foe telegraphs an opening every round, but the catch is a roll.
+      onThrowBall: (window: CatchWindow, hpFrac: number) => {
+        consumeBall();
+        const chance = catchChance({
+          rarity: catchRarity(foe),
+          window,
+          ballMult: ballMult(),
+          hpFrac,
+        });
+        return { caught: rollCatch(chance, run.rng) };
+      },
+      onWillingJoin: () => {
+        consumeMedicine();
+        const lead = run.partyBond[0] ?? 0;
+        const bonus = bondBonus(lead);
+        const chance = willingJoinChance({
+          badges: run.badges.length,
+          monRarity: monDifficulty(foe),
+          bondBonus: bonus,
+        });
+        return {
+          joined: rollWillingJoin(chance, run.rng),
+          hint: refusalHint({ badges: run.badges.length, bondBonus: bonus }, run.rng),
+        };
+      },
+      onCaught: (finalState, origin) => {
+        writebackParty(finalState);
+        addCaughtMon(foe, origin);
+        recomputeSignpostFlags();
+        popBack();
+      },
+      // Declined / walked away — return to the grass, no catch, no black-out.
+      onFlee: (finalState) => {
+        writebackParty(finalState);
+        popBack();
+      },
+      onFoeGone: (finalState) => {
+        writebackParty(finalState);
+        popBack();
+      },
+      // The player KO'd (or somehow lost to) the practice mon — either way
+      // just return to the overworld. No black-out: it's a lesson, and the
+      // benign foe can't realistically faint the player's healthy starter.
+      onResolve: (_winner, finalState) => {
+        writebackParty(finalState);
+        recomputeSignpostFlags();
+        popBack();
       },
     }),
   );

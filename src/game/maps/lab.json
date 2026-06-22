@@ -246,8 +246,64 @@
         {
           "kind": "dialog",
           "lines": [
+            "LARCH: He didn't wait for the",
+            "most important part.",
+            "",
+            "LARCH: There are two ways to earn",
+            "a creature's place beside you.",
+            "",
+            "LARCH: You can out-read it in a",
+            "fight — force an opening in its",
+            "guard, and in that opening, catch.",
+            "",
+            "LARCH: Or you can spare it, and",
+            "let it choose you. But that path",
+            "comes later, once you've earned",
+            "the standing out there.",
+            "Most only ever learn the first."
+          ]
+        },
+        {
+          "kind": "dialog",
+          "lines": [
+            "LARCH lifts a contained FLITPECK",
+            "onto the bench. Watch closely.",
+            "",
+            "LARCH: It's gathering to lunge —",
+            "see how it coils?",
+            "Brace, and force the opening.",
+            "",
+            "(The FLITPECK strikes; LARCH's",
+            "mon braces — the bird overcommits",
+            "and is left exposed.)",
+            "",
+            "LARCH: There — it's open.",
+            "NOW the throw.",
+            "",
+            "(A band arcs out. A flash.)",
+            "LARCH: Gotcha. That's a read-catch.",
+            "Read, open, throw. That's all of it."
+          ]
+        },
+        {
+          "kind": "dialog",
+          "lines": [
+            "LARCH presses a handful of",
+            "BANDS into your pack.",
+            "",
+            "LARCH: Five to start. Spend them",
+            "on the opening you make —",
+            "never on a guard you haven't broken."
+          ]
+        },
+        { "kind": "give-item", "itemId": "BALL", "qty": 5 },
+        { "kind": "set-flag", "flag": "catch_lesson_done" },
+        {
+          "kind": "dialog",
+          "lines": [
             "LARCH: Head south,",
             "through Route 31.",
+            "Try it on a real one out there.",
             "A parcel waits in the next town.",
             "Go on."
           ]
