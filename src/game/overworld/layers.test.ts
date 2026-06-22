@@ -61,27 +61,32 @@ describe('Y-sort order (depth occlusion)', () => {
 });
 
 describe('live migration — Route 31 + Violet use the layered format', () => {
-  // getMap registers outdoor_violet + the tree_big prefab at module load.
-  test('Route 31 has tree props; trunk blocks, canopy is walkable (walk-behind)', async () => {
+  // Placement-independent invariants (robust to forest/cluster re-layouts):
+  // every prop's trunk (bottom row of its cells) is solid; canopy is above it;
+  // and walk-behind exists somewhere (a canopy cell over walkable ground).
+  function assertProps(map: any) {
+    expect(map.props && map.props.length).toBeGreaterThanOrEqual(1);
+    expect(map.fringe).toBeDefined();
+    for (const p of map.props) {
+      const maxTy = Math.max(...p.cells.map((c: { ty: number }) => c.ty));
+      const trunk = p.cells.filter((c: { ty: number }) => c.ty === maxTy);
+      for (const c of trunk) expect(isWalkable(map, c.tx, c.ty)).toBe(false); // trunk blocks
+      expect(p.cells.some((c: { ty: number }) => c.ty < maxTy)).toBe(true); // has canopy above
+    }
+    const walkBehind = map.props.some((p: { cells: { tx: number; ty: number }[] }) => {
+      const maxTy = Math.max(...p.cells.map((c) => c.ty));
+      return p.cells.some((c) => c.ty < maxTy && isWalkable(map, c.tx, c.ty));
+    });
+    expect(walkBehind).toBe(true); // at least one canopy is over walkable ground
+  }
+  test('Route 31 props: trunks block, canopies walk-behind', async () => {
     const { getMap } = await import('./maps');
-    const r = getMap('ROUTE31');
-    expect(r.props && r.props.length).toBeGreaterThanOrEqual(1);
-    expect(r.fringe).toBeDefined();
-    expect(isWalkable(r, 16, 4)).toBe(false); // trunk_l — blocks
-    expect(isWalkable(r, 17, 4)).toBe(false); // trunk_r — blocks
-    expect(isWalkable(r, 16, 2)).toBe(true); // canopy — walk behind it
-    expect(isWalkable(r, 16, 3)).toBe(true);
+    assertProps(getMap('ROUTE31'));
   });
-
-  test('Violet has tree props; trunk blocks, canopy walkable; spine anchors intact', async () => {
+  test('Violet props: trunks block, canopies walk-behind; spine anchors intact', async () => {
     const { getMap } = await import('./maps');
     const v = getMap('VIOLET');
-    expect(v.props && v.props.length).toBeGreaterThanOrEqual(1);
-    expect(v.fringe).toBeDefined();
-    expect(isWalkable(v, 21, 9)).toBe(false); // trunk — blocks
-    expect(isWalkable(v, 22, 9)).toBe(false);
-    expect(isWalkable(v, 21, 7)).toBe(true); // canopy — walk behind it
-    // spine anchors must remain clear (no tree dropped on the route)
+    assertProps(v);
     expect(isWalkable(v, 9, 1)).toBe(true); // north entry
     expect(isWalkable(v, 9, 11)).toBe(true); // fromGym (above the gym door)
   });
