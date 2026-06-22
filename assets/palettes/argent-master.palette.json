@@ -1,7 +1,7 @@
 {
   "name": "argent-master",
-  "note": "Canonical palette seeded from violet-batch-01 (foundation). Per-tile colour budget is <=16 (RSE/GBA ceiling — docs/visual-ceiling-rse-2d.md); this master is the CROSS-tileset ceiling, grown additively toward ~48-64. Tileset rows encode single-char keys; the alphabet was extended 36->62 (0-9a-zA-Z) so the master can reach ~64 without renumbering existing indices. The 30 indices below are UNCHANGED (additive growth is a later curated art pass — do not invent colours in bulk). History: extended 21->29 for the SoulSilver-grade terrain masters (2026-06-21); +1 (29->30) exact HC grass base green #68b549 (2026-06-21).",
-  "size": 30,
+  "note": "Canonical palette seeded from violet-batch-01 (foundation). Per-tile colour budget is <=16 (RSE/GBA ceiling — docs/visual-ceiling-rse-2d.md); this master is the CROSS-tileset ceiling, grown additively toward ~48-64. Tileset rows encode single-char keys; the alphabet is 0-9a-zA-Z (62) so the master can reach ~64 without renumbering existing indices (decoder src/game/overworld/tileset.ts PALETTE_KEYS matches). The original 30 indices (0-9a-t) are UNCHANGED. History: extended 21->29 for the SoulSilver-grade terrain masters (2026-06-21); +1 (29->30) exact HC grass base green #68b549 (2026-06-21); +24 (30->54) curated overworld-POC ramps — grass/foliage/path/water/roof/stone/accent at indices 30-53 (keys u-z then A-R), no exact-RGB dedup against the existing 30 (2026-06-22).",
+  "size": 54,
   "colors": [
     {
       "key": "0",
@@ -122,6 +122,102 @@
     {
       "key": "t",
       "hex": "#68b549"
+    },
+    {
+      "key": "u",
+      "hex": "#4c744f"
+    },
+    {
+      "key": "v",
+      "hex": "#6ba24f"
+    },
+    {
+      "key": "w",
+      "hex": "#7ebc65"
+    },
+    {
+      "key": "x",
+      "hex": "#83c16d"
+    },
+    {
+      "key": "y",
+      "hex": "#c7e1c1"
+    },
+    {
+      "key": "z",
+      "hex": "#11241a"
+    },
+    {
+      "key": "A",
+      "hex": "#193828"
+    },
+    {
+      "key": "B",
+      "hex": "#245131"
+    },
+    {
+      "key": "C",
+      "hex": "#3e7038"
+    },
+    {
+      "key": "D",
+      "hex": "#4e8257"
+    },
+    {
+      "key": "E",
+      "hex": "#5e5948"
+    },
+    {
+      "key": "F",
+      "hex": "#8a5a48"
+    },
+    {
+      "key": "G",
+      "hex": "#c7a374"
+    },
+    {
+      "key": "H",
+      "hex": "#ceac7a"
+    },
+    {
+      "key": "I",
+      "hex": "#244a3e"
+    },
+    {
+      "key": "J",
+      "hex": "#3f7264"
+    },
+    {
+      "key": "K",
+      "hex": "#6ca581"
+    },
+    {
+      "key": "L",
+      "hex": "#5a2a2c"
+    },
+    {
+      "key": "M",
+      "hex": "#853a3c"
+    },
+    {
+      "key": "N",
+      "hex": "#c08a6a"
+    },
+    {
+      "key": "O",
+      "hex": "#3c3c36"
+    },
+    {
+      "key": "P",
+      "hex": "#5d805a"
+    },
+    {
+      "key": "Q",
+      "hex": "#969d7a"
+    },
+    {
+      "key": "R",
+      "hex": "#af745f"
     }
   ]
 }

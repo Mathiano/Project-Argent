@@ -16,8 +16,14 @@
 // the right one. No code change to ship new area looks — drop a
 // new tileset JSON.
 
+// Single-char palette keys. Extended 36 -> 62 (0-9a-zA-Z) so the decoder can
+// render master-palette indices past 35 — the prerequisite for growing the
+// palette beyond 36 colours (docs/visual-ceiling-rse-2d.md). Matches the
+// 0-9a-zA-Z scheme the validators + studio already use; existing 0-9a-z indices
+// are unchanged (additive — no renumbering). Decoding still bounds-checks
+// against palette.length, so a key past the live palette is rejected.
 export const PALETTE_KEYS =
-  '0123456789abcdefghijklmnopqrstuvwxyz' as const;
+  '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' as const;
 
 export interface TilesetJson {
   readonly name: string;
