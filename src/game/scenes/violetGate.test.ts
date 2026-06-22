@@ -107,6 +107,35 @@ describe('Violet→Route 32 gate — map wiring', () => {
     const r32 = getMap('ROUTE32');
     expect(r32.objects.some((o) => o.type === 'warp' && o.target === 'VIOLET:fromRoute32')).toBe(true);
   });
+
+  test('the obstacle is FLAVOR, not the fight (no start-rival-battle on it)', () => {
+    const obstacle = atGate.find((n) => n.hiddenAfterFlag === 'zephyr_earned' && !n.requiresFlag)!;
+    expect(obstacle.interact.some((c) => c.kind === 'start-rival-battle')).toBe(false);
+    // it still reads (interactable blockage), so the player learns why it's shut
+    expect(JSON.stringify(obstacle.interact)).toMatch(/ROUTE 32|gym|south/i);
+  });
+
+  test('KAMON runs a placeholder pre-fight line BEFORE the battle fires', () => {
+    const kamon = atGate.find((n) => n.requiresFlag === 'zephyr_earned')!;
+    const kinds = kamon.interact.map((c) => c.kind);
+    expect(kinds[0]).toBe('dialog'); // the pre-fight voice (placeholder) comes first
+    expect(kinds[kinds.length - 1]).toBe('start-rival-battle'); // then the fight
+  });
+
+  test('NO SOFT-LOCK: the reopen is gated SOLELY on kamon_beaten (so a LOSS opens it too)', () => {
+    // KAMON despawns on kamon_beaten alone — main.ts sets that flag on BOTH a win
+    // and a loss (loss heals first), so either outcome clears the gate. There must
+    // be no separate win-only flag on KAMON or on the south warp.
+    const kamon = atGate.find((n) => n.requiresFlag === 'zephyr_earned')!;
+    expect(kamon.hiddenAfterFlag).toBe('kamon_beaten');
+    expect(kamon.blockedUntilFlag).toBeUndefined(); // not a "beat to pass" win-gate — presence-gated only
+    const warp = v.objects.find((o) => o.type === 'warp' && o.x === EXIT.x && o.y === EXIT.y) as
+      | Extract<typeof v.objects[number], { type: 'warp' }>
+      | undefined;
+    // the exit itself carries no flag gate — it opens the moment KAMON is gone
+    expect(warp && 'requiresFlag' in warp).toBe(false);
+    expect(warp && 'hiddenAfterFlag' in warp).toBe(false);
+  });
 });
 
 describe('Violet→Route 32 gate — transition behavior', () => {
