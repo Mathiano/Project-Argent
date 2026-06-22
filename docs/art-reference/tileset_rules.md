@@ -6,17 +6,17 @@
 
 ---
 
-## Rule 1 — 4-colour budget per 16×16 tile
+## Rule 1 — 16-colour budget per 16×16 tile (RSE/GBA ceiling)
 
-Every 16×16 tile texture uses **at most 4 colours** (transparent pixels don't count), allocated as:
+Every 16×16 tile texture uses **at most 16 colours** (transparent pixels don't count).
 
-- **1 outline** — pure black `#000000`.
-- **1 highlight** — the lit shade.
-- **2 mid-tones** — the base colour + one shadow shade.
+**Why 16 (and why the tile is still 16×16):** the art ceiling moved from authentic-GBC (≤4 colours/tile) to **Ruby/Sapphire (GBA) capability** — 2D, 16×16 tiles, **≤16 colours/tile**, on an expanded master palette (`docs/visual-ceiling-rse-2d.md`, DECISION LOCKED). Crucially this is a **colour-and-art change only**: the **320×180 canvas, the 16×16 grid, camera, UI, fonts, and sprite metrics are unchanged** — we deliberately *stay* 16×16 to avoid any rescale. HGSS is the art *sensibility*; RSE is the literal engine capability we now target. At 4 colours the RSE/HGSS richness was impossible; at 16 it's reachable.
 
-This is the GBC/SoulSilver discipline: tight per-tile ramps read crisp and cohesive; sprawling per-tile palettes read muddy and "AI-smeared". The project's 64-colour master palette is the *cross-tileset* ceiling (`argent-master.palette.json`); **per tile** the cap is 4.
+- A tile may use **fewer** than 16 (a flat ground tile is often 2–3, a clean prop 4–6). Sixteen is the ceiling, not a quota.
+- **Colour *headroom* ≠ quality.** Sixteen colours gives an authored or curated tile room to breathe; it does **not** make a raw AI texture stop being muddy. The source still has to be authored, packed, or a clean generation. The new discipline is **palette coherence** — the expanded palette is curated as a deliberate ramp (an art-direction pass), not invented piecemeal per tile.
+- The project's **~64-colour master palette** is the *cross-tileset* ceiling (`argent-master.palette.json`, grown additively toward ~48–64); **per tile** the cap is 16.
 
-> A tile may use *fewer* than 4 (a flat ground tile is often 2–3). Four is the ceiling, not a quota.
+> **Advisory — hand-rework candidates:** tiles that pass ≤16 but exceed the **legacy ≤4 GBC budget** (the AI-ingested high-colour transitions that the ceiling move makes "compliant") are flagged by the validator as a **non-failing advisory**. Budget-compliant ≠ visually vetted — they stay tracked as rework candidates (perspective/seam/muddiness unfixed), not silently absolved. The validator never auto-resolves or redraws them.
 
 ## Rule 2 — hard-indexed pixels (no anti-aliasing)
 
@@ -48,4 +48,4 @@ python tools/validate_assets.py <path ...>
 
 Accepts **`.tileset.json`** files (checks each tile's `rows` against Rules 1–2) and **`.png`** sheets (scans on a 16×16 cell grid; checks colour count + soft/alpha edges). Exits non-zero if any asset breaks a rule, so it can gate a content batch. It is a **standalone art lint** — not part of `npm test` (the engine suite stays green independently).
 
-What it reports per tile/cell: unique-colour count (vs the 4 ceiling), partial-alpha pixels (AA), near-duplicate colours (gradient/AA smell), and whether a `#000000` outline is present. Rules 3–4 (projection, non-directional) are **human review** items — the doc is the checklist; the validator covers the mechanically-checkable Rules 1–2.
+What it reports per tile/cell: unique-colour count (vs the **16** ceiling), partial-alpha pixels (AA), near-duplicate colours (gradient/AA smell), and whether a `#000000` outline is present. A tile **over the legacy ≤4 budget but within ≤16** is printed as a **`⚠` non-failing advisory** ("hand-rework candidate") and tallied in the summary, but does **not** change the exit code. Rules 3–4 (projection, non-directional) are **human review** items — the doc is the checklist; the validator covers the mechanically-checkable Rules 1–2.

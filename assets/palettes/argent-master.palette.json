@@ -1,6 +1,6 @@
 {
   "name": "argent-master",
-  "note": "Canonical palette seeded from violet-batch-01 (foundation). Tileset rows encode <=36 single-char keys (0-9a-z); 64 is the project ceiling across tilesets. Extended 21->29 for the SoulSilver-grade terrain masters (2026-06-21). +1 (29->30): exact HC grass base green #68b549 (2026-06-21).",
+  "note": "Canonical palette seeded from violet-batch-01 (foundation). Per-tile colour budget is <=16 (RSE/GBA ceiling — docs/visual-ceiling-rse-2d.md); this master is the CROSS-tileset ceiling, grown additively toward ~48-64. Tileset rows encode single-char keys; the alphabet was extended 36->62 (0-9a-zA-Z) so the master can reach ~64 without renumbering existing indices. The 30 indices below are UNCHANGED (additive growth is a later curated art pass — do not invent colours in bulk). History: extended 21->29 for the SoulSilver-grade terrain masters (2026-06-21); +1 (29->30) exact HC grass base green #68b549 (2026-06-21).",
   "size": 30,
   "colors": [
     {

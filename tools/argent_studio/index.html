@@ -68,7 +68,7 @@
     </div>
     <div class="row">
       <label class="tog"><input type="checkbox" id="pgrid" checked> pixel grid</label>
-      <label class="tog"><input type="checkbox" id="enforce" checked> ≤4/tile</label>
+      <label class="tog"><input type="checkbox" id="enforce" checked> ≤16/tile</label>
     </div>
     <div class="row"><button id="clear">clear</button>
       <button id="loadPalBtn">load .json…</button>
@@ -76,7 +76,7 @@
 
     <h2 style="margin-top:14px">Rules</h2>
     <ul class="rules">
-      <li><b>1</b> ≤4 colours / 16px tile — enforced</li>
+      <li><b>1</b> ≤16 colours / 16px tile — enforced (RSE/GBA)</li>
       <li><b>2</b> hard-indexed, no AA — by construction</li>
       <li><b>3</b> ¾ depth — human review</li>
       <li><b>4</b> non-directional — use tiling →</li>
@@ -87,7 +87,7 @@
   <section class="panel">
     <h2>Editor — paint (left) · erase (right)</h2>
     <canvas id="editor" width="384" height="384"></canvas>
-    <div>per-tile colours (/4):</div>
+    <div>per-tile colours (/16):</div>
     <div class="budgetGrid" id="budget"></div>
     <div class="row" style="margin-top:12px">
       <input type="text" id="tileId" placeholder="base id (e.g. tree_big)" style="flex:1">
@@ -118,7 +118,11 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const T = 16, KEYS = '0123456789abcdefghijklmnopqrstuvwxyz';
+// BUDGET: per-16px-tile colour ceiling (Rule 1). Moved 4 -> 16 with the RSE/GBA
+// ceiling (docs/visual-ceiling-rse-2d.md); index-clamp + on-palette stay enforced.
+// KEYS extended 36 -> 62 (0-9a-zA-Z) so the master palette can grow toward ~64
+// additively — existing 0-9a-z indices unchanged.
+const T = 16, BUDGET = 16, KEYS = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const FALLBACK = [{"key":"0","hex":"#092626"},{"key":"1","hex":"#202525"},{"key":"2","hex":"#1d402a"},{"key":"3","hex":"#283751"},{"key":"4","hex":"#2e5831"},{"key":"5","hex":"#134182"},{"key":"6","hex":"#402a25"},{"key":"7","hex":"#3d343a"},{"key":"8","hex":"#3d5937"},{"key":"9","hex":"#514434"},{"key":"a","hex":"#825437"},{"key":"b","hex":"#945d38"},{"key":"c","hex":"#406a31"},{"key":"d","hex":"#557c23"},{"key":"e","hex":"#a1683a"},{"key":"f","hex":"#648054"},{"key":"g","hex":"#718a63"},{"key":"h","hex":"#98784a"},{"key":"i","hex":"#8f9c75"},{"key":"j","hex":"#ac743f"},{"key":"k","hex":"#a9af8b"},{"key":"l","hex":"#82b969"},{"key":"m","hex":"#85c069"},{"key":"n","hex":"#86c16a"},{"key":"o","hex":"#86be69"},{"key":"p","hex":"#889563"},{"key":"q","hex":"#bca06e"},{"key":"r","hex":"#cea773"},{"key":"s","hex":"#d5af7b"},{"key":"t","hex":"#68b549"}];
 
 let palette = [], sel = -1;
@@ -194,14 +198,14 @@ function draw() {
 function updateBudget() {
   const el=$('budget'); el.style.gridTemplateColumns='repeat('+TW+',30px)'; el.innerHTML='';
   for (let ty=0;ty<TH;ty++) for (let tx=0;tx<TW;tx++){ const n=tileColorCount(tx,ty).size; const d=document.createElement('div');
-    d.className='bt '+(n>4?'bad':'ok'); d.textContent=n; el.appendChild(d); }
+    d.className='bt '+(n>BUDGET?'bad':'ok'); d.textContent=n; el.appendChild(d); }
 }
 function paint(e, erase) {
   const r = editor.getBoundingClientRect();
   const x = Math.floor((e.clientX-r.left)/r.width*W), y = Math.floor((e.clientY-r.top)/r.height*H);
   if (x<0||y<0||x>=W||y>=H) return;
   const idx = erase?-1:sel; if (grid[y*W+x]===idx) return;
-  if (idx>=0 && $('enforce').checked) { const used=tileColorCount(Math.floor(x/T),Math.floor(y/T)); if(!used.has(idx)&&used.size>=4){ toast('4-colour budget for this tile (Rule 1)'); return; } }
+  if (idx>=0 && $('enforce').checked) { const used=tileColorCount(Math.floor(x/T),Math.floor(y/T)); if(!used.has(idx)&&used.size>=BUDGET){ toast(BUDGET+'-colour budget for this tile (Rule 1)'); return; } }
   grid[y*W+x]=idx; draw();
 }
 editor.addEventListener('contextmenu', e=>e.preventDefault());
