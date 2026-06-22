@@ -166,11 +166,12 @@ describe('Phase 3 polish — Hearthwick south exit is HARD-gated by player_has_s
 
   function findGatekeeper(): { x: number; y: number; blockedUntilFlag?: string } {
     const town = getMap('HEARTHWICK');
+    // The south-exit gatekeeper is uniquely the NPC gated on player_has_starter.
+    // (Hearthwick-depth pass: this is now the TOWN ELDER, whose pre-starter line
+    // is the canonical bench line — the old "see the Professor" text was dropped,
+    // so identify by the gate flag, not by dialogue.)
     const npc = town.objects.find(
-      (o) =>
-        o.type === 'npc' &&
-        o.blockedUntilFlag === 'player_has_starter' &&
-        JSON.stringify(o.interact).includes('Professor'),
+      (o) => o.type === 'npc' && o.blockedUntilFlag === 'player_has_starter',
     );
     if (!npc || npc.type !== 'npc') throw new Error('south-exit gatekeeper NPC missing');
     return { x: npc.x, y: npc.y, ...(npc.blockedUntilFlag ? { blockedUntilFlag: npc.blockedUntilFlag } : {}) };

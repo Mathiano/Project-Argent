@@ -7,6 +7,7 @@
 
 import labData from '../maps/lab.json';
 import houseData from '../maps/house.json';
+import kamonHouseData from '../maps/kamon_house.json';
 import bedroomData from '../maps/bedroom.json';
 import hearthwickData from '../maps/hearthwick.json';
 import hearthwickCenterData from '../maps/hearthwick_center.json';
@@ -48,6 +49,7 @@ function chooseRoute31(): MapData {
 const REGISTRY: { [name: string]: () => MapData } = {
   BEDROOM: () => loadMap(bedroomData as GrayboxMapJson),
   HOUSE: () => loadMap(houseData as GrayboxMapJson),
+  KAMON_HOUSE: () => loadMap(kamonHouseData as GrayboxMapJson),
   HEARTHWICK: () => loadMap(hearthwickData as GrayboxMapJson),
   HEARTHWICK_CENTER: () => loadMap(hearthwickCenterData as GrayboxMapJson),
   HEARTHWICK_MART: () => loadMap(hearthwickMartData as GrayboxMapJson),

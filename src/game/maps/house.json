@@ -3,14 +3,16 @@
   "width": 12,
   "height": 9,
   "tilesize": 16,
-  "tiles": "WWWWWWWsWWWW\nW..........W\nW.TT....F..W\nW.TT....F..W\nW.......b..W\nW.FF.......W\nW.FF.......W\nW..........W\nWWWWdWWWWWWW",
-  "_layout": "12 wide, 9 tall. Stairs at (7,0) warp to bedroom; door warp south (4,8). TT kitchen table NW; F potted fern (decoration) NE+SW; b bookshelf NE. Parent NPC at (8,7) — to the side so the central path stays clear.",
+  "tiles": "WWWWWWWsWWWW\nW..........W\nW.TT....F.hW\nW.TT....F..W\nW.......b..W\nW.FF.......W\nW.FF......pW\nW..........W\nWWWWdWWWWWWW",
+  "_layout": "12 wide, 9 tall. Stairs at (7,0) warp to bedroom; door warp south (4,8). TT kitchen table NW; F potted fern (decoration) NE+SW; b bookshelf NE. h lit hearth (10,2) — the home's warm centre; p family photos (10,6). Parent NPC at (8,7) — to the side so the central path stays clear.",
   "tileset": {
     "W": { "color": "#5a4a2a", "solid": true, "label": "wall" },
     ".": { "color": "#cec3a0", "solid": false, "label": "floor" },
     "T": { "color": "#7a4e2d", "solid": true, "label": "table" },
     "F": { "color": "#4f7a3a", "solid": true, "label": "fern" },
     "b": { "color": "#4a3c1f", "solid": true, "label": "bookshelf" },
+    "h": { "color": "#d8753a", "solid": true, "label": "hearth" },
+    "p": { "color": "#8a6d54", "solid": true, "label": "photos" },
     "s": { "color": "#d8c08a", "solid": false, "label": "stairs" },
     "d": { "color": "#daa520", "solid": false, "label": "door" }
   },
@@ -52,6 +54,18 @@
       "lines": ["A row of houseplants.", "She tends to them every morning."]
     },
     {
+      "type": "sign",
+      "x": 10,
+      "y": 2,
+      "lines": ["The hearth, lit. The kettle's on.", "It's always warm in this corner.", "You'll think of it on cold roads."]
+    },
+    {
+      "type": "sign",
+      "x": 10,
+      "y": 6,
+      "lines": ["Family photos along the wall.", "You, smaller, year by year.", "A face that's not in the newer ones.", "Mom keeps them all dusted."]
+    },
+    {
       "type": "npc",
       "x": 8,
       "y": 7,
@@ -60,11 +74,9 @@
         {
           "kind": "dialog",
           "lines": [
-            "MOM: You're awake.",
-            "MOM: Larch's letter — yes, I saw.",
-            "MOM: I knew this day was coming.",
-            "MOM: ...Go on. Don't keep him waiting.",
-            "MOM: And come home when you can."
+            "MOM: You've got everything?",
+            "MOM: ...Of course you do.",
+            "MOM: Look at you."
           ]
         },
         { "kind": "set-flag", "flag": "spoke_to_parent" }
@@ -72,10 +84,7 @@
       "interactAfterFlag": [
         {
           "kind": "dialog",
-          "lines": [
-            "MOM: The town will feel emptier without you.",
-            "MOM: ...Be safe."
-          ]
+          "lines": ["MOM: Go on, then.", "MOM: And come home for the winters."]
         }
       ],
       "blockedUntilFlag": "spoke_to_parent"

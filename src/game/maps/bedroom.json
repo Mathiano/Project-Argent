@@ -3,13 +3,15 @@
   "width": 9,
   "height": 8,
   "tilesize": 16,
-  "tiles": "WWWWWWWWW\nWbb.D...W\nWbb.....W\nW.......W\nW.......W\nW.......W\nW.......W\nWWWWdWWWW",
-  "_layout": "9 wide, 8 tall. bed (2x2) NW; desk single tile at col 4 row 1; door warp south at (4,7).",
+  "tiles": "WWWWWWWWW\nWbb.D..cW\nWbb.....W\nW.......W\nW.....g.W\nW.......W\nW.......W\nWWWWdWWWW",
+  "_layout": "9 wide, 8 tall. bed (2x2) NW; desk single tile at col 4 row 1; c circled calendar (7,1); g packed bag (6,4) — the today's-the-day signals; door warp south at (4,7).",
   "tileset": {
     "W": { "color": "#4a3c1f", "solid": true, "label": "wall" },
     ".": { "color": "#cec3a0", "solid": false, "label": "floor" },
     "b": { "color": "#8aa0c4", "solid": true, "label": "bed" },
     "D": { "color": "#6c4a28", "solid": true, "label": "desk" },
+    "c": { "color": "#c7b27a", "solid": true, "label": "calendar" },
+    "g": { "color": "#7a5a3a", "solid": true, "label": "packed_bag" },
     "d": { "color": "#daa520", "solid": false, "label": "door" }
   },
   "objects": [
@@ -59,6 +61,18 @@
       "x": 2,
       "y": 1,
       "lines": ["A worn pillow.", "Smells like home."]
+    },
+    {
+      "type": "sign",
+      "x": 7,
+      "y": 1,
+      "lines": ["A calendar on the wall.", "One day is circled, twice over.", "Today.", "You've known for a while."]
+    },
+    {
+      "type": "sign",
+      "x": 6,
+      "y": 4,
+      "lines": ["A travel bag, packed and re-packed.", "You did it last night, then again", "this morning to be sure.", "Everything you own that fits."]
     }
   ],
   "spawns": {

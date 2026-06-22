@@ -3,79 +3,132 @@
   "width": 20,
   "height": 14,
   "tilesize": 16,
-  "tiles": "TTTTTTTTTTTTTTTTTTTT\nT..................T\nT.HH.HH....LL.LL...T\nT.HD.HH....LL.LD...T\nT..................T\nT..................T\nT.........X........T\nT.........X........T\nT.........X........T\nT..................T\nT.HH.HH......MMM...T\nT.HD.HH......MDM...T\nT..................T\nTTTTTTTTTpTTTTTTTTTT",
-  "_layout": "20x14 town. T=tree border, H=house wall, D=house/center/mart door (warp), L=lab wall, LD=lab door, M=mart wall, X=path, p=southern exit to Route 31. Player house top-left (HH/HD), lab top-right (LL/LD), Pokémon Center bottom-left (HH/HD door at 3,11), Poké Mart bottom-right (MMM/MDM door at 14,11) — the classic Center+Mart pair.",
+  "tiles": "TTTTTTTTTTTTTTTTTTTT\nT..................T\nT.HH.HHKKK.LL.LL...T\nT.HD.HHKkK.LL.LD...T\nT..................T\nT..................T\nT.........X........T\nT...nfn...X........T\nT....u....X........T\nT...............ww.T\nT.HH.HH......MMMww.T\nT.HD.HH......MDM...T\nT......n...........T\nTTTTTTTTTpTTTTTTTTTT",
+  "_layout": "20x14 town, DRESSED for environmental storytelling (hearthwick-design.md). Existing kept: player house (HH/HD, door 3,3), lab (LL/LD, door 15,3), Center (door 3,11), Mart (MMM/MDM, door 14,11), south exit p (9,13)->Route31, central path X (col9). ADDED (placeholder tiles): KAMON's house K/k (door 8,3 -> KAMON_HOUSE interior); Common Hearth f + benches n + founder marker u (cols 4-6, rows 7-8); pond w (cols 16-17, rows 9-10) at the east edge; worn bench n (7,12) at the southern threshold. Detail layer + beats are objects (signs/sprite-NPCs). ISOLATED from the theft (lab.json) + catch-tutorial + combat — none touched.",
   "tileset": {
     "T": { "color": "#1d4a26", "solid": true, "label": "tree" },
     ".": { "color": "#86c06c", "solid": false, "label": "grass" },
     "H": { "color": "#7a4e2d", "solid": true, "label": "house_wall" },
     "L": { "color": "#9c8a78", "solid": true, "label": "lab_wall" },
     "M": { "color": "#3a6ea5", "solid": true, "label": "mart_wall" },
+    "K": { "color": "#6d4636", "solid": true, "label": "kamon_wall" },
     "D": { "color": "#daa520", "solid": false, "label": "house_door" },
+    "k": { "color": "#daa520", "solid": false, "label": "kamon_door" },
     "X": { "color": "#d8c08a", "solid": false, "label": "path" },
-    "p": { "color": "#d8c08a", "solid": false, "label": "path_exit" }
+    "p": { "color": "#d8c08a", "solid": false, "label": "path_exit" },
+    "f": { "color": "#d8753a", "solid": true, "label": "hearth_fire" },
+    "n": { "color": "#9c7a4a", "solid": true, "label": "bench" },
+    "u": { "color": "#8a8a82", "solid": true, "label": "founder_marker" },
+    "w": { "color": "#3f7264", "solid": true, "label": "pond_water" }
   },
   "objects": [
-    {
-      "type": "warp",
-      "x": 3,
-      "y": 3,
-      "target": "HOUSE:fromHearthwick"
-    },
-    {
-      "type": "warp",
-      "x": 15,
-      "y": 3,
-      "target": "LAB:fromHearthwick"
-    },
-    {
-      "type": "warp",
-      "x": 9,
-      "y": 13,
-      "target": "ROUTE31:fromHearthwick"
-    },
-    {
-      "type": "warp",
-      "x": 3,
-      "y": 11,
-      "target": "HEARTHWICK_CENTER:fromHearthwick"
-    },
+    { "type": "warp", "x": 3, "y": 3, "target": "HOUSE:fromHearthwick" },
+    { "type": "warp", "x": 15, "y": 3, "target": "LAB:fromHearthwick" },
+    { "type": "warp", "x": 8, "y": 3, "target": "KAMON_HOUSE:fromHearthwick" },
+    { "type": "warp", "x": 9, "y": 13, "target": "ROUTE31:fromHearthwick" },
+    { "type": "warp", "x": 3, "y": 11, "target": "HEARTHWICK_CENTER:fromHearthwick" },
     {
       "type": "sign",
       "x": 4,
       "y": 11,
-      "lines": [
-        "POKÉMON CENTER",
-        "Heal your team —",
-        "free for trainers."
-      ]
+      "lines": ["POKÉMON CENTER", "Heal your team —", "free for trainers."]
     },
-    {
-      "type": "warp",
-      "x": 14,
-      "y": 11,
-      "target": "HEARTHWICK_MART:fromHearthwick"
-    },
+    { "type": "warp", "x": 14, "y": 11, "target": "HEARTHWICK_MART:fromHearthwick" },
     {
       "type": "sign",
       "x": 16,
       "y": 11,
-      "lines": [
-        "POKÉ MART",
-        "Potions, and a little",
-        "of everything."
-      ]
+      "lines": ["POKÉ MART", "Potions, and a little", "of everything."]
     },
     {
       "type": "sign",
       "x": 1,
       "y": 5,
-      "lines": [
-        "HEARTHWICK",
-        "Population: 27.",
-        "(Was 31 last year.)"
-      ]
+      "lines": ["HEARTHWICK", "Population: 27.", "(Was 31 last year.)"]
     },
+
+    {
+      "type": "sign",
+      "x": 7,
+      "y": 4,
+      "lines": ["KAMON's place.", "He's lived here all your life.", "The schedule tacked by his", "door is filled to the minute."]
+    },
+
+    {
+      "type": "sign",
+      "x": 4,
+      "y": 1,
+      "lines": ["Chimney smoke, thin and steady.", "Someone's home, or just was.", "The town breathes."]
+    },
+    {
+      "type": "sign",
+      "x": 12,
+      "y": 1,
+      "lines": ["Laundry strung between two poles,", "swaying. Shirts your size, and", "smaller ones, and larger.", "A whole life, hung out to dry."]
+    },
+    {
+      "type": "sign",
+      "x": 4,
+      "y": 4,
+      "lines": ["A shallow dish of water by the step.", "Not for any mon in particular —", "just for whoever's passing."]
+    },
+    {
+      "type": "sign",
+      "x": 16,
+      "y": 4,
+      "lines": ["A watering can, tipped against", "a flowerbed. Still half full.", "Someone meant to come back to it."]
+    },
+    {
+      "type": "sign",
+      "x": 13,
+      "y": 4,
+      "lines": ["A paper festival lantern, faded.", "No one ever took it down.", "It still lights, some nights."]
+    },
+    {
+      "type": "sign",
+      "x": 17,
+      "y": 5,
+      "lines": ["The old tree by the lane.", "Notches in the bark — a child's", "height, year by year.", "The top ones came slower."]
+    },
+
+    {
+      "type": "sign",
+      "x": 5,
+      "y": 7,
+      "lines": ["The Common Hearth.", "Kept lit the year round —", "someone always feeds it.", "The town's name, made plain."]
+    },
+    {
+      "type": "sign",
+      "x": 5,
+      "y": 8,
+      "lines": ["A worn stone marker:", "'HEARTHWICK — kindled, year one.", "Keep the fire.'", "The letters are nearly gone."]
+    },
+    {
+      "type": "sign",
+      "x": 4,
+      "y": 7,
+      "lines": ["A bench by the fire, smoothed", "by years of sitting.", "Warm, even now."]
+    },
+
+    {
+      "type": "sign",
+      "x": 7,
+      "y": 12,
+      "lines": ["A bench worn smooth, facing", "the road south.", "How many sat here before", "they left?"]
+    },
+    {
+      "type": "sign",
+      "x": 10,
+      "y": 12,
+      "lines": ["ROUTE 31 — Violet City, north.", "Below, in smaller hand-lettering", "someone added later:", "'Come home for the winters.'"]
+    },
+    {
+      "type": "sign",
+      "x": 18,
+      "y": 11,
+      "lines": ["A dish at the pond's edge,", "kept full. The wild ones drink", "here; no one minds."]
+    },
+
     {
       "type": "npc",
       "x": 7,
@@ -125,6 +178,79 @@
         }
       ]
     },
+
+    {
+      "type": "npc",
+      "x": 6,
+      "y": 4,
+      "sprite": "MARSHMASH",
+      "spriteType": "AQUA",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "A mon asleep in the sun on the sill,",
+            "paws twitching.",
+            "No one's watching it.",
+            "It doesn't need watching."
+          ]
+        }
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 6,
+      "y": 6,
+      "sprite": "GRITHOAX",
+      "spriteType": "TERRA",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "A mon curled by the Common Hearth,",
+            "warming its back.",
+            "It lives here as much as anyone does.",
+            "No collar. No need."
+          ]
+        }
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 18,
+      "y": 9,
+      "sprite": "MARSHMASH",
+      "spriteType": "AQUA",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "A wild mon dozes at the water's edge,",
+            "unbothered by you.",
+            "The town and the wild, sharing a bank.",
+            "It's always been this way here."
+          ]
+        }
+      ]
+    },
+    {
+      "type": "npc",
+      "x": 8,
+      "y": 12,
+      "sprite": "GALEHAWK",
+      "spriteType": "GALE",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "The elder's old mon, grey at the muzzle.",
+            "It leans against their knee,",
+            "eyes half-closed.",
+            "Forty winters will do that."
+          ]
+        }
+      ]
+    },
     {
       "type": "npc",
       "x": 9,
@@ -135,11 +261,10 @@
         {
           "kind": "dialog",
           "lines": [
-            "TOWN ELDER: Heading out?",
-            "Not without a partner,",
-            "you're not.",
-            "See the Professor first.",
-            "His door's been waiting."
+            "TOWN ELDER: Forty winters, this one and I.",
+            "You don't learn a creature in a hurry —",
+            "you learn it the way you learn a song.",
+            "A little at a time."
           ]
         }
       ],
@@ -147,9 +272,9 @@
         {
           "kind": "dialog",
           "lines": [
-            "TOWN ELDER: Good luck out there.",
-            "Roads need walking again.",
-            "It's been too quiet."
+            "TOWN ELDER: Off already? Good.",
+            "Just — don't go so fast you miss it.",
+            "The road's best taken slow."
           ]
         }
       ]
@@ -157,6 +282,7 @@
   ],
   "spawns": {
     "fromHouse": { "x": 3, "y": 4, "facing": "down" },
+    "fromKamonHouse": { "x": 8, "y": 4, "facing": "down" },
     "fromLab": { "x": 15, "y": 4, "facing": "down" },
     "fromRoute": { "x": 9, "y": 12, "facing": "up" },
     "fromCenter": { "x": 3, "y": 12, "facing": "down" },
