@@ -33,7 +33,7 @@ function walkOne(scene: Scene, input: ReturnType<typeof mockInput>, dir: 'up' | 
 }
 
 // Walk a fixed bounce pattern inside ROUTE31's left grass encounter zone
-// (cols 2-3, rows 5-9 — FLITPECK @ rate 0.18) and record the per-step
+// (cols 2-5, rows 12-15 — FLITPECK @ rate 0.18) and record the per-step
 // encounter outcome. Same seed → same record.
 function runWalk(seed: number): string[] {
   const rng = mulberry32(seed);
@@ -43,7 +43,7 @@ function runWalk(seed: number): string[] {
   const scene = createOverworldScene({
     map: 'ROUTE31',
     spawn: 'default',
-    spawnAt: { x: 2, y: 5, facing: 'down' },
+    spawnAt: { x: 2, y: 12, facing: "down" },
     inputState: input,
     flags: mockFlags(),
     random: () => rng.next(),
@@ -52,7 +52,7 @@ function runWalk(seed: number): string[] {
     onTrainerBattle: () => {},
     onBossBattle: () => {},
   });
-  // 16 steps, bouncing between rows 5 and 9 (all in-zone, all walkable).
+  // 16 steps, bouncing between rows 12 and 16 (all in-zone, all walkable).
   const pattern: Array<'up' | 'down'> = [];
   for (let b = 0; b < 2; b += 1) { for (let i = 0; i < 4; i += 1) pattern.push('down'); for (let i = 0; i < 4; i += 1) pattern.push('up'); }
   const record: string[] = [];

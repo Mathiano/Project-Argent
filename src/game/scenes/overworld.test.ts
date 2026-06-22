@@ -476,7 +476,7 @@ describe('Phase 5a fix — encounter rolls only on real moves + post-battle grac
       // Drop the player onto a tall-grass encounter tile directly (the
       // left grass column, encounter_zone cols 2-3 rows 5-9).
       spawn: 'default',
-      spawnAt: { x: 2, y: 6, facing: 'down' },
+      spawnAt: { x: 2, y: 12, facing: "down" },
       inputState: input,
       flags: route31Flags(),
       onWarp: () => {},
@@ -506,7 +506,7 @@ describe('Phase 5a fix — encounter rolls only on real moves + post-battle grac
       // Start ABOVE the left grass column (encounter_zone cols 2-3 rows
       // 5-9) and walk DOWN into it twice.
       spawn: 'default',
-      spawnAt: { x: 2, y: 4, facing: 'down' },
+      spawnAt: { x: 2, y: 11, facing: "down" },
       inputState: input,
       flags: route31Flags(),
       onWarp: () => {},
@@ -523,11 +523,11 @@ describe('Phase 5a fix — encounter rolls only on real moves + post-battle grac
 
     // First step onto grass — grace consumed, no encounter despite
     // Math.random() = 0.
-    walkOne(scene, input, 'down'); // → (2, 5), in the encounter zone
+    walkOne(scene, input, "down"); // → (2,12), in the zone
     expect(encounters).toBe(0);
 
     // Second step — grace already spent, encounter fires.
-    walkOne(scene, input, 'down'); // → (2, 6), still in the zone
+    walkOne(scene, input, "down"); // → (2,13), still in the zone
     expect(encounters).toBe(1);
   });
 });
@@ -686,7 +686,7 @@ describe('JAY the robber — the opening bond hook is UNMISSABLE (forced on entr
     const cc = stubCtx();
     live.scene.draw(cc);
     // His threat dialogue is up (we're mid-confrontation, not mid-walk).
-    expect(cc.texts.join(' ')).toContain('sharp little');
+    expect(cc.texts.join(' ')).toContain('barely got anything');
     const confrontX = jayMarkerX(cc);
 
     expect(spawnX).not.toBeNull();

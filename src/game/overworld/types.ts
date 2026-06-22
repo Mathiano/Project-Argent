@@ -117,6 +117,14 @@ export type MapObject =
       // starter first) so a player who wanders out early doesn't burn
       // the `flag`+`once` marker on a no-op.
       readonly requiresFlag?: string;
+      // ZONE step-on (Route 31 expansion): when BOTH width and height are set,
+      // the step-on trigger fires anywhere inside the [x, x+width) × [y, y+height)
+      // rectangle (a single zone-entry check) instead of on the single (x,y) tile.
+      // Lets one object cover a whole grass patch — the guided-catch's first-grass
+      // trigger — without a script on every tile. Absent on every legacy script,
+      // so single-tile behaviour is unchanged.
+      readonly width?: number;
+      readonly height?: number;
     }
   | {
       readonly type: 'npc';

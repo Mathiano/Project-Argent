@@ -82,35 +82,43 @@ describe('Catching lesson — the lab beat fires once + sets the tutorial-done f
   });
 });
 
-describe('Catching lesson — the Route 31 guided catch fires once on tall grass', () => {
+describe('Catching lesson — the Route 31 guided catch fires once on §1 grass (zone-entry)', () => {
+  // Route 31 expansion: the 35 per-tile triggers were replaced by ONE zone-entry
+  // step-on script over §1 Meadowgate's grass (overworld.ts fires a step-on script
+  // with width+height anywhere inside its rectangle). Same contract: it fires once,
+  // gated by the lab lesson, on the first §1 grass tile entered.
   const cells = route31.cells as string[];
-  const triggers = (route31.objects as ScriptObj[]).filter(
+  const triggers = (route31.objects as (ScriptObj & { width?: number; height?: number })[]).filter(
     (o) =>
       o.type === 'script' &&
       o.trigger === 'step-on' &&
       flatten(o.commands).some((c) => c.kind === 'start-tutorial-catch'),
   );
 
-  test('at least one guided-catch trigger exists', () => {
-    expect(triggers.length).toBeGreaterThan(0);
+  test('the guided catch is now a SINGLE zone-entry trigger (refactored from per-tile)', () => {
+    expect(triggers.length).toBe(1);
+    const z = triggers[0]!;
+    expect(z.width).toBeGreaterThan(1);
+    expect(z.height).toBeGreaterThan(1);
   });
 
-  test('every trigger is gated by the lesson + fires once via a SHARED flag', () => {
-    // A shared flag means whichever grass tile is stepped first wins; the rest
-    // no-op. So the guided catch fires exactly once across the whole route.
-    for (const t of triggers) {
-      expect(t.once).toBe(true);
-      expect(t.requiresFlag).toBe('catch_lesson_done'); // only after the lab lesson
-      expect(t.flag).toBe('route31_guided_catch_done'); // the one shared once-marker
-    }
-    const flags = new Set(triggers.map((t) => t.flag));
-    expect(flags.size).toBe(1);
+  test('the trigger is gated by the lab lesson + fires exactly once (shared once-flag)', () => {
+    const z = triggers[0]!;
+    expect(z.once).toBe(true);
+    expect(z.requiresFlag).toBe('catch_lesson_done'); // only after the lab lesson
+    expect(z.flag).toBe('route31_guided_catch_done'); // the one once-marker
   });
 
-  test('triggers sit on tall_grass tiles (the lesson DOES happen in the grass)', () => {
-    for (const t of triggers) {
-      expect(cells[t.y]![t.x]).toBe('G'); // G = tall_grass in the generator
+  test('the catch zone lies over tall_grass (the lesson DOES happen in the grass)', () => {
+    const z = triggers[0]!;
+    // every NON-path cell of the zone is tall_grass (the path may thread through it)
+    let grass = 0;
+    for (let dy = 0; dy < z.height!; dy++) for (let dx = 0; dx < z.width!; dx++) {
+      const ch = cells[z.y + dy]![z.x + dx];
+      if (ch === 'G') grass += 1;
+      else expect(ch).toBe('p'); // the only non-grass a zone cell may be is the path
     }
+    expect(grass).toBeGreaterThan(0);
   });
 });
 

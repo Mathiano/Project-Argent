@@ -623,6 +623,12 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
     for (const obj of map.objects) {
       if (obj.type !== 'script') continue;
       if (obj.trigger !== 'step-on') continue;
+      // ZONE step-on: width+height present → fire anywhere inside the rectangle
+      // (one object covers a whole patch). Otherwise the legacy single-tile match.
+      if (obj.width !== undefined && obj.height !== undefined) {
+        if (x >= obj.x && x < obj.x + obj.width && y >= obj.y && y < obj.y + obj.height) return obj;
+        continue;
+      }
       if (obj.x === x && obj.y === y) return obj;
     }
     return null;

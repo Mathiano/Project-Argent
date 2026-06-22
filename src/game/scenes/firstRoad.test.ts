@@ -123,10 +123,10 @@ describe('Sprint 1 — the seed event (lost mon) flag chain', () => {
     const flags = mockFlags();
     flags.set('route31_trainer_beaten'); // skip JAY's forced-entry approach (own test)
     const input = mockInput();
-    // Stand just below the lost-mon NPC (16,21) and face up to talk.
+    // Stand just below the rehomed lost-mon NPC (14,50) and face up to talk.
     const scene = createOverworldScene({ random: () => 0,
       map: 'ROUTE31', spawn: 'default', inputState: input, flags,
-      spawnAt: { x: 16, y: 22, facing: 'up' },
+      spawnAt: { x: 14, y: 51, facing: "up" },
       onWarp: () => {}, onEncounter: () => {}, onTrainerBattle: () => {}, onBossBattle: () => {},
     });
     expect(flags.has('route31_lost_mon_found')).toBe(false);
@@ -144,7 +144,7 @@ describe('Sprint 1 — give-item verb works', () => {
     let granted: { id: string; qty: number } | null = null;
     const scene = createOverworldScene({ random: () => 0,
       map: 'ROUTE31', spawn: 'default', inputState: input, flags,
-      spawnAt: { x: 3, y: 12, facing: 'down' }, // forest floor, one tile above the item at (3,13)
+      spawnAt: { x: 7, y: 31, facing: 'down' }, // one tile above the rehomed wood item at (7,32)
       onWarp: () => {}, onEncounter: () => {}, onTrainerBattle: () => {}, onBossBattle: () => {},
       onGiveItem: (id, qty) => { granted = { id, qty }; },
     });
