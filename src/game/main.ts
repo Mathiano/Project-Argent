@@ -52,7 +52,7 @@ import { createPrepScene } from './scenes/prep';
 import { createStarterPickScene } from './scenes/starterPick';
 import { createTitleScene } from './scenes/title';
 import { freshBattleSide } from './battlePrep';
-import { bagAdd, bagByPocket, bagConsume, ITEMS } from './items';
+import { bagAdd, bagByPocket, bagConsume, ITEMS, seedStartingBag } from './items';
 import type { BagEntry } from './items';
 import { STARTING_MONEY, awardMoney, buyItem, sellItem } from './economy';
 import {
@@ -590,8 +590,10 @@ function startNewGame(): void {
   wipeStorage();
   run.party = [];
   run.bag = [];
-  bagAdd(run.bag, 'POTION', 3);
-  bagAdd(run.bag, 'BALL', 5); // Phase 6a — starting balls so catching is testable early
+  // Normal playthrough: 3 POTIONs, NO balls — the player's first Bands are
+  // LARCH's lab grant (the Catching 2.0 lesson). The ?skip=wild dev hook
+  // seeds its own balls to keep combat playtests handy.
+  seedStartingBag(run.bag);
   run.money = STARTING_MONEY;
   run.badges = [];
   run.partyBond = [];
@@ -1248,6 +1250,7 @@ if (skip === 'starter') {
   startNewGame();
 } else if (skip === 'wild') {
   run.party = [createSide(SPECIES.EMBERCUB!)];
+  bagAdd(run.bag, 'BALL', 5); // dev hook — starting balls so catching is testable early (was the cold-start grant)
   showWildBattle();
 } else if (skip === 'test-battle') {
   // Canonical Phase 0 hook: cold-start CH1 starter + a wild FLITPECK

@@ -169,6 +169,15 @@ export function bagAdd(bag: BagEntry[], itemId: string, count: number): void {
   bag.push({ itemId, qty: count });
 }
 
+// The canonical NEW-GAME starting bag (a normal playthrough, no ?skip).
+// 3 POTIONs so the survival loop is testable from the first wild fight —
+// but ZERO balls: the player's first Bands are LARCH's lab grant (the
+// Catching 2.0 lesson), so catching can't happen before it's taught. The
+// dev ?skip=wild hook seeds balls itself to keep combat playtests handy.
+export function seedStartingBag(bag: BagEntry[]): void {
+  bagAdd(bag, 'POTION', 3);
+}
+
 // Remove ONE of an item from the bag (decrement qty; remove entry at
 // zero). Returns false if the item wasn't in the bag.
 export function bagConsume(bag: BagEntry[], itemId: string): boolean {

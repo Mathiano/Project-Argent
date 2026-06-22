@@ -45,6 +45,8 @@ import { createStarterPickScene } from './scenes/starterPick';
 import { createOverworldScene } from './scenes/overworld';
 import type { FlagStore } from './scenes/overworld';
 import { createBattleScene } from './scenes/battle';
+import { bagByPocket, seedStartingBag } from './items';
+import type { BagEntry } from './items';
 
 // One-time CH1 setup (matches main.ts).
 registerMoves(loadMoves(movesData as MoveJson[]));
@@ -231,6 +233,18 @@ function wildFoeAI(state: BattleState, rng: RNG): Action {
 }
 
 describe('Phase 0 GATE — cold-start integration', () => {
+  // The cold-start bag is the SAME seeding main.ts's startNewGame() uses (no
+  // ?skip). Contract: a normal playthrough reaches Route 31 with ZERO balls —
+  // LARCH's lab grant (the Catching 2.0 lesson) must be the player's first
+  // Bands. The dev ?skip=wild hook seeds its own balls; this is the real path.
+  test('a normal new game starts with NO balls (Larch’s grant is the first)', () => {
+    const bag: BagEntry[] = [];
+    seedStartingBag(bag);
+    const pockets = bagByPocket(bag);
+    expect(pockets.balls).toHaveLength(0); // no balls before the lab lesson
+    expect(pockets.medicine.reduce((n, e) => n + e.qty, 0)).toBe(3); // 3 POTIONs kept
+  });
+
   test('title → A → starter pick → A → overworld(LAB)', () => {
     const h = createHarness();
     expect(h.topName()).toBe('title');
