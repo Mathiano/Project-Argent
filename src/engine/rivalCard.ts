@@ -23,19 +23,30 @@ export const KAMON_STEAL: { readonly [playerPick: string]: string } = {
   SILTSKIP: 'GRUBLEAF', // NATURE beats AQUA
 };
 
-// Per-ace LEVEL (the fairness knob) — keyed by the STOLEN species. RE-CONVERGED
-// off the BALANCED trio (2026-06-21, starter-trio-rebalance.md RESOLUTION). With
-// the trio now budget-balanced (mirror-sim ~50% RPS each), the per-pick spread
-// collapsed to a TIGHT band around ~1.0 — 0.90–1.03 — versus the old 0.95–1.37
-// that was papering over the bulk asymmetry. Each pick lands winnable-but-tense
-// (player ~66–72%, n=2000 seed=1): KINDRAKE-pick 72.0% · GRUBLEAF-pick 70.3% ·
-// SILTSKIP-pick 65.7%. The lone sub-1.0 (KINDRAKE, the ace stolen vs a GRUBLEAF
-// pick) is the FLAME>NATURE type counter being reined so the grass pick isn't a
-// wall. Sim-gated: src/sim/rivalCard.test.ts.
+// Per-ace LEVEL (the fairness knob) — keyed by the STOLEN species. RE-TUNED for
+// the POST-FALKNER PLACEMENT (2026-06-22, kamon-first-fight integration). The
+// fight moved from "early-route first fight" to the Violet→Route 32 gate, AFTER
+// the ZEPHYR badge — which is also the badge that GATES the starter's evolution
+// (evolution.ts, bond stage 3 + ZEPHYR). The expected developed player's lead
+// is therefore the STAGE-2 EVOLVED form, and at the OLD ~1.0 levels the fight
+// was trivial (evolved player win% 99.7 / 81.8 / 99.8, n=2000 seed=1 — two near
+// auto-wins). Re-converged so the EVOLVED matchup lands winnable-but-tense again
+// (player ~67%, tight): KINDRAKE-pick 67.8% · GRUBLEAF-pick 66.7% · SILTSKIP-
+// pick 67.6%. Sim-gated: src/sim/rivalCard.test.ts (post-Falkner gate).
+//
+// ⚠️ FLAG — STRUCTURAL TENSION (a design call for a fuller fix): a SOLO stage-1
+// ace can't be fair for BOTH an evolved and an unevolved lead at once (they're
+// an evolution of stats apart; the 0.85 bond-factor is locked, so LEVEL is the
+// only knob and the matchup is a cliff). Tuned for the EXPECTED (evolved) team,
+// an UNEVOLVED lead now faces a near-unwinnable KAMON for 2/3 picks (win% 9.6 /
+// 53.9 / 2.4). This is MITIGATED by the gate's both-advance design (no soft-lock
+// — a loss still has KAMON leave + the exit open). The proper long-term fix is a
+// CARD-SHAPE change (give KAMON a 2nd mon — buildKamonTeam already supports a
+// chaff — or an evolved ace), which is Mathias's design call; NOT done here.
 export const KAMON_ACE_LEVEL: { readonly [stolen: string]: number } = {
-  SILTSKIP: 1.03, // stolen when the player picks KINDRAKE
-  KINDRAKE: 0.9, // stolen when the player picks GRUBLEAF (rein the FLAME>NATURE wall)
-  GRUBLEAF: 1.02, // stolen when the player picks SILTSKIP
+  SILTSKIP: 1.21, // stolen when the player picks KINDRAKE (evolved KILNDRAKE → 67.8%)
+  KINDRAKE: 0.94, // stolen when the player picks GRUBLEAF (FLAME>NATURE reined; VINESNAP → 66.7%)
+  GRUBLEAF: 1.24, // stolen when the player picks SILTSKIP (evolved BRACKSLAP → 67.6%)
 };
 
 // The starter KAMON steals, given the player's pick. Returns undefined for a

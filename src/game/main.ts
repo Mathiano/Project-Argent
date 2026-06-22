@@ -267,6 +267,11 @@ function recomputeSignpostFlags(): void {
   const hasTerra = types.has('TERRA');
   if (hasSprout && !hasTerra) flagStore.set('need_terra_nudge');
   else flagStore.unset('need_terra_nudge');
+  // The canonical "ZEPHYR badge earned" flag — derived from run.badges so it's
+  // always consistent (and recomputed on load). Gates the Violet→Route 32
+  // obstacle (gone once earned) and KAMON's spawn (present once earned).
+  if (run.badges.includes(ZEPHYR_BADGE)) flagStore.set('zephyr_earned');
+  else flagStore.unset('zephyr_earned');
 }
 
 // Stable RNG seed from the party composition. Same party → same seed
@@ -988,6 +993,55 @@ function showRivalBattle(): void {
   );
 }
 
+// Phase 7 — the KAMON first-fight as the Violet→Route 32 GATE (post-Falkner).
+// The overworld-launched twin of showRivalBattle: the same bespoke v2 card
+// (counter-type stolen starter SOLO, kamon profile, bit-identical combat spec)
+// but PUSHED over the Violet scene and POPPED back on resolve instead of
+// ending the demo. Both win and loss advance — KAMON leaves (kamon_beaten) and
+// the exit opens, no soft-lock (a loss heals first so the party isn't stranded
+// fainted). The pre-fight line is a placeholder (warm-foil voice is a separate
+// narrative-lane task). Sim-gated for the post-Falkner team: src/sim/rivalCard.
+function pushRivalGateFight(): void {
+  const player = partyLead();
+  const stolen = kamonStolenSpecies(player);
+  const foeTeam = buildKamonTeam(stolen);
+  const isCh1 = CH1_DEX[player.name] !== undefined;
+  const state = createBattleState(
+    buildPlayerTeam(),
+    foeTeam,
+    isCh1 ? { typeChart: TYPECHART_CH1 } : {},
+  );
+  scenes.push(
+    createBattleScene({
+      state,
+      rng: run.rng,
+      chooseFoeAction: (s, r) => trainerPolicy(TRAINER_PROFILES.kamon!)(s, 'foe', r),
+      intro: [
+        'KAMON blocks the road south.',
+        'KAMON: So you earned the badge.',
+        `Then prove it — ${stolen.name}, go!`,
+      ],
+      catchBreathUnlocked: callsUnlocked(),
+      canRun: false,
+      onResolve: (winner, finalState, participants) => {
+        writebackParty(finalState);
+        // Both branches advance: KAMON leaves + the exit opens (no soft-lock).
+        flagStore.set('kamon_beaten');
+        if (winner === 'player') {
+          awardBondForFight(foeTeam, 'trainer', finalState, participants);
+        } else {
+          // A loss still advances — heal so the party isn't stranded fainted
+          // back in town (BUG 2 contract), then KAMON leaves all the same.
+          healPartyInPlace();
+        }
+        recomputeSignpostFlags();
+        scenes.pop(); // back to Violet — KAMON is gone, the exit is open
+        autosaveNow();
+      },
+    }),
+  );
+}
+
 function buildFalknerTeam(): { team: ReturnType<typeof createTeam>; card: BossCard } {
   const flitpeck: Species = FALKNER_LEAD_DEX.FLITPECK!;
   const galehawk: Species = { ...FALKNER_ACE_DEX.GALEHAWK!, trait: 'GUSTBORNE' };
@@ -1418,6 +1472,9 @@ function showOverworld(
     },
     onTutorialCatch() {
       pushTutorialCatch();
+    },
+    onRivalBattle() {
+      pushRivalGateFight();
     },
     onTrainerBattle(foeSpecies: string | readonly string[], winFlag: string, reward?: number) {
       pushTrainerFight(foeSpecies, winFlag, reward);

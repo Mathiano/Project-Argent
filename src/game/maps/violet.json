@@ -60,7 +60,7 @@
     "T........AAAAAAAAA.......T",
     "TFFFF....AAAAAAAAA.......T",
     "Twwww....................T",
-    "TTTTTTTTTTTTTTTTTTTTTTTTTT"
+    "TTTTTTpTTTTTTTTTTTTTTTTTTT"
   ],
   "objects": [
     {
@@ -93,6 +93,57 @@
       "x": 13,
       "y": 22,
       "target": "VIOLET_ACADEMY:fromViolet"
+    },
+    {
+      "_note": "Phase 7 (KAMON first-fight gate) — the south road to ROUTE 32. Blocked pre-ZEPHYR by a placeholder obstacle; KAMON guards it post-ZEPHYR until beaten. The opened exit leads to a boundary stub (Route 32 is later content).",
+      "type": "warp",
+      "x": 6,
+      "y": 29,
+      "target": "ROUTE32:fromViolet"
+    },
+    {
+      "_note": "Placeholder obstacle (flavor is Mathias's) — present until ZEPHYR is earned, then gone (replaced by KAMON).",
+      "type": "npc",
+      "x": 6,
+      "y": 28,
+      "color": "#6b5a3a",
+      "hiddenAfterFlag": "zephyr_earned",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "A rockfall blocks the road",
+            "south to ROUTE 32.",
+            "",
+            "Word is the way clears once",
+            "you've proven yourself at",
+            "the gym."
+          ]
+        }
+      ]
+    },
+    {
+      "_note": "KAMON — the first rival fight (placeholder pre-fight voice; warm-foil characterization is a separate narrative task). Spawns once ZEPHYR is earned, blocks the south exit, gone once beaten (kamon_beaten, set on win OR loss).",
+      "type": "npc",
+      "x": 6,
+      "y": 28,
+      "color": "#c2491a",
+      "requiresFlag": "zephyr_earned",
+      "hiddenAfterFlag": "kamon_beaten",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "KAMON is waiting at the",
+            "south gate, arms folded.",
+            "",
+            "KAMON: A badge already.",
+            "Fine. Let's see if it means",
+            "anything. No running this time."
+          ]
+        },
+        { "kind": "start-rival-battle" }
+      ]
     },
     {
       "type": "sign",
@@ -521,6 +572,11 @@
     "fromAcademy": {
       "x": 13,
       "y": 21,
+      "facing": "up"
+    },
+    "fromRoute32": {
+      "x": 6,
+      "y": 28,
       "facing": "up"
     }
   },

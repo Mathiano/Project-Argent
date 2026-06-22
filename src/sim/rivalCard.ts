@@ -67,3 +67,42 @@ export function runRivalCardPick(pick: StarterPick, n = 2000, seed = 1): RivalCa
 export function runRivalCard(n = 2000, seed = 1): RivalCardResult[] {
   return CH1_STARTERS.map((p) => runRivalCardPick(p, n, seed));
 }
+
+// ── POST-FALKNER placement (the KAMON first-fight gate moved to Violet→Route
+// 32, AFTER the ZEPHYR badge). A developed player's lead has EVOLVED (stage 1 →
+// stage 2; gate = bond stage 3 + the ZEPHYR badge — evolution.ts). Evolution is
+// the ONLY combat-power change a developed team brings here (bond is horizontal,
+// there is no leveling). KAMON's card is unchanged — his stolen STARTER stays
+// stage 1 (he's the rival's first fight, he never grew it). This measures
+// whether the authored card is still fair once its placement is post-Falkner.
+const EVOLVED_LEAD: { readonly [pick in StarterPick]: string } = {
+  KINDRAKE: 'KILNDRAKE',
+  GRUBLEAF: 'VINESNAP',
+  SILTSKIP: 'BRACKSLAP',
+};
+
+export function runRivalCardPostFalknerPick(pick: StarterPick, n = 2000, seed = 1): RivalCardResult {
+  const stolenName = kamonStolenStarter(pick)!;
+  const lead = CH1[EVOLVED_LEAD[pick]]!;
+  let wins = 0;
+  for (let i = 0; i < n; i += 1) {
+    const rng = mulberry32(seed + i);
+    let state = createBattleState(
+      createTeam([createSide(lead)]),
+      buildKamonTeam(CH1[stolenName]!),
+      { typeChart: CHART },
+    );
+    for (let r = 0; r < 200; r += 1) {
+      const fA = trainerPolicy(TRAINER_PROFILES.kamon!)(state, 'foe', rng);
+      const pA = reader.chooseAction(state, 'player', rng, fA);
+      state = resolveRound(state, pA, fA, rng).state;
+      if (isTeamWiped(state.foe)) { wins += 1; break; }
+      if (isTeamWiped(state.player)) break;
+    }
+  }
+  return { pick, stolen: stolenName, playerWinPct: (wins / n) * 100 };
+}
+
+export function runRivalCardPostFalkner(n = 2000, seed = 1): RivalCardResult[] {
+  return CH1_STARTERS.map((p) => runRivalCardPostFalknerPick(p, n, seed));
+}

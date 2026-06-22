@@ -1,0 +1,38 @@
+{
+  "name": "ROUTE 32",
+  "_layout": "Phase 7 BOUNDARY STUB — the road south out of Violet, opened by beating KAMON at the gate. Route 32 proper is later content; this is the current end-of-chapter boundary. Entered from the north (fromViolet at 4,1); the only exit is the warp back north (4,0) → VIOLET:fromRoute32. A sign marks the end of built content.",
+  "width": 9,
+  "height": 8,
+  "tilesize": 16,
+  "tiles": "TTTTpTTTT\nT.......T\nT.......T\nT.......T\nT.......T\nT.......T\nT.......T\nTTTTTTTTT",
+  "tileset": {
+    "T": { "color": "#2f5a37", "solid": true, "label": "tree" },
+    ".": { "color": "#6cab52", "solid": false, "label": "grass" },
+    "p": { "color": "#caa86a", "solid": false, "label": "path" }
+  },
+  "objects": [
+    {
+      "type": "warp",
+      "x": 4,
+      "y": 0,
+      "target": "VIOLET:fromRoute32"
+    },
+    {
+      "type": "sign",
+      "x": 4,
+      "y": 4,
+      "lines": [
+        "ROUTE 32 — the road south.",
+        "The way onward is still",
+        "being cleared.",
+        "",
+        "(End of the current chapter.",
+        "More content ahead soon.)"
+      ]
+    }
+  ],
+  "spawns": {
+    "default": { "x": 4, "y": 1, "facing": "down" },
+    "fromViolet": { "x": 4, "y": 1, "facing": "down" }
+  }
+}

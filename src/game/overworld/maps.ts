@@ -18,6 +18,7 @@ import violetMartData from '../maps/violet_mart.json';
 import violetAcademyData from '../maps/violet_academy.json';
 import gymData from '../maps/gym.json';
 import route31VioletData from '../maps/route31.violet.json';
+import route32Data from '../maps/route32.json';
 import outdoorVioletTileset from '../../../assets/tilesets/outdoor_violet.tileset.json';
 import houseVioletPrefab from '../../../assets/prefabs/house_violet.prefab.json';
 import gymVioletPrefab from '../../../assets/prefabs/gym_violet.prefab.json';
@@ -60,6 +61,9 @@ const REGISTRY: { [name: string]: () => MapData } = {
   // Phase 7 (violet-city-design.md): the Academy core — an enterable stub.
   VIOLET_ACADEMY: () => loadMap(violetAcademyData as GrayboxMapJson),
   GYM: () => loadMap(gymData as GrayboxMapJson),
+  // Phase 7 — the Route 32 boundary stub (opened by beating KAMON at the
+  // Violet south gate). End-of-chapter; Route 32 proper is later content.
+  ROUTE32: () => loadMap(route32Data as GrayboxMapJson),
 };
 
 // Each call rebuilds from the JSON so any in-place editing during dev

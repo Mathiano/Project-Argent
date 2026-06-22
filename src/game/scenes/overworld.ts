@@ -73,6 +73,9 @@ export interface OverworldSceneOpts {
   // push the one-time guided FLITPECK catch (forgiving tutorial layer). No
   // callback = no-op (maps without the lesson don't need it).
   readonly onTutorialCatch?: () => void;
+  // Phase 7 — opt-in. The start-rival-battle verb fires this so main.ts can
+  // launch the KAMON v2 fight (the Violet→Route 32 gate). No callback = no-op.
+  readonly onRivalBattle?: () => void;
   // Encounter RNG source (risks/gaps #2). Returns [0,1) like Math.random.
   // REQUIRED — main.ts passes the run's SEEDED rng so encounter sequences
   // are deterministic + testable, consistent with the combat engine. No
@@ -371,6 +374,13 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         opts.onTutorialCatch?.();
         return;
       }
+      if (cmd.kind === 'start-rival-battle') {
+        // Phase 7. Terminal — hand control to main.ts to fire the KAMON v2
+        // rival fight (the Violet→Route 32 gate). Same delegation as
+        // start-trainer-battle. Maps without onRivalBattle no-op silently.
+        opts.onRivalBattle?.();
+        return;
+      }
     }
   }
 
@@ -413,10 +423,23 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
     moving = true;
   }
 
+  // Presence gating (Phase 7) — an NPC with requiresFlag is absent until that
+  // flag is set; with hiddenAfterFlag it's absent once that flag is set. Unlike
+  // blockedUntilFlag (which keeps a non-blocking NPC around), an inactive NPC is
+  // fully gone: not drawn, not solid, not interactable. Used by the Violet gate
+  // (obstacle replaced by KAMON, KAMON gone once beaten).
+  function npcActive(npc: Extract<MapObject, { type: 'npc' }>): boolean {
+    if (npc.requiresFlag && !opts.flags.has(npc.requiresFlag)) return false;
+    if (npc.hiddenAfterFlag && opts.flags.has(npc.hiddenAfterFlag)) return false;
+    return true;
+  }
+
   function npcAt(x: number, y: number): Extract<MapObject, { type: 'npc' }> | null {
     for (const obj of map.objects) {
       if (obj.type !== 'npc') continue;
-      if (obj.x === x && obj.y === y) return obj;
+      if (obj.x !== x || obj.y !== y) continue;
+      if (!npcActive(obj)) continue; // skip a gated-away NPC (return the active one)
+      return obj;
     }
     return null;
   }
@@ -675,6 +698,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         if (dialogLines === null && !approach) {
           for (const obj of map.objects) {
             if (obj.type !== 'npc' || !obj.approachOnEnter) continue;
+            if (!npcActive(obj)) continue; // gated away (presence)
             if (obj.blockedUntilFlag && opts.flags.has(obj.blockedUntilFlag)) continue; // already beaten
             const stop = adjacentStopToward(tx, ty, obj.x, obj.y);
             startApproach(obj, stop.x, stop.y);
@@ -1109,6 +1133,11 @@ function drawObjectMarkers(
   const ts = map.tilesize;
   for (const obj of map.objects) {
     if (skipNpc && obj === skipNpc) continue; // drawn separately (mid-approach)
+    // Presence gating (Phase 7) — don't draw an NPC that's gated away.
+    if (obj.type === 'npc') {
+      if (obj.requiresFlag && !flags.has(obj.requiresFlag)) continue;
+      if (obj.hiddenAfterFlag && flags.has(obj.hiddenAfterFlag)) continue;
+    }
     if (obj.type === 'sign') {
       ctx.fillStyle = '#ffd700';
       ctx.fillRect(obj.x * ts - camX + ts / 2 - 1, obj.y * ts - camY + 2, 2, 4);

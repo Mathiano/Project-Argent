@@ -85,7 +85,12 @@ export type ScriptCommand =
   // layer. TERMINAL (the battle scene takes over). main.ts wires
   // onTutorialCatch -> a battle built with `tutorial: true`. Gate it with the
   // script's own `once`+`flag` so it fires exactly once.
-  | { readonly kind: 'start-tutorial-catch' };
+  | { readonly kind: 'start-tutorial-catch' }
+  // Phase 7: the KAMON first-fight (the Violet→Route 32 gate). TERMINAL — fires
+  // the bespoke RIVAL v2 card (counter-type stolen starter, kamon profile).
+  // main.ts wires onRivalBattle -> the fight; both win and loss set
+  // kamon_beaten (no soft-lock) so the gate opens either way.
+  | { readonly kind: 'start-rival-battle' };
 
 export type MapObject =
   | { readonly type: 'warp'; readonly x: number; readonly y: number; readonly target: string }
@@ -141,6 +146,15 @@ export type MapObject =
       // the map (if not yet beaten) and starts its `interact` — unmissable,
       // no walk-around. Used where line-of-sight can't cover open terrain.
       readonly approachOnEnter?: boolean;
+      // Phase 7 — PRESENCE gating (distinct from blockedUntilFlag, which keeps
+      // a non-blocking NPC on the map). These remove the NPC entirely (not
+      // drawn, not solid, not interactable). `requiresFlag`: present ONLY when
+      // the flag is set. `hiddenAfterFlag`: present ONLY until the flag is set.
+      // Used by the Violet→Route 32 gate: a placeholder obstacle (hiddenAfter
+      // the ZEPHYR flag) is REPLACED by KAMON (requires ZEPHYR, hiddenAfter
+      // beaten). Both absent on every existing NPC, so behaviour is unchanged.
+      readonly requiresFlag?: string;
+      readonly hiddenAfterFlag?: string;
     }
   | {
       readonly type: 'gust_pulse';
