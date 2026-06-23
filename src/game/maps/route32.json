@@ -16,21 +16,9 @@
       "x": 4,
       "y": 0,
       "target": "VIOLET:fromRoute32"
-    },
-    {
-      "type": "sign",
-      "x": 4,
-      "y": 4,
-      "lines": [
-        "ROUTE 32 — the road south.",
-        "The way onward is still",
-        "being cleared.",
-        "",
-        "(End of the current chapter.",
-        "More content ahead soon.)"
-      ]
     }
   ],
+  "_placard": "The old end-of-chapter SIGN was replaced by the chapter-end CARD shown on entry — main.ts showOverworld('ROUTE32') → pushChapterEndBeat (the quiet-resolve message + the CHAPTER ONE / Kindled / To be continued card). See docs/ch1-ending-design.md.",
   "spawns": {
     "default": { "x": 4, "y": 1, "facing": "down" },
     "fromViolet": { "x": 4, "y": 1, "facing": "down" }

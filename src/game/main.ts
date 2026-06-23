@@ -54,6 +54,10 @@ import { createStarterPickScene } from './scenes/starterPick';
 import { createTitleScene } from './scenes/title';
 import { createNameEntryScene, NAME_MAX_LEN } from './scenes/nameEntry';
 import { createConfirmScene } from './scenes/confirmPrompt';
+import { createMessageScene } from './scenes/messageScene';
+import { createChapterCardScene } from './scenes/chapterCard';
+import { monDisplayName } from './monName';
+import { kamonGateLines, quietResolveLines, CHAPTER_CARD } from './ch1Ending';
 import { freshBattleSide } from './battlePrep';
 import { bagAdd, bagByPocket, bagConsume, ITEMS, seedStartingBag } from './items';
 import type { BagEntry } from './items';
@@ -1046,6 +1050,46 @@ function showRivalBattle(): void {
 // the exit opens, no soft-lock (a loss heals first so the party isn't stranded
 // fainted). The pre-fight line is a placeholder (warm-foil voice is a separate
 // narrative-lane task). Sim-gated for the post-Falkner team: src/sim/rivalCard.
+// No player-name system exists yet (flagged in A's engineering scan). The CH1
+// ending's [player] token has no source → null, and KAMON's sign-off drops the
+// address cleanly. When a name-entry primitive lands, return it here (one seam).
+const PLAYER_NAME: string | null = null;
+
+// The [starter] token: the player's mon by nickname-aware display name —
+// prefer the lab starter (origin 'starter'), then the lead, then a graceful
+// fallback. Handles a boxed starter (search the box) and a fainted one (still
+// named) without special-casing.
+function starterDisplayName(): string {
+  const pIdx = run.partyOrigin.findIndex((o) => o === 'starter');
+  if (pIdx >= 0 && run.party[pIdx]) return monDisplayName(run.party[pIdx]!);
+  const bIdx = run.boxOrigin.findIndex((o) => o === 'starter');
+  if (bIdx >= 0 && run.box[bIdx]) return monDisplayName(run.box[bIdx]!);
+  if (run.party[0]) return monDisplayName(run.party[0]);
+  return 'your partner';
+}
+
+// Push a paged narrated message (cutscene textbox) that pops itself when
+// dismissed, then runs `onDone`. Used by the CH1 ending beats.
+function pushMessage(lines: readonly string[], onDone: () => void = () => {}): void {
+  scenes.push(
+    createMessageScene({
+      lines,
+      onDone: () => {
+        scenes.pop();
+        onDone();
+      },
+    }),
+  );
+}
+
+// CH1 ending — the Route 32 beat: the quiet-resolve message, then the chapter
+// card (which replaces the old boundary placard). Fired on entering Route 32.
+function pushChapterEndBeat(): void {
+  pushMessage(quietResolveLines(starterDisplayName()), () => {
+    scenes.push(createChapterCardScene({ ...CHAPTER_CARD, onDone: () => scenes.pop() }));
+  });
+}
+
 function pushRivalGateFight(): void {
   const player = partyLead();
   const stolen = kamonStolenSpecies(player);
@@ -1083,16 +1127,22 @@ function pushRivalGateFight(): void {
         writebackParty(finalState);
         // Both branches advance: KAMON leaves + the exit opens (no soft-lock).
         flagStore.set('kamon_beaten');
-        if (winner === 'player') {
+        const playerWon = winner === 'player';
+        if (playerWon) {
           awardBondForFight(foeTeam, 'trainer', finalState, participants);
         } else {
           // A loss still advances — heal so the party isn't stranded fainted
           // back in town (BUG 2 contract), then KAMON leaves all the same.
+          flagStore.set('kamon_won'); // KAMON won (player lost) — persisted branch flag
           healPartyInPlace();
         }
         recomputeSignpostFlags();
         scenes.pop(); // back to Violet — KAMON is gone, the exit is open
         autosaveNow();
+        // CH1 ending — the gate exchange: branch-aware opener (off the resolve's
+        // own `winner`, the cleanest signal) → converged deflection + Concord
+        // stinger. KAMON's despawn (kamon_beaten) IS his "leaving north."
+        pushMessage(kamonGateLines(playerWon, PLAYER_NAME));
       },
     }),
   );
@@ -1579,6 +1629,9 @@ function showOverworld(
   // the snapshot captures their fresh position (or the restored spawn
   // when applySave called us).
   autosaveNow();
+  // CH1 ending — entering Route 32 (the road KAMON took) closes the chapter:
+  // the quiet-resolve beat + the chapter card (replacing the old placard).
+  if (map === 'ROUTE32') pushChapterEndBeat();
 }
 
 function pushWildEncounter(foeSpeciesName: string): void {
