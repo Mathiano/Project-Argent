@@ -37,10 +37,12 @@ describe('Route 31 expansion — ~3x, four distinct sections', () => {
   });
 
   test('all four sections are signposted (Meadowgate → Wood → Wayside → Pondside)', () => {
-    expect(allSignText).toContain('ROUTE 31'); // §1 entrance
+    expect(allSignText).toContain('ROUTE 31'); // §1 the route signpost (carried forward)
+    expect(allSignText).toContain('MEADOWGATE'); // §1 named in-world
     expect(allSignText).toContain('THE WENDING WOOD'); // §2
-    expect(allSignText).toMatch(/the first to be trusted/); // §3 the shrine
-    expect(allSignText).toContain('STILLWATER POND'); // §4
+    expect(allSignText).toContain('THE WAYSIDE'); // §3 named in-world
+    expect(allSignText).toMatch(/the first to be trusted/); // §3 the shrine landmark
+    expect(allSignText).toContain('STILLWATER POND'); // §4 the pond landmark
   });
 
   test('endpoints preserved: fromHearthwick spawn + the Violet exit warp', () => {

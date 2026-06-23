@@ -94,7 +94,7 @@ const objects = [
   { type: 'warp', x: 10, y: 73, target: 'VIOLET:fromRoute' },
 
   // ============================ §1 MEADOWGATE ===============================
-  { type: 'sign', x: 5, y: 3, lines: ['ROUTE 31', 'The long road south', 'to VIOLET CITY.', 'Mind the tall grass.'] },
+  { type: 'sign', x: 5, y: 3, lines: ['ROUTE 31 · MEADOWGATE', 'The meadow road south', 'out of Hearthwick.', 'Mind the tall grass.'] },
   // detail: a signpost with hand-added notes (tone anchor)
   { type: 'sign', x: 3, y: 5, lines: ['A weathered signpost.', "Below the carved arrow, in", 'three different hands:', "'good water ½ day on'", "'BERRIES past the woods'", "'say hi to the shrine for me'"] },
   // the fellow first-timer — INTRO (canonical)
@@ -123,6 +123,8 @@ const objects = [
     commands: [{ kind: 'dialog', lines: ['Wings rustle in the canopy —', 'and something heavier waits', 'in the hollow to the east.'] }] },
 
   // ============================= §3 THE WAYSIDE =============================
+  // section name in-world (matches §2's WENDING WOOD area sign)
+  { type: 'sign', x: 13, y: 44, lines: ['THE WAYSIDE', 'Where the road pauses.', 'Old stone, a long view,', 'a place to rest.'] },
   // the landmark — the Wayside Shrine (canonical plaque) + the Overlook (canonical)
   { type: 'sign', x: 13, y: 41, lines: ['Worn stone, older than the road.', 'The carving shows a small figure', 'and a great winged shape, side by', 'side, beneath a crescent.', 'The words have mostly weathered', "away — only '...the first to be", "trusted...' remains."] },
   { type: 'sign', x: 16, y: 40, lines: ['The land opens, and you see it', 'for the first time — a town in the', 'distance, a tower rising over it.', 'Violet City. Where you\'re going.'] },

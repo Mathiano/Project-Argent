@@ -44,7 +44,7 @@
       "type": "sign",
       "x": 1,
       "y": 5,
-      "lines": ["HEARTHWICK", "Population: 27.", "(Was 31 last year.)"]
+      "lines": ["HEARTHWICK", "Population: 27."]
     },
 
     {
@@ -120,7 +120,7 @@
       "type": "sign",
       "x": 10,
       "y": 12,
-      "lines": ["ROUTE 31 — Violet City, north.", "Below, in smaller hand-lettering", "someone added later:", "'Come home for the winters.'"]
+      "lines": ["ROUTE 31 — Violet City, north.", "'Come home for the winters.'"]
     },
     {
       "type": "sign",
@@ -129,22 +129,6 @@
       "lines": ["A dish at the pond's edge,", "kept full. The wild ones drink", "here; no one minds."]
     },
 
-    {
-      "type": "npc",
-      "x": 7,
-      "y": 5,
-      "color": "#3a7fbe",
-      "interact": [
-        {
-          "kind": "dialog",
-          "lines": [
-            "OLD WOMAN: You're Larch's new one, aren't you?",
-            "OLD WOMAN: You're the first kid to take up training here in years.",
-            "OLD WOMAN: ...Be careful out there. The roads aren't what they were."
-          ]
-        }
-      ]
-    },
     {
       "type": "npc",
       "x": 13,

@@ -233,9 +233,9 @@
       "x": 5,
       "y": 3,
       "lines": [
-        "ROUTE 31",
-        "The long road south",
-        "to VIOLET CITY.",
+        "ROUTE 31 · MEADOWGATE",
+        "The meadow road south",
+        "out of Hearthwick.",
         "Mind the tall grass."
       ]
     },
@@ -416,6 +416,17 @@
             "in the hollow to the east."
           ]
         }
+      ]
+    },
+    {
+      "type": "sign",
+      "x": 13,
+      "y": 44,
+      "lines": [
+        "THE WAYSIDE",
+        "Where the road pauses.",
+        "Old stone, a long view,",
+        "a place to rest."
       ]
     },
     {
