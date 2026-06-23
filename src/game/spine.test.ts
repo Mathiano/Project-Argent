@@ -143,6 +143,7 @@ interface Harness {
   pushWild(species: string): void;
   press(key: InputKey): void;
   tick(n?: number, dt?: number): void;
+  rivalBondAwarded(): boolean;
 }
 
 // Slim harness mirroring main.ts's relevant show/push helpers + the
@@ -167,6 +168,7 @@ function createHarness(
   let topKind: TopKind = 'overworld';
   let currentOverworld: OverworldScene | null = null;
   let badgeWasShown = false;
+  let rivalBondAwarded = false; // mirrors main.ts awardBondForFight on a KAMON win
 
   function healPartyInPlace(): void {
     run.party = run.party.map((s) => ({ ...s, hp: s.maxHp, st: 100, momentum: 0, exhausted: false, staggered: false }));
@@ -226,6 +228,40 @@ function createHarness(
           scenes.pop();
           topKind = 'overworld';
           currentOverworld?.armPostBattleGrace();
+        },
+      }),
+    );
+  }
+
+  // The KAMON gate fight, mirroring main.ts pushRivalGateFight's RESOLVE wiring
+  // (the part that lived only in main.ts, inspection-verified). BOTH branches
+  // advance — set kamon_beaten + return to the overworld, NO soft-lock and NO
+  // black-out: a WIN awards bond, a LOSS heals the party first (so it isn't left
+  // fainted in the gate). The KAMON card/AI/bond-factor are untouched + sim-gated
+  // elsewhere; this proves only the loss/win resolve paths end-to-end. Foe shape
+  // is a 2-mon team (chaff + ace) per the card; weakFoe/normal drives the outcome.
+  function pushRivalGate(): void {
+    const foeTeam = createTeam([makeFoe(CH1.FLITPECK!), makeFoe(CH1.GRITHOAX!)]);
+    const state = createBattleState(buildPlayerTeam(), foeTeam, { typeChart: TYPECHART });
+    topKind = 'battle';
+    scenes.push(
+      createBattleScene({
+        state,
+        rng,
+        chooseFoeAction: (s, r) => wildFoeAI(s, r),
+        intro: ['KAMON blocks the road south.'],
+        catchBreathUnlocked: false,
+        canRun: false,
+        onResolve: (winner, finalState) => {
+          writeback(finalState);
+          flags.set('kamon_beaten'); // BOTH branches advance — KAMON leaves, the exit opens
+          if (winner === 'player') {
+            rivalBondAwarded = true; // mirror awardBondForFight (win only)
+          } else {
+            healPartyInPlace(); // a loss HEALS — not stranded fainted, not a black-out
+          }
+          scenes.pop();
+          topKind = 'overworld';
         },
       }),
     );
@@ -344,6 +380,9 @@ function createHarness(
       onBossBattle(bossId) {
         if (bossId === 'falkner') pushFalknerPrep();
       },
+      onRivalBattle() {
+        pushRivalGate();
+      },
     });
     currentOverworld = scene;
     topKind = 'overworld';
@@ -365,6 +404,7 @@ function createHarness(
     tick: (n = 1, dt = 0.02) => {
       for (let i = 0; i < n; i += 1) scenes.update(dt);
     },
+    rivalBondAwarded: () => rivalBondAwarded,
   };
 }
 
@@ -658,6 +698,78 @@ describe('DEMO-COMPLETE GATE — the LOSE path (BUG 2: losing must not advance y
     expect(h.flags.has('falkner_beaten')).toBe(false);
     expect(h.run.badges).not.toContain('ZEPHYR');
     expect(h.run.party.every((m) => m.hp === m.maxHp)).toBe(true);
+  });
+});
+
+describe('KAMON gate fight — BOTH resolve paths advance (no soft-lock)', () => {
+  // The Violet→Route 32 gate fight's resolve (pushRivalGateFight) lived only in
+  // main.ts, inspection-verified. These drive the gate fight end-to-end through
+  // the spine harness and assert both branches. KAMON sits at (6,28); the player
+  // approaches from (6,27); the exit warp is (6,29)→ROUTE32.
+  beforeEach(() => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Approach KAMON + drain his pre-fight dialog → the rival fight starts.
+  function startGateFight(h: Harness): void {
+    h.tick(2);
+    face(h, 'down'); // face KAMON at (6,28)
+    for (let i = 0; i < 12 && h.top() !== 'battle'; i += 1) {
+      h.press('a'); // open / advance the pre-fight dialog → start-rival-battle
+      h.tick(2);
+    }
+    expect(h.top()).toBe('battle');
+  }
+
+  test('LOSE: still advances — kamon_beaten set, party HEALED, exit opens, NOT blacked out', () => {
+    const h = createHarness(
+      { map: 'VIOLET', spawnAt: { x: 6, y: 27, facing: 'down' } },
+      { foeMode: 'normal' },
+    );
+    h.run.party = [{ ...createSide(CH1.KINDRAKE!), hp: 1 }]; // guaranteed loss
+    h.flags.set('zephyr_earned'); // KAMON present (obstacle gone)
+
+    startGateFight(h);
+    driveBattleToWin(h); // drives to resolve — here a LOSS
+
+    // No soft-lock, no black-out: still on VIOLET (not warped to the Center).
+    expect(h.top()).toBe('overworld');
+    expect(h.overworld().currentPosition().map).toBe('VIOLET');
+    expect(h.flags.has('kamon_beaten')).toBe(true); // the gate opens on a loss too
+    expect(h.run.party.every((m) => m.hp === m.maxHp)).toBe(true); // healed, not stranded fainted
+    expect(h.rivalBondAwarded()).toBe(false); // no bond on a loss
+
+    // KAMON despawned (kamon_beaten) → the way south is clear: walk to the exit.
+    step(h, 'down'); // (6,27) → (6,28), the now-clear gate tile
+    step(h, 'down'); // (6,28) → (6,29), the exit warp
+    h.tick(30);
+    expect(h.overworld().currentPosition().map).toBe('ROUTE32'); // exit opened
+  });
+
+  test('WIN: kamon_beaten set, bond awarded, exit opens', () => {
+    const h = createHarness(
+      { map: 'VIOLET', spawnAt: { x: 6, y: 27, facing: 'down' } },
+      { foeMode: 'weak' },
+    );
+    h.run.party = [createSide(CH1.KINDRAKE!)]; // full HP vs weak foes → win
+    h.flags.set('zephyr_earned');
+
+    startGateFight(h);
+    driveBattleToWin(h); // a WIN
+
+    expect(h.top()).toBe('overworld');
+    expect(h.overworld().currentPosition().map).toBe('VIOLET');
+    expect(h.flags.has('kamon_beaten')).toBe(true);
+    expect(h.rivalBondAwarded()).toBe(true); // bond awarded on a win
+    expect(h.run.party[0]!.hp).toBeGreaterThan(0); // survived
+
+    step(h, 'down');
+    step(h, 'down');
+    h.tick(30);
+    expect(h.overworld().currentPosition().map).toBe('ROUTE32'); // exit opened
   });
 });
 
