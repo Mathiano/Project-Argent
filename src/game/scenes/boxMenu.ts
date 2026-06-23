@@ -20,6 +20,7 @@ import type { CatchOrigin } from '../catching';
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
+import { monDisplayName } from '../monName';
 import { drawBar, drawPanel, drawText, hpColor } from '../ui';
 
 export interface BoxMenuOpts {
@@ -208,7 +209,7 @@ export function createBoxMenuScene(opts: BoxMenuOpts): Scene {
       const fainted = mon.hp <= 0;
       const marker = isCursor ? '>' : ' ';
       const nameColor = fainted ? PALETTE.paperDim : PALETTE.ink;
-      drawText(ctx, `${marker}${mon.species.name}`, panel.x + 8, y, nameColor);
+      drawText(ctx, `${marker}${monDisplayName(mon)}`, panel.x + 8, y, nameColor);
       // Bond stage (the ★ indicator) on the next half-row.
       drawText(ctx, `★ ${bondStageName(bond[i] ?? 0)}`, panel.x + 8, y + 7, PALETTE.star);
       // Compact HP bar at the right of the row.
@@ -240,7 +241,12 @@ export function createBoxMenuScene(opts: BoxMenuOpts): Scene {
     const P = { x: 4, y: 4, w: 312, h: 150 };
     drawPanel(ctx, P.x, P.y, P.w, P.h);
     drawText(ctx, 'SUMMARY', P.x + 8, P.y + 6, PALETTE.paperShadow);
-    drawText(ctx, mon.species.name, P.x + 12, P.y + 22);
+    drawText(
+      ctx,
+      mon.nickname ? `${monDisplayName(mon)} / ${mon.species.name}` : mon.species.name,
+      P.x + 12,
+      P.y + 22,
+    );
     drawText(ctx, `Type: ${mon.species.types.join('/') || 'Neutral'}`, P.x + 12, P.y + 34, PALETTE.paperShadow);
 
     drawText(ctx, 'HP', P.x + 12, P.y + 50, PALETTE.paperShadow);

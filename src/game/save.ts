@@ -75,6 +75,9 @@ export interface SavedSide {
   readonly hp: number;
   readonly st: number;
   readonly momentum: number;
+  // Player-chosen nickname. Additive — pre-nickname saves omit it; absent →
+  // the mon displays its species name (backward-compatible). Never backfilled.
+  readonly nickname?: string;
 }
 
 export interface SavedPosition {
@@ -93,6 +96,8 @@ export function toSavedSide(side: SideState): SavedSide {
     hp: side.hp,
     st: side.st,
     momentum: side.momentum,
+    // Only emit when set, so a no-nickname mon's wire shape is unchanged.
+    ...(side.nickname ? { nickname: side.nickname } : {}),
   };
 }
 
@@ -111,6 +116,8 @@ export function fromSavedSide(
     hp: Math.max(0, Math.min(fresh.maxHp, saved.hp)),
     st: Math.max(0, Math.min(100, saved.st)),
     momentum: Math.max(0, Math.min(2, saved.momentum)),
+    // Restore the nickname when present (absent on old saves → species name).
+    ...(saved.nickname ? { nickname: saved.nickname } : {}),
   };
 }
 
@@ -181,6 +188,7 @@ function validateSave(value: unknown): SaveState | null {
     if (typeof mm.hp !== 'number') return null;
     if (typeof mm.st !== 'number') return null;
     if (typeof mm.momentum !== 'number') return null;
+    if (mm.nickname !== undefined && typeof mm.nickname !== 'string') return null;
   }
   if (typeof v.position !== 'object' || v.position === null) return null;
   const pos = v.position as Record<string, unknown>;
@@ -222,6 +230,7 @@ function validateSave(value: unknown): SaveState | null {
       const mm = m as Record<string, unknown>;
       if (typeof mm.speciesName !== 'string') return null;
       if (typeof mm.hp !== 'number' || typeof mm.st !== 'number' || typeof mm.momentum !== 'number') return null;
+      if (mm.nickname !== undefined && typeof mm.nickname !== 'string') return null;
     }
   }
   // boxBond optional (pre-6.5 saves). When present, a number[].

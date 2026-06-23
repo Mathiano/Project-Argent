@@ -5,6 +5,12 @@ export interface Scene {
   exit?(): void;
   update?(dt: number): void;
   input?(key: InputKey): void;
+  // Raw-text channel for typed entry (the nickname field, future search boxes).
+  // Receives the raw `KeyboardEvent.key` ('a', 'B', ' ', 'Backspace', 'Enter',
+  // 'Escape', …). Returns true when consumed — the dispatcher then SKIPS the
+  // gamepad `InputKey` mapping for that keypress, so typing 'z' enters a 'z'
+  // instead of firing the 'a' button. Absent on every gameplay scene → unchanged.
+  textInput?(key: string): boolean;
   draw(ctx: CanvasRenderingContext2D): void;
 }
 
@@ -47,5 +53,12 @@ export class SceneStack {
 
   input(key: InputKey): void {
     this.top()?.input?.(key);
+  }
+
+  // Route a raw typed key to the top scene's text channel. Returns true when
+  // the scene consumed it (a text field is active), so the caller can suppress
+  // the gamepad mapping for the same keypress.
+  textInput(key: string): boolean {
+    return this.top()?.textInput?.(key) ?? false;
   }
 }

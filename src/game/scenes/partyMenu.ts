@@ -27,6 +27,7 @@ import { stageProgress } from '../bond';
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
+import { monDisplayName } from '../monName';
 import { drawBar, drawPanel, drawText, hpColor } from '../ui';
 
 export interface PartyMenuOpts {
@@ -176,7 +177,7 @@ export function createPartyMenuScene(opts: PartyMenuOpts): Scene {
       }
       if (mode === 'ask') {
         drawPanel(ctx, LIST_PANEL.x, LIST_PANEL.y, LIST_PANEL.w, LIST_PANEL.h);
-        drawText(ctx, `You ask ${opts.party[cursor]!.species.name}…`, LIST_PANEL.x + 12, LIST_PANEL.y + 14, PALETTE.paperShadow);
+        drawText(ctx, `You ask ${monDisplayName(opts.party[cursor]!)}…`, LIST_PANEL.x + 12, LIST_PANEL.y + 14, PALETTE.paperShadow);
         askLines.forEach((line, i) => {
           drawText(ctx, line, LIST_PANEL.x + 16, LIST_PANEL.y + 40 + i * 13, PALETTE.ink);
         });
@@ -205,7 +206,7 @@ export function createPartyMenuScene(opts: PartyMenuOpts): Scene {
       const fainted = mon.hp <= 0;
       drawText(
         ctx,
-        `${marker} ${mon.species.name}`,
+        `${marker} ${monDisplayName(mon)}`,
         LIST_PANEL.x + 8,
         y,
         fainted ? PALETTE.paperDim : PALETTE.ink,
@@ -249,7 +250,13 @@ export function createPartyMenuScene(opts: PartyMenuOpts): Scene {
     drawPanel(ctx, LIST_PANEL.x, LIST_PANEL.y, LIST_PANEL.w, LIST_PANEL.h);
     drawText(ctx, 'SUMMARY', LIST_PANEL.x + 8, LIST_PANEL.y + 6, PALETTE.paperShadow);
 
-    drawText(ctx, mon.species.name, LIST_PANEL.x + 12, LIST_PANEL.y + 22);
+    // Surface the species even when nicknamed, so identity is never lost.
+    drawText(
+      ctx,
+      mon.nickname ? `${monDisplayName(mon)} / ${mon.species.name}` : mon.species.name,
+      LIST_PANEL.x + 12,
+      LIST_PANEL.y + 22,
+    );
     drawText(
       ctx,
       `Type: ${mon.species.types.join('/') || 'Neutral'}`,

@@ -52,6 +52,8 @@ import { createPauseMenuScene } from './scenes/pauseMenu';
 import { createPrepScene } from './scenes/prep';
 import { createStarterPickScene } from './scenes/starterPick';
 import { createTitleScene } from './scenes/title';
+import { createNameEntryScene, NAME_MAX_LEN } from './scenes/nameEntry';
+import { createConfirmScene } from './scenes/confirmPrompt';
 import { freshBattleSide } from './battlePrep';
 import { bagAdd, bagByPocket, bagConsume, ITEMS, seedStartingBag } from './items';
 import type { BagEntry } from './items';
@@ -109,7 +111,10 @@ const host = document.getElementById('app');
 if (!host) throw new Error('Argent: #app element missing in index.html');
 
 const { ctx } = mountCanvas(host);
-const dispatcher = createInputDispatcher((key) => scenes.input(key));
+const dispatcher = createInputDispatcher(
+  (key) => scenes.input(key),
+  (raw) => scenes.textInput(raw), // raw typed keys → the active text field (nameEntry)
+);
 
 const sessionFlags = new Set<string>();
 const flagStore = {
@@ -372,8 +377,9 @@ function ballMult(): number {
 }
 // Add a caught/joined mon to the party (or the box if full). Fresh +
 // healthy (the ball/mercy restored it); starts at the caught bond stage.
-function addCaughtMon(species: Species, origin: CatchOrigin): void {
-  const fresh = createSide(species);
+function addCaughtMon(species: Species, origin: CatchOrigin, nickname?: string): void {
+  const base = createSide(species);
+  const fresh = nickname ? { ...base, nickname } : base;
   if (run.party.length < 6) {
     run.party.push(fresh);
     run.partyBond.push(BOND_START_CAUGHT);
@@ -385,6 +391,29 @@ function addCaughtMon(species: Species, origin: CatchOrigin): void {
     run.boxOrigin.push(origin);
   }
   markCaught(run.dex, species.name); // Phase 6.5 — dex CAUGHT on add
+}
+
+// Name-on-catch: prompt "Give SPECIES a nickname?" YES/NO; YES opens the typed
+// field. `done(nickname?)` runs exactly once after the player names or skips
+// (skip → undefined → the mon keeps its species name). The prompt overlays the
+// overworld (the battle was already popped); both scenes pop themselves on exit.
+function promptNickname(speciesName: string, done: (nickname?: string) => void): void {
+  scenes.push(
+    createConfirmScene({
+      prompt: `Give ${speciesName} a nickname?`,
+      onYes: () => {
+        scenes.push(
+          createNameEntryScene({
+            prompt: `Name your ${speciesName}:`,
+            maxLen: NAME_MAX_LEN,
+            onConfirm: (name) => { scenes.pop(); scenes.pop(); done(name); },
+            onCancel: () => { scenes.pop(); scenes.pop(); done(undefined); }, // skip
+          }),
+        );
+      },
+      onNo: () => { scenes.pop(); done(undefined); },
+    }),
+  );
 }
 // Award bond on a win to the mon(s) that ACTUALLY FOUGHT — challenge-scaled,
 // never flat (the anti-grind firewall: a fight that didn't test a mon yields
@@ -1602,14 +1631,17 @@ function pushWildEncounter(foeSpeciesName: string): void {
           hint: refusalHint({ badges: run.badges.length, bondBonus: bonus }, run.rng),
         };
       },
-      // Caught (Path 1) or joined (Path 2) → add the wild mon, pop back.
+      // Caught (Path 1) or joined (Path 2) → drop the battle, offer a nickname,
+      // THEN add the wild mon (with the chosen name) + return to the overworld.
       onCaught: (finalState, origin) => {
         writebackParty(finalState);
-        addCaughtMon(foe, origin); // 'read' (Path 1) | 'mercy' (Path 2)
-        recomputeSignpostFlags();
-        scenes.pop();
-        currentOverworldScene?.armPostBattleGrace();
-        autosaveNow();
+        scenes.pop(); // back to the overworld; the prompt overlays it
+        promptNickname(foe.name, (nickname) => {
+          addCaughtMon(foe, origin, nickname); // 'read' (Path 1) | 'mercy' (Path 2)
+          recomputeSignpostFlags();
+          currentOverworldScene?.armPostBattleGrace();
+          autosaveNow();
+        });
       },
       // RUN bug fix — fleeing returns to the SAME tile, no heal, no
       // warp (NOT a black-out, which is loss-only). Writeback preserves

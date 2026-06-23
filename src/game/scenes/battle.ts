@@ -25,6 +25,7 @@ import type {
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
+import { monDisplayName } from '../monName';
 import { fleeTelegraphed } from '../catching';
 import type { CatchWindow } from '../catching';
 import {
@@ -174,6 +175,9 @@ interface DisplaySide {
   // which. Set by `focus`, cleared by `release`; persists across roundStart.
   focusing: boolean;
   species: Species;
+  // Player-chosen display nickname (carried so the HUD/log name the player's mon
+  // by it). Absent for foe/wild mons → they show their species.
+  nickname?: string;
 }
 
 interface Display {
@@ -192,6 +196,7 @@ function snapshot(side: SideState): DisplaySide {
     dazed: false,
     focusing: side.focus !== undefined,
     species: side.species,
+    ...(side.nickname ? { nickname: side.nickname } : {}),
   };
 }
 
@@ -649,8 +654,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       if (forced.kind === 'rest') {
         const me = activeMon(state.player);
         const line = me.exhausted
-          ? `${me.species.name} is EXHAUSTED — it must recover stamina before it can act!`
-          : `${me.species.name} has no stamina for a move — it must catch its breath.`;
+          ? `${monDisplayName(me)} is EXHAUSTED — it must recover stamina before it can act!`
+          : `${monDisplayName(me)} has no stamina for a move — it must catch its breath.`;
         setText([line], () => commit(forced));
         return;
       }
@@ -689,7 +694,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // Display name for a side: the player's bare species name; the foe prefixed
   // "Foe" (so callouts read naturally — "Foe FLITPECK took the bait").
   const monName = (side: Side): string =>
-    side === 'player' ? display.player.species.name : `Foe ${display.foe.species.name}`;
+    side === 'player' ? monDisplayName(display.player) : `Foe ${display.foe.species.name}`;
   // Flipped-triangle verb for the winning release over the loser (HIDE slips
   // the HEAVY, HEAVY crushes the FEINT, FEINT catches the HIDE).
   const FLIP_VERB: { readonly [k in ReleaseKind]: string } = {
@@ -776,11 +781,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         emitGameEvent({ kind: 'move-resolved', side: ev.side, move: ev.action.move });
       }
       if (ev.action.kind === 'rest') {
-        const who = ev.side === 'player' ? activeMon(state.player).species.name : activeMon(state.foe).species.name;
+        const who = ev.side === 'player' ? monDisplayName(activeMon(state.player)) : activeMon(state.foe).species.name;
         const note = ev.action.reason === 'exhaustion' ? 'is spent — resting.' : 'has no moves — resting.';
         pushLog(`${who} ${note}`);
       } else if (ev.action.kind === 'catchBreath') {
-        const who = ev.side === 'player' ? activeMon(state.player).species.name : activeMon(state.foe).species.name;
+        const who = ev.side === 'player' ? monDisplayName(activeMon(state.player)) : activeMon(state.foe).species.name;
         pushLog(`${who}: catch your breath!`);
       } else if (ev.action.kind === 'throwBall') {
         pushLog('You hurled a ball!');
@@ -794,7 +799,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         // intent was ambiguous/opaque.
         pushLog(stanceConfirmLine(display.foe.species.name, ev.action.stance, ev.action.move));
       } else {
-        const who = ev.side === 'player' ? activeMon(state.player).species.name : `Foe ${activeMon(state.foe).species.name}`;
+        const who = ev.side === 'player' ? monDisplayName(activeMon(state.player)) : `Foe ${activeMon(state.foe).species.name}`;
         pushLog(`${who} used ${ev.action.move}.`);
       }
       return;
@@ -806,7 +811,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       display[ev.side].st = Math.min(100, display[ev.side].st + ev.restored);
       display[ev.side].momentum = Math.max(0, display[ev.side].momentum - 1);
       const who =
-        ev.side === 'player' ? activeMon(state.player).species.name : `Foe ${activeMon(state.foe).species.name}`;
+        ev.side === 'player' ? monDisplayName(activeMon(state.player)) : `Foe ${activeMon(state.foe).species.name}`;
       calloutLine = `${who} catches its breath — stamina +${ev.restored}!`;
       pushLog(`${who} catches its breath — +${ev.restored} ST!`);
       return;
@@ -816,7 +821,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       animSide = ev.winner;
       animT = 0.3;
       if (ev.winner === 'player') pendingReadWindow = true; // read window
-      const cw = ev.winner === 'player' ? activeMon(state.player).species.name : 'Foe';
+      const cw = ev.winner === 'player' ? monDisplayName(activeMon(state.player)) : 'Foe';
       calloutLine = `CLASH! ${cw} broke through.${starTag(ev.winner)}`;
       pushLog(`CLASH! ${cw} broke through.`);
       return;
@@ -845,7 +850,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
     if (ev.kind === 'dodge') {
       // S1 — FLUID dodged an Aggressive strike because it was faster.
-      const who = ev.side === 'player' ? display.player.species.name : 'Foe ' + display.foe.species.name;
+      const who = ev.side === 'player' ? monDisplayName(display.player) : 'Foe ' + display.foe.species.name;
       if (ev.side === 'player') pendingReadWindow = true; // read window
       calloutLine = (stanceCallout({ kind: 'dodge' }) ?? 'DODGE!') + starTag(ev.side);
       pushLog(`DODGE! ${who}'s FLUID was faster.`);
@@ -946,7 +951,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // Layer 2 — a ★-Call override fired (the ★ is spent; the momentum readout
       // updates here since no `momentum` event accompanies a Call).
       display[ev.side].momentum = Math.max(0, display[ev.side].momentum - 1);
-      const who = ev.side === 'player' ? display.player.species.name : 'Foe';
+      const who = ev.side === 'player' ? monDisplayName(display.player) : 'Foe';
       const label = ev.call === 'getAway' ? 'GET AWAY' : 'HANG IN THERE';
       calloutLine = `${label}!`;
       pushLog(`${who}: ${label}! (★ spent)`);
@@ -956,7 +961,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // Layer 1 — same stance 3 rounds running: predictability punished. Show
       // a panel tag (DAZE) + name the EFFECT so the player knows what it does.
       display[ev.side].dazed = true;
-      const who = ev.side === 'player' ? activeMon(state.player).species.name : 'Foe';
+      const who = ev.side === 'player' ? monDisplayName(activeMon(state.player)) : 'Foe';
       calloutLine = `${who} is DAZED — takes extra damage this round!`;
       pushLog(`${who} is DAZED — predictable! It takes extra damage this round.`);
       return;
@@ -966,7 +971,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const att = opposite(ev.side);
       display[att].hp = Math.max(0, display[att].hp - ev.damage);
       emitGameEvent({ kind: 'hit-landed', side: ev.side, effectiveness: 1 });
-      const who = ev.side === 'player' ? display.player.species.name : 'Foe';
+      const who = ev.side === 'player' ? monDisplayName(display.player) : 'Foe';
       if (ev.side === 'player') pendingReadWindow = true; // read window
       calloutLine = (stanceCallout({ kind: 'counter' }) ?? 'COUNTER!') + starTag(ev.side);
       pushLog(`COUNTER! ${who}'s GUARD turns it back.`);
@@ -988,17 +993,17 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // B5 — the bond jumpstart fired: a Familiar-tier mon's first read-win
       // banked a free ★. A subtle in-battle cue so the player FEELS the bond
       // do something (the momentum event already moved the ★ readout).
-      const who = ev.side === 'player' ? activeMon(state.player).species.name : 'Foe';
+      const who = ev.side === 'player' ? monDisplayName(activeMon(state.player)) : 'Foe';
       pushLog(`${who}'s bond sparks — a free ★!`);
       return;
     }
     if (ev.kind === 'winded') {
-      pushLog(`${ev.side === 'player' ? activeMon(state.player).species.name : 'Foe'} is winded — heavy moves locked.`);
+      pushLog(`${ev.side === 'player' ? monDisplayName(activeMon(state.player)) : 'Foe'} is winded — heavy moves locked.`);
       return;
     }
     if (ev.kind === 'exhausted') {
       display[ev.side].exhausted = true;
-      const who = ev.side === 'player' ? activeMon(state.player).species.name : 'Foe';
+      const who = ev.side === 'player' ? monDisplayName(activeMon(state.player)) : 'Foe';
       // Name the mechanic, not just the state: it's out of stamina and must
       // spend a turn recovering before it can act (the EXH tag shows it's
       // still in effect).
@@ -1498,7 +1503,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // silent), then the effect. Only Catch Breath has an engine effect this
   // build; design-only Calls are cursor-skipped so never reach here.
   function fireCall(call: CallDef): void {
-    const monName = activeMon(state.player).species.name;
+    const monName = monDisplayName(activeMon(state.player));
     setText([callShout(call, monName)], () => {
       if (call.id === 'catch-breath') commit({ kind: 'catchBreath' });
       else if (call.id === 'get-away') commit({ kind: 'call', call: 'getAway' });
@@ -1663,7 +1668,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function drawPlayerPanel(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, PL_PANEL.x, PL_PANEL.y, PL_PANEL.w, PL_PANEL.h);
-    drawText(ctx, display.player.species.name, PL_PANEL.x + 8, PL_PANEL.y + 6);
+    drawText(ctx, monDisplayName(display.player), PL_PANEL.x + 8, PL_PANEL.y + 6);
     if (display.player.focusing) drawText(ctx, 'FOCUS', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
     else if (display.player.dazed) drawText(ctx, 'DAZE', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpCrit);
     else if (display.player.staggered) drawText(ctx, 'STAG', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
@@ -1850,7 +1855,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const cursor = partyCursor === i ? '>' : ' ';
       const hpStr = `HP ${Math.round(side.hp)}/${side.maxHp}`;
       const tag = fainted ? 'FNT' : isActive ? 'ACT' : '';
-      const row = `${cursor}${side.species.name.padEnd(10, ' ')} ${hpStr.padEnd(10, ' ')} ${tag}`;
+      const row = `${cursor}${monDisplayName(side).padEnd(10, ' ')} ${hpStr.padEnd(10, ' ')} ${tag}`;
       drawText(ctx, row, BOTTOM.x + 8, BOTTOM.y + 14 + i * 9, color);
     });
     const help = partyMode === 'forced' ? 'A: send out' : 'A: switch  B: back';
@@ -2078,7 +2083,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       );
       drawSpeciesInSlot(
         ctx,
-        { name: display.player.species.name, type: display.player.species.types[0] ?? null },
+        { name: monDisplayName(display.player), type: display.player.species.types[0] ?? null },
         PL_SLOT.x + spriteOffset('player'),
         PL_SLOT.y,
         { facing: 'right' },

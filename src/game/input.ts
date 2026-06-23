@@ -25,10 +25,19 @@ export interface InputDispatcher {
 
 export function createInputDispatcher(
   onKey: (key: InputKey) => void,
+  // Raw typed key (KeyboardEvent.key). Return true when a text field consumed
+  // it — the gamepad mapping below is then skipped for that keypress so typing
+  // doesn't also fire button actions. Omitted → no text routing (unchanged).
+  onText?: (key: string) => boolean,
 ): InputDispatcher {
   const held = new Set<InputKey>();
 
   const keyDown = (e: KeyboardEvent): void => {
+    // Text field first: if it consumes the raw key, swallow it (no button map).
+    if (onText && !e.repeat && onText(e.key)) {
+      e.preventDefault();
+      return;
+    }
     const key = KEY_MAP[e.key];
     if (!key) return;
     e.preventDefault();

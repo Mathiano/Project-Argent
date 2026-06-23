@@ -97,6 +97,12 @@ export interface SideState {
   // RELEASES (R2, the chosen release) and the field is then cleared. Absent
   // (undefined) on every legacy/sim/single-step side → bit-identical shape.
   readonly focus?: { readonly stance: Stance; readonly move: string };
+  // Player-chosen display NICKNAME (game-layer cosmetic). The engine never
+  // reads it — combat resolution is identity-agnostic — so it's absent on every
+  // sim/legacy/foe side and the shape stays bit-identical. The GAME sets it at
+  // catch/rename time; display sites show `nickname ?? species.name`. Species /
+  // L00x identity is unchanged (the dex still keys on species.name).
+  readonly nickname?: string;
 }
 
 // A side's roster. The active mon is members[active]; the rest are bench.
