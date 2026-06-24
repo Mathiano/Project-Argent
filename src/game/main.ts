@@ -9,6 +9,7 @@ import {
   falknerBossAI,
   forcedAction,
   loadDex,
+  loadSpeciesAt,
   loadMoves,
   mulberry32,
   registerMoves,
@@ -54,6 +55,8 @@ import { createStarterPickScene } from './scenes/starterPick';
 import { createTitleScene } from './scenes/title';
 import { createNameEntryScene, NAME_MAX_LEN, sanitizeName } from './scenes/nameEntry';
 import { resolvePlayerName } from './playerName';
+import { buildDevPlan, AT_TARGETS, PRESETS, type DevPlan, type DevPartyMember } from './devNav';
+import { createDevMenuScene, type DevMenuItem } from './scenes/devMenu';
 import { createConfirmScene } from './scenes/confirmPrompt';
 import { createMessageScene } from './scenes/messageScene';
 import { createChapterCardScene } from './scenes/chapterCard';
@@ -117,9 +120,19 @@ const host = document.getElementById('app');
 if (!host) throw new Error('Argent: #app element missing in index.html');
 
 const { ctx } = mountCanvas(host);
+
+// Dev gate. Vite sets import.meta.env.DEV true under `npm run dev`, false in a
+// production build. Read defensively so the strict tsconfig needs no vite/client
+// types and a non-Vite host simply reads false → the entire dev layer is inert.
+const DEV_BUILD = (import.meta as { env?: { DEV?: boolean } }).env?.DEV === true;
+
 const dispatcher = createInputDispatcher(
   (key) => scenes.input(key),
-  (raw) => scenes.textInput(raw), // raw typed keys → the active text field (nameEntry)
+  (raw) => {
+    // Dev-only: backtick toggles the debug menu (consumes the key). Inert in prod.
+    if (DEV_BUILD && raw === '`') { toggleDevMenu(); return true; }
+    return scenes.textInput(raw); // raw typed keys → the active text field (nameEntry)
+  },
 );
 
 const sessionFlags = new Set<string>();
@@ -260,6 +273,11 @@ const run: RunState = {
   rng: mulberry32(RNG_SEED),
   playerName: null,
 };
+
+// Dev playtest session marker — set when a dev-nav plan or the debug menu seeds
+// state. While set, autosave is SUPPRESSED so a skip-state never overwrites the
+// real save slot (dev sessions are ephemeral; ?wipe still clears for a clean run).
+let devSession = false;
 
 // Demo-complete: the one badge the demo ships. Falkner's ZEPHYR BADGE.
 // A registry can come later when gyms 2–8 land; one constant suffices now.
@@ -589,6 +607,7 @@ function maybeEvolve(onComplete: () => void): void {
 function autosaveNow(): void {
   if (currentOverworldScene === null) return;
   if (run.party.length === 0) return;
+  if (devSession) return; // dev playtest session — never touch the real save slot
   const pos = currentOverworldScene.currentPosition();
   const state: SaveState = {
     version: 1,
@@ -1430,7 +1449,115 @@ function applyPartyFromUrl(): void {
   run.partyOrigin = ['starter'];
 }
 
-if (skip === 'starter') {
+// --- dev playtest navigation (dev-only; gated by DEV_BUILD = import.meta.env.DEV) --
+// Resolve a dev party member to a Species, reusing the dex path: `level` (if given)
+// widens the learnset band via loadSpeciesAt (Argent has no stat-leveling — level
+// only gates moves). Falls back to the default-band species, then to the starter list.
+function resolveDevSpecies(name: string, level: number | null): Species | null {
+  const entry = (ch1BatchData as DexEntryJson[]).find((e) => e.name === name);
+  if (entry) return loadSpeciesAt(entry, level ?? CH1_LEVEL);
+  return STARTERS.find((s) => s.name === name) ?? CH1_DEX[name] ?? null;
+}
+
+function applyDevParty(members: readonly DevPartyMember[]): void {
+  const sides: SideState[] = [];
+  for (const m of members) {
+    const sp = resolveDevSpecies(m.name, m.level);
+    if (!sp) { console.warn(`Argent dev ?party: unknown mon "${m.name}"; skipped`); continue; }
+    sides.push(createSide(sp));
+  }
+  if (sides.length === 0) sides.push(createSide(pickStarter()));
+  run.party = sides;
+  run.partyBond = sides.map(() => BOND_START_STARTER);
+  run.partyOrigin = sides.map((_, i) => (i === 0 ? 'starter' : 'gift'));
+}
+
+// Apply a composed dev plan via the EXISTING setters: party-construction, flags,
+// badges (recompute derives zephyr_earned), then a map warp. Marks the session dev
+// so autosave is suppressed (real save slot protected).
+function applyDevPlan(plan: DevPlan): void {
+  devSession = true;
+  if (plan.party && plan.party.length > 0) applyDevParty(plan.party);
+  else { run.party = [createSide(pickStarter())]; run.partyBond = [BOND_START_STARTER]; run.partyOrigin = ['starter']; }
+  applyBagFromUrl();
+  applyMoneyFromUrl();
+  if (run.bag.length === 0) bagAdd(run.bag, 'POTION', 3); // a sane default kit
+  if (plan.badges.length > 0) run.badges = [...plan.badges];
+  for (const f of plan.flags) sessionFlags.add(f);
+  recomputeSignpostFlags();
+  const target = plan.at ?? AT_TARGETS.hearthwick!; // ?state without ?at → land post-opening in town
+  showOverworld(target.map, target.spawn, false);
+}
+
+// Debug menu (the convenient form). Built from the same AT_TARGETS / PRESETS tables
+// as the URL form, so the two can never drift. Toggled by the backtick key (handled
+// in the input dispatcher), dev-only. Map jumps warp (showOverworld REPLACES the
+// menu); preset/party items seed state then close the menu.
+let devMenuOpen = false;
+function closeDevMenu(): void {
+  if (!devMenuOpen) return;
+  devMenuOpen = false;
+  scenes.pop();
+}
+function ensureDevParty(): void {
+  if (run.party.length > 0) return;
+  run.party = [createSide(pickStarter())];
+  run.partyBond = [BOND_START_STARTER];
+  run.partyOrigin = ['starter'];
+}
+function openDevMenu(): void {
+  const items: DevMenuItem[] = [];
+  for (const [alias, t] of Object.entries(AT_TARGETS)) {
+    items.push({
+      label: `go: ${alias}`,
+      run: () => {
+        devSession = true;
+        devMenuOpen = false; // showOverworld replaces the menu scene below
+        ensureDevParty();
+        recomputeSignpostFlags();
+        showOverworld(t.map, t.spawn, false);
+      },
+    });
+  }
+  for (const [name, eff] of Object.entries(PRESETS)) {
+    items.push({
+      label: `state: ${name}`,
+      run: () => {
+        devSession = true;
+        if (eff.badges.length > 0) run.badges = [...eff.badges];
+        for (const f of eff.flags) sessionFlags.add(f);
+        recomputeSignpostFlags();
+        closeDevMenu();
+      },
+    });
+  }
+  items.push({
+    label: 'party: CH1 trio',
+    run: () => {
+      devSession = true;
+      applyDevParty([{ name: 'KINDRAKE', level: null }, { name: 'GRUBLEAF', level: null }, { name: 'SILTSKIP', level: null }]);
+      closeDevMenu();
+    },
+  });
+  devMenuOpen = true;
+  scenes.push(createDevMenuScene(items, closeDevMenu));
+}
+function toggleDevMenu(): void {
+  if (devMenuOpen) closeDevMenu();
+  else openDevMenu();
+}
+
+// Dev-nav gate (dev-only). buildDevPlan returns inert when !DEV_BUILD or when no
+// ?at/?state param is present, so a production build ignores ALL URL params and a
+// dev build without dev-nav params falls through to the legacy ?skip chain / title.
+const devPlan = buildDevPlan({ dev: DEV_BUILD, search: url });
+if (!DEV_BUILD) {
+  // Production: URL params are inert — always boot to the title.
+  showTitle();
+} else if (devPlan.active) {
+  // Composable dev navigation: ?at=<map> & ?state=<presets> & ?party=<mon:lvl,…>
+  applyDevPlan(devPlan);
+} else if (skip === 'starter') {
   // Phase 3 — the starter pick is now an in-lab ceremony, not a top-
   // level scene. ?skip=starter is back-compat: it jumps to the lab so
   // a tester can drive the LARCH NPC interaction directly.
