@@ -10,3 +10,10 @@ Thumbs.db
 .idea
 .vscode
 .claude/settings.local.json
+
+# Third-party Tiled map editor (local tooling, not source) — keep the Studio tracked
+/tools/*
+!/tools/argent_studio/
+# Generated / scratch art artifacts (not source)
+/assets/GPT/
+/tallgrass-fix.png
