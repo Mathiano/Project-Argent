@@ -151,6 +151,7 @@
       <button id="dlPng">PNG sheet</button>
       <button id="dlTileset">tileset.json</button>
       <button id="dlPrefab">prefab.json</button>
+      <button id="selfTest" title="Export a known canvas, decode the exported file, assert the pixels match exactly">self-test ⤺</button>
     </div>
     <textarea id="out" rows="9" spellcheck="false"></textarea>
 
@@ -205,7 +206,7 @@ async function loadPalette() {
         if (!r.ok) continue;
         palette = (await r.json()).colors;
         $('palSrc').textContent = 'argent-master (live · ' + url + ')';
-        $('palCount').textContent = palette.length; renderSwatches(); draw();
+        $('palCount').textContent = palette.length; renderSwatches(); draw(); announceSelfTest();
         return;
       } catch { /* try next candidate */ }
     }
@@ -215,7 +216,7 @@ async function loadPalette() {
     palette = FALLBACK;
     $('palSrc').textContent = 'embedded fallback — open via `npm run dev` → localhost:5173/tools/argent_studio/ for the live palette';
   }
-  $('palCount').textContent = palette.length; renderSwatches(); draw();
+  $('palCount').textContent = palette.length; renderSwatches(); draw(); announceSelfTest();
 }
 function renderSwatches() {
   syncPalRGB();
@@ -360,7 +361,38 @@ function drawPreview() {
 }
 
 // --- tile/rows helpers ---
-function tileRows(tx, ty) { const rows=[]; for (let y=0;y<T;y++){ let s=''; for (let x=0;x<T;x++){ const v=grid[(ty*T+y)*W+(tx*T+x)]; s += v<0?'.':(palette[v]?palette[v].key:'.'); } rows.push(s); } return rows; }
+// --- canonical lossless tile encoding (matches the game decoder, src/game/overworld/tileset.ts) ---
+// Each pixel is ONE char: '.' (or ' ') = transparent; otherwise the char is KEYS[index]
+// where `index` is the 0-based position in the exported `palette` array. The decoder
+// resolves char -> index by POSITION (KEYS.indexOf), bounds-checked against palette.length.
+//
+// THE FIX: encode by POSITION (KEYS[v]), never the palette's display `.key` field. They
+// coincide for the master palette but diverge for any non-sequential/over-length palette —
+// and the old `.key` encoding produced rows that decoded to phantom indices (54-61 vs a
+// 54-colour palette). A pixel whose index is out of the exported palette range is written
+// transparent rather than as an unmappable char, so an out-of-range char can never be emitted.
+// TRANSPARENCY is out-of-band: no palette index is transparent — index 0 (#092626) is opaque.
+function paletteKeys() { return KEYS.slice(0, palette.length); }   // the exact valid alphabet for this export
+function encodeTileRows(srcGrid, srcW, tx, ty) {
+  const rows = [], N = palette.length;
+  for (let y=0;y<T;y++){ let s='';
+    for (let x=0;x<T;x++){ const v=srcGrid[(ty*T+y)*srcW+(tx*T+x)];
+      s += (v>=0 && v<N) ? KEYS[v] : '.'; }
+    rows.push(s); }
+  return rows;
+}
+function tileRows(tx, ty) { return encodeTileRows(grid, W, tx, ty); }
+// Decode a tile's rows back to palette indices using the file's OWN `keys` alphabet,
+// so a reader needs nothing external. '.'/' ' or any char outside `keys` -> -1 (transparent),
+// every other char -> a guaranteed-in-range index. This is the inverse of encodeTileRows.
+function decodeTileRows(rows, keys) {
+  return rows.map(r => Array.from(r, ch => (ch==='.'||ch===' ') ? -1 : keys.indexOf(ch)));
+}
+const ENCODING_DOC =
+  'Each tile.rows entry is a ' + T + '-char string, one char per pixel (row-major). '
+  + '"." or " " = transparent. Otherwise pixelIndex = keys.indexOf(char), a 0-based index '
+  + 'into palette[]. `keys` is the positional alphabet 0-9a-zA-Z truncated to palette.length. '
+  + 'No palette index is transparent (index 0 is an opaque colour); transparency is the "." sentinel only.';
 function baseId() { return ($('tileId').value||'tile').replace(/[^a-z0-9_]/gi,'_'); }
 function tileId(tx,ty) { return TW*TH===1 ? baseId() : baseId()+'_'+tx+'_'+ty; }
 function tilesetObj() {
@@ -373,16 +405,52 @@ function tilesetObj() {
       tiles[baseId()+'_'+String(i).padStart(3,'0')] = { index:i, col:tx, row:ty, solid, rows: tileRows(tx,ty) };
       i++;
     }
-    return { name: baseId(), tilesize: T, sheet: baseId()+'.png', cols: TW, rows: TH, count: TW*TH, palette: palette.map(c=>c.hex), tiles };
+    return { name: baseId(), tilesize: T, sheet: baseId()+'.png', cols: TW, rows: TH, count: TW*TH, encoding: ENCODING_DOC, transparent: '.', keys: paletteKeys(), palette: palette.map(c=>c.hex), tiles };
   }
   for (let ty=0; ty<TH; ty++) for (let tx=0; tx<TW; tx++) tiles[tileId(tx,ty)] = { solid, rows: tileRows(tx,ty) };
-  return { name: baseId(), tilesize: T, palette: palette.map(c=>c.hex), tiles };
+  return { name: baseId(), tilesize: T, encoding: ENCODING_DOC, transparent: '.', keys: paletteKeys(), palette: palette.map(c=>c.hex), tiles };
 }
 function prefabObj() {
   const t=[], col=[]; for (let ty=0;ty<TH;ty++){ const tr=[],cr=[]; for (let tx=0;tx<TW;tx++){ tr.push(tileId(tx,ty)); cr.push(ty===TH-1); } t.push(tr); col.push(cr); }
   return { name: baseId(), width:TW, height:TH, anchor:{x:0,y:TH-1}, tiles:t, collision:col };
 }
 function updateOut() { $('out').value = JSON.stringify(tilesetObj(), null, 1); }
+
+// --- round-trip self-test: export a known canvas, decode the exported FILE, assert equality ---
+// Exercises the real tilesetObj() export path end-to-end. Installs a deterministic synthetic
+// canvas (every valid index + transparent pixels), exports, decodes the exported rows using the
+// exported `keys`, and asserts the decoded pixels EXACTLY equal the canvas. Restores the artist's
+// work afterwards. Returns {pass, mism (pixel mismatches), oob (decoded idx >= palette.length),
+// badChar (row char outside keys/'.'), N}.
+function roundTripSelfTest() {
+  const N = palette.length;
+  if (!N) return { pass:false, reason:'palette not loaded', mism:0, oob:0, badChar:0, N:0 };
+  const saved = grid.slice(), sTW = TW, sTH = TH;     // stash the artist's canvas
+  setSize(1, 1);
+  for (let i=0;i<T*T;i++) grid[i] = (i % 13 === 0) ? -1 : (i % N);   // mix transparent + every index
+  const want = grid.slice();
+  const obj = tilesetObj();                            // the REAL exported object
+  const id = Object.keys(obj.tiles)[0];
+  const rows = obj.tiles[id].rows;
+  let badChar = 0;
+  for (const r of rows) for (const ch of r) if (ch !== '.' && ch !== ' ' && obj.keys.indexOf(ch) === -1) badChar++;
+  const dec = decodeTileRows(rows, obj.keys).flat();   // decode via the file's own legend
+  let mism = 0, oob = 0;
+  for (let i=0;i<T*T;i++){ if (dec[i] !== want[i]) mism++; if (dec[i] >= N) oob++; }
+  setSize(sTW, sTH); grid.set(saved); draw();          // restore + repaint
+  return { pass: mism===0 && oob===0 && badChar===0, mism, oob, badChar, N };
+}
+function announceSelfTest() {
+  const r = roundTripSelfTest();
+  console[r.pass ? 'log' : 'error']('[studio] tileset.json round-trip self-test:', r.pass ? 'PASS' : 'FAIL', r);
+}
+$('selfTest').onclick = () => {
+  const r = roundTripSelfTest();
+  toast(r.pass
+    ? '✓ round-trip lossless — '+r.N+' colours, 0 mismatches'
+    : '✗ round-trip FAILED — mism '+r.mism+' · oob '+r.oob+' · badChar '+r.badChar);
+  console[r.pass ? 'log' : 'error']('[studio] round-trip self-test', r);
+};
 $('tileId').oninput = updateOut; $('solid').onchange = updateOut;
 $('pgrid').onchange = draw; $('clear').onclick = ()=>{ grid.fill(-1); draw(); };
 
