@@ -52,7 +52,8 @@ import { createPauseMenuScene } from './scenes/pauseMenu';
 import { createPrepScene } from './scenes/prep';
 import { createStarterPickScene } from './scenes/starterPick';
 import { createTitleScene } from './scenes/title';
-import { createNameEntryScene, NAME_MAX_LEN } from './scenes/nameEntry';
+import { createNameEntryScene, NAME_MAX_LEN, sanitizeName } from './scenes/nameEntry';
+import { resolvePlayerName } from './playerName';
 import { createConfirmScene } from './scenes/confirmPrompt';
 import { createMessageScene } from './scenes/messageScene';
 import { createChapterCardScene } from './scenes/chapterCard';
@@ -238,6 +239,10 @@ interface RunState {
   dex: DexRecord;
   catchBreathUnlocked: boolean;
   rng: RNG;
+  // Player character name — set at new-game via the nameEntry prompt; the
+  // [player] token source. null = no name → the address drops gracefully
+  // (resolvePlayerName / kamonGateLines). Persisted (additive save field).
+  playerName: string | null;
 }
 
 const run: RunState = {
@@ -253,6 +258,7 @@ const run: RunState = {
   dex: createDex(),
   catchBreathUnlocked: false,
   rng: mulberry32(RNG_SEED),
+  playerName: null,
 };
 
 // Demo-complete: the one badge the demo ships. Falkner's ZEPHYR BADGE.
@@ -600,6 +606,8 @@ function autosaveNow(): void {
     dex: toSavedDex(run.dex),
     partyOrigin: [...run.partyOrigin],
     boxOrigin: [...run.boxOrigin],
+    // Only emit when set, so a no-name run's wire shape is unchanged.
+    ...(run.playerName ? { playerName: run.playerName } : {}),
   };
   saveToStorage(state);
 }
@@ -645,9 +653,28 @@ function startNewGame(): void {
   run.catchBreathUnlocked = false;
   currentRngSeed = 0xa9c0;
   run.rng = mulberry32(currentRngSeed);
+  run.playerName = null;
   sessionFlags.clear();
   recomputeSignpostFlags();
-  showOverworld('BEDROOM', 'default', false);
+  // Pokémon-standard: name the character first, then drop into the opening.
+  // Skipping is allowed (→ null → graceful [player] drop); either way we
+  // proceed to the bedroom, so the opening beats are never blocked.
+  promptPlayerName(() => showOverworld('BEDROOM', 'default', false));
+}
+
+// Reuse the nameEntry primitive (same typed-entry / cap / validation as mon
+// nicknaming) to capture the player's name at new-game start. Confirm stores the
+// sanitized name; skip/blank stores null (graceful drop). `then` always fires so
+// the opening continues regardless. The prompt sits over the title (dimmed).
+function promptPlayerName(then: () => void): void {
+  scenes.push(
+    createNameEntryScene({
+      prompt: "What's your name?",
+      maxLen: NAME_MAX_LEN,
+      onConfirm: (name) => { run.playerName = sanitizeName(name); scenes.pop(); then(); },
+      onCancel: () => { run.playerName = null; scenes.pop(); then(); },
+    }),
+  );
 }
 
 // Phase 3 — wired into the overworld's `show-starter-pick` script
@@ -913,6 +940,9 @@ function applySave(saved: SaveState): void {
     saved.boxOrigin && saved.boxOrigin[i] ? saved.boxOrigin[i]! : 'gift',
   );
   run.dex = fromSavedDex(saved.dex);
+  // Player name: additive — pre-naming saves omit it → resolves to null (the
+  // [player] address drops gracefully). A real saved name is restored as-is.
+  run.playerName = resolvePlayerName(saved.playerName);
   run.catchBreathUnlocked = saved.catchBreathUnlocked;
   currentRngSeed = saved.rngSeed;
   run.rng = mulberry32(currentRngSeed);
@@ -1051,10 +1081,10 @@ function showRivalBattle(): void {
 // the exit opens, no soft-lock (a loss heals first so the party isn't stranded
 // fainted). The pre-fight line is a placeholder (warm-foil voice is a separate
 // narrative-lane task). Sim-gated for the post-Falkner team: src/sim/rivalCard.
-// No player-name system exists yet (flagged in A's engineering scan). The CH1
-// ending's [player] token has no source → null, and KAMON's sign-off drops the
-// address cleanly. When a name-entry primitive lands, return it here (one seam).
-const PLAYER_NAME: string | null = null;
+// The [player] token source is run.playerName, captured at new-game start by the
+// nameEntry prompt (promptPlayerName) and persisted. resolvePlayerName turns a
+// blank/absent value into null so KAMON's sign-off drops the address gracefully;
+// a real name is preferred. (Sweep: KAMON's CH1 ending line is the only consumer.)
 
 // The [starter] token: the player's mon by nickname-aware display name —
 // prefer the lab starter (origin 'starter'), then the lead, then a graceful
@@ -1143,7 +1173,7 @@ function pushRivalGateFight(): void {
         // CH1 ending — the gate exchange: branch-aware opener (off the resolve's
         // own `winner`, the cleanest signal) → converged deflection + Concord
         // stinger. KAMON's despawn (kamon_beaten) IS his "leaving north."
-        pushMessage(kamonGateLines(playerWon, PLAYER_NAME));
+        pushMessage(kamonGateLines(playerWon, resolvePlayerName(run.playerName)));
       },
     }),
   );

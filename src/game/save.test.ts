@@ -136,6 +136,56 @@ describe('save.ts — storage adapter round-trip', () => {
     expect(loadFromStorage(storage)).toEqual(state);
   });
 
+  test('player name — round-trips through storage', () => {
+    const storage = memoryStorage();
+    const state: SaveState = {
+      version: 1,
+      party: [{ speciesName: 'KINDRAKE', hp: 40, st: 100, momentum: 0 }],
+      position: { map: 'HEARTHWICK', x: 9, y: 4, facing: 'down' },
+      flags: [],
+      catchBreathUnlocked: false,
+      rngSeed: 0xa9c0,
+      playerName: 'ASH',
+    };
+    saveToStorage(state, storage);
+    expect(loadFromStorage(storage)).toEqual(state);
+  });
+
+  test('player name — backward-compat: a pre-naming save (no playerName) loads fine', () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 1,
+        party: [{ speciesName: 'KINDRAKE', hp: 40, st: 100, momentum: 0 }],
+        position: { map: 'HEARTHWICK', x: 9, y: 4, facing: 'down' },
+        flags: [],
+        catchBreathUnlocked: false,
+        rngSeed: 0,
+      }),
+    );
+    const loaded = loadFromStorage(storage);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.playerName).toBeUndefined(); // absent → consumers resolve to null (graceful drop)
+  });
+
+  test('player name — a non-string playerName nukes the save', () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 1,
+        party: [{ speciesName: 'KINDRAKE', hp: 40, st: 100, momentum: 0 }],
+        position: { map: 'X', x: 0, y: 0, facing: 'down' },
+        flags: [],
+        catchBreathUnlocked: false,
+        rngSeed: 0,
+        playerName: 42, // not a string
+      }),
+    );
+    expect(loadFromStorage(storage)).toBeNull();
+  });
+
   test('Feature 3 — a malformed catchOrigin (unknown value) nukes the save', () => {
     const storage = memoryStorage();
     storage.setItem(

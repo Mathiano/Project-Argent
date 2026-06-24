@@ -56,6 +56,11 @@ export interface SaveState {
   // time). Missing → best-effort default on load. Nothing reads it yet.
   readonly partyOrigin?: readonly CatchOrigin[];
   readonly boxOrigin?: readonly CatchOrigin[];
+  // Player character name (the [player] token source). Additive — pre-naming
+  // saves omit it; absent → null → the address drops gracefully (the same
+  // behaviour as before a name system existed). Only emitted when set, so a
+  // no-name run's wire shape is unchanged. version stays 1.
+  readonly playerName?: string;
 }
 
 // Phase 6.5 — the dex save shape (seen/caught species names). Mirrors
@@ -252,5 +257,7 @@ function validateSave(value: unknown): SaveState | null {
   if (v.boxOrigin !== undefined) {
     if (!Array.isArray(v.boxOrigin) || v.boxOrigin.some((o) => !isCatchOrigin(o))) return null;
   }
+  // playerName optional (pre-naming saves). When present, must be a string.
+  if (v.playerName !== undefined && typeof v.playerName !== 'string') return null;
   return value as SaveState;
 }
