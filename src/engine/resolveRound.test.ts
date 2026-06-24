@@ -3,8 +3,10 @@ import {
   COMBAT,
   SPECIES,
   activeMon,
+  affordableMoves,
   createBattleState,
   createSide,
+  createTeam,
   fixedRng,
   forcedAction,
   mulberry32,
@@ -12,6 +14,7 @@ import {
   setActiveMember,
   validateAction,
 } from './index';
+import type { Action } from './index';
 import type { BattleState, SideState } from './index';
 
 function makeState(playerKey = 'EMBERCUB', foeKey = 'AQUAFIN'): BattleState {
@@ -598,5 +601,40 @@ describe('determinism', () => {
     expect(fo(a.state).hp).toBe(fo(b.state).hp);
     expect(pl(a.state).hp).toBe(pl(b.state).hp);
     expect(a.events).toEqual(b.events);
+  });
+});
+
+// Regression — the switch-out PHANTOM FAINT (#7). A switched-in mon used to default
+// to Guard on defense and COUNTER the incoming Aggressive strike, reflecting damage
+// that KO'd a low-HP foe ACROSS the switch (playtest run-ender). A switching side is
+// exposed (no Guard counter, no Fluid dodge) — like throwing a ball.
+describe('switch-out phantom faint (#7)', () => {
+  const aggroFoeMove: Action = {
+    kind: 'move',
+    move: affordableMoves(createSide(SPECIES.EMBERCUB!))[0]!,
+    stance: 'A',
+  };
+  const switchToBench: Action = { kind: 'switch', toIndex: 1 };
+
+  test('player switches vs a LOW-HP Aggressive foe → no counter, no phantom faint', () => {
+    const team = createTeam([createSide(SPECIES.AQUAFIN!), createSide(SPECIES.SPROUTLE!)]);
+    const foe = createTeam([{ ...createSide(SPECIES.EMBERCUB!), hp: 3 }]); // one good hit from death
+    const r = resolveRound(createBattleState(team, foe), switchToBench, aggroFoeMove, mulberry32(1));
+
+    expect(r.state.player.active).toBe(1); // the switch actually happened
+    expect(activeMon(r.state.foe).hp).toBe(3); // foe took NO damage — the player switched, it must not counter
+    const kinds = r.events.map((e) => e.kind);
+    expect(kinds).not.toContain('counter'); // ← the phantom: a Guard counter on the switch-in
+    expect(kinds).not.toContain('ko');
+    expect(kinds).not.toContain('faint');
+    // the switched-in mon legitimately took the foe's strike (exposed, no dodge)
+    expect(activeMon(r.state.player).hp).toBeLessThan(activeMon(r.state.player).maxHp);
+  });
+
+  test('a full-HP foe is likewise untouched by the switch (no reflect at all)', () => {
+    const team = createTeam([createSide(SPECIES.AQUAFIN!), createSide(SPECIES.SPROUTLE!)]);
+    const foe = createTeam([createSide(SPECIES.EMBERCUB!)]);
+    const r = resolveRound(createBattleState(team, foe), switchToBench, aggroFoeMove, mulberry32(1));
+    expect(activeMon(r.state.foe).hp).toBe(activeMon(r.state.foe).maxHp); // no counter reflect across a switch
   });
 });

@@ -114,11 +114,14 @@ function dealt(defHp: number, dmg: number, call: CallKind | null): { hp: number;
 
 function actionStance(action: Action): Stance {
   if (action.kind === 'move') return action.stance;
-  // Throwing leaves you EXPOSED — treated as Aggressive on defense so the
-  // thrower takes the foe's hit cleanly: no Guard counter, no Fluid dodge
-  // (you didn't guard or dodge, you threw a ball). rest/catchBreath/switch
-  // keep the legacy Guard default.
-  if (action.kind === 'throwBall') return 'A';
+  // Throwing OR switching leaves you EXPOSED — treated as Aggressive on defense so
+  // the side takes the foe's hit cleanly: no Guard counter, no Fluid dodge (you
+  // didn't guard or dodge — you threw a ball / swapped a mon in). Fixes the
+  // switch-out phantom faint (#7): a switched-in mon used to default to Guard and
+  // COUNTER the incoming Aggressive strike, reflecting damage that KO'd a low-HP
+  // foe across the switch. rest/catchBreath keep the legacy Guard default (you're
+  // hunkered down, not exposed).
+  if (action.kind === 'throwBall' || action.kind === 'switch') return 'A';
   return 'G';
 }
 
