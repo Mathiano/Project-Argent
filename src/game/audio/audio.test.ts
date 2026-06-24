@@ -78,20 +78,42 @@ describe('audio — eventToSound maps the REAL emitting events', () => {
     expect(eventToSound({ kind: 'dialogue-open' })).toBe('dialogueOpen');
     expect(eventToSound({ kind: 'dialogue-advance' })).toBe('textBlip');
   });
-  test('events out of this slice (or reserved-not-emitting) map to no sound', () => {
+  test('slice 3: cancel, battle framing + the core pillars are wired', () => {
+    expect(eventToSound({ kind: 'ui-cancel' })).toBe('cancel');
+    expect(eventToSound({ kind: 'battle-start' })).toBe('battleStart');
+    expect(eventToSound({ kind: 'move-resolved', side: 'player', move: 'TACKLE' })).toBe('moveResolved');
+    expect(eventToSound({ kind: 'catch-attempt' })).toBe('ballThrow');
+    expect(eventToSound({ kind: 'catch-success' })).toBe('catchClick');
+    expect(eventToSound({ kind: 'evolve', species: 'KINDRAKE' })).toBe('evolve');
+    expect(eventToSound({ kind: 'bond-stage-cross', species: 'KINDRAKE', fromStage: 1, toStage: 2 })).toBe('bondCross');
+  });
+  test('battle-end → victory on a PLAYER win only (silent on a loss)', () => {
+    expect(eventToSound({ kind: 'battle-end', winner: 'player' })).toBe('victory');
+    expect(eventToSound({ kind: 'battle-end', winner: 'foe' })).toBeNull();
+  });
+  test('only the genuinely reserved-not-emitting events map to no sound', () => {
     const silent: GameEvent[] = [
-      { kind: 'battle-start' },
-      { kind: 'battle-end', winner: 'player' },
-      { kind: 'move-resolved', side: 'player', move: 'TACKLE' },
-      { kind: 'catch-attempt' },
-      { kind: 'catch-success' },
-      { kind: 'evolve', species: 'KINDRAKE' },
-      { kind: 'bond-stage-cross', species: 'KINDRAKE', fromStage: 1, toStage: 2 },
-      { kind: 'catch-wiggle', index: 0 }, // reserved-not-emitting
-      { kind: 'status-applied', side: 'foe', status: 'burn' }, // reserved
-      { kind: 'level' }, // reserved
+      { kind: 'catch-wiggle', index: 0 }, // reserved — waits for the catch-visual pass
+      { kind: 'status-applied', side: 'foe', status: 'burn' }, // reserved (Phase 8)
+      { kind: 'level' }, // reserved (no leveling system)
     ];
     for (const e of silent) expect(eventToSound(e)).toBeNull();
+  });
+});
+
+describe('audio — slice-3 cue character (register intent)', () => {
+  const longest = (n: keyof typeof SOUNDS) => Math.max(...SOUNDS[n].map((s) => s.dur));
+  const span = (n: keyof typeof SOUNDS) => Math.max(...SOUNDS[n].map((s) => (s.delay ?? 0) + s.dur));
+  const peak = (n: keyof typeof SOUNDS) => Math.max(...SOUNDS[n].map((s) => s.gain));
+  test('victory is BRIEF (a sting, not a long fanfare)', () => {
+    expect(span('victory')).toBeLessThanOrEqual(0.45);
+  });
+  test('bond-stage-cross is WARM — pure sine/triangle (no square bite)', () => {
+    expect(SOUNDS.bondCross.every((s) => s.type !== 'square')).toBe(true);
+  });
+  test('move-resolved sits UNDER the impact (much quieter) + is short', () => {
+    expect(peak('moveResolved')).toBeLessThan(peak('impact') / 2);
+    expect(longest('moveResolved')).toBeLessThanOrEqual(0.08);
   });
 });
 
@@ -153,7 +175,7 @@ describe('audio — installAudio wires the bus to the engine', () => {
 
     emitGameEvent({ kind: 'menu-move' });
     emitGameEvent({ kind: 'hit-landed', side: 'foe', effectiveness: 1.5 });
-    emitGameEvent({ kind: 'battle-start' }); // out of slice → no sound
+    emitGameEvent({ kind: 'catch-wiggle', index: 0 }); // reserved-not-emitting → no sound
     expect(engine.played).toEqual(['cursorMove', 'superEffective']);
 
     off();

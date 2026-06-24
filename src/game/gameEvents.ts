@@ -14,6 +14,9 @@ export type GameEvent =
   | { readonly kind: 'battle-start' }
   | { readonly kind: 'battle-end'; readonly winner: Side }
   | { readonly kind: 'menu-move' }
+  // Menu back / cancel (B-press out of a menu). Presentation-only — emitted at the
+  // pause-menu back this slice; the sound was already built (slice 1), now wired.
+  | { readonly kind: 'ui-cancel' }
   | { readonly kind: 'stance-selected'; readonly stance: Stance }
   | { readonly kind: 'move-resolved'; readonly side: Side; readonly move: string }
   // Overworld presence (SFX slice 2). door-enter = warping through a building door;

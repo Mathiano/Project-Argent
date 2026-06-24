@@ -4,15 +4,14 @@
 // writes NOTHING back to game state (pure presentation), so it cannot perturb
 // combat or any ladder.
 //
-// Wired to the REAL emitting events: UI (menu/stance) + combat hit-feedback +
-// (slice 2) overworld presence — door-enter, dialogue-open, dialogue-advance (the
-// emit sites for these were added to scenes/overworld.ts this slice). Other emitting
-// events (battle-start/end, move-resolved, catch-attempt/success, evolve,
-// bond-stage-cross) are intentionally unwired → null. Reserved-not-emitting events
-// (catch-wiggle, status-applied, level) have no emit site at all. There is NO
-// charge/wind-up or ★-award event on the bus (the doc asked to verify — they don't
-// exist), so they're skipped, not fabricated. `cancel` is built but still unwired —
-// no trivial single B-press chokepoint (deferred; see report).
+// Wired to the REAL emitting events: UI (menu/stance/cancel) + combat hit-feedback +
+// overworld presence (door/dialogue) + (slice 3) battle framing + the core pillars
+// (battle-start/end → victory on a win, move-resolved, catch-attempt/success, evolve,
+// bond-stage-cross). `ui-cancel` is the one new emit this slice (pause-menu back).
+// Reserved-not-emitting events (catch-wiggle — waits for the catch-visual pass —
+// status-applied, level) have no emit site, so they map to null. There is NO
+// charge/wind-up or ★-award event on the bus (verified — they don't exist), so
+// they're skipped, not fabricated.
 
 import { onGameEvent } from '../gameEvents';
 import type { GameEvent } from '../gameEvents';
@@ -24,8 +23,25 @@ export function eventToSound(event: GameEvent): SoundName | null {
     // UI
     case 'menu-move':
       return 'cursorMove';
+    case 'ui-cancel':
+      return 'cancel'; // built in slice 1, now wired (pause-menu back)
     case 'stance-selected':
       return 'confirm'; // committing a stance is the player's confirm
+    // Battle framing + core pillars (slice 3 — events already emitted, now voiced)
+    case 'battle-start':
+      return 'battleStart';
+    case 'battle-end':
+      return event.winner === 'player' ? 'victory' : null; // an earned sting on player win only
+    case 'move-resolved':
+      return 'moveResolved'; // subtle, sits UNDER the impact
+    case 'catch-attempt':
+      return 'ballThrow';
+    case 'catch-success':
+      return 'catchClick';
+    case 'evolve':
+      return 'evolve';
+    case 'bond-stage-cross':
+      return 'bondCross'; // the warm, rewarding bond-thesis chime
     // Overworld presence (slice 2)
     case 'door-enter':
       return 'doorEnter';

@@ -76,6 +76,50 @@ export const SOUNDS = {
   ],
   // talk: a soft, gentle "a textbox opened" blip (lower + softer than the cursor).
   dialogueOpen: [{ type: 'triangle', freq: 392, dur: 0.05, attack: 0.004, release: 0.04, gain: 0.13 }],
+
+  // ── P0 wire-up (slice 3) — events that already emit, now given voices ────────
+  // battle-start: a snappy high→low two-note "engage" alert — a transition, not music.
+  battleStart: [
+    { type: 'square', freq: 660, dur: 0.07, attack: 0.002, release: 0.04, gain: 0.18 },
+    { type: 'square', freq: 440, dur: 0.1, attack: 0.002, release: 0.07, gain: 0.18, delay: 0.07 },
+  ],
+  // victory (player win only): a BRIEF earned rising C-E-G + a top-octave sparkle —
+  // a sting, not a long fanfare (~0.35s).
+  victory: [
+    { type: 'triangle', freq: 523, dur: 0.1, attack: 0.004, release: 0.06, gain: 0.2 },
+    { type: 'triangle', freq: 659, dur: 0.1, attack: 0.004, release: 0.06, gain: 0.2, delay: 0.08 },
+    { type: 'triangle', freq: 784, dur: 0.16, attack: 0.004, release: 0.12, gain: 0.22, delay: 0.16 },
+    { type: 'square', freq: 1046, dur: 0.1, attack: 0.003, release: 0.08, gain: 0.09, delay: 0.16 },
+  ],
+  // move-resolved: a quiet low tick UNDER the impact (gain ≪ impact) so it never
+  // competes with hit-feedback — just "an action happened". Fires often → very soft.
+  moveResolved: [{ type: 'sine', freq: 160, sweepTo: 110, dur: 0.06, attack: 0.002, release: 0.05, gain: 0.08 }],
+  // catch-attempt: a quick rising whoosh (the ball's arc) + a light landing tick.
+  ballThrow: [
+    { type: 'sine', freq: 300, sweepTo: 700, dur: 0.12, attack: 0.004, release: 0.06, gain: 0.16 },
+    { type: 'square', freq: 200, dur: 0.03, attack: 0.001, release: 0.02, gain: 0.1, delay: 0.1 },
+  ],
+  // catch-success: the iconic double "click" of a caught mon + a warm "got it" lift.
+  catchClick: [
+    { type: 'square', freq: 880, dur: 0.04, attack: 0.001, release: 0.03, gain: 0.16 },
+    { type: 'square', freq: 880, dur: 0.04, attack: 0.001, release: 0.03, gain: 0.16, delay: 0.1 },
+    { type: 'triangle', freq: 587, sweepTo: 784, dur: 0.12, attack: 0.004, release: 0.09, gain: 0.14, delay: 0.18 },
+  ],
+  // evolve: a rising transformation sweep + a shimmer octave + a bright resolve cap —
+  // distinct and meaningful, "something changed".
+  evolve: [
+    { type: 'triangle', freq: 392, sweepTo: 784, dur: 0.3, attack: 0.01, release: 0.18, gain: 0.18 },
+    { type: 'sine', freq: 784, sweepTo: 1568, dur: 0.3, attack: 0.02, release: 0.2, gain: 0.1, delay: 0.04 },
+    { type: 'square', freq: 1046, dur: 0.14, attack: 0.004, release: 0.1, gain: 0.1, delay: 0.3 },
+  ],
+  // bond-stage-cross: a WARM, rewarding rising chime (root → fifth → octave bloom),
+  // pure sine/triangle (no square bite), soft slow attacks — the bond thesis's
+  // positive feedback. This one is meant to feel GOOD.
+  bondCross: [
+    { type: 'sine', freq: 523, dur: 0.16, attack: 0.008, release: 0.12, gain: 0.18 },
+    { type: 'sine', freq: 784, dur: 0.2, attack: 0.008, release: 0.16, gain: 0.16, delay: 0.1 },
+    { type: 'triangle', freq: 1046, dur: 0.22, attack: 0.01, release: 0.18, gain: 0.1, delay: 0.2 },
+  ],
 } as const satisfies Record<string, readonly ToneSpec[]>;
 
 export type SoundName = keyof typeof SOUNDS;

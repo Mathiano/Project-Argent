@@ -96,7 +96,10 @@ export function createPauseMenuScene(opts: PauseMenuOpts): Scene {
       if (key === 'up') { cursor = stepCursor(cursor, -1); emitGameEvent({ kind: 'menu-move' }); }
       else if (key === 'down') { cursor = stepCursor(cursor, 1); emitGameEvent({ kind: 'menu-move' }); }
       else if (key === 'a') confirm();
-      else if (key === 'b' || key === 'start') opts.onClose();
+      else if (key === 'b' || key === 'start') {
+        if (key === 'b') emitGameEvent({ kind: 'ui-cancel' }); // back/cancel blip (presentation-only)
+        opts.onClose();
+      }
     },
     draw(ctx) {
       // Light wash over the overworld behind — just enough to push
