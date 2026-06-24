@@ -6,6 +6,12 @@
   "height": 74,
   "tilesize": 16,
   "baseTile": "grass",
+  "tileRefs": {
+    "grass": {
+      "tileset": "heartwick_grass_test",
+      "tile": "heartwick_grass_test_027"
+    }
+  },
   "tileMap": {
     "p": "path",
     "G": "tall_grass",

@@ -62,6 +62,9 @@ export interface DataDrivenMapJson {
   // prefab by its anchor (the feet/base row); the prefab's lower cells carry
   // collision, upper cells are non-solid overlays. Rendered in the depth pass.
   readonly props?: readonly PrefabPlacement[];
+  // Registry→engine bridge: per base-tile-id render override (see MapData.tileRefs).
+  // Lets a data-driven map draw an authored registry tile for a given tile id.
+  readonly tileRefs?: { readonly [tileId: string]: { readonly tileset: string; readonly tile: string } };
   readonly objects?: readonly MapObject[];
   readonly spawns: { readonly [id: string]: Spawn };
 }
@@ -222,6 +225,7 @@ function loadDataDrivenMap(j: DataDrivenMapJson): MapData {
     tilesetRef: j.tilesetRef,
     ...(fringe !== undefined ? { fringe } : {}),
     ...(props !== undefined ? { props } : {}),
+    ...(j.tileRefs !== undefined ? { tileRefs: j.tileRefs } : {}),
   };
 }
 

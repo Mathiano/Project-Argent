@@ -277,6 +277,11 @@ const map = {
   name: 'ROUTE31',
   _note: 'Phase 7 EXPANSION — four-section Route 31 (route31-expansion-design.md). AUTHORITATIVE generator (scripts/gen_route31.mjs): all carried-forward + new content live here; safe to regenerate. Hearthwick (north) → Meadowgate → Wending Wood → Wayside → Pondside → Violet (south).',
   tilesetRef: 'outdoor_violet', width: W, height: H, tilesize: 16, baseTile: 'grass',
+  // Registry→engine bridge (POC, regen-safe): render the open meadow (baseTile
+  // `grass`) with the Studio-authored tile so it's visible at scale in playtest.
+  // Override is by TILE ID, so it covers all open `grass` on the route; tall_grass
+  // (G), forest_floor (F), path, water etc. stay placeholder. Other maps untouched.
+  tileRefs: { grass: { tileset: 'heartwick_grass_test', tile: 'heartwick_grass_test_027' } },
   tileMap, cells: rows, fringe, props, objects,
   spawns: { default: { x: 4, y: 3, facing: 'down' }, fromHearthwick: { x: 4, y: 2, facing: 'down' }, fromHouse: { x: 4, y: 2, facing: 'down' }, fromLab: { x: 4, y: 2, facing: 'down' }, fromViolet: { x: 10, y: 72, facing: 'up' } },
 };

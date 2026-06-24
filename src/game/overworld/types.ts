@@ -209,6 +209,13 @@ export interface MapData {
   // so every legacy + current map loads and renders exactly as before.
   readonly fringe?: ReadonlyArray<ReadonlyArray<string | null>>;
   readonly props?: readonly PlacedProp[];
+  // Registry→engine bridge for the DATA-DRIVEN base layer (mirrors the graybox
+  // TileDef.tileRef). Per base-tile-id render override: when a cell's tile id is a
+  // key here, the renderer draws that authored tile (from a registered registry
+  // tileset) instead of the base tileset's pixels. The base id still resolves
+  // normally for collision/fallback. Authored at the map level so a region (or a
+  // whole tile id, e.g. `grass`) can be retargeted without touching the tileset.
+  readonly tileRefs?: { readonly [tileId: string]: { readonly tileset: string; readonly tile: string } };
 }
 
 export function tileAt(map: MapData, x: number, y: number): TileDef | null {

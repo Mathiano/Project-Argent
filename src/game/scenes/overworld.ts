@@ -113,13 +113,19 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
   type Baked = Map<string, (HTMLCanvasElement | OffscreenCanvas)[]> | null;
   const refTilesets = new Map<string, Tileset>();
   const refCaches = new Map<string, Baked>();
+  const registerRef = (tilesetName: string): void => {
+    if (refTilesets.has(tilesetName) || !hasTileset(tilesetName)) return;
+    const rts = getTileset(tilesetName);
+    refTilesets.set(tilesetName, rts);
+    refCaches.set(tilesetName, bakeTileCache(rts));
+  };
+  // Graybox TileDef.tileRef (Hearthwick-style patches)…
   for (const key of Object.keys(map.tileset)) {
     const ref = map.tileset[key]?.tileRef;
-    if (!ref || refTilesets.has(ref.tileset) || !hasTileset(ref.tileset)) continue;
-    const rts = getTileset(ref.tileset);
-    refTilesets.set(ref.tileset, rts);
-    refCaches.set(ref.tileset, bakeTileCache(rts));
+    if (ref) registerRef(ref.tileset);
   }
+  // …and the DATA-DRIVEN per-tile-id overrides (map.tileRefs, e.g. Route 31 grass).
+  for (const ref of Object.values(map.tileRefs ?? {})) registerRef(ref.tileset);
   const spawn = map.spawns[opts.spawn] ?? Object.values(map.spawns)[0]!;
   // spawnAt overrides the named-spawn lookup — used by the save/load
   // restore path to land at the exact previous position. Falls back to
@@ -792,7 +798,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
       ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
 
       if (map.cells !== undefined && tileset !== null) {
-        drawTilesetCells(ctx, map, tileset, tileCache, camX, camY, tick);
+        drawTilesetCells(ctx, map, tileset, tileCache, camX, camY, tick, refTilesets, refCaches);
       } else {
         drawTiles(ctx, map, rows, camX, camY, refTilesets, refCaches, tick);
       }
@@ -1009,6 +1015,8 @@ function drawTilesetCells(
   camX: number,
   camY: number,
   tick: number,
+  refTilesets: Map<string, Tileset>,
+  refCaches: Map<string, Map<string, (HTMLCanvasElement | OffscreenCanvas)[]> | null>,
 ): void {
   const ts = map.tilesize;
   const minX = Math.max(0, Math.floor(camX / ts));
@@ -1021,6 +1029,15 @@ function drawTilesetCells(
     for (let x = minX; x < maxX; x += 1) {
       const id = row[x];
       if (id === undefined) continue;
+      // Registry override: draw an authored registry tile for this base id if mapped.
+      const ref = map.tileRefs?.[id];
+      if (ref) {
+        const rts = refTilesets.get(ref.tileset);
+        if (rts && rts.tiles[ref.tile]) {
+          drawOneTile(ctx, rts, refCaches.get(ref.tileset) ?? null, ref.tile, x * ts - camX, y * ts - camY, tick);
+          continue;
+        }
+      }
       const tile = tileset.tiles[id];
       if (!tile) continue;
       const f = frameIndex(tile, tick);
