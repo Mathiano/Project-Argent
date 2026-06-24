@@ -1,4 +1,32 @@
 {
  "_note": "Argent Studio asset registry — saved tile sheets at assets/tilesets/<name>.tileset.json. CC resolves an asset name (e.g. \"grass_a\") to its file here. Auto-maintained by the Studio \"Save to project\" button.",
- "assets": []
+ "assets": [
+  {
+   "name": "heartwick_dirt_test",
+   "file": "assets/tilesets/heartwick_dirt_test.tileset.json",
+   "tilesize": 16,
+   "cols": 8,
+   "rows": 8,
+   "count": 64,
+   "description": ""
+  },
+  {
+   "name": "heartwick_grass_test",
+   "file": "assets/tilesets/heartwick_grass_test.tileset.json",
+   "tilesize": 16,
+   "cols": 8,
+   "rows": 8,
+   "count": 64,
+   "description": ""
+  },
+  {
+   "name": "heartwick_tree_test",
+   "file": "assets/tilesets/heartwick_tree_test.tileset.json",
+   "tilesize": 16,
+   "cols": 8,
+   "rows": 8,
+   "count": 64,
+   "description": ""
+  }
+ ]
 }

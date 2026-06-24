@@ -21,6 +21,9 @@ import gymData from '../maps/gym.json';
 import route31VioletData from '../maps/route31.violet.json';
 import route32Data from '../maps/route32.json';
 import outdoorVioletTileset from '../../../assets/tilesets/outdoor_violet.tileset.json';
+// Registry asset — authored in Argent Studio, resolved by name (manifest.json).
+// Proof-of-integration: a Hearthwick grass patch references a tile from this sheet.
+import heartwickGrassTileset from '../../../assets/tilesets/heartwick_grass_test.tileset.json';
 import houseVioletPrefab from '../../../assets/prefabs/house_violet.prefab.json';
 import gymVioletPrefab from '../../../assets/prefabs/gym_violet.prefab.json';
 import treeBigPrefab from '../../../assets/prefabs/tree_big.prefab.json';
@@ -32,6 +35,7 @@ import type { MapData } from './types';
 
 // Register tilesets + prefabs first so map loaders can resolve refs.
 registerTileset(outdoorVioletTileset as TilesetJson);
+registerTileset(heartwickGrassTileset as TilesetJson);
 registerPrefab(houseVioletPrefab as PrefabJson);
 registerPrefab(gymVioletPrefab as PrefabJson);
 registerPrefab(treeBigPrefab as PrefabJson);

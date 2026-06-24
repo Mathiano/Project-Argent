@@ -2,7 +2,7 @@ import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import type { InputState } from '../input';
 import { getMap } from '../overworld/maps';
 import type { Tile, Tileset } from '../overworld/tileset';
-import { getTileset } from '../overworld/tilesetCatalog';
+import { getTileset, hasTileset } from '../overworld/tilesetCatalog';
 import type { Facing, MapData, MapObject, PlacedProp, ScriptCommand } from '../overworld/types';
 import { findObjectAt, isWalkable } from '../overworld/types';
 import { ySortOrder } from '../overworld/ysort';
@@ -106,6 +106,20 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
   const rows = map.tiles.split('\n');
   const tileset = map.tilesetRef !== undefined ? getTileset(map.tilesetRef) : null;
   const tileCache = tileset ? bakeTileCache(tileset) : null;
+  // Registry→engine bridge: any graybox TileDef carrying a `tileRef` (authored
+  // pixel art from the asset registry) gets its tileset decoded + baked once.
+  // Missing/unregistered → simply skipped (the cell falls back to its flat color,
+  // never a broken tile). This same bridge is what a Tiled importer will reuse.
+  type Baked = Map<string, (HTMLCanvasElement | OffscreenCanvas)[]> | null;
+  const refTilesets = new Map<string, Tileset>();
+  const refCaches = new Map<string, Baked>();
+  for (const key of Object.keys(map.tileset)) {
+    const ref = map.tileset[key]?.tileRef;
+    if (!ref || refTilesets.has(ref.tileset) || !hasTileset(ref.tileset)) continue;
+    const rts = getTileset(ref.tileset);
+    refTilesets.set(ref.tileset, rts);
+    refCaches.set(ref.tileset, bakeTileCache(rts));
+  }
   const spawn = map.spawns[opts.spawn] ?? Object.values(map.spawns)[0]!;
   // spawnAt overrides the named-spawn lookup — used by the save/load
   // restore path to land at the exact previous position. Falls back to
@@ -780,7 +794,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
       if (map.cells !== undefined && tileset !== null) {
         drawTilesetCells(ctx, map, tileset, tileCache, camX, camY, tick);
       } else {
-        drawTiles(ctx, map, rows, camX, camY);
+        drawTiles(ctx, map, rows, camX, camY, refTilesets, refCaches, tick);
       }
       // Layer 1 — fringe overlay (decals / ledges / edge decoration): above the
       // base, below props + player.
@@ -905,6 +919,9 @@ function drawTiles(
   rows: readonly string[],
   camX: number,
   camY: number,
+  refTilesets: Map<string, Tileset>,
+  refCaches: Map<string, Map<string, (HTMLCanvasElement | OffscreenCanvas)[]> | null>,
+  tick: number,
 ): void {
   const ts = map.tilesize;
   const minX = Math.max(0, Math.floor(camX / ts));
@@ -917,8 +934,19 @@ function drawTiles(
       const ch = row[x];
       const def = ch ? map.tileset[ch] : null;
       if (!def) continue;
-      ctx.fillStyle = def.color;
-      ctx.fillRect(x * ts - camX, y * ts - camY, ts, ts);
+      const sx = x * ts - camX;
+      const sy = y * ts - camY;
+      // Registry pixel tile, if this cell opts in and the asset resolved.
+      const ref = def.tileRef;
+      if (ref) {
+        const rts = refTilesets.get(ref.tileset);
+        if (rts && rts.tiles[ref.tile]) {
+          drawOneTile(ctx, rts, refCaches.get(ref.tileset) ?? null, ref.tile, sx, sy, tick);
+          continue;
+        }
+      }
+      ctx.fillStyle = def.color; // flat-color fallback (graybox default)
+      ctx.fillRect(sx, sy, ts, ts);
     }
   }
 }

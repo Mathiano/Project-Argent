@@ -8,6 +8,13 @@ export interface TileDef {
   readonly color: string;
   readonly solid: boolean;
   readonly label?: string;
+  // Registry→engine bridge (Phase-2 proof): opt a graybox cell into a real
+  // authored pixel tile from the asset registry. `tileset` is a registered
+  // tilesetRef (assets/tilesets/<name>.tileset.json), `tile` a tile id inside
+  // it. When set, the renderer draws that tile's pixels instead of the flat
+  // `color`; `color` stays as the fallback (no DOM / unregistered → flat fill,
+  // never a broken tile). Tiled will lean on this same bridge.
+  readonly tileRef?: { readonly tileset: string; readonly tile: string };
 }
 
 export interface Spawn {
