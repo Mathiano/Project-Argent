@@ -95,6 +95,27 @@
       "target": "VIOLET_ACADEMY:fromViolet"
     },
     {
+      "_note": "POST-GYM ACADEMY NUDGE — appears only after FALKNER's win (academy_promoted), at the Academy door, pointing the player inside. The Academy is enterable before the gym; this is the diegetic 'go learn' prompt (docs/violet-academy.md §placement: pushed post-gym, not before).",
+      "type": "npc",
+      "x": 13,
+      "y": 21,
+      "color": "#caa148",
+      "requiresFlag": "academy_promoted",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "ACADEMY USHER: Word came up from",
+            "the gym — FALKNER says you're to",
+            "see us.",
+            "ACADEMY USHER: The old hall is",
+            "right here. We'll teach you what",
+            "the gym only tested. Go on in."
+          ]
+        }
+      ]
+    },
+    {
       "_note": "Phase 7 (KAMON first-fight gate) — the south road to ROUTE 32. Blocked pre-ZEPHYR by a placeholder obstacle; KAMON guards it post-ZEPHYR until beaten. The opened exit leads to a boundary stub (Route 32 is later content).",
       "type": "warp",
       "x": 6,

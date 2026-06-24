@@ -58,6 +58,7 @@ import { createMessageScene } from './scenes/messageScene';
 import { createChapterCardScene } from './scenes/chapterCard';
 import { monDisplayName } from './monName';
 import { kamonGateLines, quietResolveLines, CHAPTER_CARD, CH1_CLOSED_FLAG, shouldFireChapterEnd } from './ch1Ending';
+import { ACADEMY_PROMOTED_FLAG, falknerMentorLines } from './violetAcademy';
 import { freshBattleSide } from './battlePrep';
 import { bagAdd, bagByPocket, bagConsume, ITEMS, seedStartingBag } from './items';
 import type { BagEntry } from './items';
@@ -1988,8 +1989,17 @@ function pushFalknerBattle(): void {
             autosaveNow();
             // After the badge fanfare: the bond beat (a boss clear is the
             // biggest bond gain), then the evo gate check (ZEPHYR may also
-            // complete a bonded mon's badge gate).
-            showBondBeats(bondCrossings, () => maybeEvolve(() => {}));
+            // complete a bonded mon's badge gate), then FALKNER's mentor line
+            // — the game's thesis, delivered in-gym on the win. It promotes the
+            // Academy as the next prompt (a Violet NPC appears on the flag).
+            // One-shot: this win onResolve fires once; the flag persists it.
+            showBondBeats(bondCrossings, () =>
+              maybeEvolve(() => {
+                flagStore.set(ACADEMY_PROMOTED_FLAG);
+                autosaveNow(); // persist the promote-marker before the line plays
+                pushMessage(falknerMentorLines());
+              }),
+            );
           });
         } else {
           // BUG 2 — a boss loss heals + offers INSTANT RETRY (the

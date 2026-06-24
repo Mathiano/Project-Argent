@@ -1,6 +1,6 @@
 {
   "name": "VIOLET ACADEMY",
-  "_layout": "10x8 enterable Academy core (docs/violet-city-design.md) — the ancient stone hall: the living answer to the Concord's 'skip the decade'. Ancient pillars (P, solid), an instructor + a student, and a wall inscription (the teaching). Door (d) south back to Violet's square. STUB this pass — the full grounds (training yard, bell room) is a Phase-7 follow-up.",
+  "_layout": "10x8 enterable Academy core (docs/violet-academy.md) — the post-gym teaching hub. The ancient stone hall: the living answer to the Concord's 'skip the decade'. Ancient pillars (P, solid), the wall inscription (the thesis), the on-thesis INSTRUCTOR (3,3) + STUDENT (6,4) flavor (kept), and the THREE teaching functions as NPCs: STANCE MASTER (5,1 — the triangle + the hidden SPEED variable), MOVE SAGE (8,3 — the move-trial teaser, no mechanics until Phase 8), BOND KEEPER (1,3 — bond unlocks moves+Calls not stats, + evo readiness). Door (d) south back to Violet's square. Map FOOTPRINT is held this pass — the full grounds (training yard, bell room) is deferred to the art/enlargement pass (same ruling as Hearthwick).",
   "width": 10,
   "height": 8,
   "tilesize": 16,
@@ -69,6 +69,105 @@
             "STUDENT: But my partner waits",
             "for me to try. That's worth",
             "more than any shortcut."
+          ]
+        }
+      ]
+    },
+    {
+      "_note": "FUNCTION 1 — stance-triangle teaching (docs/violet-academy.md §1). Teaches A/G/F + trade-offs, the CURRENT engine triangle (A>F>G>A, Combat Layer 1 — supersedes the doc's older 'dodge if faster'), and surfaces SPEED as the hidden variable (the spec's #1 thing to teach). Explanation-only: the labelled in-battle COUNTER!/OPENING!/PUNISH! + FASTER/SLOWER callouts (combat-legibility sprint, shipped) ARE the live demonstration the spec asks for; a bespoke safe-practice battle mode is deferred (would need new battle wiring, not pure content).",
+      "type": "npc",
+      "x": 5,
+      "y": 1,
+      "color": "#d8b24a",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "STANCE MASTER: You faced FALKNER",
+            "half-blind. Good — the struggle",
+            "was the lesson. Now see it.",
+            "There are three stances.",
+            "AGGRESSIVE hits hardest, but you",
+            "take more in return.",
+            "GUARD barely scratches them — but",
+            "their blows barely land on you.",
+            "FLUID is even damage, and quick.",
+            "They form a ring. Each one beats",
+            "another and loses to a third:",
+            "GUARD turns AGGRESSION back on the",
+            "attacker — a COUNTER.",
+            "FLUID slips clean past a GUARD —",
+            "an OPENING.",
+            "And AGGRESSION runs down a FLUID",
+            "dodge — a PUNISH.",
+            "So AGGRESSIVE beats FLUID, FLUID",
+            "beats GUARD, GUARD beats",
+            "AGGRESSIVE. Read theirs, then pick",
+            "the stance that eats it.",
+            "But here is what the gym never",
+            "says aloud. The hidden variable",
+            "is SPEED.",
+            "Speed decides who moves first. A",
+            "FLUID move always strikes first —",
+            "that is its edge. Initiative, not",
+            "safety.",
+            "And nothing here is a random miss.",
+            "Every result is a read. Win the",
+            "read, and you win the round."
+          ]
+        }
+      ]
+    },
+    {
+      "_note": "FUNCTION 2 — move-trial tutor TEASER (docs/violet-academy.md §2). Names the concept only; NO trial mechanics (those are Phase 8, build with bond). Pure dialog, zero script verbs — establishes the room's purpose without a Phase-8 dependency.",
+      "type": "npc",
+      "x": 8,
+      "y": 3,
+      "color": "#c77b3a",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "MOVE SAGE: Come closer — let me",
+            "look at what sleeps in your",
+            "partner.",
+            "...There is something here. A move",
+            "it could grow into.",
+            "But a move like that isn't taught.",
+            "It's earned.",
+            "Grow closer. Trust each other",
+            "through harder fights. Come back",
+            "when you have — and I'll tell you",
+            "what it's ready to learn."
+          ]
+        }
+      ]
+    },
+    {
+      "_note": "FUNCTION 3 — bond / evo-readiness context (docs/violet-academy.md §3). Frames bond as horizontal (unlocks moves + Calls, NEVER stats) and delivers the canonical evo-readiness line (nearly ready — needs the next badge). The diegetic surface for the bond-gated / badge-capped evolution model.",
+      "type": "npc",
+      "x": 1,
+      "y": 3,
+      "color": "#8fb86a",
+      "interact": [
+        {
+          "kind": "dialog",
+          "lines": [
+            "BOND KEEPER: People think training",
+            "is about getting stronger. Bigger",
+            "numbers. It isn't.",
+            "A bond doesn't raise a single",
+            "stat. Not one.",
+            "What it buys you is trust — new",
+            "moves your partner shows only",
+            "someone it believes in, and the",
+            "CALLS you can make when a battle",
+            "turns against you.",
+            "And your partner? It's close.",
+            "Nearly ready to change.",
+            "It just needs to see you earn the",
+            "next badge — then it'll know",
+            "you're worth growing for."
           ]
         }
       ]
