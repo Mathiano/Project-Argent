@@ -10,12 +10,8 @@ import houseData from '../maps/house.json';
 import kamonHouseData from '../maps/kamon_house.json';
 import bedroomData from '../maps/bedroom.json';
 import hearthwickData from '../maps/hearthwick.json';
-import hearthwickCenterData from '../maps/hearthwick_center.json';
-import hearthwickMartData from '../maps/hearthwick_mart.json';
 import route31Data from '../maps/route31.json';
 import violetData from '../maps/violet.json';
-import violetCenterData from '../maps/violet_center.json';
-import violetMartData from '../maps/violet_mart.json';
 import violetAcademyData from '../maps/violet_academy.json';
 import gymData from '../maps/gym.json';
 import route31VioletData from '../maps/route31.violet.json';
@@ -29,6 +25,7 @@ import gymVioletPrefab from '../../../assets/prefabs/gym_violet.prefab.json';
 import treeBigPrefab from '../../../assets/prefabs/tree_big.prefab.json';
 import { loadMap } from './mapLoader';
 import type { GrayboxMapJson, DataDrivenMapJson } from './mapLoader';
+import { makeCenter, makeMart } from './interiorGen';
 import { registerPrefab, registerTileset } from './tilesetCatalog';
 import type { PrefabJson, TilesetJson } from './tileset';
 import type { MapData } from './types';
@@ -55,15 +52,31 @@ const REGISTRY: { [name: string]: () => MapData } = {
   HOUSE: () => loadMap(houseData as GrayboxMapJson),
   KAMON_HOUSE: () => loadMap(kamonHouseData as GrayboxMapJson),
   HEARTHWICK: () => loadMap(hearthwickData as GrayboxMapJson),
-  HEARTHWICK_CENTER: () => loadMap(hearthwickCenterData as GrayboxMapJson),
-  HEARTHWICK_MART: () => loadMap(hearthwickMartData as GrayboxMapJson),
+  // Interiors are GENERATED from data (interiorGen.ts), not hand-authored JSON.
+  // Hearthwick uses the defaults (its text IS the default); a new town's pair is two
+  // lines: makeCenter('NEWTOWN') + makeMart('NEWTOWN', [...stock]).
+  HEARTHWICK_CENTER: () => loadMap(makeCenter('HEARTHWICK')),
+  HEARTHWICK_MART: () => loadMap(makeMart('HEARTHWICK', ['BALL', 'POTION', 'SUPER POTION', 'FULL HEAL'])),
   LAB: () => loadMap(labData as GrayboxMapJson),
   ROUTE31: chooseRoute31,
   // Phase 7: Violet is now data-driven (plaster city). Its Center + Mart
   // are real enterable interiors (graybox, like Hearthwick's pair).
   VIOLET: () => loadMap(violetData as DataDrivenMapJson),
-  VIOLET_CENTER: () => loadMap(violetCenterData as GrayboxMapJson),
-  VIOLET_MART: () => loadMap(violetMartData as GrayboxMapJson),
+  VIOLET_CENTER: () =>
+    loadMap(
+      makeCenter('VIOLET', {
+        nurseGreeting: ['NURSE: Welcome to the', 'Violet City Center.', '', 'Rest your team before', 'you climb to the roof?'],
+        nurseHealed: ['(The machine hums.)', '(A soft chime.)', '', 'NURSE: All restored.', "FALKNER won't go easy."],
+        notice: ['A noticeboard.', 'VIOLET GYM — rooftop.', 'Heal before you ascend.'],
+      }),
+    ),
+  VIOLET_MART: () =>
+    loadMap(
+      makeMart('VIOLET', ['BALL', 'POTION', 'SUPER POTION', 'FULL HEAL'], {
+        clerkGreeting: ['CLERK: Welcome to the', 'VIOLET POKÉ MART.', '', 'Stocking up for the', 'gym climb?'],
+        shelfSign: ['Shelves of supplies.', 'A few SUPER POTIONs', 'for the harder road.'],
+      }),
+    ),
   // Phase 7 (violet-city-design.md): the Academy core — an enterable stub.
   VIOLET_ACADEMY: () => loadMap(violetAcademyData as GrayboxMapJson),
   GYM: () => loadMap(gymData as GrayboxMapJson),

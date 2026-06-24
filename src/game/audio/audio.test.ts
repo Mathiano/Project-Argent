@@ -102,14 +102,17 @@ describe('audio — eventToSound maps the REAL emitting events', () => {
 });
 
 describe('audio — slice-3 cue character (register intent)', () => {
-  const longest = (n: keyof typeof SOUNDS) => Math.max(...SOUNDS[n].map((s) => s.dur));
-  const span = (n: keyof typeof SOUNDS) => Math.max(...SOUNDS[n].map((s) => (s.delay ?? 0) + s.dur));
-  const peak = (n: keyof typeof SOUNDS) => Math.max(...SOUNDS[n].map((s) => s.gain));
+  // Iterate through the ToneSpec type (SOUNDS is `as const`, which narrows each tone
+  // and hides optional `delay`); the satisfies clause guarantees the cast is sound.
+  const t = (n: keyof typeof SOUNDS): readonly ToneSpec[] => SOUNDS[n];
+  const longest = (n: keyof typeof SOUNDS) => Math.max(...t(n).map((s) => s.dur));
+  const span = (n: keyof typeof SOUNDS) => Math.max(...t(n).map((s) => (s.delay ?? 0) + s.dur));
+  const peak = (n: keyof typeof SOUNDS) => Math.max(...t(n).map((s) => s.gain));
   test('victory is BRIEF (a sting, not a long fanfare)', () => {
     expect(span('victory')).toBeLessThanOrEqual(0.45);
   });
   test('bond-stage-cross is WARM — pure sine/triangle (no square bite)', () => {
-    expect(SOUNDS.bondCross.every((s) => s.type !== 'square')).toBe(true);
+    expect(t('bondCross').every((s) => s.type !== 'square')).toBe(true);
   });
   test('move-resolved sits UNDER the impact (much quieter) + is short', () => {
     expect(peak('moveResolved')).toBeLessThan(peak('impact') / 2);
