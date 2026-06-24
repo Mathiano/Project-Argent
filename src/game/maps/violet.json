@@ -95,9 +95,9 @@
       "target": "VIOLET_ACADEMY:fromViolet"
     },
     {
-      "_note": "POST-GYM ACADEMY NUDGE — appears only after FALKNER's win (academy_promoted), at the Academy door, pointing the player inside. The Academy is enterable before the gym; this is the diegetic 'go learn' prompt (docs/violet-academy.md §placement: pushed post-gym, not before).",
+      "_note": "POST-GYM ACADEMY NUDGE — appears only after FALKNER's win (academy_promoted), BESIDE the Academy door (14,21), pointing the player inside. Must NOT sit on the door-approach cell (13,21): the door (13,22) is reached only from the north down column 13, walled (academy) on the other three sides, so an NPC on (13,21) soft-locks entry. Stands one cell east of the approach — guides, doesn't block. The Academy is enterable before the gym too; this is the diegetic 'go learn' prompt (docs/violet-academy.md §placement).",
       "type": "npc",
-      "x": 13,
+      "x": 14,
       "y": 21,
       "color": "#caa148",
       "requiresFlag": "academy_promoted",
