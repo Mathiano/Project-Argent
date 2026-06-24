@@ -16,6 +16,12 @@ export type GameEvent =
   | { readonly kind: 'menu-move' }
   | { readonly kind: 'stance-selected'; readonly stance: Stance }
   | { readonly kind: 'move-resolved'; readonly side: Side; readonly move: string }
+  // Overworld presence (SFX slice 2). door-enter = warping through a building door;
+  // dialogue-open = a textbox opened (NPC / sign); dialogue-advance = the player
+  // pressed to page a conversation forward. Presentation-only emits.
+  | { readonly kind: 'door-enter' }
+  | { readonly kind: 'dialogue-open' }
+  | { readonly kind: 'dialogue-advance' }
   | { readonly kind: 'hit-landed'; readonly side: Side; readonly effectiveness: number }
   | { readonly kind: 'ko'; readonly side: Side }
   | { readonly kind: 'catch-attempt' }

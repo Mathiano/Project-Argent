@@ -4,13 +4,15 @@
 // writes NOTHING back to game state (pure presentation), so it cannot perturb
 // combat or any ladder.
 //
-// Wired to the REAL emitting events only (verified against gameEvents.ts emit
-// sites): this slice is UI + combat hit-feedback. Other emitting events
-// (battle-start/end, move-resolved, catch-attempt/success, evolve, bond-stage-cross)
-// are intentionally unwired this slice → null. Reserved-not-emitting events
+// Wired to the REAL emitting events: UI (menu/stance) + combat hit-feedback +
+// (slice 2) overworld presence — door-enter, dialogue-open, dialogue-advance (the
+// emit sites for these were added to scenes/overworld.ts this slice). Other emitting
+// events (battle-start/end, move-resolved, catch-attempt/success, evolve,
+// bond-stage-cross) are intentionally unwired → null. Reserved-not-emitting events
 // (catch-wiggle, status-applied, level) have no emit site at all. There is NO
-// charge/wind-up or ★-award event on the bus to wire (the doc asked to verify — they
-// don't exist yet), so they're skipped, not fabricated.
+// charge/wind-up or ★-award event on the bus (the doc asked to verify — they don't
+// exist), so they're skipped, not fabricated. `cancel` is built but still unwired —
+// no trivial single B-press chokepoint (deferred; see report).
 
 import { onGameEvent } from '../gameEvents';
 import type { GameEvent } from '../gameEvents';
@@ -24,6 +26,13 @@ export function eventToSound(event: GameEvent): SoundName | null {
       return 'cursorMove';
     case 'stance-selected':
       return 'confirm'; // committing a stance is the player's confirm
+    // Overworld presence (slice 2)
+    case 'door-enter':
+      return 'doorEnter';
+    case 'dialogue-open':
+      return 'dialogueOpen';
+    case 'dialogue-advance':
+      return 'textBlip'; // the built-but-unwired text-blip, now tuned + wired
     // Combat hit-feedback — the effectiveness carries the type-read.
     case 'hit-landed':
       return event.effectiveness > 1 ? 'superEffective' : event.effectiveness < 1 ? 'impactResisted' : 'impact';

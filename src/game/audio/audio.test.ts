@@ -47,6 +47,21 @@ describe('audio — combat cues carry information (distinguishable by ear)', () 
   });
 });
 
+describe('audio — combat retune carries GBA/Ruby character (slice 2)', () => {
+  const longest = (specs: readonly ToneSpec[]) => Math.max(...specs.map((s) => s.dur));
+  test('impact is a chunky SQUARE smack with body (not a soft clean bob)', () => {
+    expect(SOUNDS.impact.some((s) => s.type === 'square')).toBe(true); // the GB punch
+    expect(longest(SOUNDS.impact)).toBeGreaterThanOrEqual(0.16); // chunkier / longer than slice 1
+  });
+  test('the KO cue is long + drawn-out (the faint takes its time)', () => {
+    expect(longest(SOUNDS.ko)).toBeGreaterThanOrEqual(0.5);
+    expect(SOUNDS.ko.length).toBeGreaterThanOrEqual(3); // layered → the warble
+  });
+  test('dialogue-advance (text-blip) stays short + soft — it fires a lot', () => {
+    expect(SOUNDS.textBlip.every((s) => s.dur <= 0.05 && s.gain <= 0.12)).toBe(true);
+  });
+});
+
 describe('audio — eventToSound maps the REAL emitting events', () => {
   test('UI: menu-move → cursor, stance-selected → confirm', () => {
     expect(eventToSound({ kind: 'menu-move' })).toBe('cursorMove');
@@ -57,6 +72,11 @@ describe('audio — eventToSound maps the REAL emitting events', () => {
     expect(eventToSound({ kind: 'hit-landed', side: 'foe', effectiveness: 0.7 })).toBe('impactResisted');
     expect(eventToSound({ kind: 'hit-landed', side: 'foe', effectiveness: 1.3 })).toBe('superEffective');
     expect(eventToSound({ kind: 'ko', side: 'foe' })).toBe('ko');
+  });
+  test('overworld (slice 2): door / dialogue events map to their cues', () => {
+    expect(eventToSound({ kind: 'door-enter' })).toBe('doorEnter');
+    expect(eventToSound({ kind: 'dialogue-open' })).toBe('dialogueOpen');
+    expect(eventToSound({ kind: 'dialogue-advance' })).toBe('textBlip');
   });
   test('events out of this slice (or reserved-not-emitting) map to no sound', () => {
     const silent: GameEvent[] = [

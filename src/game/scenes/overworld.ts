@@ -1,6 +1,7 @@
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import type { InputState } from '../input';
 import { getMap } from '../overworld/maps';
+import { emitGameEvent } from '../gameEvents';
 import type { Tile, Tileset } from '../overworld/tileset';
 import { getTileset, hasTileset } from '../overworld/tilesetCatalog';
 import type { Facing, MapData, MapObject, PlacedProp, ScriptCommand } from '../overworld/types';
@@ -293,9 +294,12 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
   function openDialog(lines: readonly string[]): void {
     dialogLines = [...lines];
     dialogPage = 0;
+    emitGameEvent({ kind: 'dialogue-open' }); // audio: a textbox opened (talk blip)
   }
   function advanceDialog(): void {
     if (!dialogLines) return;
+    emitGameEvent({ kind: 'dialogue-advance' }); // audio: paged the conversation forward
+
     const totalPages = Math.max(1, Math.ceil(dialogLines.length / DIALOG_LINES_PER_PAGE));
     dialogPage += 1;
     if (dialogPage >= totalPages) {
@@ -595,6 +599,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
 
     const warp = findObjectAt(map, tx, ty, 'warp') as Extract<MapObject, { type: 'warp' }> | null;
     if (warp) {
+      if (isDoorAt(tx, ty)) emitGameEvent({ kind: 'door-enter' }); // audio: door blip (not route edges)
       pendingWarp = warp.target;
       fadePhase = 'fadeOut';
       fadeT = 1;
@@ -655,6 +660,14 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
     const ch = rows[y]?.[x];
     const def = ch ? map.tileset[ch] : undefined;
     return def?.label !== undefined && THOROUGHFARE_IDS.has(def.label);
+  }
+
+  // A door tile — building doors (gym_door / academy_door / wall_door / *_door) read
+  // by id (data-driven) or label (graybox). Route-EDGE warps sit on path/grass, so
+  // this keeps the door sound on building entrances/exits, not seamless map edges.
+  function isDoorAt(x: number, y: number): boolean {
+    const id = map.cells ? map.cells[y]?.[x] : map.tileset[rows[y]?.[x] ?? '']?.label;
+    return id !== undefined && id.includes('door');
   }
 
   function stepOnScriptAt(x: number, y: number): Extract<MapObject, { type: 'script' }> | null {
