@@ -52,13 +52,15 @@ The stance layer IS the show's vocabulary: *"Dodge it!" / "Brace!" / "Press the 
 | **Guard** | 🛡 | 0.75× damage | 0.6× | +6 bonus regen |
 | **Fluid** | 〜 | 1.0× | evade chance (below) | +12 flat — dodging is tiring |
 
-**Triangle:** Guard > Aggressive > Fluid > Guard. Two hard edges, one contested:
+**Triangle:** Guard > Aggressive > Fluid > Guard. All three are hard edges.
+
+> **⚠️ Combat Layer 1 update (canonical — see root `CLAUDE.md` + `combat-enrichment-roadmap.md`):** the Aggressive-vs-Fluid edge below was originally a *speed-contested dodge*; **Layer 1 flipped it to a hard PUNISH** — Aggressive hard-beats Fluid (the aggressor catches the committing dodger ×1.35 + ★), there is **no** speed-gated escape. Evasion is **emergent from SPD** (initiative / turn order; Fluid acts first), **not** a discrete dodge roll. The worked Whitney turn + boss-stat notes below still use the old dodge framing — read them through this update.
 
 | Matchup | Result |
 |---|---|
 | Guard vs Aggressive | **Counter** — attacker eats 0.5× of pre-mitigation damage (post-attacker-stance multiplier, pre-defender mitigation), staggered (timeline push) |
 | Fluid vs Guard | **Opening** — act first, their counter whiffs, your hit lands at 1.15× through a degraded guard (0.85× instead of 0.6×) |
-| Aggressive vs Fluid | **Speed contest** — dodge succeeds only with a real Speed edge; slow mons cannot dodge the big hit, fast ones can. The anime rule, made mechanical |
+| Aggressive vs Fluid | **Punish** (Layer 1) — the aggressor catches the committing dodger for ×1.35 + ★. Aggression hard-beats Fluid; SPD only sets turn order (Fluid acts first), it does **not** buy an escape. *(Originally a speed-contested dodge — flipped in Layer 1.)* |
 | Mirror | No bonus exchange, base effects only |
 
 ---

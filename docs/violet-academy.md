@@ -19,8 +19,8 @@ A building in Violet City with several functions, each its own NPC/room:
 ### 1. Mechanics teaching (the stance triangle)
 The thing the player has been playing blind. An instructor explains, with interactive examples:
 - The three stances (Aggressive / Guard / Fluid) and their damage trade-offs.
-- The triangle: **Guard beats Aggressive (Counter), Fluid beats Guard (Opening), Aggressive beats Fluid IF faster (Dodge).**
-- **The hidden variable is SPEED** — dodges only work when faster; speed sets turn order. This is the single most important thing to surface, because its invisibility is what makes combat feel "random" when it's deterministic.
+- The triangle (**AGGRESSIVE > FLUID > GUARD > AGGRESSIVE** — all hard edges; Combat Layer 1): **Guard beats Aggressive (Counter), Fluid beats Guard (Opening), Aggressive beats Fluid (Punish — the aggressor catches the committing dodger).**
+- **The hidden variable is SPEED** — speed sets turn order, and a Fluid move always acts first (initiative, not safety). There is no discrete dodge stat: evasion is emergent from SPD. This is the single most important thing to surface, because its invisibility is what makes combat feel "random" when it's deterministic.
 - No random misses — outcomes come from reads, not luck.
 - Ideally a safe practice fight where the player can try each stance interaction and SEE the result labeled.
 
