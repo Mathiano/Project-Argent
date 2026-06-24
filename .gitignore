@@ -11,9 +11,15 @@ Thumbs.db
 .vscode
 .claude/settings.local.json
 
-# Third-party Tiled map editor (local tooling, not source) — keep the Studio tracked
-/tools/*
-!/tools/argent_studio/
+# Third-party Tiled map editor BINARIES (local tool — the tools/*.mjs|.py scripts + tools/argent_studio stay tracked)
+/tools/*.exe
+/tools/*.dll
+/tools/*.txt
+/tools/qt.conf
+/tools/Qt6*
+/tools/plugins/
+/tools/translations/
+/tools/examples/
 # Generated / scratch art artifacts (not source)
 /assets/GPT/
 /tallgrass-fix.png
