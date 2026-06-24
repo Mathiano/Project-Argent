@@ -57,6 +57,8 @@ import { createNameEntryScene, NAME_MAX_LEN, sanitizeName } from './scenes/nameE
 import { resolvePlayerName } from './playerName';
 import { buildDevPlan, AT_TARGETS, PRESETS, type DevPlan, type DevPartyMember } from './devNav';
 import { createDevMenuScene, type DevMenuItem } from './scenes/devMenu';
+import { createAudioEngine, loadMutedPref, saveMutedPref } from './audio/synth';
+import { installAudio } from './audio/audioSubscriber';
 import { createConfirmScene } from './scenes/confirmPrompt';
 import { createMessageScene } from './scenes/messageScene';
 import { createChapterCardScene } from './scenes/chapterCard';
@@ -134,6 +136,13 @@ const dispatcher = createInputDispatcher(
     return scenes.textInput(raw); // raw typed keys → the active text field (nameEntry)
   },
 );
+
+// First audio (docs/sfx-build-decisions.md): a synth engine + a subscriber on the
+// gameEvents bus. Pure presentation — reads events, plays sounds, writes nothing
+// back. The Web Audio context builds lazily inside the first sound-emitting keypress
+// (autoplay policy). Mute is a persisted device preference; default ON (unmuted).
+const audioEngine = createAudioEngine({ muted: loadMutedPref() });
+installAudio(audioEngine);
 
 const sessionFlags = new Set<string>();
 const flagStore = {
@@ -733,7 +742,13 @@ function pushPauseMenu(): void {
       onBag: () => pushBagMenu(),
       onDex: () => pushDexMenu(),
       onSave: () => autosaveNow(),
-      onOptions: () => {},
+      // OPTIONS → the audio mute toggle (the only live setting this slice). Persists
+      // the device preference; the menu flash shows the new SOUND state.
+      onOptions: () => {
+        audioEngine.setMuted(!audioEngine.isMuted());
+        saveMutedPref(audioEngine.isMuted());
+      },
+      audioOn: () => !audioEngine.isMuted(),
       onClose: () => scenes.pop(),
       badges: run.badges,
     }),

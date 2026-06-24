@@ -18,7 +18,10 @@ export interface PauseMenuOpts {
   // Phase 6.5 — the seen/caught registry (DEX row).
   readonly onDex: () => void;
   readonly onSave: () => void;
+  // OPTIONS — toggles the one live setting (audio mute) when confirmed.
   readonly onOptions: () => void;
+  // Current sound state, read for the OPTIONS flash readout. Omitted → assume on.
+  readonly audioOn?: () => boolean;
   readonly onClose: () => void;
   // Demo-complete: earned badge ids, shown as a trainer-card stand-in
   // footer ("BADGES ★×N"). Defaults to none when omitted.
@@ -132,10 +135,11 @@ export function createPauseMenuScene(opts: PauseMenuOpts): Scene {
         drawText(ctx, 'Saved.', 88, 90, PALETTE.paper);
         drawText(ctx, '(Autosave is on too.)', 88, 100, PALETTE.paperShadow);
       } else if (optionsFlash) {
+        const on = opts.audioOn ? opts.audioOn() : true;
         drawPanel(ctx, 60, 70, 200, 50);
         drawText(ctx, 'OPTIONS', 68, 78, PALETTE.paper);
-        drawText(ctx, 'Text speed, audio, controls', 68, 92, PALETTE.paperShadow);
-        drawText(ctx, '— coming in a later sprint.', 68, 102, PALETTE.paperShadow);
+        drawText(ctx, `SOUND: ${on ? 'ON' : 'OFF'}`, 68, 92, on ? PALETTE.hpOk : PALETTE.paperDim);
+        drawText(ctx, 'OPTIONS again to toggle.', 68, 102, PALETTE.paperShadow);
         drawText(ctx, 'A / B to dismiss.', 68, 112, PALETTE.paperDim);
       }
     },
