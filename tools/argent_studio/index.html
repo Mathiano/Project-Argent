@@ -26,6 +26,7 @@
   button:hover { border-color:var(--accent); }
   input[type=text],input[type=number],select { background:#11131a; color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:5px 8px; font:inherit; }
   input[type=number]{ width:52px; }
+  input[type=range]{ accent-color:var(--accent); }
   textarea { width:100%; background:#11131a; color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:8px; font:inherit; resize:vertical; }
   canvas { image-rendering:pixelated; display:block; background:repeating-conic-gradient(#3a3a3a 0 25%,#2a2a2a 0 50%) 0/16px 16px; border:1px solid var(--line); border-radius:4px; }
   .budgetGrid { display:inline-grid; gap:3px; margin-top:10px; }
@@ -85,6 +86,26 @@
       <span>or click to browse — pixels snap to nearest index; with ≤16/tile on, each 16px tile is reduced to its 16 top colours</span>
     </div>
     <input type="file" id="dropFile" accept="image/png,image/jpeg,image/*" hidden>
+    <div class="row" style="margin-top:8px">
+      <label class="tog" title="ON: resample the drop INTO the current workspace size (e.g. fit a big illustration into a 16×16 tile). OFF: resize the workspace to the dropped image, snapped to 16px tiles.">
+        <input type="checkbox" id="fitWorkspace"> fit drop to current workspace size
+      </label>
+    </div>
+
+    <h2 style="margin-top:14px">Reference underlay <span style="color:var(--dim);font-weight:normal">· <span id="ulSrc">none</span></span></h2>
+    <div class="row">
+      <label class="tog"><input type="checkbox" id="ulShow" checked> show underlay</label>
+    </div>
+    <div class="row">
+      opacity <input type="range" id="ulOpacity" min="0" max="100" value="50" style="flex:1">
+      <span id="ulOpacityVal" style="width:36px;text-align:right;color:var(--dim)">50%</span>
+    </div>
+    <div class="row">
+      <button id="ulLoadBtn">load underlay…</button>
+      <button id="ulClear">clear</button>
+      <input type="file" id="ulFile" accept="image/png,image/jpeg,image/*" hidden>
+    </div>
+    <div class="hint">A dimmed copy of the HD reference sits BENEATH the editable grid — trace/correct the clamped tile on top of it. Read-only: it never touches the grid, the ≤16 counter, the tiling preview, or any export. A dropped import also becomes the underlay automatically.</div>
 
     <h2 style="margin-top:14px">Active KAMON Reference <span style="color:var(--dim);font-weight:normal">· <span id="monSrc">loading…</span></span></h2>
     <div class="row">
@@ -153,6 +174,10 @@ let palette = [], sel = -1;
 let TW = 1, TH = 1, W = 16, H = 16;          // tiles + pixel dims
 let grid = new Int16Array(W*H).fill(-1);     // palette index per pixel, -1 transparent
 let painting = false, eraseDrag = false;
+// Reference underlay — a NON-destructive HD reference drawn dimmed beneath the
+// editable grid (trace/correct on top). It is read-only: never read/written by
+// the grid, the budget counter, the tiling preview, or any export.
+let underlay = null, underlayOn = true, underlayOpacity = 0.5;
 const $ = (id) => document.getElementById(id);
 const toast = (m) => { const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1400); };
 
@@ -288,6 +313,15 @@ function tileColorCount(tx, ty) { const s=new Set(); for (let y=0;y<T;y++) for (
 function draw() {
   const s = editor._scale||1;
   ectx.clearRect(0,0,editor.width,editor.height);
+  // reference underlay FIRST — dimmed, beneath the editable pixels (smoothing on:
+  // it's a reference, never an export, so a clean downscale of the HD ref reads best)
+  if (underlay && underlayOn) {
+    ectx.save();
+    ectx.globalAlpha = underlayOpacity;
+    ectx.imageSmoothingEnabled = true;
+    ectx.drawImage(underlay, 0, 0, editor.width, editor.height);
+    ectx.restore();
+  }
   for (let y=0;y<H;y++) for (let x=0;x<W;x++){ const v=grid[y*W+x]; if(v>=0&&palette[v]){ ectx.fillStyle=palette[v].hex; ectx.fillRect(x*s,y*s,s,s); } }
   if ($('pgrid').checked) { ectx.strokeStyle='rgba(255,255,255,.07)'; ectx.lineWidth=1;
     for (let x=0;x<=W;x++){ ectx.beginPath(); ectx.moveTo(x*s,0); ectx.lineTo(x*s,H*s); ectx.stroke(); }
@@ -421,10 +455,15 @@ function importImageFile(file) {
   if (!palette.length) { toast('palette still loading'); return; }
   const img = new Image();
   img.onload = () => {
-    // size the workspace to the image, snapped to 16px tiles (1..8 each axis)
-    const tw = Math.max(1, Math.min(8, Math.round(img.width / T)));
-    const th = Math.max(1, Math.min(8, Math.round(img.height / T)));
-    setSize(tw, th);
+    // Resample target: by default size the workspace to the image (snapped to 16px
+    // tiles, 1..8 each axis). With "fit to current workspace" on, keep the artist's
+    // chosen workspace and resample the drop INTO it (the brief's literal "resample
+    // to the current workspace tile dimensions" — e.g. a big illustration → 16×16).
+    if (!$('fitWorkspace').checked) {
+      const tw = Math.max(1, Math.min(8, Math.round(img.width / T)));
+      const th = Math.max(1, Math.min(8, Math.round(img.height / T)));
+      setSize(tw, th);
+    }
     const c = document.createElement('canvas'); c.width = W; c.height = H;
     const x = c.getContext('2d');
     x.imageSmoothingEnabled = false; x.mozImageSmoothingEnabled = false; x.webkitImageSmoothingEnabled = false;
@@ -437,7 +476,10 @@ function importImageFile(file) {
     // Rule 1: honour the ≤BUDGET/tile budget on import (same toggle as painting),
     // so an arbitrary photo/render can't smuggle 17+ colours/tile past the validator.
     const reduced = $('enforce').checked ? clampGridToTileBudget() : 0;
-    URL.revokeObjectURL(img.src);
+    // The ORIGINAL (un-clamped, HD) drop doubles as the reference underlay, so one
+    // drop gives both: the clamped on-grid starting tile AND the HD ref to trace.
+    underlay = img; underlayOn = $('ulShow').checked;
+    $('ulSrc').textContent = 'imported · '+img.width+'×'+img.height;
     draw();
     toast('imported '+img.width+'×'+img.height+' → '+W+'×'+H+
       (reduced ? ' · '+reduced+' tile'+(reduced>1?'s':'')+' clamped to ≤'+BUDGET : ' (clamped to palette)'));
@@ -445,6 +487,24 @@ function importImageFile(file) {
   img.onerror = () => { toast('could not read image'); URL.revokeObjectURL(img.src); };
   img.src = URL.createObjectURL(file);
 }
+// --- reference underlay controls (load a DIFFERENT ref than the import, toggle, opacity) ---
+function setUnderlay(file, label) {
+  if (!file || !/^image\//.test(file.type)) { toast('underlay needs a PNG or JPG'); return; }
+  const img = new Image();
+  img.onload = () => {
+    underlay = img; underlayOn = true; $('ulShow').checked = true;
+    $('ulSrc').textContent = (label || 'image') + ' · ' + img.width + '×' + img.height;
+    draw();
+  };
+  img.onerror = () => { toast('could not read underlay image'); };
+  img.src = URL.createObjectURL(file);
+}
+$('ulLoadBtn').onclick = () => $('ulFile').click();
+$('ulFile').onchange = (e) => { const f=e.target.files[0]; if(f) setUnderlay(f, f.name); e.target.value=''; };
+$('ulClear').onclick = () => { underlay = null; $('ulSrc').textContent = 'none'; draw(); };
+$('ulShow').onchange = (e) => { underlayOn = e.target.checked; draw(); };
+$('ulOpacity').oninput = (e) => { underlayOpacity = (+e.target.value)/100; $('ulOpacityVal').textContent = e.target.value+'%'; draw(); };
+
 const drop = $('drop'), dropFile = $('dropFile');
 drop.onclick = () => dropFile.click();
 dropFile.onchange = (e) => { const f=e.target.files[0]; if(f) importImageFile(f); dropFile.value=''; };
