@@ -57,7 +57,7 @@ import { createConfirmScene } from './scenes/confirmPrompt';
 import { createMessageScene } from './scenes/messageScene';
 import { createChapterCardScene } from './scenes/chapterCard';
 import { monDisplayName } from './monName';
-import { kamonGateLines, quietResolveLines, CHAPTER_CARD } from './ch1Ending';
+import { kamonGateLines, quietResolveLines, CHAPTER_CARD, CH1_CLOSED_FLAG, shouldFireChapterEnd } from './ch1Ending';
 import { freshBattleSide } from './battlePrep';
 import { bagAdd, bagByPocket, bagConsume, ITEMS, seedStartingBag } from './items';
 import type { BagEntry } from './items';
@@ -1630,8 +1630,14 @@ function showOverworld(
   // when applySave called us).
   autosaveNow();
   // CH1 ending — entering Route 32 (the road KAMON took) closes the chapter:
-  // the quiet-resolve beat + the chapter card (replacing the old placard).
-  if (map === 'ROUTE32') pushChapterEndBeat();
+  // the quiet-resolve beat + the chapter card (replacing the old placard). Fires
+  // ONCE (first entry) — the once-marker is persisted so re-entry is silent and
+  // the dramatic close isn't cheapened by replay.
+  if (shouldFireChapterEnd(map, flagStore.has(CH1_CLOSED_FLAG))) {
+    flagStore.set(CH1_CLOSED_FLAG);
+    autosaveNow(); // persist the once-marker before the beat plays
+    pushChapterEndBeat();
+  }
 }
 
 function pushWildEncounter(foeSpeciesName: string): void {

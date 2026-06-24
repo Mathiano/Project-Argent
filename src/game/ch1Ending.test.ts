@@ -3,7 +3,7 @@
 // the placard replacement. Pure-text builders + scene renders + map data.
 
 import { describe, expect, test } from 'vitest';
-import { kamonGateLines, quietResolveLines, CHAPTER_CARD } from './ch1Ending';
+import { kamonGateLines, quietResolveLines, CHAPTER_CARD, CH1_CLOSED_FLAG, shouldFireChapterEnd } from './ch1Ending';
 import { createMessageScene } from './scenes/messageScene';
 import { createChapterCardScene } from './scenes/chapterCard';
 import route32 from './maps/route32.json';
@@ -107,6 +107,31 @@ describe('CH1 ending — scenes render + advance', () => {
     expect(t).toContain('To be continued.');
     scene.input!('a');
     expect(done).toBe(1);
+  });
+});
+
+describe('CH1 ending — the beat fires ONCE (first Route 32 entry only)', () => {
+  test('fires on the first Route 32 entry, then is silent on re-entry', () => {
+    // mirrors main.ts: gate on the flag, set it when fired.
+    const flags = new Set<string>();
+    const enterRoute32 = (): boolean => {
+      if (shouldFireChapterEnd('ROUTE32', flags.has(CH1_CLOSED_FLAG))) {
+        flags.add(CH1_CLOSED_FLAG); // record the once-marker
+        return true; // the beat plays
+      }
+      return false;
+    };
+    expect(enterRoute32()).toBe(true); // first entry → fires
+    expect(flags.has(CH1_CLOSED_FLAG)).toBe(true); // marker persisted
+    expect(enterRoute32()).toBe(false); // re-entry → silent
+    expect(enterRoute32()).toBe(false); // still silent
+  });
+
+  test('other maps never fire the beat; an already-closed Route 32 stays silent', () => {
+    expect(shouldFireChapterEnd('VIOLET', false)).toBe(false);
+    expect(shouldFireChapterEnd('HEARTHWICK', false)).toBe(false);
+    expect(shouldFireChapterEnd('ROUTE32', true)).toBe(false); // already closed
+    expect(shouldFireChapterEnd('ROUTE32', false)).toBe(true); // not yet closed
   });
 });
 

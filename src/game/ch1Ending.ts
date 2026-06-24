@@ -14,6 +14,17 @@ export const CHAPTER_CARD = {
   footer: 'To be continued.',
 } as const;
 
+// The once-marker flag for the chapter close. Set the first time the beat fires
+// so re-entering Route 32 is silent (the dramatic close isn't cheapened by replay).
+export const CH1_CLOSED_FLAG = 'ch1_closed';
+
+// Whether to fire the chapter-end beat on this map entry: Route 32, not yet closed.
+// The caller records CH1_CLOSED_FLAG when this returns true, so it fires exactly
+// once (first entry); every later entry — and every other map — is silent.
+export function shouldFireChapterEnd(map: string, alreadyClosed: boolean): boolean {
+  return map === 'ROUTE32' && !alreadyClosed;
+}
+
 // KAMON's gate exchange, fired after the gate fight resolves. `playerWon` picks
 // the opener (he felt the bond gap either way); both branches converge on the
 // same deflection + Concord stinger. `playerName` is null in CH1 (no name
