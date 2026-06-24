@@ -135,8 +135,11 @@
     <div>per-tile colours (/16):</div>
     <div class="budgetGrid" id="budget"></div>
     <div class="row" style="margin-top:12px">
-      <input type="text" id="tileId" placeholder="base id (e.g. tree_big)" style="flex:1">
+      <input type="text" id="tileId" placeholder="asset name (e.g. hearthwick_grass)" style="flex:1" title="a-z 0-9 _ — becomes the file name AND the tileset.json name field">
       <label class="tog"><input type="checkbox" id="solid"> solid</label>
+    </div>
+    <div class="row">
+      <input type="text" id="assetDesc" placeholder="description (for the registry — e.g. 'Hearthwick field grass, 8x8')" style="flex:1">
     </div>
   </section>
 
@@ -153,6 +156,10 @@
       <button id="dlPrefab">prefab.json</button>
       <button id="selfTest" title="Export a known canvas, decode the exported file, assert the pixels match exactly">self-test ⤺</button>
     </div>
+    <div class="row">
+      <button id="saveProject" style="border-color:var(--accent)" title="Write assets/tilesets/&lt;name&gt;.tileset.json into the repo + update the manifest (needs `npm run dev`)">💾 Save to project</button>
+    </div>
+    <div class="hint">Save-to-project writes the named tileset.json into <b>assets/tilesets/</b> and registers it in <b>manifest.json</b> so it's addressable by name. Needs the dev server; refuses to overwrite an existing name without confirming.</div>
     <textarea id="out" rows="9" spellcheck="false"></textarea>
 
     <h2 style="margin-top:14px">Import (paste a tile's rows)</h2>
@@ -306,7 +313,18 @@ function setSize(tw, th) {
   const scale = Math.max(1, Math.floor(460/Math.max(W,H)));
   editor.width = W*scale; editor.height = H*scale; editor.style.width=(W*scale)+'px'; editor.style.height=(H*scale)+'px';
   editor._scale = scale;
+  syncPresetUI();   // keep the workspace dropdown honest — it lagged at "1×1" after import/load
   draw();
+}
+// Reflect the ACTUAL workspace size in the preset dropdown (it's also driven BY the
+// dropdown via onchange→setSize). After a programmatic setSize (import, load-rows,
+// custom) the select used to stay on its old value; this re-selects the matching
+// preset, or falls back to "custom…" with the live TW×TH filled in.
+function syncPresetUI() {
+  const val = TW+','+TH;
+  const opt = [...$('preset').options].find(o=>o.value===val);
+  if (opt) { $('preset').value = val; $('customWrap').style.display='none'; }
+  else { $('preset').value = 'custom'; $('customWrap').style.display='flex'; $('tw').value=TW; $('th').value=TH; }
 }
 
 const editor = $('editor'), ectx = editor.getContext('2d');
@@ -393,6 +411,16 @@ const ENCODING_DOC =
   + '"." or " " = transparent. Otherwise pixelIndex = keys.indexOf(char), a 0-based index '
   + 'into palette[]. `keys` is the positional alphabet 0-9a-zA-Z truncated to palette.length. '
   + 'No palette index is transparent (index 0 is an opaque colour); transparency is the "." sentinel only.';
+// Asset name: filesystem-safe, lower alnum + underscore, leading alnum. normalizeName
+// coerces "Grass A" → "grass_a"; requireName() validates before an export/save and
+// writes the normalized value back so the artist sees exactly what ships.
+function normalizeName(s) { return String(s||'').trim().toLowerCase().replace(/[^a-z0-9_]+/g,'_').replace(/^_+|_+$/g,''); }
+function requireName() {
+  const n = normalizeName($('tileId').value);
+  if (!/^[a-z0-9][a-z0-9_]*$/.test(n)) { toast('Name the asset first — a-z 0-9 _ (e.g. hearthwick_grass)'); $('tileId').focus(); return null; }
+  $('tileId').value = n;   // reflect the normalized name back
+  return n;
+}
 function baseId() { return ($('tileId').value||'tile').replace(/[^a-z0-9_]/gi,'_'); }
 function tileId(tx,ty) { return TW*TH===1 ? baseId() : baseId()+'_'+tx+'_'+ty; }
 function tilesetObj() {
@@ -457,11 +485,33 @@ $('pgrid').onchange = draw; $('clear').onclick = ()=>{ grid.fill(-1); draw(); };
 // exports
 function dlBlob(name,blob){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
 function dlText(name,text,type){ dlBlob(name,new Blob([text],{type:type||'application/json'})); }
-$('dlPng').onclick = ()=>{ const c=document.createElement('canvas'); c.width=W; c.height=H; const x=c.getContext('2d');
+$('dlPng').onclick = ()=>{ if(!requireName()) return; const c=document.createElement('canvas'); c.width=W; c.height=H; const x=c.getContext('2d');
   for (let y=0;y<H;y++) for (let xx=0;xx<W;xx++){ const v=grid[y*W+xx]; if(v>=0&&palette[v]){ x.fillStyle=palette[v].hex; x.fillRect(xx,y,1,1); } }
   c.toBlob(b=>dlBlob(baseId()+'.png', b)); };
-$('dlTileset').onclick = ()=>dlText(baseId()+'.tileset.json', JSON.stringify(tilesetObj(),null,1));
-$('dlPrefab').onclick = ()=>{ if(TW*TH===1){ toast('prefab is for multi-tile props'); return; } dlText(baseId()+'.prefab.json', JSON.stringify(prefabObj(),null,1)); };
+$('dlTileset').onclick = ()=>{ if(!requireName()) return; dlText(baseId()+'.tileset.json', JSON.stringify(tilesetObj(),null,1)); };
+$('dlPrefab').onclick = ()=>{ if(TW*TH===1){ toast('prefab is for multi-tile props'); return; } if(!requireName()) return; dlText(baseId()+'.prefab.json', JSON.stringify(prefabObj(),null,1)); };
+
+// Save to project — POST the named tileset.json to the dev-server endpoint, which
+// writes assets/tilesets/<name>.tileset.json + updates manifest.json. 409 → confirm
+// overwrite. The saved file is exactly the round-trip-verified tilesetObj() (name forced).
+$('saveProject').onclick = async ()=>{
+  const name = requireName(); if(!name) return;
+  const obj = tilesetObj();
+  const payload = { name, description: ($('assetDesc').value||'').trim(), cols: TW, rows: TH, count: TW*TH, tileset: obj };
+  const post = (body) => fetch('/api/save-asset', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  try {
+    let r = await post(payload);
+    if (r.status === 409) {
+      if (!confirm('"'+name+'" already exists in assets/tilesets. Overwrite it?')) { toast('save cancelled'); return; }
+      r = await post({ ...payload, overwrite:true });
+    }
+    const j = await r.json().catch(()=>({ ok:false, error:'bad response' }));
+    if (j.ok) toast('saved → '+j.file + (j.clobbered ? ' (overwritten)' : '') + ' · manifest updated');
+    else toast('save failed: ' + (j.error || ('HTTP '+r.status)));
+  } catch (e) {
+    toast('Save needs the dev server (npm run dev). ' + (e && e.message ? e.message : e));
+  }
+};
 
 // import a single tile's rows into a 1×1 workspace
 function loadRows(rows) {

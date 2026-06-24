@@ -6,5 +6,5 @@
     "types": ["node"],
     "outDir": "./node_modules/.tmp/tsbuild-node"
   },
-  "include": ["vite.config.ts"]
+  "include": ["vite.config.ts", "tools/argent_studio/dev-save-plugin.ts"]
 }
