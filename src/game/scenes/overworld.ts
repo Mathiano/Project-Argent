@@ -620,7 +620,11 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
     const zone = findObjectAt(map, tx, ty, 'encounter_zone') as
       | Extract<MapObject, { type: 'encounter_zone' }>
       | null;
-    if (zone) {
+    // Encounters fire on a zone's grass/encounter tiles — but NOT on a path/road
+    // carved THROUGH the zone rectangle. The generator stamps grass then carves the
+    // winding path over it, so a rect can't exclude the road; gate on the actual
+    // tile so the player crosses between grass patches encounter-free.
+    if (zone && !isThoroughfareAt(tx, ty)) {
       // Post-battle grace: skip exactly one encounter roll on the very
       // first step after returning from a wild/trainer battle. Consume
       // the flag whether or not the roll would have hit — the contract
@@ -637,6 +641,20 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         }
       }
     }
+  }
+
+  // A cleared path/road tile — encounters never roll here even inside a zone rect.
+  // Works for both formats: data-driven cells carry the resolved tile id; graybox
+  // uses the per-char tile label. (Grass / tall_grass / cave_mouth are NOT thoroughfares.)
+  const THOROUGHFARE_IDS = new Set(['path', 'path_exit', 'road']);
+  function isThoroughfareAt(x: number, y: number): boolean {
+    if (map.cells) {
+      const id = map.cells[y]?.[x];
+      return id !== undefined && THOROUGHFARE_IDS.has(id);
+    }
+    const ch = rows[y]?.[x];
+    const def = ch ? map.tileset[ch] : undefined;
+    return def?.label !== undefined && THOROUGHFARE_IDS.has(def.label);
   }
 
   function stepOnScriptAt(x: number, y: number): Extract<MapObject, { type: 'script' }> | null {
