@@ -31,11 +31,10 @@ describe('interior generator — makeCenter', () => {
     expect(npcWith(m, 'open-box')).toBeTruthy();
   });
   test('flavor overrides apply; defaults otherwise', () => {
-    const custom = makeCenter('X', { notice: ['Custom notice.'] });
-    const sign = custom.objects.find((o) => o.type === 'sign') as Extract<MapObject, { type: 'sign' }>;
-    expect(sign.lines).toEqual(['Custom notice.']);
-    const def = makeCenter('Y').objects.find((o) => o.type === 'sign') as Extract<MapObject, { type: 'sign' }>;
-    expect(def.lines.length).toBeGreaterThan(0); // a default noticeboard
+    const signOf = (j: ReturnType<typeof makeCenter>) =>
+      (j.objects ?? []).find((o) => o.type === 'sign') as Extract<MapObject, { type: 'sign' }> | undefined;
+    expect(signOf(makeCenter('X', { notice: ['Custom notice.'] }))?.lines).toEqual(['Custom notice.']);
+    expect((signOf(makeCenter('Y'))?.lines.length ?? 0)).toBeGreaterThan(0); // a default noticeboard
   });
 });
 
