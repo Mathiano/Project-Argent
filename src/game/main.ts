@@ -16,7 +16,6 @@ import {
   trainerPolicy,
   TRAINER_PROFILES,
   foeProfileForFlag,
-  possibleReleases,
   buildKamonTeam,
   kamonStolenStarter,
   KAMON_CHAFF_SPECIES,
@@ -42,6 +41,7 @@ import { mountCanvas } from './canvas';
 import { createInputDispatcher } from './input';
 import { SceneStack } from './scene';
 import { createBattleScene, infoLevelToReliability } from './scenes/battle';
+import { profileIntentInfo } from './trainerIntent';
 import { createEndScene } from './scenes/end';
 import { createBagMenuScene } from './scenes/bagMenu';
 import { createMartMenuScene } from './scenes/martMenu';
@@ -1067,6 +1067,10 @@ function showRivalBattle(): void {
       // KAMON's AI = the RIVAL profile's earliest rung (Aggressor/Single-only/
       // Fixed/no-Calls). He leans Aggressive and CAN'T Get Away — commit freely.
       chooseFoeAction: (s, r) => trainerPolicy(TRAINER_PROFILES.kamon!)(s, 'foe', r),
+      // Intent/info from KAMON's profile (open), same derivation as pushTrainerFight —
+      // not the scene default. Inert at CH1 (single-only → never Focuses); correct for
+      // when his profile climbs to two-step/Reactive in CH2+.
+      ...profileIntentInfo(TRAINER_PROFILES.kamon!),
       intro: chaff
         ? [
             'KAMON leads with a',
@@ -1160,6 +1164,10 @@ function pushRivalGateFight(): void {
       state,
       rng: run.rng,
       chooseFoeAction: (s, r) => trainerPolicy(TRAINER_PROFILES.kamon!)(s, 'foe', r),
+      // Intent/info from KAMON's profile (open), same derivation as pushTrainerFight —
+      // not the scene default. Inert at CH1 (single-only → never Focuses); correct for
+      // when his profile climbs to two-step/Reactive in CH2+.
+      ...profileIntentInfo(TRAINER_PROFILES.kamon!),
       intro: chaff
         ? [
             'KAMON blocks the road south.',
@@ -2036,24 +2044,13 @@ function pushTrainerFight(
   // unprofiled one keeps the generic wildFoeAI (bit-identical).
   const profile = foeProfileForFlag(winFlag);
   const foePolicy = profile ? trainerPolicy(profile) : null;
-  // Unified info legibility (one infoLevel drives BOTH tells; per-axis override
-  // reserved for the Bluffer). The focus tell narrows to the truthful lens over
-  // the trainer's possible release SET (1 for fixed-Heavy, 2 for variable).
-  const level = profile?.infoLevel ?? 'open';
-  const foeFocusInfo = profile
-    ? {
-        discipline: profile.infoOverride?.focus ?? level,
-        releases: possibleReleases(profile.release),
-        salt: profile.name,
-      }
-    : undefined;
+  const intentInfo = profile ? profileIntentInfo(profile) : null;
   scenes.push(
     createBattleScene({
       state,
       rng: run.rng,
       chooseFoeAction: (s, r) => (foePolicy ? foePolicy(s, 'foe', r) : wildFoeAI(s, r)),
-      ...(profile ? { intentReliability: infoLevelToReliability(profile.infoOverride?.stance ?? level) } : {}),
-      ...(foeFocusInfo ? { foeFocusInfo } : {}),
+      ...(intentInfo ? { intentReliability: intentInfo.intentReliability, foeFocusInfo: intentInfo.foeFocusInfo } : {}),
       intro: ['Gym trainer sent out', `${leadName}!`],
       catchBreathUnlocked: callsUnlocked(),
       canRun: false,
