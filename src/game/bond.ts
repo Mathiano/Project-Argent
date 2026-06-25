@@ -203,3 +203,12 @@ export function stageProgress(bondValue: number): number {
   const v = Math.max(BOND_MIN, Math.min(BOND_MAX, bondValue));
   return Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
 }
+
+// The top of the named stage `value` currently sits in — the value at which
+// the bar would read 100% before crossing into the next stage. Used by the
+// in-combat bond bar's post-win advance: the bar fills to its stage ceiling
+// (caps at 100%) and a genuine tier-cross is handed to the post-fight beat
+// (bond-legibility-design.md surface ①/②), never snapping the bar mid-fill.
+export function stageCeiling(bondValue: number): number {
+  return BOND_STAGES[bondStage(bondValue) - 1]!.max;
+}

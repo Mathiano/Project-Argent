@@ -478,6 +478,9 @@ interface BondCross {
   readonly species: string;
   readonly fromName: string;
   readonly toName: string;
+  // The post-cross bond value — lets the tier-up beat sweep its bond bar to
+  // full (Lane A surface ②). The named stage already comes via toName.
+  readonly toValue: number;
   // This crossing NEWLY unlocked the Call economy (crossed into the Warming
   // bond moment, and Calls weren't already unlocked by the run flag).
   readonly unlocksCalls: boolean;
@@ -516,6 +519,7 @@ function awardBondForFight(
         species: mon.species.name,
         fromName: bondStageName(before),
         toName: bondStageName(after),
+        toValue: after,
         unlocksCalls,
       });
       emitGameEvent({
@@ -543,6 +547,7 @@ function showBondBeats(crossings: readonly BondCross[], onComplete: () => void):
       species: head!.species,
       fromName: head!.fromName,
       toName: head!.toName,
+      toValue: head!.toValue,
       unlocksCalls: head!.unlocksCalls,
       onContinue: () => {
         scenes.pop();
@@ -559,6 +564,23 @@ function foeChallengePower(foe: Species | ReturnType<typeof createTeam>): number
     return Math.max(...foe.members.map((m) => powerIndex(m.species)));
   }
   return powerIndex(foe);
+}
+
+// Lane A (bond legibility) — the bond props threaded into a battle scene: the
+// live per-member bond values (the static in-combat meter) plus, for a fight
+// that AWARDS bond on a win, the challenge context so the meter can animate its
+// post-win advance via the SAME pure pipeline awardBondForFight uses (the
+// displayed target then matches run.partyBond after the award). Display-only —
+// it never moves bond. Omit (foe, kind) for non-awarding fights (intro / test /
+// ?skip) → the static meter shows, with no advance.
+function bondSceneProps(
+  foe?: Species | ReturnType<typeof createTeam>,
+  kind?: FightKind,
+): { playerBond: readonly number[]; bondContext?: { readonly kind: FightKind; readonly foePower: number } } {
+  if (foe && kind) {
+    return { playerBond: run.partyBond, bondContext: { kind, foePower: foeChallengePower(foe) } };
+  }
+  return { playerBond: run.partyBond };
 }
 
 // ---- Phase 6b — evolution (bond-gated, boss-capped) ----------------------
@@ -1019,6 +1041,7 @@ function showWildBattle(): void {
     createBattleScene({
       state,
       rng: run.rng,
+      ...bondSceneProps(), // Lane A — static bond meter (demo wild; no bond award)
       chooseFoeAction: (s, r) => wildFoeAI(s, r),
       intro: ['A wild FUZZLET', 'appeared!', 'TIP: SELECT cycles', 'your STANCE.'],
       catchBreathUnlocked: false,
@@ -1079,6 +1102,7 @@ function showRivalBattle(): void {
     createBattleScene({
       state,
       rng: run.rng,
+      ...bondSceneProps(), // Lane A — static bond meter (intro rival; no bond award)
       // KAMON's AI = the RIVAL profile's earliest rung (Aggressor/Single-only/
       // Fixed/no-Calls). He leans Aggressive and CAN'T Get Away — commit freely.
       chooseFoeAction: (s, r) => trainerPolicy(TRAINER_PROFILES.kamon!)(s, 'foe', r),
@@ -1178,6 +1202,7 @@ function pushRivalGateFight(): void {
     createBattleScene({
       state,
       rng: run.rng,
+      ...bondSceneProps(foeTeam, 'trainer'), // Lane A — bond meter + post-win advance
       chooseFoeAction: (s, r) => trainerPolicy(TRAINER_PROFILES.kamon!)(s, 'foe', r),
       // Intent/info from KAMON's profile (open), same derivation as pushTrainerFight —
       // not the scene default. Inert at CH1 (single-only → never Focuses); correct for
@@ -1259,6 +1284,7 @@ function showFalknerFight(): void {
     createBattleScene({
       state,
       rng: run.rng,
+      ...bondSceneProps(), // Lane A — static bond meter (?skip path awards no bond)
       chooseFoeAction: (s, r) => falknerBossAI(s, 'foe', r),
       // Phase 6.7-A — a gym leader reads AMBIGUOUS: his stance intent can't
       // be blind-countered. Engine still commits the true stance.
@@ -1326,6 +1352,7 @@ function showTestBattle(): void {
     createBattleScene({
       state,
       rng: run.rng,
+      ...bondSceneProps(), // Lane A — static bond meter (?skip test battle)
       chooseFoeAction: (s, r) => wildFoeAI(s, r),
       intro: [`Test battle:`, `wild ${foe.name} appeared!`],
       catchBreathUnlocked: callsUnlocked(),
@@ -1364,6 +1391,7 @@ function showTestBattle2v2(): void {
     createBattleScene({
       state,
       rng: run.rng,
+      ...bondSceneProps(), // Lane A — static bond meter (?skip 2v2 test battle)
       chooseFoeAction: (s, r) => wildFoeAI(s, r),
       intro: [
         `2v2 test:`,
@@ -1835,6 +1863,7 @@ function pushWildEncounter(foeSpeciesName: string): void {
     createBattleScene({
       state,
       rng: run.rng,
+      ...bondSceneProps(foe, 'wild'), // Lane A — bond meter + post-win advance
       chooseFoeAction: (s, r) => wildFoeAI(s, r),
       intro: [`A wild ${foe.name}`, 'appeared!'],
       catchBreathUnlocked: callsUnlocked(),
@@ -1957,6 +1986,7 @@ function pushTutorialCatch(): void {
     createBattleScene({
       state,
       rng: run.rng,
+      ...bondSceneProps(), // Lane A — static bond meter (tutorial catch; no bond award)
       // Benign, predictable practice foe (can't punish) — see tutorialCatch.ts.
       chooseFoeAction: (s, r) => tutorialFoeAI(s, r),
       // Maximally legible — open info-discipline, every tell shown.
@@ -2064,6 +2094,7 @@ function pushTrainerFight(
     createBattleScene({
       state,
       rng: run.rng,
+      ...bondSceneProps(foeTeam, 'trainer'), // Lane A — bond meter + post-win advance
       chooseFoeAction: (s, r) => (foePolicy ? foePolicy(s, 'foe', r) : wildFoeAI(s, r)),
       ...(intentInfo ? { intentReliability: intentInfo.intentReliability, foeFocusInfo: intentInfo.foeFocusInfo } : {}),
       intro: ['Gym trainer sent out', `${leadName}!`],
@@ -2130,6 +2161,7 @@ function pushFalknerBattle(): void {
     createBattleScene({
       state,
       rng: run.rng,
+      ...bondSceneProps(team, 'boss'), // Lane A — bond meter + post-win advance
       chooseFoeAction: (s, r) => falknerBossAI(s, 'foe', r),
       // Phase 6.7-A — gym leader reads AMBIGUOUS (the ?skip=falkner path).
       intentReliability: 'ambiguous',

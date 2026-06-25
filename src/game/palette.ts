@@ -32,6 +32,11 @@ export const PALETTE = {
   // Star / momentum
   star: '#c9a227',
   starOff: '#b8b09a',
+
+  // Bond (Lane A legibility) — a warm rose, distinct from HP/ST/★ so the
+  // bond meter reads as the relationship axis, not a combat resource.
+  bond: '#c0608a',
+  bondDim: '#5d2f44',
 } as const;
 
 export type PaletteKey = keyof typeof PALETTE;

@@ -40,6 +40,11 @@ export type GameEvent =
   // relationship-milestone beat. Emitted post-battle by the bond award; the
   // game shows a prompted message, and audio can chime the milestone later.
   | { readonly kind: 'bond-stage-cross'; readonly species: string; readonly fromStage: number; readonly toStage: number }
+  // A read-win banked the player a ★ this round (Lane A surface ③ — the felt
+  // spark behind the meter ticking up). Emitted in-battle the moment the
+  // PLAYER's momentum event lands; a soft ping / mon reaction can ride it.
+  // Presentation-only; the foe's read-wins stay silent (hidden ★).
+  | { readonly kind: 'read-win'; readonly side: Side }
   // Reserved: there is no leveling system (stats are species-static). Kept
   // for completeness so a future XP/level beat has a cue.
   | { readonly kind: 'level' };

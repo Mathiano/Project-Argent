@@ -28,6 +28,9 @@ import type { InputKey, Scene } from '../scene';
 import { monDisplayName } from '../monName';
 import { fleeTelegraphed } from '../catching';
 import type { CatchWindow } from '../catching';
+import { drawBondBar } from '../bondBar';
+import { bondAfterFight, powerIndex, stageCeiling } from '../bond';
+import type { FightKind } from '../bond';
 import {
   TUTORIAL_CORRECTION,
   TUTORIAL_FOE_PROMPT,
@@ -113,6 +116,20 @@ export interface BattleSceneOpts {
     finalState: BattleState,
     participants: readonly number[],
   ) => void;
+
+  // ---- Bond legibility (Lane A) — display only -------------------------
+  // Per-player-member current bond value (0–100), index-aligned with
+  // state.player.members (≡ run.party). The bond bar under the player panel
+  // shows the ACTIVE mon's standing (stage + progress). STATIC during the
+  // fight (bond doesn't move mid-round); it advances on the post-fight
+  // victory beat, XP-style. Omitted (sim / isolated tests) → no bar drawn.
+  // Foe bond is intentionally hidden (consistent with the hidden foe ★).
+  readonly playerBond?: readonly number[];
+  // This fight's challenge context, so the bar can compute its post-win
+  // advance via the SAME pure bond pipeline the authoritative award uses
+  // (display-only — the real award stays game-side in awardBondForFight).
+  // Omitted → the bar stays static even on a win (no advance animation).
+  readonly bondContext?: { readonly kind: FightKind; readonly foePower: number };
   // Fleeing (RUN, wild only) is distinct from a loss — it must NOT
   // black out. When wired, RUN calls this instead of onResolve('foe');
   // the caller returns the player to the same overworld tile, no heal.
@@ -578,6 +595,21 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let callCursor = 0;
   let tick = 0;
 
+  // ---- Bond legibility (Lane A) — presentation state -------------------
+  // Post-win bond-bar advance (XP-style). On a player win, the active mon's
+  // bar fills from its pre-fight value toward the post-fight value (capped at
+  // the current stage's ceiling — a real tier-cross is the post-fight beat).
+  // bondAdvanceFrom = null when no advance is playing.
+  const BOND_ADVANCE_SEC = 0.9;
+  let bondAdvanceFrom: number | null = null;
+  let bondAdvanceTo = 0;
+  let bondAdvanceT = 0;
+  // Surface ③ — read-win mon reaction. A short, subtle pulse on the player's
+  // mon the moment a read banks a ★ (the felt spark behind the meter ticking
+  // up). Pure render; timer counts down. NOT a score/grade popup.
+  const READ_REACT_SEC = 0.5;
+  let readReactT = 0;
+
   // Audio seam — a battle began (see gameEvents). Fire-and-forget; no-op
   // until an audio layer subscribes.
   emitGameEvent({ kind: 'battle-start' });
@@ -987,6 +1019,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (ev.kind === 'momentum') {
       display[ev.side].momentum = ev.total;
       pushLog(`★ Momentum +1 (${ev.total}).`);
+      // Surface ③ — the read landed and banked YOUR ★. A subtle, diegetic
+      // acknowledgment beyond the pip ticking up: a soft reaction pulse on the
+      // mon + a presentation event a soft ping can ride. Player side only (the
+      // foe's ★ stays hidden — no tell that the foe won a read).
+      if (ev.side === 'player') {
+        readReactT = READ_REACT_SEC;
+        emitGameEvent({ kind: 'read-win', side: 'player' });
+      }
       return;
     }
     if (ev.kind === 'bondJumpstart') {
@@ -1105,6 +1145,30 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (endingWinner !== null) {
       phase = 'end';
       emitGameEvent({ kind: 'battle-end', winner: endingWinner });
+      // Bond legibility (Lane A) — the post-fight bar advance. On a player
+      // win, fill the ACTIVE mon's bond bar from its pre-fight value toward
+      // the post-fight value, computed via the SAME pure pipeline the
+      // authoritative game-side award uses (so the displayed target matches
+      // run.partyBond after the win). Cap at the current stage's ceiling: the
+      // bar fills to 100% and a genuine tier-cross becomes the post-fight beat
+      // (createBondStageScene), never snapping the bar mid-fill.
+      if (endingWinner === 'player' && opts.playerBond && opts.bondContext) {
+        const active = state.player.active;
+        const from = opts.playerBond[active] ?? 0;
+        const mon = activeMon(state.player);
+        const target = bondAfterFight(from, {
+          monPower: powerIndex(mon.species),
+          foePower: opts.bondContext.foePower,
+          kind: opts.bondContext.kind,
+          hpFracRemaining: mon.hp / Math.max(1, mon.maxHp),
+        });
+        const capped = Math.min(target, stageCeiling(from));
+        if (capped > from + 1e-6) {
+          bondAdvanceFrom = from;
+          bondAdvanceTo = capped;
+          bondAdvanceT = 0;
+        }
+      }
       const msg =
         endingWinner === 'player'
           ? ['You won the battle!', 'Press A to continue.']
@@ -1700,7 +1764,59 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       PALETTE.stamina,
     );
     drawWindedNotch(ctx, PL_PANEL.x + 26, PL_PANEL.y + 27, PL_PANEL.w - 36);
-    drawBenchIndicators(ctx, PL_PANEL.x + 8, PL_PANEL.y + PL_PANEL.h + 2, state.player);
+    // Bench dots + the bond meter share the slim row under the panel — see
+    // drawPlayerUnderPanel (bench relocated to the right so it clears the bar).
+  }
+
+  // Bond legibility (Lane A) — the slim "player shelf" under the panel: the
+  // bond meter (active mon's stage + progress) on the left, the team bench
+  // dots on the right. The bar is STATIC during the fight and fills on the
+  // post-win advance (bondAdvanceFrom/To). Bench dots render unconditionally
+  // (their own size/phase suppression) so a caller without bond data — sim /
+  // isolated tests — still shows team status; only the meter needs the thread.
+  function drawPlayerUnderPanel(ctx: CanvasRenderingContext2D): void {
+    const stripY = PL_PANEL.y + PL_PANEL.h; // 118 — just under the panel
+    const benchShown =
+      state.player.members.length > 1 && phase !== 'resolve' && phase !== 'end' && phase !== 'text';
+    const benchW = benchShown ? state.player.members.length * 6 + 4 : 0;
+    if (opts.playerBond) {
+      const base = opts.playerBond[state.player.active] ?? 0;
+      let value = base;
+      if (bondAdvanceFrom !== null) {
+        const t = Math.min(1, bondAdvanceT / BOND_ADVANCE_SEC);
+        const eased = 1 - (1 - t) * (1 - t); // ease-out — the bar settles in
+        value = bondAdvanceFrom + (bondAdvanceTo - bondAdvanceFrom) * eased;
+      }
+      ctx.fillStyle = 'rgba(28,30,46,0.92)';
+      ctx.fillRect(PL_PANEL.x, stripY, PL_PANEL.w, 9);
+      drawBondBar(ctx, PL_PANEL.x + 4, stripY + 1, PL_PANEL.w - 8 - benchW, value);
+    }
+    // Right-aligned bench dots (relocated from the panel-left so they clear
+    // the bond meter). drawBenchIndicators no-ops for ≤1 mon / resolve phases.
+    const benchX = PL_PANEL.x + PL_PANEL.w - state.player.members.length * 6 - 2;
+    drawBenchIndicators(ctx, benchX, PL_PANEL.y + PL_PANEL.h + 2, state.player);
+  }
+
+  // Surface ③ — the read-win mon reaction. A soft, brief bond-tinted spark
+  // rising off the player's mon + a faint ring, the moment a read banks a ★.
+  // Subtle and diegetic (NOT a score/grade popup) — it just says "the read
+  // landed." Pure render; the testable signal is the 'read-win' game event.
+  function drawReadReaction(ctx: CanvasRenderingContext2D): void {
+    if (readReactT <= 0) return;
+    const t = 1 - readReactT / READ_REACT_SEC; // 0→1 across the reaction
+    const alpha = Math.max(0, 1 - t);
+    const cx = PL_SLOT.x + 28 + spriteOffset('player');
+    const topY = PL_SLOT.y + 4;
+    ctx.globalAlpha = alpha * 0.45;
+    ctx.strokeStyle = PALETTE.bond;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(cx, topY + 12, 6 + t * 9, 3 + t * 5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = PALETTE.bond;
+    ctx.fillRect(Math.round(cx - 1), Math.round(topY - t * 8), 2, 2);
+    ctx.globalAlpha = 1;
   }
 
   // Bench dots (one per team member) tinted by status. Suppressed
@@ -2021,6 +2137,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       tick += dt;
       if (breakFlashT > 0) breakFlashT = Math.max(0, breakFlashT - dt);
       if (breakPipFlashT > 0) breakPipFlashT = Math.max(0, breakPipFlashT - dt);
+      if (readReactT > 0) readReactT = Math.max(0, readReactT - dt);
+      if (bondAdvanceFrom !== null && bondAdvanceT < BOND_ADVANCE_SEC) {
+        bondAdvanceT = Math.min(BOND_ADVANCE_SEC, bondAdvanceT + dt);
+      }
       if (phase === 'resolve') tickResolve(dt);
     },
 
@@ -2089,9 +2209,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         { facing: 'right' },
       );
 
+      drawReadReaction(ctx); // surface ③ — over the mon, under the HUD panels
       drawFoePanel(ctx);
       if (breakThreshold > 0) drawBossStrip(ctx);
       drawPlayerPanel(ctx);
+      drawPlayerUnderPanel(ctx); // bond meter + bench dots (Lane A)
 
       if (phase === 'menu' || phase === 'move' || phase === 'call' || phase === 'release') drawIntent(ctx);
       // S1 — the triangle callout occupies the intent slot during resolve.
