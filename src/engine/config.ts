@@ -54,6 +54,23 @@ export const COMBAT = {
   momentumCap: 2,
   staggerInitMult: 0.5,
   restInitiative: -1,
+
+  // ── Call effects (Lane B — docs/call-effects-design.md) ────────────────
+  // These power the three newly-built Calls. Each is gated by the player's
+  // bond tier (game-side) and spends ★, so the ★ economy is their soft
+  // throttle. SIM NOTE: sim bots never emit these Call actions (recover/dodge)
+  // or a fullPower move, so every constant here is dead for the ladders →
+  // bit-identical. Balance is the ★ economy + the bond gate, not a ladder
+  // number — a Call-using sim archetype is the future stress-test (banked).
+  // RECOVER (★1): heal this fraction of maxHp. HIGH stall-risk Call — the ★
+  // cost + cap-2 momentum is the only throttle today (a hard cooldown is the
+  // banked follow-up if it stalls in playtest).
+  recoverPct: 0.5,
+  // FULL POWER (★2): the next attack deals ×this, stacking multiplicatively
+  // with the stance + triangle modifiers (it amplifies whatever the attack
+  // would have done — including the counter-reflect it eats into a Guard).
+  fullPowerMult: 1.5,
+  fullPowerCost: 2,
 } as const;
 
 // ── Combat FOCUS model (docs/combat-focus-redesign.md) ─────────────────────

@@ -26,7 +26,7 @@ import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
 import { monDisplayName } from '../monName';
-import { fleeTelegraphed } from '../catching';
+import { fleeTelegraphed, bondStage } from '../catching';
 import type { CatchWindow } from '../catching';
 import { drawBondBar } from '../bondBar';
 import { bondAfterFight, powerIndex, stageCeiling } from '../bond';
@@ -88,7 +88,17 @@ export interface BattleSceneOpts {
   readonly rng: RNG;
   readonly chooseFoeAction: (state: BattleState, rng: RNG) => Action;
   readonly intro: readonly string[];
+  // Gates Catch Breath / Get Away / Hang In There (the Warming bond moment).
   readonly catchBreathUnlocked: boolean;
+  // Lane B — the active mon's bond value (0–100), gating the newly-built Calls
+  // per CALL_UNLOCK_STAGE (Recover/Dodge/Full Power). Omitted → stage 1 → those
+  // Calls stay locked. Read-only (does NOT move bond); independent of Lane A's
+  // bond bar so the lanes stay decoupled.
+  readonly callBondValue?: number;
+  // Lane B — dev/playtest override (?calls=all): unlock every BUILT Call now,
+  // bypassing the bond gate, so the effects can be tested. The shipping default
+  // is bond-gated (this is false); never ship with it on.
+  readonly devUnlockAllCalls?: boolean;
   readonly canRun: boolean;
   // Intent reliability ramp (Phase 6.7-A) — how truthfully the FOE INTENT
   // bar shows the foe's STANCE. Defaults HONEST (wild mons + every legacy
@@ -471,15 +481,20 @@ export function speedLabel(
 
 // The Call set the submenu reads (Call-menu sprint). DATA-driven so
 // adding a Call later is data, not a rewrite. Only Catch Breath is
-// BUILT this build (commits {kind:'catchBreath'}); Recover / Dodge / the
-// rest are design-only per combat-2-0-spec.md and render greyed +
-// cursor-skipped (locked). `{MON}` in the shout is the active mon name.
+// BUILT this build (Lane B, docs/call-effects-design.md): Catch Breath, Get
+// Away, Recover (heal 50% maxHp), Dodge (full evade), Full Power (+50% on the
+// next attack — a two-step: arm it, then pick an attack). `built: false` Calls
+// render greyed + cursor-skipped. `{MON}` in the shout is the active mon name.
 export interface CallDef {
   readonly id: string;
   readonly name: string;
   readonly starCost: number;
   readonly built: boolean;
   readonly shout: string;
+  // FULL POWER is a TWO-STEP Call: confirming it doesn't resolve — it ARMS a
+  // +50% buff and returns to the attack menu to pick the move that gets it.
+  // Marked here so the menu dispatches to the arm flow instead of fireCall.
+  readonly armsAttack?: boolean;
 }
 export const CALL_SET: readonly CallDef[] = [
   { id: 'catch-breath', name: 'Catch Breath', starCost: 1, built: true, shout: '{MON}, catch your breath!' },
@@ -487,11 +502,30 @@ export const CALL_SET: readonly CallDef[] = [
   // out, never a stance): GET AWAY = guaranteed no-hit; HANG IN THERE = can't
   // die this round. Both spend 1 ★ and forgo the strike.
   { id: 'get-away', name: 'Get Away', starCost: 1, built: true, shout: '{MON}, get away!' },
+  // Hang In There (survive-at-1HP) is RETIRED from play (bad design — see
+  // call-effects-design.md). The design repurposes this slot to "Shake It Off"
+  // (clear a status), BLOCKED on the status system → it stays a locked
+  // placeholder. Left as-is here (flag, not force): flipping it broke
+  // battle.test.ts (asserts it selectable); the engine effect stays dormant.
   { id: 'hang-in', name: 'Hang In There', starCost: 1, built: true, shout: '{MON}, hang in there!' },
-  { id: 'recover', name: 'Recover', starCost: 1, built: false, shout: '{MON}, shake it off!' },
-  { id: 'dodge', name: 'Dodge', starCost: 1, built: false, shout: '{MON}, dodge it!' },
-  { id: 'full-power', name: 'Full Power', starCost: 2, built: false, shout: 'Now — {MON}, full power!' },
+  // Lane B — newly BUILT. Bond-tier gated (see CALL_UNLOCK_STAGE); each spends ★.
+  { id: 'recover', name: 'Recover', starCost: 1, built: true, shout: 'Easy, {MON} — recover!' },
+  { id: 'dodge', name: 'Dodge', starCost: 1, built: true, shout: '{MON}, dodge it!' },
+  { id: 'full-power', name: 'Full Power', starCost: 2, built: true, shout: 'Now — {MON}, full power!', armsAttack: true },
 ];
+
+// Lane B — the bond-stage at which each newly-built Call unlocks (the real,
+// shipping rule; trainer profiles are balanced against this schedule). Catch
+// Breath / Get Away keep their existing Warming-moment gate (opts.catchBreath-
+// Unlocked). The escalating ladder gates the stronger Calls later:
+//   Recover → Companions (3) · Dodge → In Sync (4) · Full Power → Partners (5).
+// PLACEMENT IS A TUNING DETAIL (bond-track-v2 leaves exact stage→Call to
+// Mathias) — data here so a retune is a one-line change, not a rewrite.
+const CALL_UNLOCK_STAGE: { readonly [id: string]: number } = {
+  recover: 3,
+  dodge: 4,
+  'full-power': 5,
+};
 
 export function callShout(call: CallDef, monName: string): string {
   return call.shout.replace('{MON}', monName);
@@ -592,6 +626,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // commit-modifier): the current stance picks which (A→CHARGE, F→HIDE,
   // G→FEINT). Toggled with ←/→ in the move menu; reset each time it opens.
   let committing = false;
+  // FULL POWER (Lane B) — armed by the Full Power Call; the next confirmed
+  // attack carries `fullPower: true` (+50%, spends 2★). Cleared on commit or on
+  // backing out of the move menu. Mutually exclusive with `committing` (Full
+  // Power is a direct strike, never a focus).
+  let pendingFullPower = false;
   let callCursor = 0;
   let tick = 0;
 
@@ -755,6 +794,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (ev.kind === 'release') return true;
     if (ev.kind === 'flipResolve') return true;
     if (ev.kind === 'call') return true;
+    if (ev.kind === 'recover') return true; // Lane B — hold so the heal lands
+    if (ev.kind === 'fullPower') return true; // Lane B — hold so the buff reads
     if (ev.kind === 'opening') return true;
     if (ev.kind === 'counter') return true;
     if (ev.kind === 'clash') return true;
@@ -980,13 +1021,35 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       return;
     }
     if (ev.kind === 'call') {
-      // Layer 2 — a ★-Call override fired (the ★ is spent; the momentum readout
-      // updates here since no `momentum` event accompanies a Call).
+      // Layer 2 / Lane B — a ★-Call override fired (the ★ is spent; the momentum
+      // readout updates here since no `momentum` event accompanies a Call). The
+      // RECOVER heal arrives in the separate `recover` event right after.
       display[ev.side].momentum = Math.max(0, display[ev.side].momentum - 1);
       const who = ev.side === 'player' ? monDisplayName(display.player) : 'Foe';
-      const label = ev.call === 'getAway' ? 'GET AWAY' : 'HANG IN THERE';
+      const label =
+        ev.call === 'getAway' ? 'GET AWAY'
+        : ev.call === 'hangInThere' ? 'HANG IN THERE'
+        : ev.call === 'recover' ? 'RECOVER'
+        : 'DODGE';
       calloutLine = `${label}!`;
       pushLog(`${who}: ${label}! (★ spent)`);
+      return;
+    }
+    if (ev.kind === 'recover') {
+      // Lane B — RECOVER healed the caller. Raise the hp bar + name the amount.
+      display[ev.side].hp = Math.min(display[ev.side].maxHp, display[ev.side].hp + ev.healed);
+      const who = ev.side === 'player' ? monDisplayName(display.player) : `Foe ${display.foe.species.name}`;
+      calloutLine = `${who} recovers — +${ev.healed} HP!`;
+      pushLog(`${who} recovers — +${ev.healed} HP!`);
+      return;
+    }
+    if (ev.kind === 'fullPower') {
+      // Lane B — FULL POWER buffed the caller's attack +50% (2★ spent; no
+      // `momentum` event accompanies the spend, so update the readout here).
+      display[ev.side].momentum = Math.max(0, display[ev.side].momentum - COMBAT.fullPowerCost);
+      const who = ev.side === 'player' ? monDisplayName(display.player) : `Foe ${display.foe.species.name}`;
+      calloutLine = `FULL POWER! ${who}'s attack +50%!`;
+      pushLog(`${who}: FULL POWER! (+50%, ★★ spent)`);
       return;
     }
     if (ev.kind === 'dazed') {
@@ -1482,12 +1545,20 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       stanceIdx = (stanceIdx + 1) % 3;
       emitGameEvent({ kind: 'stance-selected', stance: STANCES[stanceIdx]! });
     } else if (key === 'left' || key === 'right') {
+      // FULL POWER is a direct strike — the focus commit-modifier is disabled
+      // while it's armed (the two are mutually exclusive).
+      if (pendingFullPower) return;
       // Layer 2 — toggle the COMMIT modifier: confirm now initiates the
       // current stance's two-step (CHARGE/HIDE/FEINT) instead of a single step.
       committing = !committing;
       emitGameEvent({ kind: 'menu-move' });
     }
-    else if (key === 'b') phase = 'menu';
+    else if (key === 'b') {
+      // Backing out of the move menu CANCELS a pending Full Power (the ★ was
+      // never spent — it's spent only when the buffed attack resolves).
+      pendingFullPower = false;
+      phase = 'menu';
+    }
     else if (key === 'a' || key === 'start') {
       const moveName = moves[moveCursor]!;
       const move = lookupMove(moveName);
@@ -1511,7 +1582,16 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         );
         return;
       }
-      commit({ kind: 'move', move: moveName, stance: STANCES[stanceIdx]!, ...(committing ? { commit: true } : {}) });
+      // FULL POWER takes priority over the focus commit (they're exclusive; the
+      // UI already blocks committing while armed). The engine spends the 2★ +
+      // applies +50% when this strike resolves.
+      const modifier = pendingFullPower
+        ? { fullPower: true as const }
+        : committing
+          ? { commit: true as const }
+          : {};
+      pendingFullPower = false;
+      commit({ kind: 'move', move: moveName, stance: STANCES[stanceIdx]!, ...modifier });
     }
   }
 
@@ -1539,11 +1619,17 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // than greyed — for now they're greyed so the player sees the set.
   function callUnlocked(call: CallDef): boolean {
     if (!call.built) return false;
+    // Dev/playtest override (?calls=all) — unlock every built Call now.
+    if (opts.devUnlockAllCalls) return true;
     // Catch Breath + the two Layer-2 escape Calls unlock together (the run's
-    // Calls-unlocked gate); they each still cost ★ to fire.
+    // Calls-unlocked gate ≈ the Warming bond moment); they each still cost ★.
     if (call.id === 'catch-breath' || call.id === 'get-away' || call.id === 'hang-in') {
       return opts.catchBreathUnlocked;
     }
+    // Lane B — the newly-built Calls gate on the active mon's bond STAGE
+    // (the real, sim-balanced schedule). Absent bond → stage 1 → locked.
+    const gate = CALL_UNLOCK_STAGE[call.id];
+    if (gate !== undefined) return bondStage(opts.callBondValue ?? 0) >= gate;
     return false;
   }
   function callAffordable(call: CallDef): boolean {
@@ -1564,15 +1650,30 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     return start;
   }
   // Fire a Call: shout FIRST (the trainer command beat — a Call is never
-  // silent), then the effect. Only Catch Breath has an engine effect this
-  // build; design-only Calls are cursor-skipped so never reach here.
+  // silent), then the effect. Full Power is the exception (armsAttack) — it
+  // doesn't resolve here; it arms a buff and returns to the move menu.
   function fireCall(call: CallDef): void {
     const monName = monDisplayName(activeMon(state.player));
     setText([callShout(call, monName)], () => {
       if (call.id === 'catch-breath') commit({ kind: 'catchBreath' });
       else if (call.id === 'get-away') commit({ kind: 'call', call: 'getAway' });
       else if (call.id === 'hang-in') commit({ kind: 'call', call: 'hangInThere' });
+      else if (call.id === 'recover') commit({ kind: 'call', call: 'recover' });
+      else if (call.id === 'dodge') commit({ kind: 'call', call: 'dodge' });
       else phase = 'menu';
+    });
+  }
+  // FULL POWER (Lane B) — the two-step arm: shout, then return to the ATTACK
+  // menu with the +50% buff pending. The player picks one of the 4 attacks; the
+  // ★★ is spent when that buffed strike resolves (engine), not here.
+  function armFullPower(call: CallDef): void {
+    const monName = monDisplayName(activeMon(state.player));
+    setText([callShout(call, monName)], () => {
+      pendingFullPower = true;
+      committing = false; // Full Power is a direct strike, never a focus
+      moveCursor = 0;
+      moveScroll = 0;
+      phase = 'move';
     });
   }
   function handleCallInput(key: InputKey): void {
@@ -1596,7 +1697,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         );
         return;
       }
-      fireCall(call);
+      if (call.armsAttack) armFullPower(call);
+      else fireCall(call);
     }
   }
 
@@ -2003,9 +2105,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
     const stance = STANCES[stanceIdx]!;
     drawStanceBadge(ctx, BOTTOM.x + 170, BOTTOM.y + 8, stance);
-    // FOCUS — when the commit-modifier is on, confirm initiates a generic
-    // FOCUS (the release is CHOSEN next round, hidden until then).
-    if (committing) {
+    // FULL POWER armed (Lane B) takes the indicator slot — the next attack is
+    // buffed +50%. Else FOCUS (commit-modifier) / plain stance name.
+    if (pendingFullPower) {
+      drawText(ctx, '▶FULL+50%', BOTTOM.x + 182, BOTTOM.y + 8, PALETTE.star);
+    } else if (committing) {
       drawText(ctx, '▶FOCUS', BOTTOM.x + 182, BOTTOM.y + 8, PALETTE.hpCrit);
     } else {
       drawText(ctx, STANCE_NAME[stance], BOTTOM.x + 182, BOTTOM.y + 8);

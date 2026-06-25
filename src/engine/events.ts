@@ -79,6 +79,14 @@ export type BattleEvent =
     }
   // A ★-Call override fired. `side` is the caller (spent 1 ★).
   | { readonly kind: 'call'; readonly side: Side; readonly call: CallKind }
+  // RECOVER Call (Lane B) — the caller healed `healed` hp (after clamping to
+  // maxHp). Rides the same round as its `call` event; the game replays it to
+  // raise the hp bar. Player-only today → never present in legacy/sim runs.
+  | { readonly kind: 'recover'; readonly side: Side; readonly healed: number }
+  // FULL POWER Call (Lane B) — the caller's attack this round is buffed +50%
+  // (★ spent). Marks WHY the strike hits harder; the strike event carries the
+  // already-amplified damage. Player-only → absent in legacy/sim runs.
+  | { readonly kind: 'fullPower'; readonly side: Side }
   | { readonly kind: 'staggered'; readonly side: Side }
   | { readonly kind: 'momentum'; readonly side: Side; readonly total: number }
   // The bond jumpstart fired: an armed mon's first read-win this battle

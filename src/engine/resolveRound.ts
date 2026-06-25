@@ -95,10 +95,11 @@ function stripFocus(side: SideState): SideState {
   return rest;
 }
 
-// Apply damage to a defender respecting an active ★-Call: GET AWAY = no-hit;
-// HANG IN THERE = floored at 1 hp.
+// Apply damage to a defender respecting an active ★-Call: GET AWAY / DODGE =
+// no-hit (full evade); HANG IN THERE = floored at 1 hp. RECOVER does NOT negate
+// the hit (its heal is applied separately, before the strike) → normal damage.
 function applyHp(defHp: number, dmg: number, call: CallKind | null): number {
-  if (call === 'getAway') return defHp;
+  if (call === 'getAway' || call === 'dodge') return defHp;
   const hp = defHp - dmg;
   if (call === 'hangInThere') return Math.max(1, hp);
   return Math.max(0, hp);
@@ -110,6 +111,22 @@ function applyHp(defHp: number, dmg: number, call: CallKind | null): number {
 function dealt(defHp: number, dmg: number, call: CallKind | null): { hp: number; applied: number } {
   const hp = applyHp(defHp, dmg, call);
   return { hp, applied: defHp - hp };
+}
+
+// RECOVER Call (Lane B) — heal recoverPct of maxHp, clamped, and emit the
+// heal so the game raises the hp bar. Applied at call-resolution time (before
+// the round's strikes), so the caller recovers and THEN takes any incoming hit
+// this round. No-op for any non-recover call → other Calls are untouched.
+function applyRecover(
+  side: SideState,
+  call: CallKind,
+  sideKey: Side,
+  events: BattleEvent[],
+): SideState {
+  if (call !== 'recover') return side;
+  const healed = Math.min(side.maxHp, side.hp + Math.round(side.maxHp * COMBAT.recoverPct));
+  events.push({ kind: 'recover', side: sideKey, healed: healed - side.hp });
+  return { ...side, hp: healed };
 }
 
 function actionStance(action: Action): Stance {
@@ -205,6 +222,12 @@ function resolveStrike(
   traits: TraitTable,
   rhythm: boolean,
   defDazed: boolean,
+  // FULL POWER (Lane B) — ×1.5 on a buffed attack, else 1. Applied to the raw
+  // damage so it flows into EVERY branch (punish/opening/normal AND the
+  // counter-reflect preMit) — Full Power amplifies whatever the attack does,
+  // including the reflect it eats into a Guard. Defaults 1 → sim/legacy strikes
+  // are bit-identical.
+  attMult = 1,
 ): StrikeResult {
   const move = lookupMove(moveName);
   const tier = TIERS[move.tier];
@@ -218,6 +241,7 @@ function resolveStrike(
   d *= stanceOutMult(attStance);
   // Trait damage modifier (e.g., GUSTBORNE x1.3 on rhythm rounds).
   d *= traitMods(attacker, rhythm, traits).dmgMult;
+  d *= attMult;
 
   // Extra damage a DAZED defender takes this round (thrice-repeat punish).
   // Applied to whichever damage branch lands below.
@@ -467,16 +491,37 @@ export function resolveRound(
   // Focus + release rounds are commitments, not single-step stances → they
   // don't feed the single-step thrice-daze (recorded as null).
 
+  // FULL POWER (Lane B) — a buffed attack spends ★ now (win or lose) and its
+  // strike deals ×fullPowerMult in WHICHEVER path resolves it: the single-step
+  // path, OR the focus path when the OPPONENT focuses/calls (the buffed attack
+  // is still a single-step strike, just resolved over there). Hoisted so the ★
+  // is spent exactly once and the multiplier is available to both branches.
+  // Guarded to `fullPower: true` moves (never a releaser) → dead for sims.
+  const plFullPower = !plReleasing && playerAction.kind === 'move' && playerAction.fullPower === true;
+  const foeFullPower = !foeReleasing && foeAction.kind === 'move' && foeAction.fullPower === true;
+  if (plFullPower) {
+    pl = { ...pl, momentum: Math.max(0, pl.momentum - COMBAT.fullPowerCost) };
+    events.push({ kind: 'fullPower', side: 'player' });
+  }
+  if (foeFullPower) {
+    foe = { ...foe, momentum: Math.max(0, foe.momentum - COMBAT.fullPowerCost) };
+    events.push({ kind: 'fullPower', side: 'foe' });
+  }
+  const plStrikeMult = plFullPower ? COMBAT.fullPowerMult : 1;
+  const foeStrikeMult = foeFullPower ? COMBAT.fullPowerMult : 1;
+
   if (focusInvolved) {
     // ── Combat FOCUS resolution path ───────────────────────────────────────
     // Spend ★ for any Calls (validated ≥1) and announce the override.
     if (plCall !== null) {
       pl = { ...pl, momentum: Math.max(0, pl.momentum - 1) };
       events.push({ kind: 'call', side: 'player', call: plCall });
+      pl = applyRecover(pl, plCall, 'player', events);
     }
     if (foeCall !== null) {
       foe = { ...foe, momentum: Math.max(0, foe.momentum - 1) };
       events.push({ kind: 'call', side: 'foe', call: foeCall });
+      foe = applyRecover(foe, foeCall, 'foe', events);
     }
     // Stagger consumed this round.
     pl = { ...pl, staggered: false };
@@ -583,7 +628,10 @@ export function resolveRound(
         const def = relSide === 'player' ? pl : foe;
         const relCall = relSide === 'player' ? plCall : foeCall;
         const { d, eff } = rawHit(att, def, oppMove, rng, state.typeChart, state.traits, rhythm);
-        let dd = d * stanceOutMult(oppStance!) * foeMult;
+        // Full Power buffs the single-stepping opponent's strike (the buffed
+        // attacker here is oppSide; the releaser is never a fullPower move).
+        const oppStrikeMult = oppSide === 'player' ? plStrikeMult : foeStrikeMult;
+        let dd = d * stanceOutMult(oppStance!) * foeMult * oppStrikeMult;
         if (def.exhausted) dd *= COMBAT.exhTaken;
         const r = dealt(def.hp, dd, relCall);
         if (relSide === 'player') pl = { ...pl, hp: r.hp };
@@ -616,7 +664,7 @@ export function resolveRound(
         if (pl.hp <= 0 || foe.hp <= 0) break;
         if (sk === 'player' && plStrikes) {
           const { d, eff } = rawHit(pl, foe, plMove!, rng, state.typeChart, state.traits, rhythm);
-          let dd = d * stanceOutMult(plStance);
+          let dd = d * stanceOutMult(plStance) * plStrikeMult; // Full Power buffs this strike too
           if (foeInitiating) dd *= FOCUS.focusCost; // hitting a focuser → the focus cost
           if (foe.exhausted) dd *= COMBAT.exhTaken;
           const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
@@ -625,7 +673,7 @@ export function resolveRound(
           if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
         } else if (sk === 'foe' && foeStrikes) {
           const { d, eff } = rawHit(foe, pl, foeMove!, rng, state.typeChart, state.traits, rhythm);
-          let dd = d * stanceOutMult(foeStance);
+          let dd = d * stanceOutMult(foeStance) * foeStrikeMult; // Full Power buffs this strike too
           if (plInitiating) dd *= FOCUS.focusCost;
           if (pl.exhausted) dd *= COMBAT.exhTaken;
           const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
@@ -697,7 +745,7 @@ export function resolveRound(
       if (plWins) {
         events.push({ kind: 'clash', winner: 'player' });
         pl = gainMomentum(pl, 'player', events);
-        const r = resolveStrike(pl, foe, plMove!, "A", "A", "player", rng, events, state.typeChart, state.traits, rhythm, foeDazed);
+        const r = resolveStrike(pl, foe, plMove!, "A", "A", "player", rng, events, state.typeChart, state.traits, rhythm, foeDazed, plStrikeMult);
         pl = r.attacker;
         foe = r.defender;
         if (foe.hp > 0) {
@@ -707,7 +755,7 @@ export function resolveRound(
       } else {
         events.push({ kind: 'clash', winner: 'foe' });
         foe = gainMomentum(foe, 'foe', events);
-        const r = resolveStrike(foe, pl, foeMove!, "A", "A", "foe", rng, events, state.typeChart, state.traits, rhythm, plDazed);
+        const r = resolveStrike(foe, pl, foeMove!, "A", "A", "foe", rng, events, state.typeChart, state.traits, rhythm, plDazed, foeStrikeMult);
         foe = r.attacker;
         pl = r.defender;
         if (pl.hp > 0) {
@@ -719,11 +767,11 @@ export function resolveRound(
       for (const sideKey of order) {
         if (pl.hp <= 0 || foe.hp <= 0) break;
         if (sideKey === 'player' && plMove !== null) {
-          const r = resolveStrike(pl, foe, plMove, plStance, foeStance, "player", rng, events, state.typeChart, state.traits, rhythm, foeDazed);
+          const r = resolveStrike(pl, foe, plMove, plStance, foeStance, "player", rng, events, state.typeChart, state.traits, rhythm, foeDazed, plStrikeMult);
           pl = r.attacker;
           foe = r.defender;
         } else if (sideKey === 'foe' && foeMove !== null) {
-          const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, "foe", rng, events, state.typeChart, state.traits, rhythm, plDazed);
+          const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, "foe", rng, events, state.typeChart, state.traits, rhythm, plDazed, foeStrikeMult);
           foe = r.attacker;
           pl = r.defender;
         }

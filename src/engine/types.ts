@@ -8,7 +8,17 @@ export type Stance = 'A' | 'G' | 'F';
 // distinct-wind-up two-steps (CHARGE/HIDE/FEINT) — see KICKOFF-combat-focus-rebuild.
 export type ReleaseKind = 'heavy' | 'feint' | 'hide';
 
-export type CallKind = 'getAway' | 'hangInThere';
+// ★-Call overrides (docs/call-effects-design.md). getAway/hangInThere are the
+// original Layer-2 escapes; recover/dodge are the new built Calls (Lane B):
+//   getAway     — negate the incoming hit this round (★1)
+//   hangInThere — floor the user at 1 hp this round (★1) [retired from the UI;
+//                 engine effect kept dormant pending the Shake-It-Off repurpose]
+//   recover     — heal 50% maxHp (★1)
+//   dodge       — full evade: negate the incoming hit (★1; overlaps getAway by
+//                 design until the counter-window is added — banked)
+// FULL POWER is NOT a CallKind — it's a `move` modifier (`fullPower: true`)
+// because it buffs an attack rather than resolving as a standalone Call.
+export type CallKind = 'getAway' | 'hangInThere' | 'recover' | 'dodge';
 
 // The default release a Focus falls back to when none is chosen (the internal
 // base stance the focus is tied to): Aggressive→HEAVY, Fluid→HIDE, Guard→FEINT.
@@ -169,7 +179,11 @@ export type Action =
   // `commit: true` INITIATES a FOCUS (R1) tied to `stance` (generic to the
   // opponent — the release is hidden until R2). Absent/false = a normal
   // single-step move (the legacy shape → single-step resolution is bit-identical).
-  | { readonly kind: 'move'; readonly move: string; readonly stance: Stance; readonly commit?: boolean }
+  // `fullPower: true` is the FULL POWER Call's buffed attack (Lane B): the move
+  // deals ×COMBAT.fullPowerMult and spends COMBAT.fullPowerCost ★. It rides a
+  // normal single-step move (never a focus commit). Absent on every legacy/sim
+  // action → the +50% branch is dead for the ladders (bit-identical).
+  | { readonly kind: 'move'; readonly move: string; readonly stance: Stance; readonly commit?: boolean; readonly fullPower?: boolean }
   // R2 of a Focus — the player-chosen HIDDEN release. Submitted by a mon whose
   // `focus` is set (the prior round's commit); resolves via the rotation triangle.
   | { readonly kind: 'release'; readonly release: ReleaseKind }

@@ -288,6 +288,12 @@ const run: RunState = {
 // real save slot (dev sessions are ephemeral; ?wipe still clears for a clean run).
 let devSession = false;
 
+// Lane B — dev/playtest override (?calls=all): unlock every BUILT Call now,
+// bypassing the bond-tier gate, so the new Call effects can be tested. Set in
+// the URL-param section below; threaded into every battle scene via
+// bondSceneProps. The SHIPPING default is bond-gated (false) — never ship on.
+let devUnlockAllCalls = false;
+
 // Demo-complete: the one badge the demo ships. Falkner's ZEPHYR BADGE.
 // A registry can come later when gyms 2–8 land; one constant suffices now.
 const ZEPHYR_BADGE = 'ZEPHYR';
@@ -573,14 +579,30 @@ function foeChallengePower(foe: Species | ReturnType<typeof createTeam>): number
 // displayed target then matches run.partyBond after the award). Display-only —
 // it never moves bond. Omit (foe, kind) for non-awarding fights (intro / test /
 // ?skip) → the static meter shows, with no advance.
+// Also carries Lane B's Call-unlock gating (`callBondValue` = the lead mon's
+// bond, gating Recover/Dodge/Full Power per their tiers; `devUnlockAllCalls` =
+// the ?calls=all override). Folded in here because both are per-battle props
+// derived from run state at scene creation; the gating is read-only (it never
+// moves bond). callBondValue is lead-based (matching the run-level
+// catchBreathUnlocked gate) — a mid-battle switch doesn't re-gate.
 function bondSceneProps(
   foe?: Species | ReturnType<typeof createTeam>,
   kind?: FightKind,
-): { playerBond: readonly number[]; bondContext?: { readonly kind: FightKind; readonly foePower: number } } {
+): {
+  playerBond: readonly number[];
+  bondContext?: { readonly kind: FightKind; readonly foePower: number };
+  callBondValue: number;
+  devUnlockAllCalls: boolean;
+} {
+  const base = {
+    playerBond: run.partyBond,
+    callBondValue: run.partyBond[0] ?? 0,
+    devUnlockAllCalls,
+  };
   if (foe && kind) {
-    return { playerBond: run.partyBond, bondContext: { kind, foePower: foeChallengePower(foe) } };
+    return { ...base, bondContext: { kind, foePower: foeChallengePower(foe) } };
   }
-  return { playerBond: run.partyBond };
+  return base;
 }
 
 // ---- Phase 6b — evolution (bond-gated, boss-capped) ----------------------
@@ -1421,6 +1443,9 @@ function showTestBattle2v2(): void {
 //                              handling runs (Phase 2 — QA the New
 //                              Game path repeatedly without leaving
 //                              the browser).
+//   ?calls=all                 (Lane B) unlocks every BUILT Call now,
+//                              bypassing the bond-tier gate, to playtest
+//                              the Call effects. Shipping default is gated.
 const url = new URLSearchParams(window.location.search);
 const skip = url.get('skip');
 const starterName = url.get('starter');
@@ -1435,6 +1460,9 @@ const bagParam = url.get('bag');
 const moneyParam = url.get('money');
 
 if (wipeParam) wipeStorage();
+
+// Lane B — apply the ?calls=all dev override (default stays bond-gated).
+devUnlockAllCalls = url.get('calls') === 'all';
 
 function applyMoneyFromUrl(): void {
   if (moneyParam === null) return;

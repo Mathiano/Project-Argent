@@ -197,6 +197,11 @@ export function validateAction(side: SideState, action: Action): void {
   if (!canAfford(side, move)) {
     throw new Error(`Cannot afford ${action.move}`);
   }
+  // FULL POWER (Lane B) — the +50% attack buff spends ★. Validate the cost so
+  // a buffed move can't fire without the momentum (the game gates this too).
+  if (action.fullPower === true && side.momentum < COMBAT.fullPowerCost) {
+    throw new Error(`Full Power needs ≥${COMBAT.fullPowerCost} momentum`);
+  }
   void (action.stance satisfies Stance);
 }
 
