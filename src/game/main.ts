@@ -1248,8 +1248,9 @@ function pushRivalGateFight(): void {
         // Both branches advance: KAMON leaves + the exit opens (no soft-lock).
         flagStore.set('kamon_beaten');
         const playerWon = winner === 'player';
+        let bondCrossings: BondCross[] = [];
         if (playerWon) {
-          awardBondForFight(foeTeam, 'trainer', finalState, participants);
+          bondCrossings = awardBondForFight(foeTeam, 'trainer', finalState, participants);
         } else {
           // A loss still advances — heal so the party isn't stranded fainted
           // back in town (BUG 2 contract), then KAMON leaves all the same.
@@ -1259,10 +1260,17 @@ function pushRivalGateFight(): void {
         recomputeSignpostFlags();
         scenes.pop(); // back to Violet — KAMON is gone, the exit is open
         autosaveNow();
+        // BOND BEAT FIRST, THEN the gate dialogue (Fix 1). This path used to
+        // pushMessage the gate line immediately, SWALLOWING the bond tier-up
+        // beat when the fight crossed a stage. The celebratory payoff must
+        // always fire on a crossing; KAMON's line follows it. (No crossing /
+        // a loss → showBondBeats short-circuits straight to the dialogue.)
         // CH1 ending — the gate exchange: branch-aware opener (off the resolve's
-        // own `winner`, the cleanest signal) → converged deflection + Concord
-        // stinger. KAMON's despawn (kamon_beaten) IS his "leaving north."
-        pushMessage(kamonGateLines(playerWon, resolvePlayerName(run.playerName)));
+        // own `winner`) → converged deflection + Concord stinger. KAMON's
+        // despawn (kamon_beaten) IS his "leaving north."
+        showBondBeats(bondCrossings, () =>
+          pushMessage(kamonGateLines(playerWon, resolvePlayerName(run.playerName))),
+        );
       },
     }),
   );

@@ -1036,11 +1036,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       return;
     }
     if (ev.kind === 'recover') {
-      // Lane B — RECOVER healed the caller. Raise the hp bar + name the amount.
+      // Lane B — RECOVER healed the caller. Raise the hp bar (the bar shows the
+      // amount visually). The text states NO number — RSE register, and ev.healed
+      // is a raw float (maxHp/hp are fractional; near-full it clamps to a long
+      // decimal). "recovers!" reads clean; the heal math is unchanged (Fix 2).
       display[ev.side].hp = Math.min(display[ev.side].maxHp, display[ev.side].hp + ev.healed);
       const who = ev.side === 'player' ? monDisplayName(display.player) : `Foe ${display.foe.species.name}`;
-      calloutLine = `${who} recovers — +${ev.healed} HP!`;
-      pushLog(`${who} recovers — +${ev.healed} HP!`);
+      calloutLine = `${who} recovers!`;
+      pushLog(`${who} recovers!`);
       return;
     }
     if (ev.kind === 'fullPower') {

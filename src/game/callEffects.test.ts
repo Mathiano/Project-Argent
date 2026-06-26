@@ -52,13 +52,18 @@ interface BuildOpts {
   readonly callBondValue?: number;
   readonly devUnlockAllCalls?: boolean;
   readonly momentum?: number;
+  readonly hp?: number;
 }
 function buildScene(opts: BuildOpts = {}): ReturnType<typeof createBattleScene> {
   let state = createBattleState(
     createTeam([createSide(CH1.GRUBLEAF!)]),
     createTeam([createSide(CH1.FLITPECK!)]),
   );
-  const patched: SideState = { ...activeMon(state.player), momentum: opts.momentum ?? 2 };
+  const patched: SideState = {
+    ...activeMon(state.player),
+    momentum: opts.momentum ?? 2,
+    ...(opts.hp !== undefined ? { hp: opts.hp } : {}),
+  };
   state = { ...state, player: setActiveMember(state.player, patched) };
   return createBattleScene({
     state,
@@ -149,6 +154,31 @@ describe('Full Power — the two-step flow (arm → attack menu → buffed strik
       scene.input?.('a');
     }
     expect(saw).toBe(true);
+  });
+});
+
+describe('Recover message (Fix 2) — no raw decimal', () => {
+  test('the Recover beat reads "[mon] recovers!" with no number', () => {
+    // Fractional HP so the heal CLAMPS — the old code rendered a long float
+    // (e.g. "+23.4999…99 HP"). The new message states no number at all.
+    const scene = buildScene({ devUnlockAllCalls: true, momentum: 1, hp: 35.0001 });
+    scene.update?.(0.01);
+    scene.input?.('down'); // CALL
+    scene.input?.('a'); // submenu (cursor on Catch Breath)
+    for (let i = 0; i < 3; i += 1) scene.input?.('down'); // → Recover (idx 3)
+    scene.input?.('a'); // Recover → shout
+    scene.input?.('a'); // advance shout → commit recover → resolve
+    const recoverLines: string[] = [];
+    for (let i = 0; i < 200; i += 1) {
+      scene.update?.(0.05);
+      const ctx = stubCtx();
+      scene.draw(ctx);
+      for (const t of ctx.texts) if (t.includes('recovers')) recoverLines.push(t);
+      scene.input?.('a');
+    }
+    expect(recoverLines.length).toBeGreaterThan(0); // the beat fired
+    // No digit anywhere in the recover line → no raw float, no integer either.
+    expect(recoverLines.every((t) => !/\d/.test(t))).toBe(true);
   });
 });
 
