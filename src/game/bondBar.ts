@@ -48,17 +48,20 @@ export function drawBondBar(
   }
   const barX = x + labelW;
   const barW = Math.max(8, w - labelW);
+  // 5px — a touch taller so the bevel reads (the HP/ST bars use 6; this slim
+  // under-panel strip is tighter, so the bond meter stays one short of them).
+  const barH = 5;
   ctx.fillStyle = PALETTE.barEmpty;
-  ctx.fillRect(barX, y + 1, barW, 4);
+  ctx.fillRect(barX, y + 1, barW, barH);
   const filled = Math.round(barW * frac);
   if (filled > 0) {
     ctx.fillStyle = PALETTE.bond;
-    ctx.fillRect(barX, y + 1, filled, 4);
-    bevelFilled(ctx, barX, y + 1, filled); // same code-drawn sheen as the HP/ST bars
+    ctx.fillRect(barX, y + 1, filled, barH);
+    bevelFilled(ctx, barX, y + 1, filled, barH); // same code-drawn sheen as the HP/ST bars
   }
   ctx.strokeStyle = PALETTE.ink;
   ctx.lineWidth = 1;
-  ctx.strokeRect(barX + 0.5, y + 1.5, barW - 1, 3);
+  ctx.strokeRect(barX + 0.5, y + 1.5, barW - 1, barH - 1);
 }
 
 // Label-column width — sized for the longest stage name (see drawBondBar).

@@ -39,6 +39,7 @@ import {
 import { emitGameEvent } from '../gameEvents';
 import { drawSpeciesInSlot } from '../sprites';
 import {
+  BAR_HEIGHT_TALL,
   STANCE_NAME,
   drawBar,
   drawMomentum,
@@ -1774,6 +1775,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       display.foe.hp,
       display.foe.maxHp,
       hpColor(display.foe.hp, display.foe.maxHp),
+      BAR_HEIGHT_TALL,
     );
     drawText(ctx, 'ST', FOE_PANEL.x + 8, FOE_PANEL.y + 26, PALETTE.paperShadow);
     drawBar(
@@ -1784,8 +1786,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       display.foe.st,
       100,
       PALETTE.stamina,
+      BAR_HEIGHT_TALL,
     );
-    drawWindedNotch(ctx, FOE_PANEL.x + 26, FOE_PANEL.y + 27, FOE_PANEL.w - 36);
+    drawWindedNotch(ctx, FOE_PANEL.x + 26, FOE_PANEL.y + 27, FOE_PANEL.w - 36, BAR_HEIGHT_TALL);
     // Bench indicators (S5): tucked just under the panel, 4×4 dots
     // tinted by status (active / alive / fainted). For 1-mon "teams"
     // nothing draws — the row stays empty and clean. Suppressed for a
@@ -1858,6 +1861,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       display.player.hp,
       display.player.maxHp,
       hpColor(display.player.hp, display.player.maxHp),
+      BAR_HEIGHT_TALL,
     );
     drawText(ctx, 'ST', PL_PANEL.x + 8, PL_PANEL.y + 26, PALETTE.paperShadow);
     drawBar(
@@ -1868,8 +1872,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       display.player.st,
       100,
       PALETTE.stamina,
+      BAR_HEIGHT_TALL,
     );
-    drawWindedNotch(ctx, PL_PANEL.x + 26, PL_PANEL.y + 27, PL_PANEL.w - 36);
+    drawWindedNotch(ctx, PL_PANEL.x + 26, PL_PANEL.y + 27, PL_PANEL.w - 36, BAR_HEIGHT_TALL);
     // Bench dots + the bond meter share the slim row under the panel — see
     // drawPlayerUnderPanel (bench relocated to the right so it clears the bar).
   }

@@ -11,22 +11,52 @@
 import { PALETTE } from './palette';
 import type { Stance } from './engine-types';
 
+// Default bar height. Menus pass this (compact rows); the BATTLE HUD passes a
+// taller bar (BAR_HEIGHT_TALL) so the bevel has room to read.
+export const BAR_HEIGHT = 4;
+export const BAR_HEIGHT_TALL = 6;
 // Code-drawn bar bevel — a 1px translucent sheen on top + 1px shade on the
 // bottom of a filled bar, so it reads rounded/lit without a gradient texture.
-const BAR_HEIGHT = 4;
-const BAR_HIGHLIGHT = 'rgba(255,255,255,0.30)';
-const BAR_SHADOW = 'rgba(0,0,0,0.22)';
+// Strengthened (was 0.30/0.22 — imperceptible at 320×180) so it actually reads.
+const BAR_HIGHLIGHT = 'rgba(255,255,255,0.45)';
+const BAR_SHADOW = 'rgba(0,0,0,0.40)';
 
-// Lay the bevel over an already-filled bar span [x, y]..(+w, +BAR_HEIGHT).
-// Shared by the value bars (drawBar) and the bond meter (bondBar.ts) so every
-// bar in the HUD reads consistently. No-op for an empty span.
-export function bevelFilled(ctx: CanvasRenderingContext2D, x: number, y: number, w: number): void {
+// Lay the bevel over an already-filled bar span [x, y]..(+w, +h). Shared by the
+// value bars (drawBar) and the bond meter (bondBar.ts) so every bar in the HUD
+// reads consistently. No-op for an empty span.
+export function bevelFilled(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number = BAR_HEIGHT,
+): void {
   if (w <= 0) return;
   ctx.fillStyle = BAR_HIGHLIGHT;
   ctx.fillRect(x, y, w, 1);
   ctx.fillStyle = BAR_SHADOW;
-  ctx.fillRect(x, y + BAR_HEIGHT - 1, w, 1);
+  ctx.fillRect(x, y + h - 1, w, 1);
 }
+
+// Pixel-perfect rounded-rect fill (no canvas path → no anti-aliasing). Cuts the
+// corner pixels by insetting each row near the top/bottom edges, giving a clean
+// `r`-px rounded corner. Used by drawPanel for the RSE box shape + its shadow.
+function fillRoundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): void {
+  for (let i = 0; i < h; i += 1) {
+    const dy = Math.min(i, h - 1 - i);
+    const inset = dy < r ? r - dy : 0;
+    ctx.fillRect(x + inset, y + i, w - 2 * inset, 1);
+  }
+}
+
+const PANEL_RADIUS = 3;
 
 export function drawPanel(
   ctx: CanvasRenderingContext2D,
@@ -35,22 +65,29 @@ export function drawPanel(
   w: number,
   h: number,
 ): void {
+  const r = PANEL_RADIUS;
+  // DROP SHADOW — two soft layers offset down-right so the panel FLOATS over the
+  // scene (the Emerald "game box" cue), code-drawn, no art. The body covers the
+  // top-left, leaving a soft 2–3px shadow on the bottom + right edges.
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  fillRoundRect(ctx, x + 3, y + 4, w, h, r);
+  ctx.fillStyle = 'rgba(0,0,0,0.30)';
+  fillRoundRect(ctx, x + 2, y + 2, w, h, r);
+  // ROUNDED BOX — a dark outer edge with rounded corners, the paper body inset
+  // 1px (→ a 1px rounded border), and a 1px lit-from-above highlight inside the
+  // top edge for depth.
+  ctx.fillStyle = PALETTE.ink;
+  fillRoundRect(ctx, x, y, w, h, r);
   ctx.fillStyle = PALETTE.paper;
-  ctx.fillRect(x, y, w, h);
-  // A defined dark OUTER edge + a softer (paperShadow) INSET line → a framed,
-  // beveled box, code-drawn (no frame art). The softer inset reads as a bevel
-  // rather than a hard double-black border.
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = PALETTE.ink;
-  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-  ctx.strokeStyle = PALETTE.paperShadow;
-  ctx.strokeRect(x + 2.5, y + 2.5, w - 5, h - 5);
+  fillRoundRect(ctx, x + 1, y + 1, w - 2, h - 2, r - 1);
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillRect(x + r, y + 1, w - 2 * r, 1);
 }
 
-// A subtle selection-row tint behind the cursor's menu row — code-drawn
-// hierarchy (no new solid colour, no art): a low-alpha paperShadow wash darkens
-// the focused row over the light panel so it reads as selected, reinforcing the
-// '>' marker. Drawn BEFORE the row text.
+// A selection-row tint behind the cursor's menu row — code-drawn hierarchy (no
+// new solid colour, no art): a paperShadow wash darkens the focused row over the
+// light panel so it reads as selected, reinforcing the '>' marker. Strengthened
+// (was 0.16 — imperceptible) so it actually reads. Drawn BEFORE the row text.
 export function drawRowHighlight(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -58,7 +95,7 @@ export function drawRowHighlight(
   w: number,
   h: number,
 ): void {
-  ctx.fillStyle = 'rgba(90,74,42,0.16)';
+  ctx.fillStyle = 'rgba(90,74,42,0.38)';
   ctx.fillRect(x, y, w, h);
 }
 
@@ -70,9 +107,10 @@ export function drawBar(
   value: number,
   max: number,
   color: string,
+  h: number = BAR_HEIGHT,
 ): void {
   ctx.fillStyle = PALETTE.barEmpty;
-  ctx.fillRect(x, y, w, BAR_HEIGHT);
+  ctx.fillRect(x, y, w, h);
   // Clamp to [0, w] so an upstream value > max (e.g. a stale display
   // pre-switch) can never overflow the bar past the panel border.
   // The real fix is keeping value + max in sync (see battle.ts display
@@ -85,10 +123,10 @@ export function drawBar(
   // always shows ≥1px; only true 0 (KO'd) renders empty.
   if (value > 0 && filled === 0) filled = 1;
   ctx.fillStyle = color;
-  ctx.fillRect(x, y, filled, BAR_HEIGHT);
-  bevelFilled(ctx, x, y, filled); // code-drawn sheen — no gradient texture
+  ctx.fillRect(x, y, filled, h);
+  bevelFilled(ctx, x, y, filled, h); // code-drawn sheen — no gradient texture
   ctx.strokeStyle = PALETTE.ink;
-  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, BAR_HEIGHT - 1);
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
 }
 
 // HP color-shift — RSE's signature: green high → amber mid → red low. Pure
@@ -108,10 +146,11 @@ export function drawWindedNotch(
   x: number,
   y: number,
   w: number,
+  barH: number = BAR_HEIGHT,
 ): void {
   const notchX = x + Math.round(w * 0.25);
   ctx.fillStyle = PALETTE.ink;
-  ctx.fillRect(notchX, y - 1, 1, 6);
+  ctx.fillRect(notchX, y - 1, 1, barH + 2);
 }
 
 export const STANCE_NAME: { readonly [k in Stance]: string } = {

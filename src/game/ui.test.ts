@@ -5,7 +5,7 @@
 // these pin the logic that backs it.
 
 import { describe, expect, test } from 'vitest';
-import { hpColor, drawBar, drawPanel, drawRowHighlight, bevelFilled } from './ui';
+import { hpColor, drawBar, drawPanel, drawRowHighlight, bevelFilled, BAR_HEIGHT, BAR_HEIGHT_TALL } from './ui';
 import { PALETTE } from './palette';
 import { drawBondBar, BOND_LABEL_W, MONO_CHAR_W } from './bondBar';
 import { BOND_STAGES } from './catching';
@@ -44,17 +44,25 @@ describe('hpColor — RSE value→colour shift (green → amber → red)', () =>
 });
 
 describe('styled primitives render without throwing (pixel-grid only)', () => {
-  test('drawPanel / drawBar (empty·partial·full) / row highlight / bevel are safe', () => {
+  test('rounded+shadowed panel / bars (compact + tall) / row highlight / bevel are safe', () => {
     const ctx = stubCtx();
     expect(() => {
-      drawPanel(ctx, 2, 2, 100, 40);
-      drawBar(ctx, 4, 4, 80, 30, 100, PALETTE.hpOk); // partial fill → bevel drawn
-      drawBar(ctx, 4, 12, 80, 0, 100, PALETTE.stamina); // empty → no bevel
-      drawBar(ctx, 4, 20, 80, 100, 100, PALETTE.hpOk); // full
+      drawPanel(ctx, 2, 2, 100, 40); // drop shadow + rounded corners
+      drawPanel(ctx, 0, 0, 320, 180); // full-screen edge case
+      drawPanel(ctx, 4, 4, 12, 10); // tiny panel (radius > half-height)
+      drawBar(ctx, 4, 4, 80, 30, 100, PALETTE.hpOk); // default (compact) height
+      drawBar(ctx, 4, 12, 80, 30, 100, PALETTE.hpOk, BAR_HEIGHT_TALL); // tall HUD bar
+      drawBar(ctx, 4, 20, 80, 0, 100, PALETTE.stamina); // empty → no bevel
       drawBar(ctx, 4, 28, 80, 1, 100, PALETTE.hpCrit); // ≥1px floor for a live mon
       drawRowHighlight(ctx, 2, 2, 100, 9);
+      bevelFilled(ctx, 4, 4, 12, BAR_HEIGHT_TALL);
       bevelFilled(ctx, 4, 4, 0); // empty span → no-op
     }).not.toThrow();
+  });
+
+  test('bar heights: compact 4px (menus) and tall 6px (battle HUD)', () => {
+    expect(BAR_HEIGHT).toBe(4);
+    expect(BAR_HEIGHT_TALL).toBe(6);
   });
 });
 
