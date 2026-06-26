@@ -140,12 +140,15 @@ describe('both FOCUS → the FLIPPED triangle (HIDE>HEAVY>FEINT>HIDE)', () => {
 });
 
 describe('Call escapes (F.5) from a committed release', () => {
-  test('GET AWAY = guaranteed no-hit vs an enemy release; spends 1 ★', () => {
+  test('GET AWAY now GRAZES vs an enemy release (25% chip, not a clean evade); spends 1 ★', () => {
+    // Fix 3 — Get Away no longer fully negates the hit: you jump away but the
+    // attack clips you for getAwayGraze× the damage. (The exact 25% + the
+    // Dodge-stays-clean contrast is pinned in src/engine/callEffects.test.ts.)
     let s = patchFoe(mirror(), { focus: focusState('A') }); // foe will release
     s = patchPlayer(s, { momentum: 2 });
     const r = resolveRound(s, { kind: 'call', call: 'getAway' }, release('heavy'), rng0());
     expect(r.events.some((e) => e.kind === 'call' && e.side === 'player' && e.call === 'getAway')).toBe(true);
-    expect(dmgToPlayer(s, r)).toBe(0);
+    expect(dmgToPlayer(s, r)).toBeGreaterThan(0); // a graze, no longer 0
     expect(pl(r.state).momentum).toBe(1);
   });
 

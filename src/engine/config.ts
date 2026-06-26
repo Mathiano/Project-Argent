@@ -71,6 +71,14 @@ export const COMBAT = {
   // would have done — including the counter-reflect it eats into a Guard).
   fullPowerMult: 1.5,
   fullPowerCost: 2,
+  // GET AWAY GRAZE (★1, Fix 3): Get Away no longer fully negates the hit — you
+  // jump away but the attack clips you for this fraction of its damage. Dodge
+  // (★1, bond stage 4) stays the clean 0-damage evade, so the cheaper/earlier
+  // Get Away is now the weaker escape (the intended progression). ⚠️ SIM-GATED:
+  // unlike recover/dodge/fullPower (sim-unused → bit-identical), getAway IS used
+  // by the call-greedy bond probe, so this knob MOVES the getAway cells — a
+  // deliberate nerf, re-baselined in bondLadder.test.ts.
+  getAwayGraze: 0.25,
 } as const;
 
 // ── Combat FOCUS model (docs/combat-focus-redesign.md) ─────────────────────

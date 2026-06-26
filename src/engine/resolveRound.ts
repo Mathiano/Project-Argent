@@ -95,11 +95,18 @@ function stripFocus(side: SideState): SideState {
   return rest;
 }
 
-// Apply damage to a defender respecting an active ★-Call: GET AWAY / DODGE =
-// no-hit (full evade); HANG IN THERE = floored at 1 hp. RECOVER does NOT negate
-// the hit (its heal is applied separately, before the strike) → normal damage.
+// Apply damage to a defender respecting an active ★-Call:
+//   DODGE       = clean full evade (no-hit) — the later, stronger escape.
+//   GET AWAY    = GRAZE: you jump away but the attack still clips you for
+//                 getAwayGraze× the incoming damage (Fix 3 — the earlier,
+//                 cheaper escape is now the weaker one, a real progression).
+//                 SIM-GATED: this is the one Call a sim bot uses, so it moves
+//                 the getAway-using ladder cells (intended nerf).
+//   HANG IN THERE = floored at 1 hp.  RECOVER does NOT negate the hit (its heal
+//                 is applied separately, before the strike) → normal damage.
 function applyHp(defHp: number, dmg: number, call: CallKind | null): number {
-  if (call === 'getAway' || call === 'dodge') return defHp;
+  if (call === 'dodge') return defHp;
+  if (call === 'getAway') return Math.max(0, defHp - dmg * COMBAT.getAwayGraze);
   const hp = defHp - dmg;
   if (call === 'hangInThere') return Math.max(1, hp);
   return Math.max(0, hp);

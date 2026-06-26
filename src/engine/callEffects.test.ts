@@ -30,6 +30,9 @@ const pl = (s: BattleState) => activeMon(s.player);
 const rng0 = () => fixedRng([0]);
 const single = (stance: 'A' | 'G' | 'F'): Action => ({ kind: 'move', move: 'TACKLE', stance });
 const call = (c: 'getAway' | 'dodge' | 'recover' | 'hangInThere'): Action => ({ kind: 'call', call: c });
+const focusState = (stance: 'A' | 'G' | 'F') => ({ stance, move: 'TACKLE' });
+const release: Action = { kind: 'release', release: 'heavy' };
+const dmgToPlayer = (s: BattleState, r: { state: BattleState }) => pl(s).hp - pl(r.state).hp;
 
 const playerStrike = (evs: readonly BattleEvent[]) =>
   evs.find((e) => e.kind === 'strike' && e.side === 'player') as
@@ -74,6 +77,25 @@ describe('DODGE (★1) — full evade', () => {
     expect(pl(r.state).hp).toBe(before); // took zero damage
     expect(pl(r.state).momentum).toBe(0);
     expect(r.events.some((e) => e.kind === 'call' && e.side === 'player' && e.call === 'dodge')).toBe(true);
+  });
+});
+
+describe('GET AWAY (★1, Fix 3) — graze: 25% of the hit, Dodge stays clean', () => {
+  test('Get Away takes exactly getAwayGraze× the hit; Dodge 0; Hang In There full', () => {
+    // Same foe RELEASE (heavy) into the caller, three escapes from one base
+    // state (each spends 1 ★). All three are CALLS → identical resolution path
+    // + identical rng draws, so the only difference is the damage applied:
+    //   Dodge        → 0 (clean evade)
+    //   Hang In There → the FULL release damage (no 1-hp floor at full HP)
+    //   Get Away      → getAwayGraze × that full damage (the graze).
+    const base = patchPlayer(patchFoe(mirror(), { focus: focusState('A') }), { momentum: 2 });
+    const dGet = dmgToPlayer(base, resolveRound(base, call('getAway'), release, rng0()));
+    const dDodge = dmgToPlayer(base, resolveRound(base, call('dodge'), release, rng0()));
+    const dHang = dmgToPlayer(base, resolveRound(base, call('hangInThere'), release, rng0()));
+    expect(dDodge).toBe(0);
+    expect(dGet).toBeGreaterThan(0); // no longer a clean evade
+    expect(dHang).toBeGreaterThan(dGet); // the graze is much smaller than a full hit
+    expect(dGet).toBeCloseTo(dHang * COMBAT.getAwayGraze, 5); // exactly 25%
   });
 });
 
