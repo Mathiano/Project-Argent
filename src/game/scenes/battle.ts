@@ -43,6 +43,7 @@ import {
   drawBar,
   drawMomentum,
   drawPanel,
+  drawRowHighlight,
   drawStanceBadge,
   drawText,
   drawTextRight,
@@ -2032,14 +2033,15 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // canRun is false). FIGHT always lit.
       let dim = !it.enabled;
       if (it.kind === 'call' && (!opts.catchBreathUnlocked || me.momentum < 1)) dim = true;
+      // 5 rows (FIGHT/PKMN/BALL/CALL/RUN) at 8px pitch fit the 46px panel
+      // (last row at y≈169, +8px text < 180 screen edge).
+      const rowY = BOTTOM.y + 5 + i * 8;
+      if (menuCursor === i) drawRowHighlight(ctx, BOTTOM.x + 6, rowY - 1, 108, 9);
       drawText(
         ctx,
         `${menuCursor === i ? '>' : ' '} ${labels[it.kind]}`,
         BOTTOM.x + 10,
-        // 5 rows (FIGHT/PKMN/BALL/CALL/RUN) at 8px pitch fit the 46px
-        // panel (last row at y≈169, +8px text < 180 screen edge). The old
-        // 10px pitch pushed RUN to y180, clipping it off-screen.
-        BOTTOM.y + 5 + i * 8,
+        rowY,
         dim ? PALETTE.paperDim : PALETTE.ink,
       );
     });
@@ -2099,6 +2101,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         activeMon(state.player).st < tier.cost;
       const color = locked ? PALETTE.paperDim : PALETTE.ink;
       const y = BOTTOM.y + 6 + (i - moveScroll) * 8;
+      if (moveCursor === i) drawRowHighlight(ctx, BOTTOM.x + 6, y - 1, 158, 9);
       drawText(ctx, `${moveCursor === i ? '>' : ' '}${m}`, BOTTOM.x + 8, y, color);
       drawTextRight(ctx, `ST${tier.cost}`, BOTTOM.x + 150, y, color);
     }
@@ -2181,6 +2184,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const row = i % 3;
       const x = BOTTOM.x + 8 + col * 154;
       const y = BOTTOM.y + 5 + row * 10;
+      if (callCursor === i) drawRowHighlight(ctx, x - 2, y - 1, 152, 9);
       const marker = callCursor === i ? '>' : ' ';
       const tag = !unlocked ? ' ·LOCKED' : '';
       drawText(ctx, `${marker}${call.name}${tag}`, x, y, color);

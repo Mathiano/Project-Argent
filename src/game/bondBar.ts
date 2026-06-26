@@ -9,7 +9,7 @@
 // docs/bond-legibility-design.md.
 
 import { PALETTE } from './palette';
-import { drawText } from './ui';
+import { drawText, bevelFilled } from './ui';
 import { stageProgress } from './bond';
 import { bondStageName } from './catching';
 
@@ -38,9 +38,11 @@ export function drawBondBar(
   opts: BondBarOpts = {},
 ): void {
   const frac = Math.max(0, Math.min(1, opts.progress ?? stageProgress(bondValue)));
-  // The label column is wide enough for the longest stage name
-  // ("Partners in Kind"); the fill bar takes the rest of the row.
-  const labelW = opts.hideLabel ? 0 : 96;
+  // The label column holds the longest stage name + the ♥ glyph: "♥ Partners
+  // in Kind" = 18 chars × ~4.8px ≈ 86px, so a 96px column never overflows into
+  // the bar (the long-text fit flagged in the Lane-A pass). The fill bar takes
+  // the rest of the row.
+  const labelW = opts.hideLabel ? 0 : BOND_LABEL_W;
   if (!opts.hideLabel) {
     drawText(ctx, `${BOND_GLYPH} ${bondStageName(bondValue)}`, x, y, PALETTE.bond);
   }
@@ -52,8 +54,16 @@ export function drawBondBar(
   if (filled > 0) {
     ctx.fillStyle = PALETTE.bond;
     ctx.fillRect(barX, y + 1, filled, 4);
+    bevelFilled(ctx, barX, y + 1, filled); // same code-drawn sheen as the HP/ST bars
   }
   ctx.strokeStyle = PALETTE.ink;
   ctx.lineWidth = 1;
   ctx.strokeRect(barX + 0.5, y + 1.5, barW - 1, 3);
 }
+
+// Label-column width — sized for the longest stage name (see drawBondBar).
+// Exported so a test can pin the long-name fit against the real stage table.
+export const BOND_LABEL_W = 96;
+// 8px-monospace advance width (canvas reports ~0.6em). The longest label must
+// fit BOND_LABEL_W with margin — asserted in the UI test.
+export const MONO_CHAR_W = 4.8;
