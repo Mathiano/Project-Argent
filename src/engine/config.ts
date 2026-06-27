@@ -51,7 +51,14 @@ export const COMBAT = {
   // percentage so it scales with the full bar. Was +35 flat — a weak
   // trickle that caused catch-breath stalemates.
   catchBreathRestorePct: 0.5,
-  momentumCap: 2,
+  // ★ momentum cap (sim-gated, 2→3 on 2026-06-27). The Call-economy throttle:
+  // the most ★ a mon can bank. At 3, a mon can hold a 3rd charge → afford Full
+  // Power (★2) with a charge to spare, or bank toward a future spend. The
+  // 3-slot triangle meter (drawMomentum) now fills fully. SIM NOTE: every sim
+  // bot gates its ★-spend on momentum ≥ 1 (call-greedy/stamina-reader Catch
+  // Breath, reader Get Away) — none requires ≥2 or banks to the cap — so the
+  // raise is behaviourally inert for the ladders (player-facing economy change).
+  momentumCap: 3,
   staggerInitMult: 0.5,
   restInitiative: -1,
 

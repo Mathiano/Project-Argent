@@ -381,7 +381,7 @@ describe('momentum charging on each read-win', () => {
     expect(fo(result.state).momentum).toBe(0); // NOT the Fluid dodger
   });
 
-  test('momentum caps at 2', () => {
+  test('momentum caps at the momentum cap (a read-win at the cap is inert)', () => {
     const state = patchPlayer(makeState(), { momentum: COMBAT.momentumCap });
     const result = resolveRound(
       state,
