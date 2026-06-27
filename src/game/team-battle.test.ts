@@ -416,9 +416,11 @@ describe('legibility — ★/Call economy reads (bond-feel-polish #1-3)', () => 
     const ctx = stubCtx();
     scene.draw(ctx);
     const screen = ctx.texts.join('|');
-    expect(screen).toContain('CALL — needs ★'); // why it's unavailable, inline
-    expect(screen).toContain('win a read to charge ★'); // the 0-★ micro-hint
-    expect(screen.includes('MOM')).toBe(true); // the ★ pips are labelled
+    // ★ is drawn small + separate by the symbol pass, so assert the words (the
+    // trailing ★ glyph is a distinct run now).
+    expect(screen).toContain('CALL — needs'); // why it's unavailable, inline
+    expect(screen).toContain('win a read to charge'); // the 0-★ micro-hint
+    expect(screen.includes('MOMENTUM')).toBe(true); // the ★ pips are labelled
   });
 
   test('CALL row reads "locked" when Calls are not yet unlocked', () => {

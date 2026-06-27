@@ -38,6 +38,7 @@ import ch1BatchData from '../../docs/ch1-batch.json';
 import movesData from '../../docs/moves.json';
 import typechartData from '../../docs/typechart.json';
 import { mountCanvas } from './canvas';
+import { loadUiFont } from './font';
 import { createInputDispatcher } from './input';
 import { SceneStack } from './scene';
 import { createBattleScene, infoLevelToReliability } from './scenes/battle';
@@ -2260,4 +2261,9 @@ function frame(now: number): void {
   scenes.draw(ctx);
   requestAnimationFrame(frame);
 }
+// Press Start 2P is banked (vendored, OFL) but NOT in use — UI_FONT is monospace
+// (see ui.ts). Preload it fire-and-forget so re-enabling stays a ONE-LINE UI_FONT
+// flip; non-blocking, so the loop starts immediately (no startup delay for a font
+// we aren't rendering).
+void loadUiFont();
 requestAnimationFrame(frame);

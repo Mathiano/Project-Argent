@@ -5,9 +5,9 @@
 // these pin the logic that backs it.
 
 import { describe, expect, test } from 'vitest';
-import { hpColor, drawBar, drawPanel, drawRowHighlight, bevelFilled, BAR_HEIGHT, BAR_HEIGHT_TALL } from './ui';
+import { hpColor, drawBar, drawPanel, drawRowHighlight, bevelFilled, drawText, drawTextCenter, measureUiText, BAR_HEIGHT, BAR_HEIGHT_TALL, UI_FONT, UI_FONT_PX } from './ui';
 import { PALETTE } from './palette';
-import { drawBondBar, BOND_LABEL_W, MONO_CHAR_W } from './bondBar';
+import { drawBondBar } from './bondBar';
 import { BOND_STAGES } from './catching';
 
 function stubCtx(): CanvasRenderingContext2D & { texts: string[] } {
@@ -66,15 +66,42 @@ describe('styled primitives render without throwing (pixel-grid only)', () => {
   });
 });
 
-describe('bond meter — the longest stage name fits its label column', () => {
-  const longest = BOND_STAGES.reduce((a, b) => (b.name.length > a.length ? b.name : a), '');
-
-  test(`"♥ ${longest}" fits BOND_LABEL_W with margin (no overflow into the bar)`, () => {
-    const label = `♥ ${longest}`; // glyph + space + name
-    expect(label.length * MONO_CHAR_W).toBeLessThan(BOND_LABEL_W);
+describe('text pass — m3x6 proportional font, shadow off, small inline symbols', () => {
+  test('UI_FONT is the m3x6 stack at its crisp 16px (monospace fallback)', () => {
+    expect(UI_FONT).toContain('m3x6');
+    expect(UI_FONT).toContain('monospace'); // fallback for glyphs m3x6 lacks
+    expect(UI_FONT_PX).toBe(16); // the only crisp size (64 units/px)
   });
 
-  test('drawBondBar renders the longest stage name in full (not truncated)', () => {
+  test('plain text renders ONCE (shadow off; no symbol split)', () => {
+    const ctx = stubCtx();
+    drawText(ctx, 'HELLO', 10, 10, PALETTE.hpOk);
+    expect(ctx.texts.filter((t) => t === 'HELLO').length).toBe(1);
+  });
+
+  test('a string with a ★ is split into runs (symbol rendered separately, small)', () => {
+    const ctx = stubCtx();
+    drawText(ctx, 'CALL ★2', 10, 10, PALETTE.ink);
+    // The ★ is its own run (rendered in the small symbol font), and the text
+    // runs are separate — so the symbol can be sized independently of m3x6.
+    expect(ctx.texts).toContain('★');
+    expect(ctx.texts.some((t) => t.includes('CALL'))).toBe(true);
+    expect(ctx.texts).not.toContain('CALL ★2'); // not drawn as one oversized run
+  });
+
+  test('the combat callout helpers: drawTextCenter centers + splits symbols; measureUiText > 0', () => {
+    const ctx = stubCtx();
+    drawTextCenter(ctx, 'CLASH! (+★ you!)', 160, 60, PALETTE.ink); // a read-war callout w/ ★
+    expect(ctx.texts).toContain('★'); // the ★ is a small separate run, not one oversized string
+    expect(ctx.texts.some((t) => t.includes('CLASH'))).toBe(true);
+    expect(measureUiText(ctx, 'COUNTER! GUARD turns it back')).toBeGreaterThan(0);
+  });
+});
+
+describe('bond meter — the stage name is measured + drawn in full', () => {
+  const longest = BOND_STAGES.reduce((a, b) => (b.name.length > a.length ? b.name : a), '');
+
+  test('drawBondBar renders the longest stage name in full (measured, not truncated)', () => {
     const stage = BOND_STAGES.find((s) => s.name === longest)!;
     const ctx = stubCtx();
     drawBondBar(ctx, 0, 0, 200, stage.max); // a value inside the longest-named stage

@@ -9,13 +9,9 @@
 // docs/bond-legibility-design.md.
 
 import { PALETTE } from './palette';
-import { drawText, bevelFilled } from './ui';
+import { drawText, bevelFilled, UI_FONT } from './ui';
 import { stageProgress } from './bond';
 import { bondStageName } from './catching';
-
-// A warm heart glyph marks the meter as the bond/relationship axis (diegetic,
-// not a combat resource). Monospace-safe single char.
-const BOND_GLYPH = '♥'; // ♥
 
 export interface BondBarOpts {
   // Override the fill fraction (0..1) — the in-combat bar passes an
@@ -23,12 +19,12 @@ export interface BondBarOpts {
   // the STAGE NAME stays put (a tier-cross is the post-fight beat's job, not a
   // mid-fill snap). Omitted → derived from the bond value via stageProgress.
   readonly progress?: number;
-  // Hide the ♥ + stage label (the tier-up beat draws its own headline).
+  // Hide the stage label (the tier-up beat draws its own headline).
   readonly hideLabel?: boolean;
 }
 
-// Draw the bond meter into [x, y] within width `w`: "♥ <Stage>" on the left,
-// a thin fill bar on the right. One 8px row; designed to sit in a slim strip.
+// Draw the bond meter into [x, y] within width `w`: the stage name on the left,
+// a thin fill bar on the right. Designed to sit in a slim strip.
 export function drawBondBar(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -38,13 +34,16 @@ export function drawBondBar(
   opts: BondBarOpts = {},
 ): void {
   const frac = Math.max(0, Math.min(1, opts.progress ?? stageProgress(bondValue)));
-  // The label column holds the longest stage name + the ♥ glyph: "♥ Partners
-  // in Kind" = 18 chars × ~4.8px ≈ 86px, so a 96px column never overflows into
-  // the bar (the long-text fit flagged in the Lane-A pass). The fill bar takes
-  // the rest of the row.
-  const labelW = opts.hideLabel ? 0 : BOND_LABEL_W;
+  // Text pass: m5x7 is PROPORTIONAL (no fixed char width) AND lacks ♥, so the
+  // old "♥ <name> in a fixed 96px column" no longer holds. MEASURE the stage
+  // name and place the bar right after it (with a small gap). The bond COLOUR
+  // signals the relationship axis now that the ♥ glyph is gone.
+  let labelW = 0;
   if (!opts.hideLabel) {
-    drawText(ctx, `${BOND_GLYPH} ${bondStageName(bondValue)}`, x, y, PALETTE.bond);
+    const label = bondStageName(bondValue);
+    drawText(ctx, label, x, y, PALETTE.bond);
+    ctx.font = UI_FONT;
+    labelW = Math.ceil(ctx.measureText(label).width) + 6;
   }
   const barX = x + labelW;
   const barW = Math.max(8, w - labelW);
@@ -63,10 +62,3 @@ export function drawBondBar(
   ctx.lineWidth = 1;
   ctx.strokeRect(barX + 0.5, y + 1.5, barW - 1, barH - 1);
 }
-
-// Label-column width — sized for the longest stage name (see drawBondBar).
-// Exported so a test can pin the long-name fit against the real stage table.
-export const BOND_LABEL_W = 96;
-// 8px-monospace advance width (canvas reports ~0.6em). The longest label must
-// fit BOND_LABEL_W with margin — asserted in the UI test.
-export const MONO_CHAR_W = 4.8;

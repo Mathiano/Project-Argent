@@ -19,6 +19,7 @@ function stubCtx(): CanvasRenderingContext2D & { texts: string[] } {
         if (p === 'texts') return (t as { texts: string[] }).texts;
         if (p === 'fillStyle') return fill;
         if (p === 'fillText') return (s: string) => texts.push(String(s));
+        if (p === 'measureText') return () => ({ width: 10 });
         if (p === 'canvas') return { width: 320, height: 180 };
         return noop;
       },

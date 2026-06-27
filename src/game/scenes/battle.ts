@@ -41,15 +41,18 @@ import { drawSpeciesInSlot } from '../sprites';
 import {
   BAR_HEIGHT_TALL,
   STANCE_NAME,
+  UI_FONT,
   drawBar,
   drawMomentum,
   drawPanel,
   drawRowHighlight,
   drawStanceBadge,
   drawText,
+  drawTextCenter,
   drawTextRight,
   drawWindedNotch,
   hpColor,
+  measureUiText,
 } from '../ui';
 
 // Battle-text stream speed (chars/sec). Tuned readable, ~modern-Pokémon feel
@@ -1755,7 +1758,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function drawFoePanel(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, FOE_PANEL.x, FOE_PANEL.y, FOE_PANEL.w, FOE_PANEL.h);
-    drawText(ctx, display.foe.species.name, FOE_PANEL.x + 8, FOE_PANEL.y + 6);
+    // Mon name in a deep, confident slate blue (locked palette) so it pops as a
+    // header, like the coloured HP/ST labels.
+    drawText(ctx, display.foe.species.name, FOE_PANEL.x + 8, FOE_PANEL.y + 6, PALETTE.stanceG);
     if (display.foe.focusing) drawText(ctx, 'FOCUS', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
     else if (display.foe.dazed) drawText(ctx, 'DAZE', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpCrit);
     else if (display.foe.staggered) drawText(ctx, 'STAG', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
@@ -1766,7 +1771,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // Break meter moved to the dedicated boss strip below the panel
     // (BUG 3 — the in-panel pips were too small to notice).
 
-    drawText(ctx, 'HP', FOE_PANEL.x + 8, FOE_PANEL.y + 18, PALETTE.paperShadow);
+    drawText(ctx, 'HP', FOE_PANEL.x + 8, FOE_PANEL.y + 18, PALETTE.hpOk);
     drawBar(
       ctx,
       FOE_PANEL.x + 26,
@@ -1777,7 +1782,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       hpColor(display.foe.hp, display.foe.maxHp),
       BAR_HEIGHT_TALL,
     );
-    drawText(ctx, 'ST', FOE_PANEL.x + 8, FOE_PANEL.y + 26, PALETTE.paperShadow);
+    drawText(ctx, 'ST', FOE_PANEL.x + 8, FOE_PANEL.y + 26, PALETTE.stamina);
     drawBar(
       ctx,
       FOE_PANEL.x + 26,
@@ -1841,7 +1846,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function drawPlayerPanel(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, PL_PANEL.x, PL_PANEL.y, PL_PANEL.w, PL_PANEL.h);
-    drawText(ctx, monDisplayName(display.player), PL_PANEL.x + 8, PL_PANEL.y + 6);
+    drawText(ctx, monDisplayName(display.player), PL_PANEL.x + 8, PL_PANEL.y + 6, PALETTE.stanceG);
     if (display.player.focusing) drawText(ctx, 'FOCUS', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
     else if (display.player.dazed) drawText(ctx, 'DAZE', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpCrit);
     else if (display.player.staggered) drawText(ctx, 'STAG', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
@@ -1849,10 +1854,12 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // Label YOUR ★ pips clearly (playtest-polish-3 — "MOM" was too terse): the
     // player should immediately read this as their momentum meter. (The foe's
     // is hidden; only yours is shown.) Skipped while EXH occupies the row.
-    else drawText(ctx, 'MOMENTUM', PL_PANEL.x + 100, PL_PANEL.y + 6, PALETTE.paperShadow);
+    // The ★ meter HEADER — deep slate blue (matching the mon names), a confident
+    // header colour; the gold ★ pips beside it carry the value.
+    else drawText(ctx, 'MOMENTUM', PL_PANEL.x + 100, PL_PANEL.y + 6, PALETTE.stanceG);
     drawMomentum(ctx, PL_PANEL.x + 152, PL_PANEL.y + 6, display.player.momentum, COMBAT.momentumCap);
 
-    drawText(ctx, 'HP', PL_PANEL.x + 8, PL_PANEL.y + 18, PALETTE.paperShadow);
+    drawText(ctx, 'HP', PL_PANEL.x + 8, PL_PANEL.y + 18, PALETTE.hpOk);
     drawBar(
       ctx,
       PL_PANEL.x + 26,
@@ -1863,7 +1870,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       hpColor(display.player.hp, display.player.maxHp),
       BAR_HEIGHT_TALL,
     );
-    drawText(ctx, 'ST', PL_PANEL.x + 8, PL_PANEL.y + 26, PALETTE.paperShadow);
+    drawText(ctx, 'ST', PL_PANEL.x + 8, PL_PANEL.y + 26, PALETTE.stamina);
     drawBar(
       ctx,
       PL_PANEL.x + 26,
@@ -1960,11 +1967,16 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function drawIntent(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = 'rgba(32,32,44,0.92)';
     ctx.fillRect(INTENT.x, INTENT.y, INTENT.w, INTENT.h);
-    drawText(ctx, 'FOE INTENT:', INTENT.x + 4, INTENT.y + 2, PALETTE.paper);
+    const intentLabelX = INTENT.x + 4;
+    drawText(ctx, 'FOE INTENT:', intentLabelX, INTENT.y + 2, PALETTE.hpWarn);
     // Plain-language intent (honest, precision degraded per the reliability
     // ramp). A null line = OPAQUE: show a blank dash, no read. The SPD readout
     // below stays honest — speed isn't hidden, the foe's STANCE intent is.
-    drawText(ctx, shownIntent.line ?? '———', INTENT.x + 60, INTENT.y + 2, PALETTE.paper);
+    // Text pass: place the value AFTER the MEASURED label width (+ gap) so the
+    // proportional font can't collide label and value (the old fixed x+60 did).
+    ctx.font = UI_FONT;
+    const intentValueX = Math.round(intentLabelX + ctx.measureText('FOE INTENT:').width + 6);
+    drawText(ctx, shownIntent.line ?? '———', intentValueX, INTENT.y + 2, PALETTE.paper);
     // Base-SPEED relationship: the dodge lever + the initiative NUMERATOR.
     // It is NOT the turn-order verdict — order = speed ÷ move weight, with
     // the Fluid override, shown move-by-move as "NEXT:" in the move menu.
@@ -1988,21 +2000,23 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // bar's slot is free then), naming the rule behind what just happened.
   function drawCallout(ctx: CanvasRenderingContext2D): void {
     if (!calloutLine) return;
-    const w = 300;
     const h = 14;
-    const x = (LOGICAL_W - w) / 2;
     const y = INTENT.y;
+    // Text pass re-fit (m3x6): SIZE the banner to the now-proportional text via
+    // measureUiText (+ padding, capped to the screen), CENTER it, and draw with
+    // drawTextCenter (applies the UI vertical offset + renders the inline ★ from
+    // starTag small). Was a fixed 300px box + raw center fillText → off after the
+    // font swap (text sat low, the box was too wide, the ★ towered).
+    const cx = LOGICAL_W / 2;
+    const textW = measureUiText(ctx, calloutLine);
+    const w = Math.min(LOGICAL_W - 8, Math.ceil(textW) + 16);
+    const x = Math.round(cx - w / 2);
     ctx.fillStyle = 'rgba(255, 215, 90, 0.94)';
     ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = PALETTE.ink;
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-    ctx.font = '8px monospace';
-    ctx.textBaseline = 'top';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = PALETTE.ink;
-    ctx.fillText(calloutLine, LOGICAL_W / 2, y + 3);
-    ctx.textAlign = 'start';
+    drawTextCenter(ctx, calloutLine, cx, y + 4, PALETTE.ink);
   }
 
   function drawBottomDialog(ctx: CanvasRenderingContext2D, lines: readonly string[]): void {
@@ -2351,11 +2365,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
           const pulse = 0.7 + 0.3 * Math.sin(tick * 6);
           ctx.fillStyle = `rgba(70,150,230,${pulse})`;
           ctx.fillRect(0, 14, LOGICAL_W, 12);
-          drawText(ctx, '≋ GUST ROUND — heavies cost +ST, gale bites harder ≋', 16, 16, PALETTE.paper);
+          drawText(ctx, '~~ GUST ROUND — heavies cost +ST, gale bites harder ~~', 16, 16, PALETTE.paper);
         } else if (nextIsGust && (phase === 'menu' || phase === 'move')) {
           ctx.fillStyle = 'rgba(80,140,210,0.7)';
           ctx.fillRect(0, 14, LOGICAL_W, 12);
-          drawText(ctx, '~~ the wind is rising… GUST next round ~~', 40, 16, PALETTE.paper);
+          drawText(ctx, '~~ the wind is rising... GUST next round ~~', 40, 16, PALETTE.paper);
         }
       }
 

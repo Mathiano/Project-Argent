@@ -627,7 +627,7 @@ describe('battle menu — CALL paths (Call-menu sprint: submenu + shout + exit)'
     expect(screen).toContain('Catch Breath');
     expect(screen).toContain('Recover');
     expect(screen).toContain('Dodge');
-    expect(screen).toContain('★1');
+    expect(screen).toContain('★'); // ★ cost shows (drawn small + separate from the digit by the symbol pass)
     // It did NOT instant-fire (no resolve log line like "catch your breath").
     expect(screen).not.toContain('catch your breath');
   });
@@ -677,7 +677,7 @@ describe('battle menu — CALL paths (Call-menu sprint: submenu + shout + exit)'
     const ctx = stubCtx();
     scene.draw(ctx);
     const screen = ctx.texts.join('|');
-    expect(screen).toContain('Not enough ★');
+    expect(screen).toContain('Not enough'); // ★ is drawn separately (symbol pass)
     expect(screen).not.toContain('catch your breath');
 
     // Dismiss → back in the submenu (not committed).
@@ -986,7 +986,7 @@ describe('momentum visibility (playtest-polish-3)', () => {
     const ctx = stubCtx();
     scene.draw(ctx); // at the battle menu — panels visible
     const screen = ctx.texts.join('|');
-    // Your meter is clearly labelled (not the terse "MOM").
+    // Your meter is clearly labelled (the full word, gold).
     expect(screen).toContain('MOMENTUM');
     // Only the PLAYER's ★ pips render (cap = 2) — the foe's are hidden, so the
     // total ★ pip count is 2, not 4.
@@ -1101,7 +1101,8 @@ describe('resolve cadence + stance labels — legibility pass', () => {
     // The submenu reads the LIVE engine ★ (the resource Calls spend), so this
     // proves the read-win actually banked usable ★, not just fired a callout.
     // ★1 ≥ Catch Breath's cost (1) → the Call is now usable.
-    expect(ctx.texts.join('|')).toContain('Your ★1');
+    expect(ctx.texts.join('|')).toContain('Your'); // "Your ★1" — ★ drawn separately now
+    expect(ctx.texts).toContain('★');
   });
 
   test('stance label on opening: "FLUID slips past GUARD" when F attacks G', () => {
@@ -1238,13 +1239,13 @@ describe('B-on-dialog: dismissable backs out; forced is a no-op', () => {
     scene.input?.('a'); // A on the unaffordable Catch Breath → toast
     let ctx = stubCtx();
     scene.draw(ctx);
-    expect(ctx.texts.join('|')).toContain('Not enough ★');
+    expect(ctx.texts.join('|')).toContain('Not enough'); // ★ drawn separately (symbol pass)
 
     scene.input?.('b'); // dismiss → back to the submenu (its prior phase)
     ctx = stubCtx();
     scene.draw(ctx);
     expect(ctx.texts.join('|')).toContain('Catch Breath');
-    expect(ctx.texts.join('|')).not.toContain('Not enough ★');
+    expect(ctx.texts.join('|')).not.toContain('Not enough');
   });
 });
 
