@@ -1,223 +1,171 @@
 {
   "name": "argent-master",
-  "note": "Canonical palette seeded from violet-batch-01 (foundation). Per-tile colour budget is <=16 (RSE/GBA ceiling — docs/visual-ceiling-rse-2d.md); this master is the CROSS-tileset ceiling, grown additively toward ~48-64. Tileset rows encode single-char keys; the alphabet is 0-9a-zA-Z (62) so the master can reach ~64 without renumbering existing indices (decoder src/game/overworld/tileset.ts PALETTE_KEYS matches). The original 30 indices (0-9a-t) are UNCHANGED. History: extended 21->29 for the SoulSilver-grade terrain masters (2026-06-21); +1 (29->30) exact HC grass base green #68b549 (2026-06-21); +24 (30->54) curated overworld-POC ramps — grass/foliage/path/water/roof/stone/accent at indices 30-53 (keys u-z then A-R), no exact-RGB dedup against the existing 30 (2026-06-22).",
-  "size": 54,
+  "note": "Re-seeded FROM the Pocket Creature Tamer pack environment set (the chosen shipping art direction) — supersedes the old 54-colour violet-batch-01 POC seed (docs/palette-reseed-decision.md, 2026-06-27). Census of 34 env sheets = 84 raw opaque colours, inflated by alpha-export jitter; de-jittered (greedy freq-first, euclidean T=6; 41 stable across T=4..8) to 41 canonical design colours, ordered by pixel frequency (design-load-bearing first). Reps are exact pack hexes (no averaging). Per-tile budget <=16 (RSE/GBA ceiling, docs/visual-ceiling-rse-2d.md); this master is the CROSS-tileset ceiling. Keys 0-9a-zA-Z (62 cap); 41 fits single-char, NO ceiling raise. UI/HUD palette (src/game/palette.ts) is decoupled and untouched. Regenerate: tools/pct_palette_ingest.mjs.",
+  "size": 41,
   "colors": [
     {
       "key": "0",
-      "hex": "#092626"
+      "hex": "#f0e4e1"
     },
     {
       "key": "1",
-      "hex": "#202525"
+      "hex": "#1c1c1f"
     },
     {
       "key": "2",
-      "hex": "#1d402a"
+      "hex": "#aad9a5"
     },
     {
       "key": "3",
-      "hex": "#283751"
+      "hex": "#b58d79"
     },
     {
       "key": "4",
-      "hex": "#2e5831"
+      "hex": "#8c6253"
     },
     {
       "key": "5",
-      "hex": "#134182"
+      "hex": "#f0ecc7"
     },
     {
       "key": "6",
-      "hex": "#402a25"
+      "hex": "#c3ccdb"
     },
     {
       "key": "7",
-      "hex": "#3d343a"
+      "hex": "#d9c5a5"
     },
     {
       "key": "8",
-      "hex": "#3d5937"
+      "hex": "#99a3c2"
     },
     {
       "key": "9",
-      "hex": "#514434"
+      "hex": "#6eb88f"
     },
     {
       "key": "a",
-      "hex": "#825437"
+      "hex": "#c78189"
     },
     {
       "key": "b",
-      "hex": "#945d38"
+      "hex": "#a8b3ad"
     },
     {
       "key": "c",
-      "hex": "#406a31"
+      "hex": "#d6c2bf"
     },
     {
       "key": "d",
-      "hex": "#557c23"
+      "hex": "#9e555e"
     },
     {
       "key": "e",
-      "hex": "#a1683a"
+      "hex": "#dba9a2"
     },
     {
       "key": "f",
-      "hex": "#648054"
+      "hex": "#c1d6cc"
     },
     {
       "key": "g",
-      "hex": "#718a63"
+      "hex": "#dce3cc"
     },
     {
       "key": "h",
-      "hex": "#98784a"
+      "hex": "#573539"
     },
     {
       "key": "i",
-      "hex": "#8f9c75"
+      "hex": "#72709e"
     },
     {
       "key": "j",
-      "hex": "#ac743f"
+      "hex": "#c4bd93"
     },
     {
       "key": "k",
-      "hex": "#a9af8b"
+      "hex": "#7c8e8f"
     },
     {
       "key": "l",
-      "hex": "#82b969"
+      "hex": "#637178"
     },
     {
       "key": "m",
-      "hex": "#85c069"
+      "hex": "#2e1e29"
     },
     {
       "key": "n",
-      "hex": "#86c16a"
+      "hex": "#c299a4"
     },
     {
       "key": "o",
-      "hex": "#86be69"
+      "hex": "#a18a64"
     },
     {
       "key": "p",
-      "hex": "#889563"
+      "hex": "#2f3c4d"
     },
     {
       "key": "q",
-      "hex": "#bca06e"
+      "hex": "#4d6378"
     },
     {
       "key": "r",
-      "hex": "#cea773"
+      "hex": "#9c7090"
     },
     {
       "key": "s",
-      "hex": "#d5af7b"
+      "hex": "#4e5e69"
     },
     {
       "key": "t",
-      "hex": "#68b549"
+      "hex": "#70384c"
     },
     {
       "key": "u",
-      "hex": "#4c744f"
+      "hex": "#5c5078"
     },
     {
       "key": "v",
-      "hex": "#6ba24f"
+      "hex": "#37585c"
     },
     {
       "key": "w",
-      "hex": "#7ebc65"
+      "hex": "#458575"
     },
     {
       "key": "x",
-      "hex": "#83c16d"
+      "hex": "#7a5d45"
     },
     {
       "key": "y",
-      "hex": "#c7e1c1"
+      "hex": "#a2bdba"
     },
     {
       "key": "z",
-      "hex": "#11241a"
+      "hex": "#452a34"
     },
     {
       "key": "A",
-      "hex": "#193828"
+      "hex": "#232636"
     },
     {
       "key": "B",
-      "hex": "#245131"
+      "hex": "#50395c"
     },
     {
       "key": "C",
-      "hex": "#3e7038"
+      "hex": "#6d4f73"
     },
     {
       "key": "D",
-      "hex": "#4e8257"
+      "hex": "#72939e"
     },
     {
       "key": "E",
-      "hex": "#5e5948"
-    },
-    {
-      "key": "F",
-      "hex": "#8a5a48"
-    },
-    {
-      "key": "G",
-      "hex": "#c7a374"
-    },
-    {
-      "key": "H",
-      "hex": "#ceac7a"
-    },
-    {
-      "key": "I",
-      "hex": "#244a3e"
-    },
-    {
-      "key": "J",
-      "hex": "#3f7264"
-    },
-    {
-      "key": "K",
-      "hex": "#6ca581"
-    },
-    {
-      "key": "L",
-      "hex": "#5a2a2c"
-    },
-    {
-      "key": "M",
-      "hex": "#853a3c"
-    },
-    {
-      "key": "N",
-      "hex": "#c08a6a"
-    },
-    {
-      "key": "O",
-      "hex": "#3c3c36"
-    },
-    {
-      "key": "P",
-      "hex": "#5d805a"
-    },
-    {
-      "key": "Q",
-      "hex": "#969d7a"
-    },
-    {
-      "key": "R",
-      "hex": "#af745f"
+      "hex": "#2b2336"
     }
   ]
 }

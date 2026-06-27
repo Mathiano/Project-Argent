@@ -27,6 +27,62 @@
    "rows": 8,
    "count": 64,
    "description": ""
+  },
+  {
+   "name": "pct_grass",
+   "file": "assets/tilesets/pct_grass.tileset.json",
+   "tilesize": 16,
+   "count": 20,
+   "description": "grass field + variants"
+  },
+  {
+   "name": "pct_path",
+   "file": "assets/tilesets/pct_path.tileset.json",
+   "tilesize": 16,
+   "count": 47,
+   "description": "dirt path (9-slice edges)"
+  },
+  {
+   "name": "pct_fences",
+   "file": "assets/tilesets/pct_fences.tileset.json",
+   "tilesize": 16,
+   "count": 16,
+   "description": "wood fences"
+  },
+  {
+   "name": "pct_water",
+   "file": "assets/tilesets/pct_water.tileset.json",
+   "tilesize": 16,
+   "count": 4,
+   "description": "water (anim frames, ingested static)"
+  },
+  {
+   "name": "pct_trees",
+   "file": "assets/tilesets/pct_trees.tileset.json",
+   "tilesize": 16,
+   "count": 72,
+   "description": "tree parts"
+  },
+  {
+   "name": "pct_bush",
+   "file": "assets/tilesets/pct_bush.tileset.json",
+   "tilesize": 16,
+   "count": 1,
+   "description": "bush"
+  },
+  {
+   "name": "pct_flowers",
+   "file": "assets/tilesets/pct_flowers.tileset.json",
+   "tilesize": 16,
+   "count": 5,
+   "description": "flowers"
+  },
+  {
+   "name": "pct_buildings",
+   "file": "assets/tilesets/pct_buildings.tileset.json",
+   "tilesize": 16,
+   "count": 438,
+   "description": "complete houses (towns)"
   }
  ]
 }

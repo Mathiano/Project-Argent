@@ -2,8 +2,20 @@
 // Slices labeled swatches from an AI source sheet, mode-pool downscales each to
 // 16x16, quantizes to a frozen palette, validates, emits atlas-keyed tiles.
 // Node/pngjs (no Python/native deps). Run: node tools/tile_ingest.mjs
+//
+// ⚠️ SUPERSEDED (2026-06-27) — this built the OLD violet-batch-01 master, which
+// was REPLACED by the Pocket Creature Tamer re-seed (docs/palette-reseed-decision.md).
+// Running it would CLOBBER assets/palettes/argent-master.palette.json back to the
+// discarded 40-colour violet seed. Kept for provenance only. The forward tools are
+// tools/pct_palette_ingest.mjs (master) + tools/pct_tile_ingest.mjs (tiles).
+// Guard: refuses to run unless ALLOW_LEGACY_INGEST=1 is set.
 import { PNG } from 'pngjs';
 import fs from 'fs';
+if (process.env.ALLOW_LEGACY_INGEST !== '1') {
+  console.error('tile_ingest.mjs is SUPERSEDED — it would clobber the PCT-re-seeded master.\n' +
+    'Use tools/pct_palette_ingest.mjs. To override (provenance/debug): ALLOW_LEGACY_INGEST=1 node tools/tile_ingest.mjs');
+  process.exit(2);
+}
 
 const SRC = 'docs/art-reference/violet-batch-01.png';
 const TS = 16;                 // native tile size

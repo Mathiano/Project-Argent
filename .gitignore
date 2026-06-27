@@ -23,3 +23,5 @@ Thumbs.db
 # Generated / scratch art artifacts (not source)
 /assets/GPT/
 /tallgrass-fix.png
+# Scratch dir (holds extracted pack art + exploratory scripts — never source)
+/tmp/
