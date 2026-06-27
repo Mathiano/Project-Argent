@@ -39,6 +39,7 @@ import movesData from '../../docs/moves.json';
 import typechartData from '../../docs/typechart.json';
 import { mountCanvas } from './canvas';
 import { loadUiFont } from './font';
+import { createPctTileTestScene } from './scenes/pctTileTest';
 import { createInputDispatcher } from './input';
 import { SceneStack } from './scene';
 import { createBattleScene, infoLevelToReliability } from './scenes/battle';
@@ -1664,6 +1665,11 @@ if (!DEV_BUILD) {
   applyPartyFromUrl();
   recomputeSignpostFlags();
   showTestBattle();
+} else if (skip === 'pct-tiles') {
+  // Pipeline test (NOT map authoring): render a few Pocket Creature Tamer
+  // sample tiles at 320×180 so the pack's look + flow can be eye-checked.
+  devSession = true;
+  scenes.replace(createPctTileTestScene({ onExit: showTitle }));
 } else if (skip === 'test-battle-2v2') {
   // Phase 1 hook: two-mon player party vs a wild foe positioned so
   // switching is the right read. Default party is [GRUBLEAF, SILTSKIP]
