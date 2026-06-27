@@ -261,22 +261,31 @@ export function drawStanceBadge(
   ctx.textAlign = 'start';
 }
 
+// The ★ momentum meter as a TRIANGLE: 1 slot on top, 2 on the bottom (3 slots
+// total — the display is ready for a cap of 3; if the cap is still 2 the apex
+// just never fills). Slots fill (gold) up to `count`, the rest dim. Fill order is
+// base-first (bottom-left, bottom-right, then the apex) so the common 2-of-3
+// state reads as a symmetric full base. ★ isn't in m3x6 → fixed 8px, matching
+// the small-symbol pass. VISUAL ONLY — does not touch the momentum cap value.
 export function drawMomentum(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   count: number,
-  cap: number,
 ): void {
-  // ★ is not in m5x7 + the pips sit on an 8px pitch, so render them at a fixed
-  // 8px (the fallback font) rather than the 16px UI font.
   ctx.font = '8px monospace';
   ctx.letterSpacing = '0px';
   ctx.textBaseline = 'top';
   ctx.textAlign = 'start';
-  for (let i = 0; i < cap; i += 1) {
+  // [bottom-left, bottom-right, apex] — a compact triangle (~16×13px).
+  const slots: ReadonlyArray<readonly [number, number]> = [
+    [x, y + 6],
+    [x + 8, y + 6],
+    [x + 4, y],
+  ];
+  for (let i = 0; i < slots.length; i += 1) {
     ctx.fillStyle = i < count ? PALETTE.star : PALETTE.starOff;
-    ctx.fillText('★', x + i * 8, y);
+    ctx.fillText('★', slots[i]![0], slots[i]![1]);
   }
 }
 

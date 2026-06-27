@@ -574,6 +574,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // + the explanatory callout banner shown during resolve.
   let roundStance: { player: Stance | null; foe: Stance | null } = { player: null, foe: null };
   let calloutLine: string | null = null;
+  // Situation-bar (read-war callout) FADE: instead of a hard jump in/out, the
+  // banner fades in when a new line appears, holds for the beat's dwell (which is
+  // the readable part), then fades out (lingering) when it clears. situationShown
+  // is the text currently displayed (it lingers through the fade-out);
+  // situationAlpha is its opacity. Pure presentation/timing.
+  let situationShown: string | null = null;
+  let situationAlpha = 0;
+  const SITUATION_FADE_SEC = 0.18; // fade-in/out speed; the dwell is the beat hold
 
   let phase: 'text' | 'menu' | 'move' | 'call' | 'release' | 'spare' | 'party' | 'resolve' | 'end' = 'text';
   // Phase 6a catch state (wild only). pendingReadWindow = a player
@@ -1857,7 +1865,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // The ★ meter HEADER — deep slate blue (matching the mon names), a confident
     // header colour; the gold ★ pips beside it carry the value.
     else drawText(ctx, 'MOMENTUM', PL_PANEL.x + 100, PL_PANEL.y + 6, PALETTE.stanceG);
-    drawMomentum(ctx, PL_PANEL.x + 152, PL_PANEL.y + 6, display.player.momentum, COMBAT.momentumCap);
+    // ★ triangle (3 slots: apex + 2 base). y nudged up so the ~13px triangle
+    // clears the HP bar below; fills with the live momentum (cap-2 today → apex
+    // empty until the cap-3 change).
+    drawMomentum(ctx, PL_PANEL.x + 152, PL_PANEL.y + 3, display.player.momentum);
 
     drawText(ctx, 'HP', PL_PANEL.x + 8, PL_PANEL.y + 18, PALETTE.hpOk);
     drawBar(
@@ -1999,7 +2010,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // S1 — the explanatory callout banner. Shown during resolve (the intent
   // bar's slot is free then), naming the rule behind what just happened.
   function drawCallout(ctx: CanvasRenderingContext2D): void {
-    if (!calloutLine) return;
+    // Use the FADED display state (situationShown/Alpha), not calloutLine, so the
+    // banner fades in/out instead of jumping.
+    if (situationShown === null || situationAlpha <= 0) return;
     const h = 14;
     const y = INTENT.y;
     // Text pass re-fit (m3x6): SIZE the banner to the now-proportional text via
@@ -2008,15 +2021,18 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // starTag small). Was a fixed 300px box + raw center fillText → off after the
     // font swap (text sat low, the box was too wide, the ★ towered).
     const cx = LOGICAL_W / 2;
-    const textW = measureUiText(ctx, calloutLine);
+    const textW = measureUiText(ctx, situationShown);
     const w = Math.min(LOGICAL_W - 8, Math.ceil(textW) + 16);
     const x = Math.round(cx - w / 2);
+    const prevA = ctx.globalAlpha;
+    ctx.globalAlpha = prevA * situationAlpha; // fade the whole banner
     ctx.fillStyle = 'rgba(255, 215, 90, 0.94)';
     ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = PALETTE.ink;
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-    drawTextCenter(ctx, calloutLine, cx, y + 4, PALETTE.ink);
+    drawTextCenter(ctx, situationShown, cx, y + 4, PALETTE.ink);
+    ctx.globalAlpha = prevA;
   }
 
   function drawBottomDialog(ctx: CanvasRenderingContext2D, lines: readonly string[]): void {
@@ -2064,7 +2080,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         dim ? PALETTE.paperDim : PALETTE.ink,
       );
     });
-    drawText(ctx, `R${state.round}`, BOTTOM.x + BOTTOM.w - 28, BOTTOM.y + 10, PALETTE.paperDim);
+    // (Removed the dim "R{round}" debug round-counter — not player-facing.)
     // Legibility #2 — when the player has no ★, teach what charges it (the
     // cause/effect the callouts now also show: win a read → +★).
     if (me.momentum === 0) {
@@ -2272,6 +2288,19 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         bondAdvanceT = Math.min(BOND_ADVANCE_SEC, bondAdvanceT + dt);
       }
       if (phase === 'resolve') tickResolve(dt);
+      // Situation-bar fade (after tickResolve, so calloutLine reflects the
+      // current beat). Fade IN a new/changed line during resolve; otherwise fade
+      // OUT the lingering one (on clear or when resolve ends).
+      if (phase === 'resolve' && calloutLine !== null) {
+        if (calloutLine !== situationShown) {
+          situationShown = calloutLine;
+          situationAlpha = 0;
+        }
+        situationAlpha = Math.min(1, situationAlpha + dt / SITUATION_FADE_SEC);
+      } else if (situationShown !== null) {
+        situationAlpha = Math.max(0, situationAlpha - dt / SITUATION_FADE_SEC);
+        if (situationAlpha <= 0) situationShown = null;
+      }
     },
 
     input(key) {
@@ -2346,8 +2375,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       drawPlayerUnderPanel(ctx); // bond meter + bench dots (Lane A)
 
       if (phase === 'menu' || phase === 'move' || phase === 'call' || phase === 'release') drawIntent(ctx);
-      // S1 — the triangle callout occupies the intent slot during resolve.
-      if (phase === 'resolve') drawCallout(ctx);
+      // S1 — the read-war callout occupies the intent slot during resolve. Drawn
+      // whenever it's visible (situationAlpha > 0) so its fade-out completes even
+      // a beat or two after resolve ends; drawCallout no-ops when faded out.
+      drawCallout(ctx);
 
       // BUG 3 — gust legibility. Two distinct states:
       //  • ACTIVE: the round in play IS a gust round (this is what the

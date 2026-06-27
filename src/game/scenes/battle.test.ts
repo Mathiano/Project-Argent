@@ -988,10 +988,11 @@ describe('momentum visibility (playtest-polish-3)', () => {
     const screen = ctx.texts.join('|');
     // Your meter is clearly labelled (the full word, gold).
     expect(screen).toContain('MOMENTUM');
-    // Only the PLAYER's ★ pips render (cap = 2) — the foe's are hidden, so the
-    // total ★ pip count is 2, not 4.
+    // Only the PLAYER's ★ meter renders (the foe's is hidden). The meter is a
+    // 3-slot triangle (apex + 2 base), so 3 ★ glyphs draw (2 filled gold + 1 dim
+    // at momentum 2) — not 6 (which would mean the foe's showed too).
     const pips = ctx.texts.filter((t) => t === '★').length;
-    expect(pips).toBe(2);
+    expect(pips).toBe(3);
   });
 });
 
