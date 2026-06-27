@@ -40,6 +40,8 @@ URL: `http://localhost:5173/?skip=<value>[&starter=<species>]`
 | `prep`          | Rival prep scene (legacy EMBERCUB vs KAMON-counter)                   | Legacy demo flow.                                                     |
 | `rival`         | Rival battle (legacy)                                                  | Legacy demo flow.                                                     |
 | `falkner`       | Falkner boss fight (2-mon FLITPECK→GALEHAWK)                          | Sets the active starter via `?starter` (default GRUBLEAF). On a win it now awards the **ZEPHYR badge** + fanfare beat (same as the real gym), then the demo-end → title. |
+| `pct-tiles`     | PCT sample tiles at 320×180 — NATIVE drawImage vs INDEXED side-by-side | Pipeline EYE-CHECK scene (debug bypass; not the production renderer). A/B exits. |
+| **`pct-prod`**  | **Walk the `__PCT_VERIFY__` fixture — pct_* tiles through the REAL overworld renderer** | **Production-path confidence check before Tiled (tileRef → registry → indexed decode → draw). Verified headless by `pctProdRender.test.ts`; see `docs/pct-pipeline-verify.md`.** |
 | `end`           | End scene (won = true)                                                | Used to verify the end → onRestart loop.                              |
 
 ### Modifiers

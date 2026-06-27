@@ -1,0 +1,15 @@
+{
+  "_note": "DEV/VERIFICATION fixture (NOT shipping content) — a tiny graybox map whose cells opt into pct_* registry tiles via TileDef.tileRef, so the PRODUCTION overworld renderer (drawTiles -> registry -> indexed decode -> draw) can be exercised on the Pocket Creature Tamer tiles. Reachable only via ?skip=pct-prod and pctProdRender.test.ts. 6x6 so the camera clamps to (0,0) (map < viewport) and screen pos == world pos. See docs/pct-pipeline-verify.md.",
+  "name": "PCT VERIFY",
+  "width": 6,
+  "height": 6,
+  "tilesize": 16,
+  "tiles": "pggggg\npgtgwg\npggggg\npggggg\ngggggg\ngggggg",
+  "tileset": {
+    "p": { "color": "#8c6253", "solid": false, "label": "path", "tileRef": { "tileset": "pct_path", "tile": "r2c9" } },
+    "g": { "color": "#aad9a5", "solid": false, "label": "grass", "tileRef": { "tileset": "pct_grass", "tile": "r1c1" } },
+    "t": { "color": "#6eb88f", "solid": true, "label": "tree", "tileRef": { "tileset": "pct_trees", "tile": "r1c1" } },
+    "w": { "color": "#99a3c2", "solid": true, "label": "water", "tileRef": { "tileset": "pct_water", "tile": "r0c0" } }
+  },
+  "spawns": { "default": { "x": 5, "y": 5, "facing": "down" } }
+}

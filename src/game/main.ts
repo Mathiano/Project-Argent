@@ -1670,6 +1670,15 @@ if (!DEV_BUILD) {
   // sample tiles at 320×180 so the pack's look + flow can be eye-checked.
   devSession = true;
   scenes.replace(createPctTileTestScene({ onExit: showTitle }));
+} else if (skip === 'pct-prod') {
+  // PRODUCTION-PATH pipeline verification (NOT map authoring): walk a tiny fixture
+  // map (__PCT_VERIFY__) whose cells opt into the pct_* tiles via tileRef, rendered
+  // through the REAL overworld renderer the live maps use (tileRef → registry →
+  // indexed decode → draw). Confirms the pack tiles render as whole, correctly
+  // positioned tiles in-engine — the confidence check before Tiled. Verified
+  // headless by pctProdRender.test.ts; see docs/pct-pipeline-verify.md.
+  devSession = true;
+  showOverworld('__PCT_VERIFY__', 'default', false);
 } else if (skip === 'test-battle-2v2') {
   // Phase 1 hook: two-mon player party vs a wild foe positioned so
   // switching is the right read. Default party is [GRUBLEAF, SILTSKIP]

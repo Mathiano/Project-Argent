@@ -20,6 +20,15 @@ import outdoorVioletTileset from '../../../assets/tilesets/outdoor_violet.tilese
 // Registry asset — authored in Argent Studio, resolved by name (manifest.json).
 // Proof-of-integration: a Hearthwick grass patch references a tile from this sheet.
 import heartwickGrassTileset from '../../../assets/tilesets/heartwick_grass_test.tileset.json';
+// PCT pipeline-verification (dev-only) — the re-seeded pack tiles + a tiny fixture
+// map (__PCT_VERIFY__) that opts into them via tileRef, so the PRODUCTION renderer
+// can be exercised on them (?skip=pct-prod, pctProdRender.test.ts). Not shipping
+// content; reachable only via the dev hook/test. See docs/pct-pipeline-verify.md.
+import pctGrassTileset from '../../../assets/tilesets/pct_grass.tileset.json';
+import pctPathTileset from '../../../assets/tilesets/pct_path.tileset.json';
+import pctWaterTileset from '../../../assets/tilesets/pct_water.tileset.json';
+import pctTreesTileset from '../../../assets/tilesets/pct_trees.tileset.json';
+import pctVerifyData from '../maps/pct_verify.json';
 import houseVioletPrefab from '../../../assets/prefabs/house_violet.prefab.json';
 import gymVioletPrefab from '../../../assets/prefabs/gym_violet.prefab.json';
 import treeBigPrefab from '../../../assets/prefabs/tree_big.prefab.json';
@@ -33,6 +42,10 @@ import type { MapData } from './types';
 // Register tilesets + prefabs first so map loaders can resolve refs.
 registerTileset(outdoorVioletTileset as TilesetJson);
 registerTileset(heartwickGrassTileset as TilesetJson);
+registerTileset(pctGrassTileset as TilesetJson);
+registerTileset(pctPathTileset as TilesetJson);
+registerTileset(pctWaterTileset as TilesetJson);
+registerTileset(pctTreesTileset as TilesetJson);
 registerPrefab(houseVioletPrefab as PrefabJson);
 registerPrefab(gymVioletPrefab as PrefabJson);
 registerPrefab(treeBigPrefab as PrefabJson);
@@ -83,6 +96,8 @@ const REGISTRY: { [name: string]: () => MapData } = {
   // Phase 7 — the Route 32 boundary stub (opened by beating KAMON at the
   // Violet south gate). End-of-chapter; Route 32 proper is later content.
   ROUTE32: () => loadMap(route32Data as GrayboxMapJson),
+  // DEV/VERIFICATION ONLY — pct-tile pipeline check (?skip=pct-prod). Not in play.
+  __PCT_VERIFY__: () => loadMap(pctVerifyData as GrayboxMapJson),
 };
 
 // Each call rebuilds from the JSON so any in-place editing during dev
