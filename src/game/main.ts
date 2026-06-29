@@ -85,7 +85,7 @@ import {
   willingJoinChance,
 } from './catching';
 import type { CatchWindow, CatchOrigin } from './catching';
-import { TUTORIAL_CATCH_SPECIES, TUTORIAL_INTRO, tutorialFoeAI } from './tutorialCatch';
+import { TUTORIAL_CATCH_SPECIES, TUTORIAL_INTRO, tutorialFoeAI, shouldFireGuidedCatch, GUIDED_CATCH_DONE_FLAG } from './tutorialCatch';
 import { emitGameEvent } from './gameEvents';
 import { createBondStageScene } from './scenes/bondStage';
 import {
@@ -1862,6 +1862,17 @@ function showOverworld(
       showOverworld(nextMap, nextSpawn, true);
     },
     onEncounter(foeSpecies: string) {
+      // Guided-catch onboarding (docs/guided-catch-redesign-note): the FIRST wild
+      // encounter on Route 31 (after the lab lesson) is intercepted + wrapped as the
+      // guided catch — contextual, where there's actually a mon to catch — then never
+      // again. The practice mon is always FLITPECK (pushTutorialCatch), so it's
+      // reliable regardless of which species the zone rolled.
+      if (shouldFireGuidedCatch(map, (f) => flagStore.has(f))) {
+        flagStore.set(GUIDED_CATCH_DONE_FLAG); // once; set BEFORE the catch so re-entry is normal
+        autosaveNow();
+        pushTutorialCatch();
+        return;
+      }
       pushWildEncounter(foeSpecies);
     },
     onTutorialCatch() {

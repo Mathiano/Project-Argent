@@ -145,15 +145,11 @@ const REGISTRY: { [name: string]: () => MapData } = {
 // route31.violet.json. See docs/tiled-importer.md / route31-migration-scope.md.
 function buildRoute31(): MapData {
   const map = importAndWire(route31BigTmj, 'ROUTE 31');
+  // NOTE: the guided-catch tutorial is NOT a grass step-on script anymore — it fires
+  // on the player's FIRST WILD ENCOUNTER (main.ts onEncounter + shouldFireGuidedCatch),
+  // so it teaches catching with an actual mon present, not in a vacuum
+  // (docs/guided-catch-redesign-note.md). The §1 grass step trigger was removed.
   const scripts: MapObject[] = [
-    // The guided-catch HARD PIN — ONE zone-entry trigger over the §1 (Meadowgate)
-    // grass, gated by the lab lesson (catch_lesson_done), fires once. Carries forward
-    // the built-and-green tutorial beat (catch-tutorial-design.md).
-    {
-      type: 'script', x: 6, y: 3, width: 6, height: 7, trigger: 'step-on',
-      requiresFlag: 'catch_lesson_done', once: true, flag: 'route31_guided_catch_done',
-      commands: [{ kind: 'start-tutorial-catch' }],
-    },
     // Two discoverable off-path items (one-time give-item step-ons, the live pattern).
     {
       type: 'script', x: 7, y: 32, trigger: 'step-on', once: true, flag: 'route31_item_forest',

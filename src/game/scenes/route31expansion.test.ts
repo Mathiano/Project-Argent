@@ -8,13 +8,10 @@
 // not on the Tiled map — Mathias chose 4 signs; those assertions were removed.)
 
 import { describe, expect, test } from 'vitest';
-import { createOverworldScene } from './overworld';
-import type { FlagStore } from './overworld';
 import { getMap } from '../overworld/maps';
 import { isWalkable } from '../overworld/types';
+import { shouldFireGuidedCatch } from '../tutorialCatch';
 import type { MapObject } from '../overworld/types';
-import type { InputKey } from '../scene';
-import type { InputState } from '../input';
 
 const R = getMap('ROUTE31');
 const objs = R.objects;
@@ -22,15 +19,6 @@ const npcs = objs.filter((o): o is Extract<MapObject, { type: 'npc' }> => o.type
 const signs = objs.filter((o): o is Extract<MapObject, { type: 'sign' }> => o.type === 'sign');
 const zones = objs.filter((o): o is Extract<MapObject, { type: 'encounter_zone' }> => o.type === 'encounter_zone');
 const allSignText = signs.map((s) => s.lines.join(' ')).join(' || ');
-
-function mockInput(): InputState & { press(k: InputKey): void; release(k: InputKey): void } {
-  const held = new Set<InputKey>();
-  return { pressed: (k) => held.has(k), press: (k) => void held.add(k), release: (k) => void held.delete(k) };
-}
-function mockFlags(initial: string[] = []): FlagStore {
-  const s = new Set(initial);
-  return { has: (f) => s.has(f), set: (f) => void s.add(f), unset: (f) => void s.delete(f) };
-}
 
 describe('Route 31 (live Tiled map) — a real multi-screen journey', () => {
   test('the map is a tall journey (taller than one screen)', () => {
@@ -107,38 +95,25 @@ describe('Route 31 (live) — carried-forward content', () => {
   });
 });
 
-describe('Route 31 (live) — the guided catch (single zone-entry, HARD PIN)', () => {
-  const catchZone = objs.find((o): o is Extract<MapObject, { type: 'script' }> =>
-    o.type === 'script' && o.commands.some((c) => c.kind === 'start-tutorial-catch'))!;
+describe('Route 31 (live) — the guided catch (FIRST-ENCOUNTER interrupt, HARD PIN)', () => {
+  // Redesign (docs/guided-catch-redesign-note): the tutorial fires on the player's
+  // FIRST wild encounter (contextual — a mon present), NOT on a grass step. So the
+  // OLD grass step-on script must be gone, and the trigger PREDICATE gates it.
 
-  test('it is ONE zone script over §1 grass, gated by the lab lesson', () => {
-    const all = objs.filter((o) => o.type === 'script' && o.commands.some((c) => c.kind === 'start-tutorial-catch'));
-    expect(all.length).toBe(1);
-    expect(catchZone.width).toBeGreaterThan(1);
-    expect(catchZone.height).toBeGreaterThan(1);
-    expect(catchZone.requiresFlag).toBe('catch_lesson_done');
-    expect(catchZone.once).toBe(true);
+  test('the OLD grass step-on guided-catch script is REMOVED (no start-tutorial-catch)', () => {
+    const stepScripts = objs.filter((o) => o.type === 'script' && o.commands.some((c) => c.kind === 'start-tutorial-catch'));
+    expect(stepScripts.length).toBe(0);
   });
 
-  test('it STILL FIRES on first entry into §1 grass (after the lab lesson)', () => {
-    let fired = 0;
-    const input = mockInput();
-    // catch_lesson_done set (lab lesson done) + JAY pre-beaten (skip his approach).
-    const flags = mockFlags(['catch_lesson_done', 'route31_trainer_beaten']);
-    // Spawn one tile ABOVE the catch zone's top edge, walk DOWN into it.
-    const scene = createOverworldScene({
-      random: () => 0.999, map: 'ROUTE31', spawn: 'default',
-      spawnAt: { x: catchZone.x + 1, y: catchZone.y - 1, facing: 'down' },
-      inputState: input, flags,
-      onWarp: () => {}, onEncounter: () => {}, onTrainerBattle: () => {}, onBossBattle: () => {},
-      onTutorialCatch: () => { fired += 1; },
-    });
-    for (let i = 0; i < 4; i += 1) scene.update?.(0.02); // settle
-    input.press('down');
-    for (let i = 0; i < 20; i += 1) scene.update?.(0.02);
-    input.release('down');
-    for (let i = 0; i < 14; i += 1) scene.update?.(0.02);
-    expect(fired).toBe(1); // the guided catch fired on entering the grass
-    expect(flags.has('route31_guided_catch_done')).toBe(true); // once-marker set
+  test('shouldFireGuidedCatch gates: Route 31 first encounter only, after the lab lesson, once', () => {
+    const has = (set: Set<string>) => (f: string) => set.has(f);
+    // before the lab lesson → no
+    expect(shouldFireGuidedCatch('ROUTE31', has(new Set()))).toBe(false);
+    // after the lab lesson, not yet done → YES (the first encounter wraps as the tutorial)
+    expect(shouldFireGuidedCatch('ROUTE31', has(new Set(['catch_lesson_done'])))).toBe(true);
+    // already fired → no (once)
+    expect(shouldFireGuidedCatch('ROUTE31', has(new Set(['catch_lesson_done', 'route31_guided_catch_done'])))).toBe(false);
+    // a different map → no (Route 31 only)
+    expect(shouldFireGuidedCatch('VIOLET', has(new Set(['catch_lesson_done'])))).toBe(false);
   });
 });

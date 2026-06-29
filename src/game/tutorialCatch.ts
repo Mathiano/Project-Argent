@@ -17,6 +17,22 @@ import type { Action, BattleState, RNG } from '../engine';
 // species the player meets wild right after, so the lesson transfers 1:1.
 export const TUTORIAL_CATCH_SPECIES = 'FLITPECK';
 
+// ── The guided-catch TRIGGER (onboarding redesign, docs/guided-catch-redesign-note)
+// The guided catch fires on the player's FIRST WILD ENCOUNTER on Route 31 (contextual
+// — a real mon to catch), NOT on a grass step (which fired in a vacuum). It wraps that
+// first encounter as the guided tutorial, then never again. main.ts's onEncounter
+// consults this; the practice mon is always TUTORIAL_CATCH_SPECIES (FLITPECK), so the
+// tutorial is reliable regardless of which species the zone rolls.
+export const GUIDED_CATCH_MAP = 'ROUTE31';
+export const GUIDED_CATCH_GATE_FLAG = 'catch_lesson_done'; // the lab lesson is done
+export const GUIDED_CATCH_DONE_FLAG = 'route31_guided_catch_done'; // the once-marker
+
+// True when an encounter on `map` should be intercepted as the guided catch: on
+// Route 31, after the lab lesson, exactly once.
+export function shouldFireGuidedCatch(map: string, has: (flag: string) => boolean): boolean {
+  return map === GUIDED_CATCH_MAP && has(GUIDED_CATCH_GATE_FLAG) && !has(GUIDED_CATCH_DONE_FLAG);
+}
+
 // The live read->window->throw prompts. The scripted lab DEMO (lab.json)
 // mirrors these in dialogue so the watch-the-mentor beat surfaces the exact
 // prompts the player then uses live. Placeholder voice — final script pass later.
