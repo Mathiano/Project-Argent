@@ -1687,6 +1687,15 @@ if (!DEV_BUILD) {
   // warnings log to the console. Not shipping content.
   devSession = true;
   showOverworld('__TILED_TEST__', 'default', false);
+} else if (skip === 'tiled-kitchen') {
+  // Phase-8 KITCHEN-SINK: the full pipeline at once — collision, 3 NPCs (incl. a
+  // trainer), 2 warps, 2 spawns, 4 encounter zones — all imported+wired live. Arrive
+  // at spawn_player; walk into walls, talk to NPCs, fight the trainer, step the
+  // encounter zones, use a warp. Proves all features coexist. Not shipping content.
+  devSession = true;
+  applyPartyFromUrl(); // a party so the trainer battle is fightable (?party=/?starter=)
+  recomputeSignpostFlags();
+  showOverworld('__KITCHEN_SINK__', 'player', false);
 } else if (skip === 'test-battle-2v2') {
   // Phase 1 hook: two-mon player party vs a wild foe positioned so
   // switching is the right read. Default party is [GRUBLEAF, SILTSKIP]

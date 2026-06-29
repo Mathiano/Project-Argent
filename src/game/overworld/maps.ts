@@ -35,6 +35,7 @@ import pctHillsTileset from '../../../assets/tilesets/pct_hills.tileset.json';
 import pctBushanimTileset from '../../../assets/tilesets/pct_bushanim.tileset.json';
 import pctVerifyData from '../maps/pct_verify.json';
 import testMapTmj from '../maps/tiled/test-map.tmj.json';
+import kitchenSinkTmj from '../maps/tiled/test-map-kitchen-sink.tmj.json';
 import houseVioletPrefab from '../../../assets/prefabs/house_violet.prefab.json';
 import gymVioletPrefab from '../../../assets/prefabs/gym_violet.prefab.json';
 import treeBigPrefab from '../../../assets/prefabs/tree_big.prefab.json';
@@ -72,19 +73,19 @@ function chooseRoute31(): MapData {
   return loadMap(route31VioletData as DataDrivenMapJson);
 }
 
-// Phase-8: import the snapshotted Tiled export through the real importer (so
-// ?skip=tiled-test renders Mathias's painted map via the verified production tile
-// path). tileExists prunes GIDs that hit a blank/un-ingested registry cell.
-function buildTiledTestMap(): MapData {
-  const imported = importTiledMap(testMapTmj as unknown as TiledMapJson, {
-    name: 'TILED TEST',
+// Phase-8: import a snapshotted Tiled export through the real importer + wiring (so
+// the ?skip hooks render Mathias's painted maps via the verified production tile
+// path). tileExists prunes GIDs that hit a blank/un-ingested registry cell; warnings
+// surface in the console.
+function importAndWire(tmj: unknown, name: string): MapData {
+  const imported = importTiledMap(tmj as TiledMapJson, {
+    name,
     resolveSheet: defaultResolveSheet,
     tileExists: (pct, key) => hasTileset(pct) && getTileset(pct).tiles[key] !== undefined,
   });
-  for (const w of imported.warnings) console.warn(`[tiled-import] ${w}`);
-  // Wiring layer: resolve the carried npc_*/warp_* markers to real definitions.
+  for (const w of imported.warnings) console.warn(`[tiled-import:${name}] ${w}`);
   const wired = wireImportedMap(imported.map);
-  for (const w of wired.warnings) console.warn(`[tiled-wiring] ${w}`);
+  for (const w of wired.warnings) console.warn(`[tiled-wiring:${name}] ${w}`);
   return wired.map;
 }
 
@@ -128,7 +129,10 @@ const REGISTRY: { [name: string]: () => MapData } = {
   __PCT_VERIFY__: () => loadMap(pctVerifyData as GrayboxMapJson),
   // DEV ONLY — Phase-8 Tiled importer demo (?skip=tiled-test). Mathias's painted
   // test map, imported live. Not in play.
-  __TILED_TEST__: buildTiledTestMap,
+  __TILED_TEST__: () => importAndWire(testMapTmj, 'TILED TEST'),
+  // DEV ONLY — Phase-8 kitchen-sink (?skip=tiled-kitchen): EVERY feature at once
+  // (collision + 3 NPCs incl. a trainer + 2 warps + 2 spawns + 4 encounter zones).
+  __KITCHEN_SINK__: () => importAndWire(kitchenSinkTmj, 'KITCHEN SINK'),
 };
 
 // Each call rebuilds from the JSON so any in-place editing during dev

@@ -43,6 +43,7 @@ URL: `http://localhost:5173/?skip=<value>[&starter=<species>]`
 | `pct-tiles`     | PCT sample tiles at 320×180 — NATIVE drawImage vs INDEXED side-by-side | Pipeline EYE-CHECK scene (debug bypass; not the production renderer). A/B exits. |
 | **`pct-prod`**  | **Walk the `__PCT_VERIFY__` fixture — pct_* tiles through the REAL overworld renderer** | **Production-path confidence check before Tiled (tileRef → registry → indexed decode → draw). Verified headless by `pctProdRender.test.ts`; see `docs/pct-pipeline-verify.md`.** |
 | **`tiled-test`** | **Mathias's painted `test-map.tmj` IMPORTED + WIRED, walked in-engine** | **Phase-8 Tiled loop — multi-layer pct_* tiles + `npc_*`/`warp_*` markers wired to real defs. Walk up to `npc_test` (dialogue); step on `warp_test` (→ Hearthwick). Import/wiring warnings log to console. See `docs/tiled-importer.md`.** |
+| **`tiled-kitchen`** | **The KITCHEN-SINK map — EVERY feature at once, walked in-engine** | **Phase-8 full-pipeline proof: collision walls + 3 NPCs (incl. a trainer, `?party=`/`?starter=` for a team) + 2 warps + 2 spawns + 4 encounter zones. Arrives at `spawn_player`. Walk into a wall, talk/fight, step both zone types, use a warp. See `docs/tiled-importer.md`.** |
 | `end`           | End scene (won = true)                                                | Used to verify the end → onRestart loop.                              |
 
 ### Modifiers

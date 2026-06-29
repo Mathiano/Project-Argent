@@ -48,15 +48,42 @@ export const DEFAULT_DEFS: WiringDefs = {
         { kind: 'dialog', lines: ['A test NPC, placed in Tiled.', 'The marker wired to a real def —', 'the loop is closed.'] },
       ],
     },
+    // Kitchen-sink: a real TRAINER NPC — blocks until beaten, talks then battles,
+    // pays a reward, and has a post-win line. Minimal content, real wiring.
+    npc_trainer_1: {
+      color: '#3a6ea5',
+      facing: 'down',
+      blockedUntilFlag: 'kitchen_trainer_1_beaten',
+      interact: [
+        { kind: 'dialog', lines: ['YOUNGSTER JOEY:', "You can't walk past me!", "Let's battle!"] },
+        { kind: 'start-trainer-battle', foeSpecies: 'FLITPECK', winFlag: 'kitchen_trainer_1_beaten', reward: 200 },
+      ],
+      interactAfterFlag: [
+        { kind: 'dialog', lines: ['YOUNGSTER JOEY:', 'My FLITPECK is still the best!'] },
+      ],
+    },
+    // Kitchen-sink: a flavor dialogue NPC.
+    npc_flavor_1: {
+      color: '#7c4fa8',
+      interact: [{ kind: 'dialog', lines: ['A traveller rests by the path.', "Nice day for a walk, isn't it?"] }],
+    },
   },
   warp: {
     // Trivial-but-real destination: HEARTHWICK has a "fromRoute" spawn. Stepping on
     // the warp tile transitions maps, proving the wired warp works.
     warp_test: { target: 'HEARTHWICK:fromRoute' },
+    // Kitchen-sink: a second warp to a different map. NOTE: the destination comes
+    // from HERE (WARP_DEFS), NOT from the marker's target_map/target_z properties.
+    warp_next_map: { target: 'VIOLET:fromRoute' },
   },
   encounter: {
     // A small test wild zone (the marker rectangle decides where/how big).
     encounter_test: { species: ['FLITPECK'], rate: 0.18 },
+    // Kitchen-sink: two DISTINCT zone types — route31a (grass) and route31b (cave),
+    // proving different markers get different species/rates. (3 route31a markers
+    // share this one def; each becomes its own zone at its own rectangle.)
+    encounter_route31a: { species: ['FLITPECK'], rate: 0.18 },
+    encounter_route31b: { species: ['GRITHOAX'], rate: 0.45 },
   },
 };
 

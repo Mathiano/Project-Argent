@@ -87,7 +87,8 @@ clusters, and the `path_02` dirt all render whole and correctly layered.
 Tests: `tiledImport.test.ts` (15 — translation, flip-bit mask, layer order, object
 snapping + `facing` property, all 4 warn cases, full-fixture coverage, + collision) +
 `tiledRender.test.ts` (1 — production render) + `tiledWiring.test.ts` (13 — marker
-resolution incl. encounter zones, see below). Suite 808 green.
+resolution incl. encounter zones, see below) + `tiledKitchenSink.test.ts` (7 — the
+full-pipeline proof, see below). Suite 815 green.
 
 ## Wiring layer — markers → real definitions (loop complete)
 
@@ -129,6 +130,21 @@ Tests: `tiledWiring.test.ts` (13 — npc/warp/sign/encounter/spawn resolution, s
 facing, missing-def + unknown-prefix + script warns, preservation, and the real
 `__TILED_TEST__` map: `npc_test`→(6,2), `warp_test`→(4,0), `encounter_test` rect
 (10,5)3×3 found by `findObjectAt`, `spawn_fromTest` facing up).
+
+### Full-pipeline proof — the kitchen-sink map
+
+`test-map-kitchen-sink.tmj` exercises EVERY feature at once (the proof before the
+Route 31 migration): a `Collision` layer (155 cells), 3 NPCs (`npc_test` dialogue,
+`npc_trainer_1` a real `start-trainer-battle` trainer, `npc_flavor_1` flavor), 2 warps
+(`warp_test`→HEARTHWICK, `warp_next_map`→VIOLET), 2 spawns (`spawn_player` /
+`spawn_alt`), and 4 encounter zones (3× `encounter_route31a` FLITPECK@0.18 + 1×
+`encounter_route31b` GRITHOAX@0.45). `DEFAULT_DEFS` carries all the matching defs.
+`?skip=tiled-kitchen` walks it (arrive at `spawn_player`). `tiledKitchenSink.test.ts`
+(7) asserts all features coexist with **0 unexpected import/wiring warnings**: 2
+visual layers, collision blocks, 3 NPCs (1 trainer), 2 distinct warp targets, 4 zones
+with distinct species/rate, both spawns. NOTE: `warp_next_map`'s destination comes
+from `WARP_DEFS`, NOT the marker's `target_map`/`target_z` properties (those are
+ignored).
 
 ## Collision — a dedicated collision layer (self-describing)
 
