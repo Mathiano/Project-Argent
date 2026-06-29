@@ -92,3 +92,39 @@ Every mon MUST always have ≥1 Tier-0 Basic attack in its ATTACKS pool. A mon w
 
 ## Tempo (Q1) — framing CONFIRMED by Mathias (with a caveat)
 Tempo affects the KO-race / lethal-resolution order, NOT the triangle outcome (Brace counters regardless of order). Tempo = finisher/denial tool, paired with aggressive moves, not a general "go first" buff. **Caveat (Mathias): only if CC can make it work without breaking the triangle/game** — so tempo's exact implementation is sim-gated + must preserve the triangle; if it can't be done cleanly, tempo may be cut. Flagged for the build.
+
+---
+
+# RESOLVED — Techniques are cast IN A STANCE (the read-war unification, Mathias)
+
+**The hole this closes:** without this, effect moves float outside the stance triangle — a free action bypassing the read-war (why read stances if you can cast a status risk-free?). This makes techniques OBEY the read-war.
+
+## The unified rule (attacks AND techniques)
+**Every action is performed in one of the three stances** (Aggressive / Fluid / Brace). When you use a TECHNIQUE (non-attack), you also pick the stance you "carry yourself in while casting":
+- **Aggressive cast** — still weak to Brace (you close on the opponent; they counter).
+- **Fluid cast** — still weak to Aggressive (you drift while they strike hard).
+- **Brace cast** — still weak to Fluid.
+So casting is NOT a safe escape from the triangle — you're still in the read-war, still punishable, based on your cast-stance. (Thematically: "how do you carry yourself while conjuring this?" — exposed in a posture. Operationalizes the phased-unlock "conjuring leaves you exposed" fiction.)
+
+This UNIFIES attacks + techniques under ONE resolution (the existing stance triangle) — elegant, not a parallel system. The engine already resolves stances for attacks; techniques reuse that dimension.
+
+## Debuffs vs buffs under this rule
+- **Debuffs (target foe):** land ONLY if your cast-stance WINS the read. Lose the read → you're countered, the status FIZZLES (does not apply), you deal only the effect move's chip damage. This IS the status economy's "land only through a read-win" lever, operationalized. The risk of casting in a losing stance.
+- **Buffs (target self):** ALWAYS land (self-cast, no foe-read needed), BUT you're still in a vulnerable cast-stance → the opponent can punish the TIMING (you buff, but may eat a hit). So buffs aren't free either — exposure is the cost. (e.g. cast SECOND WIND in Fluid, foe goes Aggressive, you gain your ★ but take the hit.)
+
+## Resolution when a debuff-cast LOSES the read (confirm: option a)
+Proposed (lean a): losing the read → technique FAILS to land + you eat the counter + you deal only chip damage. "You committed to a cast in a losing stance; punished, technique fizzled." (vs. option b: status lands anyway but you eat the counter — rejected as too forgiving.) Chip damage softens it (not a TOTAL dead turn). NEEDS final confirm but a is the lean.
+
+## Build note (scope — contained, NOT creep)
+Reuses the EXISTING stance-resolution (attacks already resolve by stance); techniques gain the same stance dimension. Extending, not inventing a parallel system. More surface (techniques now stance-tagged) but the same dimension attacks have. Banked as a CORE rule.
+
+## Type-as-counter-to-strategies (Flag 2 settled)
+The momentum-economy effect homes (Sap Focus→SPARK, Silence→UMBRA, Echo→PSI) are fine. Different types counter different STRATEGIES — which is also the BOSS-ADJUSTMENT answer: if you can't beat a boss, bring different-typed mons whose techniques counter its strategy. Type identity = strategic counter-pick.
+
+## Sample effect moves (5 types — establishes the patterns)
+- **SPARK:** STATIC HAZE (Daze, T0-1) · THUNDERCLAP (Sap Focus, T1-2, read-win-gated — Mathias's original idea, canonical)
+- **PSI:** MIND SNARE (Inception, T1) · FALSE ECHO (Echo, T1-2)
+- **UMBRA:** CREEPING DOUBT (Doubt, T1) · DEAD SILENCE (Silence, T2, read-win-gated — most Argent-thematic)
+- **STONE:** SET STANCE (Brace-buff = poker tell-for-power, T0-1) · SECOND WIND (gain 1★, T1-2, maybe bond-gated)
+- **FLAME:** SEAR (Burn, T0-1) · KINDLE (Attunement, T1)
+Patterns: evocative status-readable names (distinct from 43 damage verbs); potency→tier (mild T0-1, game-warping T2+read-win); all carry chip damage (so a missed read isn't a dead turn); each type = one debuff + one other (buff or 2nd disruption); momentum-economy effects spread across types.
