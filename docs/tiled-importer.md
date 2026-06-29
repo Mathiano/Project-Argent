@@ -86,14 +86,43 @@ clusters, and the `path_02` dirt all render whole and correctly layered.
 
 Tests: `tiledImport.test.ts` (11 — translation, flip-bit mask, layer order, object
 snapping, all 4 warn cases, full-fixture coverage) + `tiledRender.test.ts` (1 —
-production render). Suite 791 green.
+production render) + `tiledWiring.test.ts` (8 — marker resolution, see below). Suite
+799 green.
+
+## Wiring layer — markers → real definitions (loop complete)
+
+`src/game/overworld/tiledWiring.ts` resolves the carried `importedObjects` into the
+engine's EXISTING inline `MapObject`s (Argent has no shared NPC registry — NPCs/warps
+/signs live inline in each map's `objects`; warps target `"MAP:spawnName"`). The
+naming convention IS the contract — **Tiled supplies *where* (the marker), CC supplies
+*what* (the definition), joined by name:**
+
+| marker | resolves via | becomes |
+|--|--|--|
+| `npc_<id>` | `NPC_DEFS["npc_<id>"]` | inline `npc` MapObject at the marker (dialogue/sprite/behaviour) |
+| `warp_<id>` | `WARP_DEFS["warp_<id>"]` | `warp` MapObject, `target:"MAP:spawn"` |
+| `sign_<id>` | `SIGN_DEFS["sign_<id>"]` | `sign` MapObject (lines) |
+| `spawn_<name>` | — (no def) | `map.spawns["<name>"]` = a spawn warps can land on |
+
+`wireImportedMap(map, defs=DEFAULT_DEFS) → { map, warnings }` emits those objects/
+spawns into the map and consumes `importedObjects` (so placeholders stop rendering —
+the real objects do). **Unknown prefix / missing definition → warn + skip** (same
+robustness as the importer). `maps.ts buildTiledTestMap` runs import → wire, so
+`?skip=tiled-test` is fully interactive: `DEFAULT_DEFS` seeds `npc_test` (a dialogue
+NPC) and `warp_test` (→ `HEARTHWICK:fromRoute`). Add a marker's behaviour by adding
+an entry to `NPC_DEFS`/`WARP_DEFS`; Mathias places the matching-named marker in Tiled.
+
+Tests: `tiledWiring.test.ts` (8 — npc/warp/spawn resolution, missing-def + unknown-
+prefix warns, preservation, and the real `__TILED_TEST__` map wiring `npc_test`→(6,2)
+/ `warp_test`→(4,0)).
 
 ## Seams / next
 - **Collision** — imported maps are fully walkable (no solidity yet). A later pass
   derives collision (per-tile `solid` or a Tiled collision layer / object).
 - **Layer depth** — all imported layers draw below the player; Y-sorted walk-behind
   for "top" layers (tree canopies) is the big-object-lane refinement.
-- **Wiring** — `importedObjects` carry names only; the resolver (`npc_*`/`warp_*` →
-  CC defs) is the next task. Animated tiles (bush-anim frames) import static for now.
+- **Definitions library** — `DEFAULT_DEFS` holds the test markers; real maps grow it
+  with their NPCs/warps (or per-map override defs). Animated tiles (bush-anim) import
+  static for now.
 - **Snapshot** — `test-map.tmj.json` is a committed snapshot of a live working file;
   re-snapshot when Mathias re-exports.

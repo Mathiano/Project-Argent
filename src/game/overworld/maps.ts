@@ -42,6 +42,7 @@ import { loadMap } from './mapLoader';
 import type { GrayboxMapJson, DataDrivenMapJson } from './mapLoader';
 import { importTiledMap, defaultResolveSheet } from './tiledImport';
 import type { TiledMapJson } from './tiledImport';
+import { wireImportedMap } from './tiledWiring';
 import { makeCenter, makeMart } from './interiorGen';
 import { getTileset, hasTileset, registerPrefab, registerTileset } from './tilesetCatalog';
 import type { PrefabJson, TilesetJson } from './tileset';
@@ -75,13 +76,16 @@ function chooseRoute31(): MapData {
 // ?skip=tiled-test renders Mathias's painted map via the verified production tile
 // path). tileExists prunes GIDs that hit a blank/un-ingested registry cell.
 function buildTiledTestMap(): MapData {
-  const { map, warnings } = importTiledMap(testMapTmj as unknown as TiledMapJson, {
+  const imported = importTiledMap(testMapTmj as unknown as TiledMapJson, {
     name: 'TILED TEST',
     resolveSheet: defaultResolveSheet,
     tileExists: (pct, key) => hasTileset(pct) && getTileset(pct).tiles[key] !== undefined,
   });
-  for (const w of warnings) console.warn(`[tiled-import] ${w}`);
-  return map;
+  for (const w of imported.warnings) console.warn(`[tiled-import] ${w}`);
+  // Wiring layer: resolve the carried npc_*/warp_* markers to real definitions.
+  const wired = wireImportedMap(imported.map);
+  for (const w of wired.warnings) console.warn(`[tiled-wiring] ${w}`);
+  return wired.map;
 }
 
 const REGISTRY: { [name: string]: () => MapData } = {

@@ -139,7 +139,7 @@ describe('importTiledMap — real test-map.tmj snapshot (full coverage)', () => 
   test('every distinct painted GID maps to a tile that exists in its pct tileset', () => {
     const tmj = testMapTmj as unknown as TiledMapJson;
     const gids = new Set<number>();
-    for (const l of tmj.layers) if (l.type === 'tilelayer') for (const g of (l as { data: number[] }).data) if (g) gids.add(g & 0x1fffffff);
+    for (const l of tmj.layers) if (l.type === 'tilelayer') for (const g of (l as unknown as { data: number[] }).data) if (g) gids.add(g & 0x1fffffff);
     expect(gids.size).toBe(19); // the documented 19 distinct GIDs
     // Reconstruct each ref from the imported layers and confirm it's a real tile.
     const seen = new Set<string>();
