@@ -50,6 +50,9 @@ const SHEETS = [
   { src: 'Tilesets/path_02.png',                     name: 'pct_path02',    desc: 'dirt path v2 — CANONICAL route path (9-slice edges)' },
   { src: 'Tilesets/Hills.png',                       name: 'pct_hills',     desc: 'hills / cliffs / elevation set' },
   { src: 'Enviroment/Vegetation/Bushes/bush-anim.png',name: 'pct_bushanim', desc: 'animated bush (frames ingested static)' },
+  // Route 31 Phase 1: the water sheet (Water_tile-Sheet.png, 704x80 = 44x5 anim
+  // frames — ingested STATIC for now; animation is a deferred refinement).
+  { src: 'Tilesets/Water_tile-Sheet.png',            name: 'pct_watersheet',desc: 'water (sheet, anim frames ingested static)' },
 ];
 
 if (!fs.existsSync(PACK_ROOT)) { console.error(`PCT pack not found at "${PACK_ROOT}".`); process.exit(2); }

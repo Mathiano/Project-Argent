@@ -33,9 +33,12 @@ import pctTreesTileset from '../../../assets/tilesets/pct_trees.tileset.json';
 import pctPath02Tileset from '../../../assets/tilesets/pct_path02.tileset.json';
 import pctHillsTileset from '../../../assets/tilesets/pct_hills.tileset.json';
 import pctBushanimTileset from '../../../assets/tilesets/pct_bushanim.tileset.json';
+import pctBushTileset from '../../../assets/tilesets/pct_bush.tileset.json';
+import pctWatersheetTileset from '../../../assets/tilesets/pct_watersheet.tileset.json';
 import pctVerifyData from '../maps/pct_verify.json';
 import testMapTmj from '../maps/tiled/test-map.tmj.json';
 import kitchenSinkTmj from '../maps/tiled/test-map-kitchen-sink.tmj.json';
+import route31BigTmj from '../maps/tiled/test-map-kitchen-sink-big.tmj.json';
 import houseVioletPrefab from '../../../assets/prefabs/house_violet.prefab.json';
 import gymVioletPrefab from '../../../assets/prefabs/gym_violet.prefab.json';
 import treeBigPrefab from '../../../assets/prefabs/tree_big.prefab.json';
@@ -59,6 +62,8 @@ registerTileset(pctTreesTileset as TilesetJson);
 registerTileset(pctPath02Tileset as TilesetJson);
 registerTileset(pctHillsTileset as TilesetJson);
 registerTileset(pctBushanimTileset as TilesetJson);
+registerTileset(pctBushTileset as TilesetJson);
+registerTileset(pctWatersheetTileset as TilesetJson);
 registerPrefab(houseVioletPrefab as PrefabJson);
 registerPrefab(gymVioletPrefab as PrefabJson);
 registerPrefab(treeBigPrefab as PrefabJson);
@@ -133,6 +138,10 @@ const REGISTRY: { [name: string]: () => MapData } = {
   // DEV ONLY — Phase-8 kitchen-sink (?skip=tiled-kitchen): EVERY feature at once
   // (collision + 3 NPCs incl. a trainer + 2 warps + 2 spawns + 4 encounter zones).
   __KITCHEN_SINK__: () => importAndWire(kitchenSinkTmj, 'KITCHEN SINK'),
+  // Route 31 Phase 1 (?skip=route31-big): the full 22×74 canvas imported+wired —
+  // terrain incl. water + collision + warps + encounters + spawns. NPCs are still the
+  // kitchen-sink placeholders (Jay + flavor replace them next). Not yet the live ROUTE31.
+  __ROUTE31_BIG__: () => importAndWire(route31BigTmj, 'ROUTE 31 (Phase 1)'),
 };
 
 // Each call rebuilds from the JSON so any in-place editing during dev

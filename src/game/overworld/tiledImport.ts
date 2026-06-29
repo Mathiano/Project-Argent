@@ -103,6 +103,12 @@ export function isCollisionLayerName(name: string): boolean {
   return COLLISION_LAYER_NAMES.has(name.trim().toLowerCase());
 }
 
+// An "Overhead" tile layer (name contains "overhead") renders ABOVE the player for
+// walk-behind (tree-tops/roofs). Other visual layers render below. See docs.
+export function isOverheadLayerName(name: string): boolean {
+  return name.trim().toLowerCase().includes('overhead');
+}
+
 export function basename(p: string): string {
   const parts = p.split(/[\\/]/);
   return parts[parts.length - 1] ?? p;
@@ -230,7 +236,7 @@ export function importTiledMap(tmj: TiledMapJson, opts: ImportOptions): ImportRe
       }
       grid.push(rowArr);
     }
-    importedLayers.push({ name: tl.name, tiles: grid });
+    importedLayers.push({ name: tl.name, tiles: grid, ...(isOverheadLayerName(tl.name) ? { overhead: true } : {}) });
   }
 
   // Object layers → carried-through named markers (snapped to the tile grid).
@@ -307,7 +313,8 @@ export function importTiledMap(tmj: TiledMapJson, opts: ImportOptions): ImportRe
 // (the immutable pack dims — NOT the .tsx's editable columns attr). Extend here as
 // more sheets are ingested. (docs/tiled-gid-correspondence.md §3.)
 //   Grass.png 192→12 · path_02.png 192→12 · Hills.png 304→19 · bush-anim.png 384→24
-//   · trees.png 160→10 · bush.png 48→3 · path_01.png 192→12
+//   · trees.png 160→10 · bush.png 48→3 · path_01.png 192→12 · water_anim.png 64→4
+//   · Water_tile-Sheet.png 704→44
 export const DEFAULT_SHEET_TABLE: { readonly [tsx: string]: ResolvedSheet } = {
   'Argent_Grass_1.tsx': { pct: 'pct_grass', cols: 12 },
   'path_02.tsx': { pct: 'pct_path02', cols: 12 },
@@ -317,6 +324,8 @@ export const DEFAULT_SHEET_TABLE: { readonly [tsx: string]: ResolvedSheet } = {
   'Argent_Trees_1.tsx': { pct: 'pct_trees', cols: 10 }, // legacy alias for trees.png@16
   'Argent_Bush_1.tsx': { pct: 'pct_bush', cols: 3 },
   'path_01.tsx': { pct: 'pct_path', cols: 12 },
+  'water.tsx': { pct: 'pct_water', cols: 4 }, // water_anim.png (64 wide)
+  'Water_tile-Sheet.tsx': { pct: 'pct_watersheet', cols: 44 }, // 704 wide
 };
 
 export function defaultResolveSheet(source: string): ResolvedSheet | null {

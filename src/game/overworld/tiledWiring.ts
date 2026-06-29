@@ -75,15 +75,19 @@ export const DEFAULT_DEFS: WiringDefs = {
     // Kitchen-sink: a second warp to a different map. NOTE: the destination comes
     // from HERE (WARP_DEFS), NOT from the marker's target_map/target_z properties.
     warp_next_map: { target: 'VIOLET:fromRoute' },
+    // Route 31 Phase 1: the two route boundary warps (Hearthwick ↔ Violet).
+    warp_north: { target: 'HEARTHWICK:fromRoute' },
+    warp_south: { target: 'VIOLET:fromRoute' },
   },
   encounter: {
     // A small test wild zone (the marker rectangle decides where/how big).
     encounter_test: { species: ['FLITPECK'], rate: 0.18 },
-    // Kitchen-sink: two DISTINCT zone types — route31a (grass) and route31b (cave),
-    // proving different markers get different species/rates. (3 route31a markers
-    // share this one def; each becomes its own zone at its own rectangle.)
-    encounter_route31a: { species: ['FLITPECK'], rate: 0.18 },
+    // Kitchen-sink + Route 31: distinct zone types share a def by name. route31a =
+    // grassland, route31b = cave, water1a = water (species/rates per the B spec). Each
+    // same-named marker becomes its own zone at its own rectangle.
+    encounter_route31a: { species: ['FLITPECK', 'GALEHAWK'], rate: 0.18 },
     encounter_route31b: { species: ['GRITHOAX'], rate: 0.45 },
+    encounter_water1a: { species: ['MARSHMASH'], rate: 0.3 },
   },
 };
 

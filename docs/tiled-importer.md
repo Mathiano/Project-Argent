@@ -88,7 +88,8 @@ Tests: `tiledImport.test.ts` (15 — translation, flip-bit mask, layer order, ob
 snapping + `facing` property, all 4 warn cases, full-fixture coverage, + collision) +
 `tiledRender.test.ts` (1 — production render) + `tiledWiring.test.ts` (13 — marker
 resolution incl. encounter zones, see below) + `tiledKitchenSink.test.ts` (7 — the
-full-pipeline proof, see below). Suite 815 green.
+full-pipeline proof) + `tiledRoute31Big.test.ts` (7 — Route 31 Phase 1 incl. water +
+walk-behind, see below). Suite 822 green.
 
 ## Wiring layer — markers → real definitions (loop complete)
 
@@ -130,6 +131,27 @@ Tests: `tiledWiring.test.ts` (13 — npc/warp/sign/encounter/spawn resolution, s
 facing, missing-def + unknown-prefix + script warns, preservation, and the real
 `__TILED_TEST__` map: `npc_test`→(6,2), `warp_test`→(4,0), `encounter_test` rect
 (10,5)3×3 found by `findObjectAt`, `spawn_fromTest` facing up).
+
+### Overhead layers — walk-behind
+
+A visual tile layer whose name **contains `overhead`** (e.g. `Overhead (4)`) is flagged
+`overhead` by the importer and drawn by the renderer **AFTER the player** — so tree-tops
+/ roofs occlude the player (walk-behind). All other visual layers draw below the player.
+(One simple flag; full per-prop Y-sort stays the big-object-lane refinement.)
+
+### Route 31 Phase 1 — the full 22×74 map
+
+`test-map-kitchen-sink-big.tmj` (the Phase-1 Route 31 canvas, `?skip=route31-big`)
+imports + wires end-to-end: 3 visual layers (Floor/Props/**Overhead**) + a Collision
+layer (**556 cells**), terrain across 8 sheets **including water** (`water.tsx`→
+`pct_water`, `Water_tile-Sheet.tsx`→`pct_watersheet` — added to the sheet table; the
+`Water_tile-Sheet.png` 704×80 anim frames ingested **static**, 68 tiles, ≤16/tile),
+2 warps (`warp_north`→HEARTHWICK, `warp_south`→VIOLET), 4 spawns (`default`/`player`/
+`fromHearthwick` down/`fromViolet` **up**), and 7 encounter zones (`encounter_route31a`
+grass FLITPECK/GALEHAWK, `encounter_route31b` cave GRITHOAX, `encounter_water1a` water
+MARSHMASH). **0 unresolvable GIDs, 0 warnings.** The carried NPCs are still the
+kitchen-sink placeholders (Jay + flavor replace them next). `tiledRoute31Big.test.ts`
+(7) asserts all of the above.
 
 ### Full-pipeline proof — the kitchen-sink map
 

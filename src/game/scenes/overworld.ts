@@ -834,8 +834,9 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
       ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
 
       if (map.importedLayers !== undefined) {
-        // Phase-8 Tiled import: draw the ordered registry-ref layers (bottom→top).
-        drawImportedLayers(ctx, map, refTilesets, refCaches, camX, camY, tick);
+        // Phase-8 Tiled import: draw the BELOW-player layers (bottom→top); the
+        // Overhead layers draw AFTER the player (walk-behind) — see below.
+        drawImportedLayers(ctx, map, refTilesets, refCaches, camX, camY, tick, false);
       } else if (map.cells !== undefined && tileset !== null) {
         drawTilesetCells(ctx, map, tileset, tileCache, camX, camY, tick, refTilesets, refCaches);
       } else {
@@ -907,6 +908,13 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         for (const d of ySortOrder(layer2)) d.render();
       } else {
         drawPlayerSprite();
+      }
+
+      // Phase-8 import: the OVERHEAD layers draw AFTER the player → tree-tops/roofs
+      // occlude the player (walk-behind). Non-overhead imported layers already drew
+      // below, before the player.
+      if (map.importedLayers !== undefined) {
+        drawImportedLayers(ctx, map, refTilesets, refCaches, camX, camY, tick, true);
       }
 
       ctx.fillStyle = 'rgba(32, 32, 44, 0.85)';
@@ -1175,6 +1183,7 @@ function drawImportedLayers(
   camX: number,
   camY: number,
   tick: number,
+  overhead: boolean,
 ): void {
   const ts = map.tilesize;
   const minX = Math.max(0, Math.floor(camX / ts));
@@ -1182,6 +1191,7 @@ function drawImportedLayers(
   const minY = Math.max(0, Math.floor(camY / ts));
   const maxY = Math.min(map.height, Math.ceil((camY + LOGICAL_H) / ts) + 1);
   for (const layer of map.importedLayers!) {
+    if ((layer.overhead ?? false) !== overhead) continue; // below-player vs above-player pass
     for (let y = minY; y < maxY; y += 1) {
       const row = layer.tiles[y];
       if (!row) continue;

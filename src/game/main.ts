@@ -1696,6 +1696,15 @@ if (!DEV_BUILD) {
   applyPartyFromUrl(); // a party so the trainer battle is fightable (?party=/?starter=)
   recomputeSignpostFlags();
   showOverworld('__KITCHEN_SINK__', 'player', false);
+} else if (skip === 'route31-big') {
+  // Route 31 Phase 1: the full 22×74 canvas imported+wired live — walk the whole
+  // route (terrain incl. water, collision, warps to Hearthwick/Violet, encounters).
+  // Enter from the north (fromHearthwick, facing down). NPCs are placeholders (Jay
+  // next). Not shipping content; the live ROUTE31 stays the hand-authored map.
+  devSession = true;
+  applyPartyFromUrl();
+  recomputeSignpostFlags();
+  showOverworld('__ROUTE31_BIG__', 'fromHearthwick', false);
 } else if (skip === 'test-battle-2v2') {
   // Phase 1 hook: two-mon player party vs a wild foe positioned so
   // switching is the right read. Default party is [GRUBLEAF, SILTSKIP]

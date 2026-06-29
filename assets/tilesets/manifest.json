@@ -104,6 +104,13 @@
    "tilesize": 16,
    "count": 8,
    "description": "animated bush (frames ingested static)"
+  },
+  {
+   "name": "pct_watersheet",
+   "file": "assets/tilesets/pct_watersheet.tileset.json",
+   "tilesize": 16,
+   "count": 68,
+   "description": "water (sheet, anim frames ingested static)"
   }
  ]
 }

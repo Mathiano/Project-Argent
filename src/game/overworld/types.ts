@@ -39,6 +39,10 @@ export interface TileRef {
 export interface ImportedTileLayer {
   readonly name: string;
   readonly tiles: ReadonlyArray<ReadonlyArray<TileRef | null>>;
+  // True for an "Overhead" layer (name contains "overhead") — drawn ABOVE the player
+  // for walk-behind (tree-tops/roofs occlude the player). Non-overhead layers draw
+  // below the player. Set by the importer from the Tiled layer name.
+  readonly overhead?: boolean;
 }
 
 // A named marker carried through from a Tiled object layer (npc_test, warp_test…).
