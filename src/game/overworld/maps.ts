@@ -52,7 +52,7 @@ import { wireImportedMap } from './tiledWiring';
 import { makeCenter, makeMart } from './interiorGen';
 import { getTileset, hasTileset, registerPrefab, registerTileset } from './tilesetCatalog';
 import type { PrefabJson, TilesetJson } from './tileset';
-import type { MapData } from './types';
+import type { MapData, MapObject } from './types';
 
 // Register tilesets + prefabs first so map loaders can resolve refs.
 registerTileset(outdoorVioletTileset as TilesetJson);
@@ -142,11 +142,31 @@ const REGISTRY: { [name: string]: () => MapData } = {
   // DEV ONLY — Phase-8 kitchen-sink (?skip=tiled-kitchen): EVERY feature at once
   // (collision + 3 NPCs incl. a trainer + 2 warps + 2 spawns + 4 encounter zones).
   __KITCHEN_SINK__: () => importAndWire(kitchenSinkTmj, 'KITCHEN SINK'),
-  // Route 31 Phase 1 (?skip=route31-big): the full 22×74 canvas imported+wired —
-  // terrain incl. water + collision + warps + encounters + spawns. NPCs are still the
-  // kitchen-sink placeholders (Jay + flavor replace them next). Not yet the live ROUTE31.
-  __ROUTE31_BIG__: () => importAndWire(route31BigTmj, 'ROUTE 31 (Phase 1)'),
+  // Route 31 Phase 1+2 (?skip=route31-big): the full 22×74 canvas imported+wired +
+  // Jay/flavor/lost-kid content + the one-time PIP reward (a code-authored step-on
+  // script, the live-route pattern). NOT yet the live ROUTE31 — promotion is blocked
+  // on the content gap vs the old map (docs/route31-migration-scope.md / the Phase-2
+  // report): the Tiled map lacks the guided-catch HARD PIN, 4 trainers, ground items,
+  // the 4 sections + signs, and the canonical PIP/Jay flags — 36 tests encode them.
+  __ROUTE31_BIG__: buildRoute31Big,
 };
+
+// __ROUTE31_BIG__ build: import+wire the Tiled map, then inject the lost-kid quest's
+// one-time reward (returning to the kid after finding PIP gives SUPER POTION ×1).
+// Scripts are code-authored (not Tiled markers); this follows the live route's
+// reunion-reward pattern (requiresFlag + once + flag, so it fires exactly once).
+function buildRoute31Big(): MapData {
+  const map = importAndWire(route31BigTmj, 'ROUTE 31 (Phase 1+2)');
+  const pipReward: MapObject = {
+    type: 'script', x: 15, y: 21, trigger: 'step-on',
+    requiresFlag: 'r31big_pip_found', once: true, flag: 'r31big_pip_rewarded',
+    commands: [
+      { kind: 'dialog', lines: ['KID: Mum keeps these for the rough', 'days. You gave PIP back one of his.', 'Take it. Please.'] },
+      { kind: 'give-item', itemId: 'SUPER POTION', qty: 1 },
+    ],
+  };
+  return { ...map, objects: [...map.objects, pipReward] };
+}
 
 // Each call rebuilds from the JSON so any in-place editing during dev
 // surfaces immediately. Cheap — graybox is just object spread, the

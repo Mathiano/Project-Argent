@@ -173,12 +173,16 @@ export const DEFAULT_DEFS: WiringDefs = {
         'sings three notes, can’t hold a fourth',
         'to save his life. If you hear it...',
         'KID: ...please. He’s never been alone.'] }],
+      // PIP stays at its find-spot (no follower-mon mechanic yet —
+      // docs/follower-mon-mechanic-BACKLOG.md), so the reunion is narrative: the kid
+      // goes to PIP. The one-time SUPER POTION reward is a code-authored step-on
+      // script injected at the build (route 31 phase-2), the live-route pattern.
       interactAfterFlag: [{ kind: 'dialog', lines: [
-        'KID: PIP! You — you found him!',
-        '(The FLITPECK pours off your shoulder',
-        'into the kid’s arms, singing its whole',
-        'song at once — fourth note and all.)',
-        'KID: I won’t forget this. Not ever.'] }],
+        'KID: You found him? By the reeds — really?',
+        '(The kid is already moving, calling',
+        'PIP’s name, the three-note whistle',
+        'spilling out wrong and not caring.)',
+        'KID: Wait — here. For helping. Go on, take it.'] }],
     },
   },
 

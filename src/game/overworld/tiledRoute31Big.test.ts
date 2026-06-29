@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { importTiledMap, defaultResolveSheet } from './tiledImport';
 import type { TiledMapJson } from './tiledImport';
 import { wireImportedMap, DEFAULT_DEFS, CALLS_UNLOCK_ON_WIN } from './tiledWiring';
+import { getMap } from './maps';
 import { isWalkable } from './types';
 import type { MapObject, ScriptCommand } from './types';
 import bigTmj from '../maps/tiled/test-map-kitchen-sink-big.tmj.json';
@@ -144,5 +145,20 @@ describe('Route 31 Phase-2 content — Jay, flavor NPCs, lost-kid quest', () => 
     const jayDef = DEFAULT_DEFS.npc.npc_jay!;
     const wf = (jayDef.interact.find((c) => c.kind === 'start-trainer-battle') as { winFlag: string }).winFlag;
     expect(CALLS_UNLOCK_ON_WIN.has(wf)).toBe(true);
+  });
+
+  test('lost-kid reward: a one-time SUPER POTION step-on script (injected at the build)', () => {
+    // The reward is a code-authored step-on (the live-route pattern); it lives on the
+    // registry build (__ROUTE31_BIG__), not the raw wired map.
+    const big = getMap('__ROUTE31_BIG__');
+    const reward = big.objects.find(
+      (o): o is Extract<MapObject, { type: 'script' }> =>
+        o.type === 'script' && o.requiresFlag === 'r31big_pip_found' && o.once === true &&
+        o.flag === 'r31big_pip_rewarded' && o.commands.some((c) => c.kind === 'give-item'),
+    );
+    expect(reward, 'one-time reunion reward gated on the found flag').toBeTruthy();
+    const give = reward!.commands.find((c) => c.kind === 'give-item') as { itemId: string; qty: number };
+    expect(give.itemId).toBe('SUPER POTION');
+    expect({ x: reward!.x, y: reward!.y }).toEqual({ x: 15, y: 21 }); // at the kid's tile
   });
 });
