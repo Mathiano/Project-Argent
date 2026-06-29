@@ -127,6 +127,11 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
   }
   // …and the DATA-DRIVEN per-tile-id overrides (map.tileRefs, e.g. Route 31 grass).
   for (const ref of Object.values(map.tileRefs ?? {})) registerRef(ref.tileset);
+  // …and the Phase-8 IMPORTED multi-layer refs (Tiled import — every tileset any
+  // layer cell references).
+  for (const layer of map.importedLayers ?? []) {
+    for (const row of layer.tiles) for (const cell of row) if (cell) registerRef(cell.tileset);
+  }
   const spawn = map.spawns[opts.spawn] ?? Object.values(map.spawns)[0]!;
   // spawnAt overrides the named-spawn lookup — used by the save/load
   // restore path to land at the exact previous position. Falls back to
@@ -828,7 +833,10 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
 
-      if (map.cells !== undefined && tileset !== null) {
+      if (map.importedLayers !== undefined) {
+        // Phase-8 Tiled import: draw the ordered registry-ref layers (bottom→top).
+        drawImportedLayers(ctx, map, refTilesets, refCaches, camX, camY, tick);
+      } else if (map.cells !== undefined && tileset !== null) {
         drawTilesetCells(ctx, map, tileset, tileCache, camX, camY, tick, refTilesets, refCaches);
       } else {
         drawTiles(ctx, map, rows, camX, camY, refTilesets, refCaches, tick);
@@ -844,6 +852,9 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
       // back at its spawn tile.
       const confrontingNpc = approach?.npc ?? confront?.npc;
       drawObjectMarkers(ctx, map, camX, camY, opts.flags, tick, confrontingNpc);
+      // Phase-8 import: carried-through named markers (npc_*/warp_*), drawn as a
+      // labelled placeholder until the wiring layer resolves each name to a real def.
+      if (map.importedObjects !== undefined) drawImportedObjectMarkers(ctx, map, camX, camY);
       const ts = map.tilesize;
       if (approach) {
         // Walking up on sight/entry: draw at its animated tile + an "!".
@@ -1149,6 +1160,60 @@ function drawPropCells(
     const sy = c.ty * ts - camY;
     if (sx <= -ts || sy <= -ts || sx >= LOGICAL_W || sy >= LOGICAL_H) continue;
     drawOneTile(ctx, tileset, cache, c.tile, sx, sy, tick);
+  }
+}
+
+// Phase-8 Tiled import: draw the ordered registry-ref layers bottom→top. Each
+// non-null cell resolves its tileset from refTilesets and reuses the SAME verified
+// per-tile draw (drawOneTile → baked bitmap / per-pixel fallback) as live maps.
+// Same viewport cull as the base layer; an unregistered/empty cell is skipped.
+function drawImportedLayers(
+  ctx: CanvasRenderingContext2D,
+  map: MapData,
+  refTilesets: Map<string, Tileset>,
+  refCaches: Map<string, Map<string, (HTMLCanvasElement | OffscreenCanvas)[]> | null>,
+  camX: number,
+  camY: number,
+  tick: number,
+): void {
+  const ts = map.tilesize;
+  const minX = Math.max(0, Math.floor(camX / ts));
+  const maxX = Math.min(map.width, Math.ceil((camX + LOGICAL_W) / ts) + 1);
+  const minY = Math.max(0, Math.floor(camY / ts));
+  const maxY = Math.min(map.height, Math.ceil((camY + LOGICAL_H) / ts) + 1);
+  for (const layer of map.importedLayers!) {
+    for (let y = minY; y < maxY; y += 1) {
+      const row = layer.tiles[y];
+      if (!row) continue;
+      for (let x = minX; x < maxX; x += 1) {
+        const ref = row[x];
+        if (!ref) continue;
+        const rts = refTilesets.get(ref.tileset);
+        if (!rts || !rts.tiles[ref.tile]) continue; // unregistered/missing → empty
+        drawOneTile(ctx, rts, refCaches.get(ref.tileset) ?? null, ref.tile, x * ts - camX, y * ts - camY, tick);
+      }
+    }
+  }
+}
+
+// Phase-8 import: a carried-through named marker (npc_*/warp_*). Placeholder box +
+// name label — the wiring layer (later) resolves the name to a real NPC/warp def.
+function drawImportedObjectMarkers(
+  ctx: CanvasRenderingContext2D,
+  map: MapData,
+  camX: number,
+  camY: number,
+): void {
+  const ts = map.tilesize;
+  for (const obj of map.importedObjects!) {
+    const sx = obj.x * ts - camX;
+    const sy = obj.y * ts - camY;
+    if (sx <= -ts || sy <= -ts || sx >= LOGICAL_W || sy >= LOGICAL_H) continue;
+    const warp = obj.name.startsWith('warp');
+    ctx.strokeStyle = warp ? PALETTE.star : PALETTE.hpCrit;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(sx + 1.5, sy + 1.5, ts - 3, ts - 3);
+    drawText(ctx, obj.name, sx, sy - 7, warp ? PALETTE.star : PALETTE.hpCrit);
   }
 }
 

@@ -23,6 +23,36 @@ export interface Spawn {
   readonly facing: Facing;
 }
 
+// A reference to one authored tile in a registered registry tileset (the same
+// {tileset, tile} shape TileDef.tileRef uses). Named so the Tiled-import layer
+// model can carry per-cell refs across many tilesets.
+export interface TileRef {
+  readonly tileset: string;
+  readonly tile: string;
+}
+
+// One imported tile layer (Phase-8 Tiled import). A row-major grid of registry
+// tile refs (null = empty cell). Tiled maps stack several transparent layers
+// across MULTIPLE tilesets — neither the graybox nor the data-driven single-
+// tilesetRef format expresses that — so an imported map carries an ORDERED list
+// of these and the renderer draws them bottom→top. See docs/tiled-importer.md.
+export interface ImportedTileLayer {
+  readonly name: string;
+  readonly tiles: ReadonlyArray<ReadonlyArray<TileRef | null>>;
+}
+
+// A named marker carried through from a Tiled object layer (npc_test, warp_test…).
+// The importer does NOT invent NPC/warp definitions — it carries the NAME + grid
+// position; a future wiring layer resolves `name` → a CC-code definition (the
+// typed-object contract: npc_* → an NPC, warp_* → a warp, …). w/h in tiles.
+export interface ImportedObject {
+  readonly name: string;
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
+
 // Map-level prefab placement: stamp the named prefab so its anchor cell
 // lands on (x, y). Per-cell solidity from the prefab overrides the
 // tileset's `solid` flag (lets a roof have a walkable door cutout).
@@ -216,6 +246,13 @@ export interface MapData {
   // normally for collision/fallback. Authored at the map level so a region (or a
   // whole tile id, e.g. `grass`) can be retargeted without touching the tileset.
   readonly tileRefs?: { readonly [tileId: string]: { readonly tileset: string; readonly tile: string } };
+  // Phase-8 Tiled import. When set, the renderer draws these ORDERED layers
+  // (bottom→top) of registry tile refs instead of the graybox/data-driven base —
+  // the multi-layer, multi-tileset model a Tiled .tmj needs. `importedObjects` are
+  // the carried-through named markers (resolved to definitions by a later wiring
+  // layer). Both optional, so every existing map loads/renders exactly as before.
+  readonly importedLayers?: readonly ImportedTileLayer[];
+  readonly importedObjects?: readonly ImportedObject[];
 }
 
 export function tileAt(map: MapData, x: number, y: number): TileDef | null {

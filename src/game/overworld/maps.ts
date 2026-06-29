@@ -28,14 +28,22 @@ import pctGrassTileset from '../../../assets/tilesets/pct_grass.tileset.json';
 import pctPathTileset from '../../../assets/tilesets/pct_path.tileset.json';
 import pctWaterTileset from '../../../assets/tilesets/pct_water.tileset.json';
 import pctTreesTileset from '../../../assets/tilesets/pct_trees.tileset.json';
+// Phase-8 Tiled importer: the sheets the test map paints with + the importer + a
+// snapshot of Mathias's export (?skip=tiled-test). See docs/tiled-importer.md.
+import pctPath02Tileset from '../../../assets/tilesets/pct_path02.tileset.json';
+import pctHillsTileset from '../../../assets/tilesets/pct_hills.tileset.json';
+import pctBushanimTileset from '../../../assets/tilesets/pct_bushanim.tileset.json';
 import pctVerifyData from '../maps/pct_verify.json';
+import testMapTmj from '../maps/tiled/test-map.tmj.json';
 import houseVioletPrefab from '../../../assets/prefabs/house_violet.prefab.json';
 import gymVioletPrefab from '../../../assets/prefabs/gym_violet.prefab.json';
 import treeBigPrefab from '../../../assets/prefabs/tree_big.prefab.json';
 import { loadMap } from './mapLoader';
 import type { GrayboxMapJson, DataDrivenMapJson } from './mapLoader';
+import { importTiledMap, defaultResolveSheet } from './tiledImport';
+import type { TiledMapJson } from './tiledImport';
 import { makeCenter, makeMart } from './interiorGen';
-import { registerPrefab, registerTileset } from './tilesetCatalog';
+import { getTileset, hasTileset, registerPrefab, registerTileset } from './tilesetCatalog';
 import type { PrefabJson, TilesetJson } from './tileset';
 import type { MapData } from './types';
 
@@ -46,6 +54,9 @@ registerTileset(pctGrassTileset as TilesetJson);
 registerTileset(pctPathTileset as TilesetJson);
 registerTileset(pctWaterTileset as TilesetJson);
 registerTileset(pctTreesTileset as TilesetJson);
+registerTileset(pctPath02Tileset as TilesetJson);
+registerTileset(pctHillsTileset as TilesetJson);
+registerTileset(pctBushanimTileset as TilesetJson);
 registerPrefab(houseVioletPrefab as PrefabJson);
 registerPrefab(gymVioletPrefab as PrefabJson);
 registerPrefab(treeBigPrefab as PrefabJson);
@@ -58,6 +69,19 @@ function isGrayboxForced(): boolean {
 function chooseRoute31(): MapData {
   if (isGrayboxForced()) return loadMap(route31Data as GrayboxMapJson);
   return loadMap(route31VioletData as DataDrivenMapJson);
+}
+
+// Phase-8: import the snapshotted Tiled export through the real importer (so
+// ?skip=tiled-test renders Mathias's painted map via the verified production tile
+// path). tileExists prunes GIDs that hit a blank/un-ingested registry cell.
+function buildTiledTestMap(): MapData {
+  const { map, warnings } = importTiledMap(testMapTmj as unknown as TiledMapJson, {
+    name: 'TILED TEST',
+    resolveSheet: defaultResolveSheet,
+    tileExists: (pct, key) => hasTileset(pct) && getTileset(pct).tiles[key] !== undefined,
+  });
+  for (const w of warnings) console.warn(`[tiled-import] ${w}`);
+  return map;
 }
 
 const REGISTRY: { [name: string]: () => MapData } = {
@@ -98,6 +122,9 @@ const REGISTRY: { [name: string]: () => MapData } = {
   ROUTE32: () => loadMap(route32Data as GrayboxMapJson),
   // DEV/VERIFICATION ONLY — pct-tile pipeline check (?skip=pct-prod). Not in play.
   __PCT_VERIFY__: () => loadMap(pctVerifyData as GrayboxMapJson),
+  // DEV ONLY — Phase-8 Tiled importer demo (?skip=tiled-test). Mathias's painted
+  // test map, imported live. Not in play.
+  __TILED_TEST__: buildTiledTestMap,
 };
 
 // Each call rebuilds from the JSON so any in-place editing during dev

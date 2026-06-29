@@ -1679,6 +1679,13 @@ if (!DEV_BUILD) {
   // headless by pctProdRender.test.ts; see docs/pct-pipeline-verify.md.
   devSession = true;
   showOverworld('__PCT_VERIFY__', 'default', false);
+} else if (skip === 'tiled-test') {
+  // Phase-8 Tiled IMPORTER demo: Mathias's painted test-map.tmj, imported live
+  // (tools docs/tiled-importer.md) and rendered through the REAL overworld path —
+  // multi-layer pct_* tiles + carried-through npc_*/warp_* markers. Import warnings
+  // (duplicate/unnamed/unresolvable) log to the console. Not shipping content.
+  devSession = true;
+  showOverworld('__TILED_TEST__', 'default', false);
 } else if (skip === 'test-battle-2v2') {
   // Phase 1 hook: two-mon player party vs a wild foe positioned so
   // switching is the right read. Default party is [GRUBLEAF, SILTSKIP]
