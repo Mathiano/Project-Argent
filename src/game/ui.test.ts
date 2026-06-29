@@ -5,7 +5,7 @@
 // these pin the logic that backs it.
 
 import { describe, expect, test } from 'vitest';
-import { hpColor, drawBar, drawPanel, drawRowHighlight, bevelFilled, drawText, drawTextCenter, measureUiText, BAR_HEIGHT, BAR_HEIGHT_TALL, UI_FONT, UI_FONT_PX } from './ui';
+import { hpColor, drawBar, drawPanel, drawRowHighlight, bevelFilled, drawText, drawTextCenter, measureUiText, normalizeUiText, BAR_HEIGHT, BAR_HEIGHT_TALL, UI_FONT, UI_FONT_PX } from './ui';
 import { PALETTE } from './palette';
 import { drawBondBar } from './bondBar';
 import { BOND_STAGES } from './catching';
@@ -106,5 +106,52 @@ describe('bond meter — the stage name is measured + drawn in full', () => {
     const ctx = stubCtx();
     drawBondBar(ctx, 0, 0, 200, stage.max); // a value inside the longest-named stage
     expect(ctx.texts.some((t) => t.includes(longest))).toBe(true);
+  });
+});
+
+describe('m3x6 apostrophe / smart-quote fix — curly quotes → present ASCII', () => {
+  // m3x6 LACKS the curly quote forms (’ ‘ ” “) → they fell to the 16px monospace
+  // fallback (oversized); it HAS the ASCII forms (' "). Normalize so contractions
+  // draw as proper small m3x6 marks. (Em-dash/ellipsis share the bug but are NOT
+  // remapped — deliberately out of scope; see normalizeUiText.)
+  const REMAPPED = '‘’“”'; // the curly quotes this fix targets
+
+  test('curly single quotes → straight U+0027 (the apostrophe m3x6 has)', () => {
+    expect(normalizeUiText('don’t')).toBe("don't");
+    expect(normalizeUiText('it’s')).toBe("it's");
+    expect(normalizeUiText('you’re')).toBe("you're");
+    expect(normalizeUiText('‘quoted’')).toBe("'quoted'");
+  });
+
+  test('curly double quotes → straight U+0022 (its twin)', () => {
+    expect(normalizeUiText('“wind”')).toBe('"wind"');
+  });
+
+  test('the normalized output contains NONE of the remapped curly glyphs', () => {
+    const sample = 'JAY: “don’t” it’s you’re';
+    const out = normalizeUiText(sample);
+    for (const ch of REMAPPED) expect(out.includes(ch)).toBe(false);
+  });
+
+  test('em-dash + ellipsis are LEFT AS-IS (out of scope — flagged follow-up)', () => {
+    expect(normalizeUiText('you — wait…')).toBe('you — wait…'); // unchanged
+  });
+
+  test('drawText draws the normalized apostrophe (U+0027), not the curly one', () => {
+    const ctx = stubCtx();
+    drawText(ctx, 'don’t', 0, 0);
+    const joined = ctx.texts.join('');
+    expect(joined.includes("don't")).toBe(true); // straight ' (U+0027 — present in m3x6)
+    expect(joined.includes('’')).toBe(false); // no curly ' reaches the canvas
+  });
+
+  test('inline symbols (★ ♥ ▼ ₽) are UNTOUCHED by normalization + still drawn', () => {
+    expect(normalizeUiText('★♥▼₽')).toBe('★♥▼₽'); // not remapped
+    const ctx = stubCtx();
+    drawText(ctx, '★ HP 100’s', 0, 0); // symbol path + a curly apostrophe
+    const joined = ctx.texts.join('');
+    expect(joined.includes('★')).toBe(true); // symbol still drawn (small-symbol pass)
+    expect(joined.includes("100's")).toBe(true); // apostrophe normalized in the same string
+    expect(joined.includes('’')).toBe(false);
   });
 });

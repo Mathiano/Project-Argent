@@ -63,6 +63,26 @@ function isSym(ch: string): boolean {
   return UI_SYMBOL_RE.test(ch);
 }
 
+// Typographic-Unicode → ASCII QUOTE normalization (render-layer). m3x6 has the
+// ASCII quote forms (' and ") but LACKS the "smart" curly forms (’ ‘ ” “) — embedded,
+// those fall PER-GLYPH to the 16px monospace fallback and render OVERSIZED (the
+// towering-apostrophe bug; smart-quote editors auto-insert the curly forms). Map
+// them to the ASCII glyph m3x6 DOES have, so contractions ("don't") + dialogue
+// quotes draw as proper small m3x6 marks. SOURCE strings keep their curly chars
+// (authors type either) — only the drawn glyphs are normalized; applied at every
+// draw/measure entry so widths agree.
+//
+// SCOPE: quotes only (the reported apostrophe bug + its double-quote twin). m3x6
+// ALSO lacks the em/en dash (— –) and ellipsis (…) — the SAME oversize bug — but
+// those are NOT remapped here: '—'→'-' is a typography downgrade and many UI strings
+// + tests use the em-dash deliberately. To fix those, add the glyphs to the CC0
+// m3x6.ttf, or extend this map (and update the em-dash-asserting tests). Flagged.
+export function normalizeUiText(s: string): string {
+  return s
+    .replace(/[‘’]/g, "'") // ‘ ’ → '  (the apostrophe fix)
+    .replace(/[“”]/g, '"'); // “ ” → "  (its double-quote twin)
+}
+
 // Sum the width of a mixed string, each run measured in its own font.
 function mixedWidth(ctx: CanvasRenderingContext2D, text: string): number {
   let w = 0;
@@ -296,6 +316,7 @@ export function drawText(
   y: number,
   color: string = PALETTE.ink,
 ): void {
+  text = normalizeUiText(text);
   ctx.textBaseline = 'top';
   const ty = y + UI_TEXT_DY;
   // Mixed (contains a symbol m3x6 lacks) → run-split so the symbol renders small.
@@ -323,6 +344,7 @@ export function drawTextRight(
   y: number,
   color: string = PALETTE.ink,
 ): void {
+  text = normalizeUiText(text);
   ctx.textBaseline = 'top';
   const ty = y + UI_TEXT_DY;
   if (UI_SYMBOL_RE.test(text)) {
@@ -347,7 +369,7 @@ export function drawTextRight(
 // Mixed-aware width of a UI string (m3x6 runs + small symbol runs). Use this to
 // SIZE a box around proportional text (e.g. the combat callout banner).
 export function measureUiText(ctx: CanvasRenderingContext2D, text: string): number {
-  return mixedWidth(ctx, text);
+  return mixedWidth(ctx, normalizeUiText(text));
 }
 
 // Draw a UI string CENTERED on `cx` — applies the vertical offset + the small
@@ -360,6 +382,7 @@ export function drawTextCenter(
   y: number,
   color: string = PALETTE.ink,
 ): void {
+  text = normalizeUiText(text);
   ctx.textBaseline = 'top';
   const ty = y + UI_TEXT_DY;
   const left = Math.round(cx - mixedWidth(ctx, text) / 2);
