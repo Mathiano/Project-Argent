@@ -94,6 +94,10 @@ export interface StatusInstance {
   readonly kind: StatusKind;
   readonly duration: number;
   readonly applied?: number;
+  // The FORCED stance for a stance-lock control debuff (Frozen/Inception lock
+  // the stance held when applied; Taunt forces Aggressive). Absent for every
+  // non-control status → unchanged shape. (Wave B.)
+  readonly stance?: Stance;
 }
 
 // An effect-move's effect descriptor. OPTIONAL on Move — the 43 damage moves

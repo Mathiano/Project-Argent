@@ -99,6 +99,50 @@ export const MOVES: { readonly [name: string]: Move } = {
     type: null,
     effect: { status: 'amplify', polarity: 'buff', condition: 'always' },
   },
+  // ── Control & resource effect moves (Increment 1b Wave B) ─────────────────
+  // Same 1a mechanism (read-win to land debuffs; chip damage). CONTROL moves
+  // force/lock the foe's stance (escapable: read-win to apply, bounded
+  // durations, diminishing returns on re-apply, foe can Call/rest). Typeless
+  // fixtures (canon: FROST BIND/GLASS EDGE→FROST, MIND SNARE→PSI, CHALLENGE/
+  // LEECH BITE→BRAWN/INSECT, TOXIC SAP/CORRODE→VENOM).
+  // Control debuffs (read-win to land):
+  'FROST BIND': {
+    name: 'FROST BIND',
+    tier: 'heavy',
+    type: null,
+    effect: { status: 'frozen', polarity: 'debuff', condition: 'readWin' },
+  },
+  'MIND SNARE': {
+    name: 'MIND SNARE',
+    tier: 'mid',
+    type: null,
+    effect: { status: 'inception', polarity: 'debuff', condition: 'readWin' },
+  },
+  CHALLENGE: {
+    name: 'CHALLENGE',
+    tier: 'mid',
+    type: null,
+    effect: { status: 'taunt', polarity: 'debuff', condition: 'readWin' },
+  },
+  // Resource debuffs (read-win to land):
+  'TOXIC SAP': {
+    name: 'TOXIC SAP',
+    tier: 'mid',
+    type: null,
+    effect: { status: 'drained', polarity: 'debuff', condition: 'readWin' },
+  },
+  'LEECH BITE': {
+    name: 'LEECH BITE',
+    tier: 'mid',
+    type: null,
+    effect: { status: 'sap', polarity: 'debuff', condition: 'readWin' },
+  },
+  CORRODE: {
+    name: 'CORRODE',
+    tier: 'mid',
+    type: null,
+    effect: { status: 'corrode', polarity: 'debuff', condition: 'readWin' },
+  },
 };
 
 export const SPECIES: { readonly [name: string]: Species } = {

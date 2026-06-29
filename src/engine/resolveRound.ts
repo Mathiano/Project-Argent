@@ -6,6 +6,7 @@ import { lookupMove, setActiveMember, validateActionTeam } from './state';
 import {
   applyPendingEffect,
   buffDamageTakenMult,
+  clearDebuff,
   durationForStatus,
   effectDamageFactor,
   tickStatuses,
@@ -166,6 +167,30 @@ function actionMove(action: Action): string | null {
   return action.kind === 'move' ? action.move : null;
 }
 
+// ── Stance-lock control debuffs (Wave B) ────────────────────────────────────
+// Frozen / Inception lock the bearer into the stance it held when applied;
+// Taunt forces Aggressive. The locked stance is stored on the debuff. Returns
+// null for any side with no active stance-lock → no override (bit-identical).
+function lockedStance(side: SideState): Stance | null {
+  const d = side.debuff;
+  if (d === undefined || d.stance === undefined) return null;
+  if (d.kind === 'frozen' || d.kind === 'inception' || d.kind === 'taunt') return d.stance;
+  return null;
+}
+
+// Override a forced side's MOVE stance to its locked stance. Engine-enforced so
+// control is real + sim-testable: the forced stance flows through resolution,
+// stamina (paySide) and — crucially — the recorded history, so a reader
+// naturally counters the now-predictable foe. Only MOVE actions are locked: a
+// frozen mon can still Call / rest (an escapability valve — never a stun-lock).
+// A releasing mon is exempt (already locked into its release).
+function applyStanceLock(action: Action, side: SideState, isReleasing: boolean): Action {
+  if (isReleasing || action.kind !== 'move') return action;
+  const ls = lockedStance(side);
+  if (ls === null || action.stance === ls) return action;
+  return { ...action, stance: ls };
+}
+
 function describeAction(action: Action, side: SideState): CommitDescriptor {
   // FOCUS model — a focusing mon RELEASES this round (its chosen release, or
   // the focus's default if none was passed).
@@ -287,6 +312,9 @@ interface StrikeResult {
   // resolved by resolveRound AFTER the end-of-round tick (so a fresh status
   // does not tick on its cast round). Absent for the 43 damage moves.
   readonly effect?: PendingEffect;
+  // Wave B — CORRODE: the caster bore Corrode, so its technique FIZZLED (no
+  // status, just chip) and Corrode must be consumed by resolveRound.
+  readonly consumeCorrode?: boolean;
 }
 
 function resolveStrike(
@@ -320,17 +348,37 @@ function resolveStrike(
   // damage, and on a cast-stance READ-WIN its status replaces the ★ (no
   // double-win); a BUFF self-applies in every branch (exposure is the cost).
   const effect = move.effect;
+  // Wave B — CORRODE: if the caster bears Corrode, its TECHNIQUE fizzles (no
+  // status lands; just chip) and Corrode is consumed (signalled to resolveRound).
+  const corroded = effect !== undefined && attacker.debuff?.kind === 'corrode';
   // The defender's active buffs (e.g. BULWARK) mitigate every incoming strike;
   // 1.0 when the defender has no buffs.
   const defTaken = buffDamageTakenMult(defender);
+  // Forced stance carried by a control debuff (Frozen/Inception lock the
+  // target's CURRENT stance; Taunt forces Aggressive).
+  const controlStance = (): Stance | undefined =>
+    effect === undefined
+      ? undefined
+      : effect.status === 'frozen' || effect.status === 'inception'
+        ? defStance
+        : effect.status === 'taunt'
+          ? 'A'
+          : undefined;
   const makeBuffPending = (): PendingEffect | undefined =>
-    effect !== undefined && effect.polarity === 'buff'
+    effect !== undefined && effect.polarity === 'buff' && !corroded
       ? { target: attSide, status: effect.status, polarity: 'buff', duration: durationForStatus(effect.status) }
       : undefined;
-  const makeDebuffPending = (): PendingEffect | undefined =>
-    effect !== undefined && effect.polarity === 'debuff'
-      ? { target: defSide, status: effect.status, polarity: 'debuff', duration: durationForStatus(effect.status) }
-      : undefined;
+  const makeDebuffPending = (): PendingEffect | undefined => {
+    if (!(effect !== undefined && effect.polarity === 'debuff' && !corroded)) return undefined;
+    const stance = controlStance();
+    return {
+      target: defSide,
+      status: effect.status,
+      polarity: 'debuff',
+      duration: durationForStatus(effect.status),
+      ...(stance ? { stance } : {}),
+    };
+  };
   // On a read-win (punish / opening) a buff lands on self OR a debuff on the foe.
   const readWinPending = (): PendingEffect | undefined => makeBuffPending() ?? makeDebuffPending();
 
@@ -362,7 +410,7 @@ function resolveStrike(
     const newAtt = effect !== undefined ? attacker : gainMomentum(attacker, attSide, events);
     if (newDef.hp <= 0) events.push({ kind: 'ko', side: defSide });
     const pend = readWinPending();
-    return { attacker: newAtt, defender: newDef, ...(pend !== undefined ? { effect: pend } : {}) };
+    return { attacker: newAtt, defender: newDef, ...(pend !== undefined ? { effect: pend } : {}), ...(corroded ? { consumeCorrode: true } : {}) };
   }
 
   // F vs G — opening (no counter possible)
@@ -375,7 +423,7 @@ function resolveStrike(
     const newAtt = effect !== undefined ? attacker : gainMomentum(attacker, attSide, events);
     if (newDef.hp <= 0) events.push({ kind: 'ko', side: defSide });
     const pend = readWinPending();
-    return { attacker: newAtt, defender: newDef, ...(pend !== undefined ? { effect: pend } : {}) };
+    return { attacker: newAtt, defender: newDef, ...(pend !== undefined ? { effect: pend } : {}), ...(corroded ? { consumeCorrode: true } : {}) };
   }
 
   // Normal hit (with defender mitigation). preMit stays PRE-daze so the
@@ -399,7 +447,7 @@ function resolveStrike(
 
   if (newDef.hp <= 0) {
     events.push({ kind: 'ko', side: defSide });
-    return { attacker: newAtt, defender: newDef, ...(buffPending !== undefined ? { effect: buffPending } : {}) };
+    return { attacker: newAtt, defender: newDef, ...(buffPending !== undefined ? { effect: buffPending } : {}), ...(corroded ? { consumeCorrode: true } : {}) };
   }
 
   // G vs A — counter, only because defender survived
@@ -416,7 +464,7 @@ function resolveStrike(
     if (newAtt.hp <= 0) events.push({ kind: 'ko', side: attSide });
   }
 
-  return { attacker: newAtt, defender: newDef, ...(buffPending !== undefined ? { effect: buffPending } : {}) };
+  return { attacker: newAtt, defender: newDef, ...(buffPending !== undefined ? { effect: buffPending } : {}), ...(corroded ? { consumeCorrode: true } : {}) };
 }
 
 function paySide(
@@ -520,6 +568,13 @@ export function resolveRound(
   // round (its chosen release). Captured before any mutation.
   const plReleasing = pl.focus !== undefined;
   const foeReleasing = foe.focus !== undefined;
+
+  // Wave B — apply stance-lock control debuffs (Frozen/Inception/Taunt) BEFORE
+  // anything reads the action: the forced stance then threads through the
+  // commit event, resolution, stamina, and the recorded history. Inert for a
+  // side with no stance-lock → bit-identical.
+  playerAction = applyStanceLock(playerAction, pl, plReleasing);
+  foeAction = applyStanceLock(foeAction, foe, foeReleasing);
 
   events.push({
     kind: 'roundStart',
@@ -885,6 +940,7 @@ export function resolveRound(
         pl = r.attacker;
         foe = r.defender;
         if (r.effect !== undefined) pendingEffects.push(r.effect);
+        if (r.consumeCorrode) { pl = clearDebuff(pl); events.push({ kind: 'statusBreak', side: 'player', status: 'corrode' }); }
         if (foe.hp > 0) {
           foe = { ...foe, staggered: true };
           events.push({ kind: 'staggered', side: 'foe' });
@@ -896,6 +952,7 @@ export function resolveRound(
         foe = r.attacker;
         pl = r.defender;
         if (r.effect !== undefined) pendingEffects.push(r.effect);
+        if (r.consumeCorrode) { foe = clearDebuff(foe); events.push({ kind: 'statusBreak', side: 'foe', status: 'corrode' }); }
         if (pl.hp > 0) {
           pl = { ...pl, staggered: true };
           events.push({ kind: 'staggered', side: 'player' });
@@ -909,11 +966,13 @@ export function resolveRound(
           pl = r.attacker;
           foe = r.defender;
           if (r.effect !== undefined) pendingEffects.push(r.effect);
+          if (r.consumeCorrode) { pl = clearDebuff(pl); events.push({ kind: 'statusBreak', side: 'player', status: 'corrode' }); }
         } else if (sideKey === 'foe' && foeMove !== null) {
           const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, "foe", rng, events, state.typeChart, state.traits, rhythm, plDazed, foeStrikeMult);
           foe = r.attacker;
           pl = r.defender;
           if (r.effect !== undefined) pendingEffects.push(r.effect);
+          if (r.consumeCorrode) { foe = clearDebuff(foe); events.push({ kind: 'statusBreak', side: 'foe', status: 'corrode' }); }
         }
       }
     }

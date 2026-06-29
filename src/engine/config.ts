@@ -191,8 +191,17 @@ export const STATUS = {
   attunementDiscount: 1,
   // Per-status durations (rounds); kinds absent here use baseDuration. Silence /
   // Call Lock are bounded short (the foe can still ACT, only not Call — never a
-  // stun-lock); Echo is a single next-round re-map.
-  statusDurations: { silence: 2, callLock: 2, echo: 1 } as { readonly [k: string]: number },
+  // stun-lock); Echo is a single next-round re-map. CONTROL stance-locks
+  // (Wave B) are bounded short for escapability: Frozen/Inception ≤2, Taunt 1.
+  statusDurations: {
+    silence: 2, callLock: 2, echo: 1, frozen: 2, inception: 2, taunt: 1,
+  } as { readonly [k: string]: number },
+  // ── Resource effects (Wave B) ──────────────────────────────────────────────
+  // Drained (TOXIC SAP): stamina bled per round while active (offsets +8 regen
+  // → real pressure, but not an instant softlock).
+  drainedStaminaDot: 10,
+  // Sap (LEECH BITE): instant burst stamina-drain on the read-win.
+  sapStaminaBurst: 20,
   // ★ cost to apply a status via a technique (placeholder — the two-pool /
   // momentum-economy increment sets the real economy).
   applicationCost: 1,

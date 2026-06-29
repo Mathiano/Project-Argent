@@ -1,11 +1,25 @@
 import { COMBAT, STATUS } from './config';
 import type { BattleEvent } from './events';
-import type { Move, Side, SideState, StatusKind } from './types';
+import type { Move, Side, SideState, Stance, StatusKind } from './types';
 
-// Wave A economy statuses that resolve INSTANTLY on application (an immediate ★
-// swing) and leave NO lingering status — so they don't occupy the one-debuff
-// slot or a buff entry. The rest are lingering (checked at the economy sites).
-const INSTANT_STATUSES: ReadonlySet<string> = new Set(['sapFocus', 'secondWind']);
+// Statuses that resolve INSTANTLY on application (an immediate ★/ST swing) and
+// leave NO lingering status — so they don't occupy the one-debuff slot or a
+// buff entry. The rest are lingering (checked at their economy/combat sites).
+//   sapFocus −1★ · secondWind +1★ (Wave A) · sap burst-drains stamina (Wave B).
+const INSTANT_STATUSES: ReadonlySet<string> = new Set(['sapFocus', 'secondWind', 'sap']);
+
+// CONTROL stance-locks (Wave B): they force the bearer's stance and carry
+// diminishing returns on re-apply (escapability — re-locking shrinks then
+// RESISTS, so a controller can't chain-lock to death).
+const CONTROL_STATUSES: ReadonlySet<string> = new Set(['frozen', 'inception', 'taunt']);
+
+// Remove a side's single active debuff (used to CONSUME Corrode when it fizzles
+// the bearer's next technique). No-op if there is no debuff.
+export function clearDebuff(side: SideState): SideState {
+  if (side.debuff === undefined) return side;
+  const { debuff: _drop, ...rest } = side;
+  return rest;
+}
 
 // ── Effect-move + status MECHANISM helpers (Increment 1a) ───────────────────
 // Pure + headless. resolveRound wires these into the EXISTING stance triangle
@@ -23,6 +37,8 @@ export interface PendingEffect {
   readonly status: StatusKind;
   readonly polarity: 'buff' | 'debuff';
   readonly duration: number;
+  // The forced stance for a stance-lock control debuff (Wave B). Absent otherwise.
+  readonly stance?: Stance;
 }
 
 // Effect moves deal REDUCED chip damage (so a missed read isn't a dead turn).
@@ -63,9 +79,33 @@ export function applyPendingEffect(
   sideKey: Side,
   events: BattleEvent[],
 ): SideState {
+  // CONTROL re-apply DIMINISHING RETURNS — checked BEFORE announcing, so a
+  // resisted re-lock emits statusResist (not statusApply). Re-applying the SAME
+  // lock while active shrinks the new duration; once it would be ≤0 it RESISTS,
+  // guaranteeing the bearer eventually breaks free (escapability). A fresh lock
+  // (none active) falls through to the full-duration apply below.
+  if (pe.polarity === 'debuff' && CONTROL_STATUSES.has(pe.status) && side.debuff?.kind === pe.status) {
+    const applied = (side.debuff.applied ?? 1) + 1;
+    const dur = Math.max(0, pe.duration - (applied - 1));
+    if (dur <= 0) {
+      events.push({ kind: 'statusResist', side: sideKey, status: pe.status });
+      return side; // resisted — the lock does not refresh
+    }
+    events.push({ kind: 'statusApply', side: sideKey, status: pe.status, duration: dur });
+    return {
+      ...side,
+      debuff: { kind: pe.status, duration: dur, applied, ...(pe.stance ? { stance: pe.stance } : {}) },
+    };
+  }
   events.push({ kind: 'statusApply', side: sideKey, status: pe.status, duration: pe.duration });
-  // ── Instant ★ effects (Wave A) — apply the ★ swing now, leave no lingering
-  // status. SAP FOCUS (debuff): the foe loses ★. SECOND WIND (buff): self-gain ★.
+  // ── Instant effects — apply the swing now, leave no lingering status. ───────
+  // SAP (Wave B, debuff): burst-drain the foe's stamina.
+  if (pe.status === 'sap') {
+    const st = Math.max(0, side.st - STATUS.sapStaminaBurst);
+    events.push({ kind: 'stamina', side: sideKey, before: side.st, after: st, netDelta: st - side.st });
+    return { ...side, st, exhausted: st <= 0 ? true : side.exhausted };
+  }
+  // SAP FOCUS −1★ (Wave A) / SECOND WIND +1★ (Wave A).
   if (INSTANT_STATUSES.has(pe.status)) {
     const total =
       pe.status === 'secondWind'
@@ -75,7 +115,16 @@ export function applyPendingEffect(
     return { ...side, momentum: total };
   }
   if (pe.polarity === 'debuff') {
-    return { ...side, debuff: { kind: pe.status, duration: pe.duration } };
+    // Fresh debuff (incl. a first-time control lock → applied:1 + forced stance).
+    return {
+      ...side,
+      debuff: {
+        kind: pe.status,
+        duration: pe.duration,
+        ...(CONTROL_STATUSES.has(pe.status) ? { applied: 1 } : {}),
+        ...(pe.stance ? { stance: pe.stance } : {}),
+      },
+    };
   }
   const buffs = side.buffs ?? [];
   const fresh = { kind: pe.status, duration: pe.duration };
@@ -99,12 +148,21 @@ export function tickStatuses(
   if (side.hp <= 0) return side;
   let s = side;
 
-  // Active debuff: DoT (Burn) then decrement / expire.
+  // Active debuff: DoT (Burn HP / Drained stamina) then decrement / expire.
   if (s.debuff !== undefined) {
-    const kind = s.debuff.kind;
+    const deb = s.debuff; // captured (narrowed) before the drained reassign below
+    const kind = deb.kind;
+    const remaining = deb.duration - 1;
     const dot = kind === 'burn' ? Math.round(s.maxHp * STATUS.burnDotPct) : 0;
     const hp = dot > 0 ? Math.max(0, s.hp - dot) : s.hp;
-    const remaining = s.debuff.duration - 1;
+    // DRAINED (Wave B): bleed stamina each round (a separate 'stamina' event).
+    if (kind === 'drained') {
+      const st = Math.max(0, s.st - STATUS.drainedStaminaDot);
+      if (st !== s.st) {
+        events.push({ kind: 'stamina', side: sideKey, before: s.st, after: st, netDelta: st - s.st });
+        s = { ...s, st, exhausted: st <= 0 ? true : s.exhausted };
+      }
+    }
     events.push({
       kind: 'statusTick',
       side: sideKey,
@@ -117,7 +175,8 @@ export function tickStatuses(
       const { debuff: _drop, ...rest } = s;
       s = { ...rest, hp };
     } else {
-      s = { ...s, hp, debuff: { kind, duration: remaining } };
+      // Preserve applied (DR count) + stance (the forced stance) across ticks.
+      s = { ...s, hp, debuff: { ...deb, duration: remaining } };
     }
     if (hp <= 0) events.push({ kind: 'ko', side: sideKey });
   }
