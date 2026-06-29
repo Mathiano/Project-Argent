@@ -1,20 +1,17 @@
 // Map registry. Registers all asset JSONs (tilesets, prefabs, maps) at
 // module load and exposes getMap(name) → runtime MapData.
 //
-// ?graybox=1 in the URL forces the legacy graybox maps over the
-// re-skinned data-driven versions — useful when comparing the design
-// pass against the original layout, or when art is broken.
+// ROUTE31 is the Tiled-built map (Phase-4 capstone — buildRoute31; the old
+// route31.json / route31.violet.json were retired). Other maps stay JSON.
 
 import labData from '../maps/lab.json';
 import houseData from '../maps/house.json';
 import kamonHouseData from '../maps/kamon_house.json';
 import bedroomData from '../maps/bedroom.json';
 import hearthwickData from '../maps/hearthwick.json';
-import route31Data from '../maps/route31.json';
 import violetData from '../maps/violet.json';
 import violetAcademyData from '../maps/violet_academy.json';
 import gymData from '../maps/gym.json';
-import route31VioletData from '../maps/route31.violet.json';
 import route32Data from '../maps/route32.json';
 import outdoorVioletTileset from '../../../assets/tilesets/outdoor_violet.tileset.json';
 // Registry asset — authored in Argent Studio, resolved by name (manifest.json).
@@ -37,6 +34,7 @@ import pctBushTileset from '../../../assets/tilesets/pct_bush.tileset.json';
 import pctWatersheetTileset from '../../../assets/tilesets/pct_watersheet.tileset.json';
 import pctFencesTileset from '../../../assets/tilesets/pct_fences.tileset.json';
 import pctBuildingsTileset from '../../../assets/tilesets/pct_buildings.tileset.json';
+import pctDecorTileset from '../../../assets/tilesets/pct_decor.tileset.json';
 import pctVerifyData from '../maps/pct_verify.json';
 import testMapTmj from '../maps/tiled/test-map.tmj.json';
 import kitchenSinkTmj from '../maps/tiled/test-map-kitchen-sink.tmj.json';
@@ -68,19 +66,11 @@ registerTileset(pctBushTileset as TilesetJson);
 registerTileset(pctWatersheetTileset as TilesetJson);
 registerTileset(pctFencesTileset as TilesetJson);
 registerTileset(pctBuildingsTileset as TilesetJson);
+registerTileset(pctDecorTileset as TilesetJson);
 registerPrefab(houseVioletPrefab as PrefabJson);
 registerPrefab(gymVioletPrefab as PrefabJson);
 registerPrefab(treeBigPrefab as PrefabJson);
 
-function isGrayboxForced(): boolean {
-  if (typeof window === 'undefined') return false;
-  return new URLSearchParams(window.location.search).has('graybox');
-}
-
-function chooseRoute31(): MapData {
-  if (isGrayboxForced()) return loadMap(route31Data as GrayboxMapJson);
-  return loadMap(route31VioletData as DataDrivenMapJson);
-}
 
 // Phase-8: import a snapshotted Tiled export through the real importer + wiring (so
 // the ?skip hooks render Mathias's painted maps via the verified production tile
@@ -109,7 +99,8 @@ const REGISTRY: { [name: string]: () => MapData } = {
   HEARTHWICK_CENTER: () => loadMap(makeCenter('HEARTHWICK')),
   HEARTHWICK_MART: () => loadMap(makeMart('HEARTHWICK', ['BALL', 'POTION', 'SUPER POTION', 'FULL HEAL'])),
   LAB: () => loadMap(labData as GrayboxMapJson),
-  ROUTE31: chooseRoute31,
+  // Phase-4 capstone: Route 31 IS the Tiled-built map (route31.violet.json retired).
+  ROUTE31: buildRoute31,
   // Phase 7: Violet is now data-driven (plaster city). Its Center + Mart
   // are real enterable interiors (graybox, like Hearthwick's pair).
   VIOLET: () => loadMap(violetData as DataDrivenMapJson),
@@ -142,30 +133,54 @@ const REGISTRY: { [name: string]: () => MapData } = {
   // DEV ONLY — Phase-8 kitchen-sink (?skip=tiled-kitchen): EVERY feature at once
   // (collision + 3 NPCs incl. a trainer + 2 warps + 2 spawns + 4 encounter zones).
   __KITCHEN_SINK__: () => importAndWire(kitchenSinkTmj, 'KITCHEN SINK'),
-  // Route 31 Phase 1+2 (?skip=route31-big): the full 22×74 canvas imported+wired +
-  // Jay/flavor/lost-kid content + the one-time PIP reward (a code-authored step-on
-  // script, the live-route pattern). NOT yet the live ROUTE31 — promotion is blocked
-  // on the content gap vs the old map (docs/route31-migration-scope.md / the Phase-2
-  // report): the Tiled map lacks the guided-catch HARD PIN, 4 trainers, ground items,
-  // the 4 sections + signs, and the canonical PIP/Jay flags — 36 tests encode them.
-  __ROUTE31_BIG__: buildRoute31Big,
+  // ?skip=route31-big — an alias to the now-LIVE Route 31 build (enters at the north
+  // gate). Kept for the dev hook + tiledRoute31Big.test; same content as ROUTE31.
+  __ROUTE31_BIG__: buildRoute31,
 };
 
-// __ROUTE31_BIG__ build: import+wire the Tiled map, then inject the lost-kid quest's
-// one-time reward (returning to the kid after finding PIP gives SUPER POTION ×1).
-// Scripts are code-authored (not Tiled markers); this follows the live route's
-// reunion-reward pattern (requiresFlag + once + flag, so it fires exactly once).
-function buildRoute31Big(): MapData {
-  const map = importAndWire(route31BigTmj, 'ROUTE 31 (Phase 1+2)');
-  const pipReward: MapObject = {
-    type: 'script', x: 15, y: 21, trigger: 'step-on',
-    requiresFlag: 'r31big_pip_found', once: true, flag: 'r31big_pip_rewarded',
-    commands: [
-      { kind: 'dialog', lines: ['KID: Mum keeps these for the rough', 'days. You gave PIP back one of his.', 'Take it. Please.'] },
-      { kind: 'give-item', itemId: 'SUPER POTION', qty: 1 },
-    ],
-  };
-  return { ...map, objects: [...map.objects, pipReward] };
+// THE LIVE Route 31 (Phase-4 capstone): import+wire the Tiled map (terrain/collision/
+// water/walk-behind + 6 trainers incl. Jay + flavor + the lost-kid quest + 4 signs +
+// 7 encounter zones), then inject the CODE-AUTHORED scripts (the hybrid: Tiled = where,
+// code = the logic-scripts). Canonical flags throughout. This replaces the old
+// route31.violet.json. See docs/tiled-importer.md / route31-migration-scope.md.
+function buildRoute31(): MapData {
+  const map = importAndWire(route31BigTmj, 'ROUTE 31');
+  const scripts: MapObject[] = [
+    // The guided-catch HARD PIN — ONE zone-entry trigger over the §1 (Meadowgate)
+    // grass, gated by the lab lesson (catch_lesson_done), fires once. Carries forward
+    // the built-and-green tutorial beat (catch-tutorial-design.md).
+    {
+      type: 'script', x: 6, y: 3, width: 6, height: 7, trigger: 'step-on',
+      requiresFlag: 'catch_lesson_done', once: true, flag: 'route31_guided_catch_done',
+      commands: [{ kind: 'start-tutorial-catch' }],
+    },
+    // Two discoverable off-path items (one-time give-item step-ons, the live pattern).
+    {
+      type: 'script', x: 7, y: 32, trigger: 'step-on', once: true, flag: 'route31_item_forest',
+      commands: [
+        { kind: 'give-item', itemId: 'POTION', qty: 1 },
+        { kind: 'dialog', lines: ['Tucked in the roots — a POTION,', 'left for whoever needed it.'] },
+      ],
+    },
+    {
+      type: 'script', x: 12, y: 64, trigger: 'step-on', once: true, flag: 'route31_item_pond',
+      commands: [
+        { kind: 'give-item', itemId: 'BALL', qty: 2 },
+        { kind: 'dialog', lines: ["Two BALLs by the water's edge,", 'a quiet kindness for the road.'] },
+      ],
+    },
+    // The lost-kid reunion reward: returning to the kid after finding PIP gives a
+    // SUPER POTION, once (canonical flags route31_lost_mon_found/reunited).
+    {
+      type: 'script', x: 15, y: 21, trigger: 'step-on',
+      requiresFlag: 'route31_lost_mon_found', once: true, flag: 'route31_lost_mon_reunited',
+      commands: [
+        { kind: 'dialog', lines: ['KID: Mum keeps these for the rough', 'days. You gave PIP back one of his.', 'Take it. Please.'] },
+        { kind: 'give-item', itemId: 'SUPER POTION', qty: 1 },
+      ],
+    },
+  ];
+  return { ...map, objects: [...map.objects, ...scripts] };
 }
 
 // Each call rebuilds from the JSON so any in-place editing during dev

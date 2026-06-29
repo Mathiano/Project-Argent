@@ -18,12 +18,13 @@ import pctWater from '../../../assets/tilesets/pct_water.tileset.json';
 import pctWatersheet from '../../../assets/tilesets/pct_watersheet.tileset.json';
 import pctFences from '../../../assets/tilesets/pct_fences.tileset.json';
 import pctBuildings from '../../../assets/tilesets/pct_buildings.tileset.json';
+import pctDecor from '../../../assets/tilesets/pct_decor.tileset.json';
 
 const RAW: Record<string, { tiles: Record<string, unknown> }> = {
   pct_grass: pctGrass as never, pct_path02: pctPath02 as never, pct_hills: pctHills as never,
   pct_bushanim: pctBushanim as never, pct_trees: pctTrees as never, pct_bush: pctBush as never,
   pct_water: pctWater as never, pct_watersheet: pctWatersheet as never,
-  pct_fences: pctFences as never, pct_buildings: pctBuildings as never,
+  pct_fences: pctFences as never, pct_buildings: pctBuildings as never, pct_decor: pctDecor as never,
 };
 const imported = importTiledMap(bigTmj as unknown as TiledMapJson, {
   name: 'ROUTE 31 (Phase 1)',
@@ -133,12 +134,12 @@ describe('Route 31 Phase-2 content — Jay, flavor NPCs, lost-kid quest', () => 
   test('lost-kid quest: kid + the lost FLITPECK (mon_ marker) wire as a flag chain', () => {
     const kid = named(15, 21);
     expect(kid).toBeDefined();
-    expect(kid!.blockedUntilFlag).toBe('r31big_pip_found');
+    expect(kid!.blockedUntilFlag).toBe('route31_lost_mon_found');
     expect(kid!.interactAfterFlag).toBeDefined(); // the reunion
     const bird = named(18, 29); // mon_lost_bird, wired as a sprite NPC
     expect(bird).toBeDefined();
     expect(bird!.sprite).toBe('FLITPECK');
-    expect(hasKind(bird!.interact, 'set-flag')).toBe(true); // finding it sets r31big_pip_found
+    expect(hasKind(bird!.interact, 'set-flag')).toBe(true); // finding it sets route31_lost_mon_found
   });
 
   test('the Calls-unlock set matches Jay’s def (single source of truth)', () => {
@@ -153,8 +154,8 @@ describe('Route 31 Phase-2 content — Jay, flavor NPCs, lost-kid quest', () => 
     const big = getMap('__ROUTE31_BIG__');
     const reward = big.objects.find(
       (o): o is Extract<MapObject, { type: 'script' }> =>
-        o.type === 'script' && o.requiresFlag === 'r31big_pip_found' && o.once === true &&
-        o.flag === 'r31big_pip_rewarded' && o.commands.some((c) => c.kind === 'give-item'),
+        o.type === 'script' && o.requiresFlag === 'route31_lost_mon_found' && o.once === true &&
+        o.flag === 'route31_lost_mon_reunited' && o.commands.some((c) => c.kind === 'give-item'),
     );
     expect(reward, 'one-time reunion reward gated on the found flag').toBeTruthy();
     const give = reward!.commands.find((c) => c.kind === 'give-item') as { itemId: string; qty: number };

@@ -1698,10 +1698,10 @@ if (!DEV_BUILD) {
   recomputeSignpostFlags();
   showOverworld('__KITCHEN_SINK__', 'player', false);
 } else if (skip === 'route31-big') {
-  // Route 31 Phase 1: the full 22×74 canvas imported+wired live — walk the whole
-  // route (terrain incl. water, collision, warps to Hearthwick/Violet, encounters).
-  // Enter from the north (fromHearthwick, facing down). NPCs are placeholders (Jay
-  // next). Not shipping content; the live ROUTE31 stays the hand-authored map.
+  // Route 31 — the Tiled-built map IS the live ROUTE31 now (Phase-4 capstone);
+  // __ROUTE31_BIG__ is an alias that enters from the north gate (fromHearthwick) for
+  // quick dev access. Full content: 6 trainers (incl. Jay's Calls-unlock), flavor +
+  // lost-kid quest, signs, encounters, the guided catch, water, walk-behind.
   devSession = true;
   applyPartyFromUrl();
   recomputeSignpostFlags();

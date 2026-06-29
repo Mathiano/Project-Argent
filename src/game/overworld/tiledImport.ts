@@ -328,6 +328,7 @@ export const DEFAULT_SHEET_TABLE: { readonly [tsx: string]: ResolvedSheet } = {
   'Water_tile-Sheet.tsx': { pct: 'pct_watersheet', cols: 44 }, // 704 wide
   'Fences.tsx': { pct: 'pct_fences', cols: 4 }, // Fences.png (64 wide)
   'premade_builds.tsx': { pct: 'pct_buildings', cols: 40 }, // premade_builds.png (640 wide)
+  'decor.tsx': { pct: 'pct_decor', cols: 7 }, // decor.png (112 wide)
 };
 
 export function defaultResolveSheet(source: string): ResolvedSheet | null {

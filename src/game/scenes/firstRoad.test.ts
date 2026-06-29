@@ -69,8 +69,8 @@ describe('Sprint 1 — maps load + connect', () => {
   });
   test('Route 31 is a real multi-screen journey (taller than one screen)', () => {
     const r = getMap('ROUTE31');
-    expect(r.height).toBeGreaterThanOrEqual(24); // > 11-tile screen → scrolls
-    expect(r.cells).toBeDefined();
+    expect(r.height).toBeGreaterThanOrEqual(24); // > 11-tile screen → scrolls (74)
+    expect(r.importedLayers).toBeDefined(); // the Tiled-built map renders via imported layers
   });
 });
 
@@ -94,12 +94,16 @@ describe('Sprint 1 — Route 31 is populated', () => {
   test('discoverable items tucked off-path (give-item scripts)', () => {
     expect(giveItemScripts(r.objects).length).toBeGreaterThanOrEqual(2);
   });
-  test('water is impassable scenery (walk-around only)', () => {
-    // The pond exists as solid water cells somewhere in the grid.
-    const ts = loadTileset(outdoorVioletTileset as never);
-    const hasWater = (r.cells ?? []).some((row) => row.includes('water'));
-    expect(hasWater).toBe(true);
-    expect(ts.tiles.water!.solid).toBe(true);
+  test('water is present (the pond) — rendered + impassable collision somewhere', () => {
+    // The Tiled map renders water via imported pct_water/pct_watersheet refs, and
+    // the pond is solid (collision), so it's walk-around scenery.
+    const refs = new Set<string>();
+    for (const layer of r.importedLayers ?? []) for (const row of layer.tiles) for (const ref of row) if (ref) refs.add(ref.tileset);
+    expect(refs.has('pct_water') || refs.has('pct_watersheet')).toBe(true);
+    // there is solid (impassable) terrain on the map (the pond/banks/cliffs).
+    let solid = 0;
+    for (let y = 0; y < r.height; y += 1) for (let x = 0; x < r.width; x += 1) if (!isWalkable(r, x, y)) solid += 1;
+    expect(solid).toBeGreaterThan(0);
   });
 });
 
@@ -123,10 +127,10 @@ describe('Sprint 1 — the seed event (lost mon) flag chain', () => {
     const flags = mockFlags();
     flags.set('route31_trainer_beaten'); // skip JAY's forced-entry approach (own test)
     const input = mockInput();
-    // Stand just below the rehomed lost-mon NPC (14,50) and face up to talk.
+    // Stand just below the lost-mon (mon_lost_bird at (18,29)) and face up to talk.
     const scene = createOverworldScene({ random: () => 0,
       map: 'ROUTE31', spawn: 'default', inputState: input, flags,
-      spawnAt: { x: 14, y: 51, facing: "up" },
+      spawnAt: { x: 18, y: 30, facing: "up" },
       onWarp: () => {}, onEncounter: () => {}, onTrainerBattle: () => {}, onBossBattle: () => {},
     });
     expect(flags.has('route31_lost_mon_found')).toBe(false);

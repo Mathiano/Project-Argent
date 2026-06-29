@@ -1,8 +1,15 @@
 # Route 31 Phase 4 (promotion) — BLOCKED, decision needed
 
-**Status:** Step 1 DONE; **Steps 2–4 (promote `__ROUTE31_BIG__` → live ROUTE31 +
-retire `route31.violet.json`) HELD** pending a content/scope decision. 2026-06-29,
-Terminal A. The live route is UNTOUCHED (suite 834 green).
+> **✅ RESOLVED & DONE (2026-06-29).** Mathias placed the missing content markers (5
+> trainers, 4 signs); CC carried the content forward (trainer/sign DEFs, the
+> guided-catch + ground-item + PIP-reward code-scripts, canonical flags) and PROMOTED
+> the Tiled map to the live `ROUTE31`. The old `route31.json` / `route31.violet.json`
+> + `gen_route31.mjs` are retired; the 9 coupled test files were updated (2 obsolete
+> ones removed). Suite green. The analysis below is kept as the historical record of
+> why the FIRST promotion attempt was correctly blocked.
+
+**Status (historical):** Steps 2–4 were HELD pending a content/scope decision; the
+live route was untouched at that time.
 
 ## Step 1 — lost-kid quest finalized ✅ (on `__ROUTE31_BIG__`)
 - **PIP stays put** at its find-spot (no follower-mon mechanic — `docs/follower-mon-mechanic-BACKLOG.md`); the reunion is narrative (the kid goes to PIP).

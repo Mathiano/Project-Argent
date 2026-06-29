@@ -79,9 +79,13 @@ describe('live migration — Route 31 + Violet use the layered format', () => {
     });
     expect(walkBehind).toBe(true); // at least one canopy is over walkable ground
   }
-  test('Route 31 props: trunks block, canopies walk-behind', async () => {
+  test('Route 31 (Tiled) walk-behind: an Overhead layer draws over the player', async () => {
+    // The Tiled-built Route 31 does walk-behind via an `overhead`-flagged imported
+    // tile layer (tree-tops drawn AFTER the player), not the prefab `props` model.
     const { getMap } = await import('./maps');
-    assertProps(getMap('ROUTE31'));
+    const r = getMap('ROUTE31');
+    expect(r.props).toBeUndefined(); // not the prefab-prop format
+    expect(r.importedLayers!.some((l) => l.overhead)).toBe(true); // a walk-behind layer exists
   });
   test('Violet props: trunks block, canopies walk-behind; spine anchors intact', async () => {
     const { getMap } = await import('./maps');

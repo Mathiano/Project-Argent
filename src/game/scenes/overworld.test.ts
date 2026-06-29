@@ -193,9 +193,9 @@ describe('overworld cold-start warp round-trip', () => {
     // Let the fade-in finish so input is accepted.
     tickStep(scene, 0.4);
 
-    // ROUTE31 fromHearthwick spawn is (4, 5) facing down. The town
-    // door warp is at (4, 4).
-    walkOne(scene, input, 'up'); // (4, 4)
+    // ROUTE31 (Tiled) fromHearthwick spawn is (5, 0); warp_north is at (4, 0)
+    // — one tile west along the top edge.
+    walkOne(scene, input, 'left'); // (4, 0) → warp
 
     // Fade timer for outbound warp.
     tickStep(scene, 0.4);
@@ -237,7 +237,9 @@ describe('Demo-complete — Violet City hub wires Route 31 → Violet → gym', 
     const input = mockInput();
     const scene = createOverworldScene({ random: () => 0,
       map: 'ROUTE31',
-      spawn: 'fromViolet', // one tile north of the bottom-edge gap (Phase 7 route)
+      // Tiled map: warp_south is at (11,73) on the bottom edge; start one tile north.
+      spawnAt: { x: 11, y: 72, facing: 'down' },
+      spawn: 'fromViolet',
       inputState: input,
       flags: route31Flags(),
       onWarp: (target) => {
@@ -249,7 +251,7 @@ describe('Demo-complete — Violet City hub wires Route 31 → Violet → gym', 
       startFaded: true,
     });
     tickStep(scene, 0.4);
-    walkOne(scene, input, 'down'); // onto the gap at (9,14) → warp
+    walkOne(scene, input, 'down'); // onto the south gap at (11,73) → warp
     tickStep(scene, 0.4);
     expect(warpTarget).toBe('VIOLET:fromRoute');
   });
@@ -503,10 +505,10 @@ describe('Phase 5a fix — encounter rolls only on real moves + post-battle grac
     const input = mockInput();
     const scene = createOverworldScene({ random: () => 0,
       map: 'ROUTE31',
-      // Start ABOVE the left grass column (encounter_zone cols 2-3 rows
-      // 5-9) and walk DOWN into it twice.
+      // Start ABOVE the Meadowgate grass zone (route31a, cols 7-10 rows 7-9) and
+      // walk DOWN into it twice.
       spawn: 'default',
-      spawnAt: { x: 2, y: 11, facing: "down" },
+      spawnAt: { x: 7, y: 6, facing: "down" },
       inputState: input,
       flags: route31Flags(),
       onWarp: () => {},
@@ -523,11 +525,11 @@ describe('Phase 5a fix — encounter rolls only on real moves + post-battle grac
 
     // First step onto grass — grace consumed, no encounter despite
     // Math.random() = 0.
-    walkOne(scene, input, "down"); // → (2,12), in the zone
+    walkOne(scene, input, "down"); // → (7,7), in the zone
     expect(encounters).toBe(0);
 
     // Second step — grace already spent, encounter fires.
-    walkOne(scene, input, "down"); // → (2,13), still in the zone
+    walkOne(scene, input, "down"); // → (7,8), still in the zone
     expect(encounters).toBe(1);
   });
 });
@@ -665,12 +667,12 @@ describe('JAY the robber — the opening bond hook is UNMISSABLE (forced on entr
   // The on-screen NPC square (the flat-colour body, width tilesize-6) is
   // JAY's; with the camera fixed (player hasn't moved) we compare his drawn
   // x while confronting against where he'd render parked at spawn.
-  function jayMarkerX(ctx: ReturnType<typeof stubCtx>): number | null {
+  function jayMarker(ctx: ReturnType<typeof stubCtx>): { x: number; y: number } | null {
     // JAY's body square is his flat colour (#c2491a alive / #777 once beaten)
     // — unambiguous vs the player/UI rects. (Approach, confront, and the static
     // marker all use the npc colour; beaten greys it.)
     const jay = ctx.rects.filter((r) => ['#c2491a', '#777'].includes(r.fill.toLowerCase()));
-    return jay.length > 0 ? jay[0]!.x : null;
+    return jay.length > 0 ? { x: jay[0]!.x, y: jay[0]!.y } : null;
   }
 
   test('JAY stays at his walked-up tile through the dialogue — no snap-back to spawn', () => {
@@ -678,7 +680,7 @@ describe('JAY the robber — the opening bond hook is UNMISSABLE (forced on entr
     const beaten = jayScene(true);
     const cb = stubCtx();
     beaten.scene.draw(cb);
-    const spawnX = jayMarkerX(cb);
+    const atSpawn = jayMarker(cb);
 
     // The live encounter: let JAY walk up + his dialogue open.
     const live = jayScene(false);
@@ -687,13 +689,15 @@ describe('JAY the robber — the opening bond hook is UNMISSABLE (forced on entr
     live.scene.draw(cc);
     // His threat dialogue is up (we're mid-confrontation, not mid-walk).
     expect(cc.texts.join(' ')).toContain('barely got anything');
-    const confrontX = jayMarkerX(cc);
+    const confronting = jayMarker(cc);
 
-    expect(spawnX).not.toBeNull();
-    expect(confrontX).not.toBeNull();
-    // He walked LEFT toward the player (entry at x=4) and STAYED there — his
-    // confronting position is left of his spawn column, not snapped back.
-    expect(confrontX!).toBeLessThan(spawnX!);
+    expect(atSpawn).not.toBeNull();
+    expect(confronting).not.toBeNull();
+    // He walked UP toward the player (entry at (4,3)) and STAYED at that tile —
+    // his confronting render is NOT his spawn tile (no snap-back). Camera is fixed
+    // (the player never moved), so a different draw position = he stayed put.
+    expect(confronting).not.toEqual(atSpawn);
+    expect(confronting!.y).toBeLessThan(atSpawn!.y); // walked-up tile is above spawn
   });
 });
 

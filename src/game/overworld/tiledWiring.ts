@@ -45,8 +45,9 @@ export interface WiringDefs {
 // Trainer winFlags whose victory unlocks the Call economy (the designed bond-gated
 // unlock — the mon-defends-you moment). main.ts's pushTrainerFight reads THIS set
 // and sets the EXISTING run.catchBreathUnlocked (what callsUnlocked() checks) — NOT a
-// parallel flag. JAY is the Route 31 unlock beat. See docs/tiled-importer.md.
-export const CALLS_UNLOCK_ON_WIN: ReadonlySet<string> = new Set(['r31big_jay_beaten']);
+// parallel flag. JAY is the Route 31 unlock beat; the CANONICAL live flag
+// (route31_trainer_beaten — what the neighbors/tests expect). See docs/tiled-importer.md.
+export const CALLS_UNLOCK_ON_WIN: ReadonlySet<string> = new Set(['route31_trainer_beaten']);
 
 // CC-maintained marker definitions. Add an entry here to give a Tiled marker
 // behaviour; Mathias places the matching-named marker in the map. Seeded with the
@@ -89,7 +90,7 @@ export const DEFAULT_DEFS: WiringDefs = {
     npc_jay: {
       color: '#c2491a',
       approachOnEnter: true,
-      blockedUntilFlag: 'r31big_jay_beaten',
+      blockedUntilFlag: 'route31_trainer_beaten',
       interact: [
         { kind: 'dialog', lines: [
           'JAY: Hand over your — ...huh.',
@@ -97,7 +98,7 @@ export const DEFAULT_DEFS: WiringDefs = {
           'Just started. ...Forget it.',
           "Battle me anyway. A guy's got to",
           'win at SOMETHING today.'] },
-        { kind: 'start-trainer-battle', foeSpecies: 'FLITPECK', winFlag: 'r31big_jay_beaten', reward: 500 },
+        { kind: 'start-trainer-battle', foeSpecies: 'FLITPECK', winFlag: 'route31_trainer_beaten', reward: 500 },
       ],
       interactAfterFlag: [
         { kind: 'dialog', lines: [
@@ -109,6 +110,48 @@ export const DEFAULT_DEFS: WiringDefs = {
           'you two — lean on it. Call to it,',
           'and it’ll answer. ...Go on. Get.'] },
       ],
+    },
+
+    // ── Route 31 trainers (carried-forward canon; B's spec species/flags/rewards) ──
+    npc_youngster_milo: {
+      color: '#caa148', blockedUntilFlag: 'route31_youngster_beaten',
+      interact: [
+        { kind: 'dialog', lines: ['YOUNGSTER MILO: My FLITPECK', 'and I have been training', 'all summer! Have a go?'] },
+        { kind: 'start-trainer-battle', foeSpecies: 'FLITPECK', winFlag: 'route31_youngster_beaten', reward: 300 },
+      ],
+      interactAfterFlag: [{ kind: 'dialog', lines: ['YOUNGSTER MILO: Whoa — you', 'really read the wind!'] }],
+    },
+    npc_camper_rourke: {
+      color: '#8a6a3a', blockedUntilFlag: 'route31_camper_beaten',
+      interact: [
+        { kind: 'dialog', lines: ['ROURKE: Twelve days on the road', 'and not one backward step.', 'I only know one direction — at you.', 'Keep up!'] },
+        { kind: 'start-trainer-battle', foeSpecies: 'MARSHMASH', winFlag: 'route31_camper_beaten', reward: 350 },
+      ],
+      interactAfterFlag: [{ kind: 'dialog', lines: ["ROURKE: You didn't flinch.", 'Respect. Onward, then — both of us.'] }],
+    },
+    npc_birdkeeper_wren: {
+      color: '#5a7a4a', blockedUntilFlag: 'route31_birdkeeper_beaten',
+      interact: [
+        { kind: 'dialog', lines: ['WREN: Shh — watch the canopy, not me.', 'My FLITPECK never sits still;', 'I learned to read it by going still', 'myself. Now — try and catch it.'] },
+        { kind: 'start-trainer-battle', foeSpecies: 'FLITPECK', winFlag: 'route31_birdkeeper_beaten', reward: 350 },
+      ],
+      interactAfterFlag: [{ kind: 'dialog', lines: ['WREN: You read its feints.', 'Sharp eyes. The woods taught you fast.'] }],
+    },
+    npc_youngster_pax: {
+      color: '#caa148', blockedUntilFlag: 'route31_youngster2_beaten',
+      interact: [
+        { kind: 'dialog', lines: ["PAX: I've got two now! I sat with", 'them at the shrine a while.', 'No tricks — just a clean, honest', 'battle. Ready?'] },
+        { kind: 'start-trainer-battle', foeSpecies: ['GRITHOAX', 'MARSHMASH'], winFlag: 'route31_youngster2_beaten', reward: 400 },
+      ],
+      interactAfterFlag: [{ kind: 'dialog', lines: ['PAX: Two in a row — wow!', 'Good reads. The shrine saw it.'] }],
+    },
+    npc_lass_bryn: {
+      color: '#b86a8a', blockedUntilFlag: 'route31_lass_beaten',
+      interact: [
+        { kind: 'dialog', lines: ['LASS BRYN: I caught my', 'MARSHMASH right here by', 'the water. Bet it can', 'out-splash you!'] },
+        { kind: 'start-trainer-battle', foeSpecies: 'MARSHMASH', winFlag: 'route31_lass_beaten', reward: 350 },
+      ],
+      interactAfterFlag: [{ kind: 'dialog', lines: ['LASS BRYN: Well splashed.', 'The pond respects you.'] }],
     },
 
     // BIRDWATCHER — obsessive, precise; his count is OFF and it unsettles him (a
@@ -165,7 +208,7 @@ export const DEFAULT_DEFS: WiringDefs = {
     // (PROPOSED — see report). Carries real weight in a darker world.
     npc_lost_kid: {
       color: '#9aaecf',
-      blockedUntilFlag: 'r31big_pip_found',
+      blockedUntilFlag: 'route31_lost_mon_found',
       interact: [{ kind: 'dialog', lines: [
         'KID: Have you seen PIP? A FLITPECK —',
         'small, scared of his own shadow.',
@@ -192,7 +235,7 @@ export const DEFAULT_DEFS: WiringDefs = {
     // you (the find beat); sets r31big_pip_found, which flips both PIP and the kid.
     mon_lost_bird: {
       sprite: 'FLITPECK', spriteType: 'GALE',
-      blockedUntilFlag: 'r31big_pip_found',
+      blockedUntilFlag: 'route31_lost_mon_found',
       interact: [
         { kind: 'dialog', lines: [
           'A FLITPECK, ruffled and wary, wedged',
@@ -200,12 +243,21 @@ export const DEFAULT_DEFS: WiringDefs = {
           'until you whistle the three notes.',
           'It freezes. Then it hops, once,',
           'toward you. Toward home.'] },
-        { kind: 'set-flag', flag: 'r31big_pip_found' },
+        { kind: 'set-flag', flag: 'route31_lost_mon_found' },
       ],
       interactAfterFlag: [{ kind: 'dialog', lines: [
         'PIP pads after you, peeping its',
         'three-note song — braver now.'] }],
     },
+  },
+
+  // sign_* markers → readable signs (4, intentionally — Mathias's count). Text
+  // carried from the live route (the section markers + the Violet overlook).
+  sign: {
+    sign_meadowgate: { lines: ['ROUTE 31 · MEADOWGATE', 'The meadow road south', 'out of Hearthwick.', 'Mind the tall grass.'] },
+    sign_wayside: { lines: ['THE WAYSIDE', 'Where the road pauses.', 'Old stone, a long view,', 'a place to rest.'] },
+    sign_stillwater: { lines: ['STILLWATER POND', 'Too deep to wade.', 'Follow the bank around.'] },
+    sign_violet_distance: { lines: ['The land opens, and you see it', 'for the first time — a town in the', 'distance, a tower rising over it.', "Violet City. Where you're going."] },
   },
   warp: {
     // Trivial-but-real destination: HEARTHWICK has a "fromRoute" spawn. Stepping on

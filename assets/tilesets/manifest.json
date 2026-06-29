@@ -111,6 +111,13 @@
    "tilesize": 16,
    "count": 68,
    "description": "water (sheet, anim frames ingested static)"
+  },
+  {
+   "name": "pct_decor",
+   "file": "assets/tilesets/pct_decor.tileset.json",
+   "tilesize": 16,
+   "count": 12,
+   "description": "decoration props (signs, small objects)"
   }
  ]
 }

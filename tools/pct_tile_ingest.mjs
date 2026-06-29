@@ -53,6 +53,7 @@ const SHEETS = [
   // Route 31 Phase 1: the water sheet (Water_tile-Sheet.png, 704x80 = 44x5 anim
   // frames — ingested STATIC for now; animation is a deferred refinement).
   { src: 'Tilesets/Water_tile-Sheet.png',            name: 'pct_watersheet',desc: 'water (sheet, anim frames ingested static)' },
+  { src: 'Enviroment/Decoration/decor.png',          name: 'pct_decor',     desc: 'decoration props (signs, small objects)' },
 ];
 
 if (!fs.existsSync(PACK_ROOT)) { console.error(`PCT pack not found at "${PACK_ROOT}".`); process.exit(2); }

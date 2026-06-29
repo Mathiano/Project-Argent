@@ -576,8 +576,9 @@ describe('DEMO-COMPLETE GATE — cold spine intro → Violet → gym → Falkner
     expect(h.overworld().currentPosition().map).toBe('ROUTE31');
 
     // Route 31 → Violet City: the BFS walker winds the whole multi-screen
-    // route (grass, forest, around the pond) to the south-edge exit gap.
-    walkTo(h, 10, 73);
+    // route (grass, forest, around the pond) to the south-edge exit gap
+    // (the Tiled map's warp_south at (11,73)).
+    walkTo(h, 11, 73);
     h.tick(30);
     expect(h.overworld().currentPosition().map).toBe('VIOLET');
 

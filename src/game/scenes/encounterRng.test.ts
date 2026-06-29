@@ -43,7 +43,8 @@ function runWalk(seed: number): string[] {
   const scene = createOverworldScene({
     map: 'ROUTE31',
     spawn: 'default',
-    spawnAt: { x: 2, y: 12, facing: "down" },
+    // Tiled map: a route31a grass zone at cols 8-13 rows 40-43 (FLITPECK/GALEHAWK @ 0.18).
+    spawnAt: { x: 9, y: 40, facing: "down" },
     inputState: input,
     flags: mockFlags(),
     random: () => rng.next(),
@@ -52,9 +53,9 @@ function runWalk(seed: number): string[] {
     onTrainerBattle: () => {},
     onBossBattle: () => {},
   });
-  // 16 steps, bouncing between rows 12 and 16 (all in-zone, all walkable).
+  // 12 steps, bouncing between rows 40 and 43 (all in-zone, all walkable).
   const pattern: Array<'up' | 'down'> = [];
-  for (let b = 0; b < 2; b += 1) { for (let i = 0; i < 4; i += 1) pattern.push('down'); for (let i = 0; i < 4; i += 1) pattern.push('up'); }
+  for (let b = 0; b < 2; b += 1) { for (let i = 0; i < 3; i += 1) pattern.push('down'); for (let i = 0; i < 3; i += 1) pattern.push('up'); }
   const record: string[] = [];
   for (const dir of pattern) {
     walkOne(scene, input, dir);
@@ -78,8 +79,9 @@ describe('overworld encounter RNG is seeded (reproducible)', () => {
     expect(a).not.toEqual(b);
   });
 
-  test('every rolled encounter is the zone species (FLITPECK)', () => {
+  test('every rolled encounter is a zone species (FLITPECK / GALEHAWK)', () => {
     const rolled = runWalk(0x1234).filter((x) => x !== '-');
-    for (const sp of rolled) expect(sp).toBe('FLITPECK');
+    expect(rolled.length).toBeGreaterThan(0);
+    for (const sp of rolled) expect(['FLITPECK', 'GALEHAWK']).toContain(sp);
   });
 });
