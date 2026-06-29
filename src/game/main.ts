@@ -50,6 +50,7 @@ import { createMartMenuScene } from './scenes/martMenu';
 import { createBadgeAwardScene } from './scenes/badgeAward';
 import { createFalknerPrepScene } from './scenes/falknerPrep';
 import { createOverworldScene } from './scenes/overworld';
+import { CALLS_UNLOCK_ON_WIN } from './overworld/tiledWiring';
 import { createPartyMenuScene } from './scenes/partyMenu';
 import { createPauseMenuScene } from './scenes/pauseMenu';
 import { createPrepScene } from './scenes/prep';
@@ -2190,6 +2191,11 @@ function pushTrainerFight(
         }
         flagStore.set(winFlag);
         const bondCrossings = awardBondForFight(foeTeam, 'trainer', finalState, participants); // trainers weighted above wilds
+        // The designed Calls-unlock beat (JAY): a mon-defends-you win unlocks the Call
+        // economy. Sets the EXISTING run.catchBreathUnlocked (what callsUnlocked() reads)
+        // — not a parallel flag. After awardBondForFight, so a natural bond crossing can
+        // still show its own "Calls unlocked" beat; this guarantees the unlock regardless.
+        if (CALLS_UNLOCK_ON_WIN.has(winFlag)) run.catchBreathUnlocked = true;
         // Phase 5b — trainer payout (game-layer; engine untouched).
         // Wild wins never reach here (trainers-only, anti-grind).
         if (reward && reward > 0) run.money = awardMoney(run.money, reward);

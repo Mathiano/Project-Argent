@@ -88,8 +88,8 @@ Tests: `tiledImport.test.ts` (15 — translation, flip-bit mask, layer order, ob
 snapping + `facing` property, all 4 warn cases, full-fixture coverage, + collision) +
 `tiledRender.test.ts` (1 — production render) + `tiledWiring.test.ts` (13 — marker
 resolution incl. encounter zones, see below) + `tiledKitchenSink.test.ts` (7 — the
-full-pipeline proof) + `tiledRoute31Big.test.ts` (7 — Route 31 Phase 1 incl. water +
-walk-behind, see below). Suite 822 green.
+full-pipeline proof) + `tiledRoute31Big.test.ts` (12 — Route 31 Phase 1+2: water,
+walk-behind, Jay+Calls-unlock, flavor NPCs, lost-kid quest). Suite 827 green.
 
 ## Wiring layer — markers → real definitions (loop complete)
 
@@ -105,6 +105,7 @@ naming convention IS the contract — **Tiled supplies *where* (the marker), CC 
 | `warp_<id>` | `WARP_DEFS["warp_<id>"]` | `warp` MapObject, `target:"MAP:spawn"` |
 | `sign_<id>` | `SIGN_DEFS["sign_<id>"]` | `sign` MapObject (lines) |
 | `encounter_<id>` | `ENCOUNTER_DEFS["encounter_<id>"]` | `encounter_zone` MapObject over the marker **RECTANGLE** (x/y/w/h) with the def's `{species, rate}` |
+| `mon_<id>` | `MON_DEFS["mon_<id>"]` | an overworld creature — a sprite `npc` MapObject (e.g. a lost FLITPECK) |
 | `spawn_<name>` | — (no def) | `map.spawns["<name>"]` = a spawn warps land on; **facing** from the marker's `facing` custom property (up/down/left/right), default `down` |
 | `script_<id>` | — | **SKIPPED** — scripts stay code-authored (logic, not spatial markers); warn + skip |
 
