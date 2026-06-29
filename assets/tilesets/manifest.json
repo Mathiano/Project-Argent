@@ -61,7 +61,7 @@
    "file": "assets/tilesets/pct_trees.tileset.json",
    "tilesize": 16,
    "count": 72,
-   "description": "tree parts"
+   "description": "tree parts (16x16 components — a tree = several composed)"
   },
   {
    "name": "pct_bush",
@@ -83,6 +83,27 @@
    "tilesize": 16,
    "count": 438,
    "description": "complete houses (towns)"
+  },
+  {
+   "name": "pct_path02",
+   "file": "assets/tilesets/pct_path02.tileset.json",
+   "tilesize": 16,
+   "count": 47,
+   "description": "dirt path v2 — CANONICAL route path (9-slice edges)"
+  },
+  {
+   "name": "pct_hills",
+   "file": "assets/tilesets/pct_hills.tileset.json",
+   "tilesize": 16,
+   "count": 150,
+   "description": "hills / cliffs / elevation set"
+  },
+  {
+   "name": "pct_bushanim",
+   "file": "assets/tilesets/pct_bushanim.tileset.json",
+   "tilesize": 16,
+   "count": 8,
+   "description": "animated bush (frames ingested static)"
   }
  ]
 }

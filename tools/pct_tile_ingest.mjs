@@ -40,10 +40,16 @@ const SHEETS = [
   { src: 'Tilesets/path_01.png',                     name: 'pct_path',      desc: 'dirt path (9-slice edges)' },
   { src: 'Tilesets/Fences.png',                      name: 'pct_fences',    desc: 'wood fences' },
   { src: 'Tilesets/water_anim.png',                  name: 'pct_water',     desc: 'water (anim frames, ingested static)' },
-  { src: 'Enviroment/Vegetation/Trees/trees.png',    name: 'pct_trees',     desc: 'tree parts' },
+  { src: 'Enviroment/Vegetation/Trees/trees.png',    name: 'pct_trees',     desc: 'tree parts (16x16 components — a tree = several composed)' },
   { src: 'Enviroment/Vegetation/Bushes/bush.png',    name: 'pct_bush',      desc: 'bush' },
   { src: 'Enviroment/Vegetation/Flowers/flowers.png',name: 'pct_flowers',   desc: 'flowers' },
   { src: 'Enviroment/Buildings/premade_builds.png',  name: 'pct_buildings', desc: 'complete houses (towns)' },
+  // Sheets the Tiled test map paints with (test-map.tmj) — ingested for the Phase-8
+  // importer (docs/tiled-gid-correspondence.md). path_02 is the canonical route path
+  // Mathias paints with (path_01 / pct_path can retire later).
+  { src: 'Tilesets/path_02.png',                     name: 'pct_path02',    desc: 'dirt path v2 — CANONICAL route path (9-slice edges)' },
+  { src: 'Tilesets/Hills.png',                       name: 'pct_hills',     desc: 'hills / cliffs / elevation set' },
+  { src: 'Enviroment/Vegetation/Bushes/bush-anim.png',name: 'pct_bushanim', desc: 'animated bush (frames ingested static)' },
 ];
 
 if (!fs.existsSync(PACK_ROOT)) { console.error(`PCT pack not found at "${PACK_ROOT}".`); process.exit(2); }

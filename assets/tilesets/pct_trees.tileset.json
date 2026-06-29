@@ -1,6 +1,6 @@
 {
  "name": "pct_trees",
- "_note": "INGESTED from PCT \"Enviroment/Vegetation/Trees/trees.png\" — tree parts. 16x16, indexed to argent-master (PCT re-seed). solid=false (set per-placement at map/prefab layer). Regenerate: tools/pct_tile_ingest.mjs.",
+ "_note": "INGESTED from PCT \"Enviroment/Vegetation/Trees/trees.png\" — tree parts (16x16 components — a tree = several composed). 16x16, indexed to argent-master (PCT re-seed). solid=false (set per-placement at map/prefab layer). Regenerate: tools/pct_tile_ingest.mjs.",
  "tilesize": 16,
  "palette": [
   "#f0e4e1",

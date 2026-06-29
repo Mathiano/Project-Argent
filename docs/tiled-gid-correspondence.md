@@ -1,9 +1,33 @@
 # Tiled GID ↔ Argent registry-key correspondence (Phase-8 importer scope)
 
 **Status:** INVESTIGATION (2026-06-28, Terminal A). Scopes the Phase-8 Tiled
-importer for **16×16 tilesets only** (trees/buildings/interiors = big-object lane,
+importer for **16×16 tilesets only** (buildings/interiors = big-object lane,
 deferred). Read-only analysis — no importer built, no registry/map/palette change.
 Source: `tiled-maps/tiled-experiments/test-map.tmj` + the `tiled-maps/*.tsx`.
+
+> **UPDATE (2026-06-29, Terminal A) — registry now COVERS the full test map.** The
+> map was re-exported (Jun 29): it now uses **5 16×16 tilesets** — Grass, path_02,
+> Hills, bush-anim, and **trees_new (trees.png @ 16×16, 110 tiles, 10 cols)** — the
+> 32×58 trees set and bush.png are gone, so the §4 stale-trees hazard is **RESOLVED**
+> (firstgids are now internally consistent). The 3 missing sheets are **ingested**:
+> `path_02.png → pct_path02` (47 tiles), `Hills.png → pct_hills` (150 tiles),
+> `bush-anim.png → pct_bushanim` (8 tiles); trees stays `pct_trees` (72 tiles, 16×16).
+> Per-tile ≤16 holds (max: path_02 4, Hills 6, bush-anim 6). **Coverage verified: all
+> 19 distinct painted GIDs resolve to an ingested tile (0 broken); re-slice match 0
+> mismatches.** Current map's tileset table (authoritative firstgids):
+>
+> | firstgid | source | grid | → registry |
+> |--|--|--|--|
+> | 1 | Grass.png | 12×6 (72) | pct_grass |
+> | 73 | path_02.png | 12×4 (48) | pct_path02 |
+> | 121 | Hills.png | 19×25 (475) | pct_hills |
+> | 596 | bush-anim.png | 24×3 (72) | pct_bushanim |
+> | 668 | trees.png | 10×11 (110) | pct_trees |
+>
+> Source→pct table for the importer: `Grass.png→pct_grass`, `path_02.png→pct_path02`,
+> `Hills.png→pct_hills`, `bush-anim.png→pct_bushanim`, `trees.png→pct_trees`. The
+> rule below is unchanged and confirmed against the new map. (Sections §1/§3/§4 below
+> describe the *prior* Jun-28 export — kept for history; this banner supersedes them.)
 
 ## TL;DR — the translation rule (deterministic for 16×16 sheets)
 
