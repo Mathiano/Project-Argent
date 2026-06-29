@@ -51,6 +51,9 @@ export interface ImportedObject {
   readonly y: number;
   readonly w: number;
   readonly h: number;
+  // Optional Tiled custom property `facing` (up/down/left/right) — used by spawn_*
+  // markers (e.g. a south gate spawn that should face up). Absent → wiring defaults.
+  readonly facing?: Facing;
 }
 
 // Map-level prefab placement: stamp the named prefab so its anchor cell

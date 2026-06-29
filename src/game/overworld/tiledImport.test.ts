@@ -70,6 +70,20 @@ describe('importTiledMap — object snapping + carry-through', () => {
       { name: 'warp_test', x: 4, y: 0, w: 2, h: 1 }, // round(64.5/16)=4, round(0.8/16)=0, 32/16=2
     ]);
   });
+
+  test('a `facing` custom property is carried; an invalid value warns + is dropped', () => {
+    const tmj: TiledMapJson = {
+      width: 5, height: 5, tilewidth: 16, tileheight: 16, tilesets: [{ firstgid: 1, source: 'x/g.tsx' }],
+      layers: [{ type: 'objectgroup', name: 'obj', objects: [
+        { name: 'spawn_a', x: 16, y: 16, width: 16, height: 16, properties: [{ name: 'facing', value: 'up' }] },
+        { name: 'spawn_b', x: 32, y: 16, width: 16, height: 16, properties: [{ name: 'facing', value: 'sideways' }] },
+      ] }],
+    };
+    const { map, warnings } = importTiledMap(tmj, { name: 'M', resolveSheet: grassResolver });
+    expect(map.importedObjects![0]).toEqual({ name: 'spawn_a', x: 1, y: 1, w: 1, h: 1, facing: 'up' });
+    expect(map.importedObjects![1]!.facing).toBeUndefined(); // invalid dropped
+    expect(warnings.some((w) => w.includes('facing="sideways"'))).toBe(true);
+  });
 });
 
 describe('importTiledMap — robustness warnings (degrade, never throw)', () => {
@@ -129,12 +143,14 @@ describe('importTiledMap — real test-map.tmj snapshot (full coverage)', () => 
     expect(result.stats.gidsResolved).toBeGreaterThan(0);
   });
 
-  test('all 3 tile layers preserved + both named objects placed at the right tiles', () => {
+  test('all 3 tile layers preserved + named objects placed at the right tiles', () => {
     expect(result.stats.tileLayers).toBe(3);
-    expect(result.map.importedObjects).toEqual([
-      { name: 'npc_test', x: 6, y: 2, w: 1, h: 1 },
-      { name: 'warp_test', x: 4, y: 0, w: 1, h: 1 },
-    ]);
+    const objs = result.map.importedObjects!;
+    expect(objs).toContainEqual({ name: 'npc_test', x: 6, y: 2, w: 1, h: 1 });
+    expect(objs).toContainEqual({ name: 'warp_test', x: 4, y: 0, w: 1, h: 1 });
+    // encounter_* is a RECTANGLE (w/h > 1); spawn carries its facing property.
+    expect(objs).toContainEqual({ name: 'encounter_test', x: 10, y: 5, w: 3, h: 3 });
+    expect(objs).toContainEqual({ name: 'spawn_fromTest', x: 2, y: 10, w: 1, h: 1, facing: 'up' });
   });
 
   test('every distinct painted GID maps to a tile that exists in its pct tileset', () => {

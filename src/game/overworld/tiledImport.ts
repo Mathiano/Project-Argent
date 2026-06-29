@@ -32,12 +32,17 @@ export interface TiledTileLayer {
   readonly height: number;
   readonly data: readonly number[];
 }
+export interface TiledProperty {
+  readonly name: string;
+  readonly value: unknown;
+}
 export interface TiledObject {
   readonly name: string;
   readonly x: number;
   readonly y: number;
   readonly width: number;
   readonly height: number;
+  readonly properties?: readonly TiledProperty[];
 }
 export interface TiledObjectGroup {
   readonly type: 'objectgroup';
@@ -241,12 +246,21 @@ export function importTiledMap(tmj: TiledMapJson, opts: ImportOptions): ImportRe
         );
         continue;
       }
+      // Optional `facing` custom property (up/down/left/right) — for spawn_* markers.
+      let facing: 'up' | 'down' | 'left' | 'right' | undefined;
+      const fp = obj.properties?.find((p) => p.name === 'facing');
+      if (fp !== undefined) {
+        const v = String(fp.value);
+        if (v === 'up' || v === 'down' || v === 'left' || v === 'right') facing = v;
+        else warnings.push(`object "${name}" has facing="${v}" (expected up/down/left/right) — ignored.`);
+      }
       importedObjects.push({
         name,
         x: Math.round(obj.x / tilesize),
         y: Math.round(obj.y / tilesize),
         w: Math.max(1, Math.round((obj.width || tilesize) / tilesize)),
         h: Math.max(1, Math.round((obj.height || tilesize) / tilesize)),
+        ...(facing !== undefined ? { facing } : {}),
       });
     }
   }

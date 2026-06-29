@@ -84,10 +84,10 @@ through `createOverworldScene` emits real multi-colour per-pixel tile fills (PNG
 `tmp/tiled_import_render.png`): grass base, the Hills cobble path, composed tree
 clusters, and the `path_02` dirt all render whole and correctly layered.
 
-Tests: `tiledImport.test.ts` (14 — translation, flip-bit mask, layer order, object
-snapping, all 4 warn cases, full-fixture coverage, + collision) + `tiledRender.test.ts`
-(1 — production render) + `tiledWiring.test.ts` (8 — marker resolution, see below).
-Suite 802 green.
+Tests: `tiledImport.test.ts` (15 — translation, flip-bit mask, layer order, object
+snapping + `facing` property, all 4 warn cases, full-fixture coverage, + collision) +
+`tiledRender.test.ts` (1 — production render) + `tiledWiring.test.ts` (13 — marker
+resolution incl. encounter zones, see below). Suite 808 green.
 
 ## Wiring layer — markers → real definitions (loop complete)
 
@@ -102,19 +102,33 @@ naming convention IS the contract — **Tiled supplies *where* (the marker), CC 
 | `npc_<id>` | `NPC_DEFS["npc_<id>"]` | inline `npc` MapObject at the marker (dialogue/sprite/behaviour) |
 | `warp_<id>` | `WARP_DEFS["warp_<id>"]` | `warp` MapObject, `target:"MAP:spawn"` |
 | `sign_<id>` | `SIGN_DEFS["sign_<id>"]` | `sign` MapObject (lines) |
-| `spawn_<name>` | — (no def) | `map.spawns["<name>"]` = a spawn warps can land on |
+| `encounter_<id>` | `ENCOUNTER_DEFS["encounter_<id>"]` | `encounter_zone` MapObject over the marker **RECTANGLE** (x/y/w/h) with the def's `{species, rate}` |
+| `spawn_<name>` | — (no def) | `map.spawns["<name>"]` = a spawn warps land on; **facing** from the marker's `facing` custom property (up/down/left/right), default `down` |
+| `script_<id>` | — | **SKIPPED** — scripts stay code-authored (logic, not spatial markers); warn + skip |
+
+`encounter_<id>` is the one **rectangle** marker (it has w/h, like the zone it
+becomes) — place it over the grass; the def supplies the wild table + roll rate. It
+emits the engine's existing `encounter_zone` (consumed by `onStepFinish` →
+`findObjectAt(...,'encounter_zone')` → `rand() < rate` → a wild battle).
 
 `wireImportedMap(map, defs=DEFAULT_DEFS) → { map, warnings }` emits those objects/
 spawns into the map and consumes `importedObjects` (so placeholders stop rendering —
 the real objects do). **Unknown prefix / missing definition → warn + skip** (same
 robustness as the importer). `maps.ts buildTiledTestMap` runs import → wire, so
-`?skip=tiled-test` is fully interactive: `DEFAULT_DEFS` seeds `npc_test` (a dialogue
-NPC) and `warp_test` (→ `HEARTHWICK:fromRoute`). Add a marker's behaviour by adding
-an entry to `NPC_DEFS`/`WARP_DEFS`; Mathias places the matching-named marker in Tiled.
+`?skip=tiled-test` is fully interactive: `DEFAULT_DEFS` seeds `npc_test` (dialogue),
+`warp_test` (→ `HEARTHWICK:fromRoute`), `encounter_test` (a FLITPECK zone), and the
+fixture's `spawn_fromTest` (facing up). Add a marker's behaviour by adding an entry to
+`NPC_DEFS`/`WARP_DEFS`/`ENCOUNTER_DEFS`; Mathias places the matching-named marker.
 
-Tests: `tiledWiring.test.ts` (8 — npc/warp/spawn resolution, missing-def + unknown-
-prefix warns, preservation, and the real `__TILED_TEST__` map wiring `npc_test`→(6,2)
-/ `warp_test`→(4,0)).
+**Scripts are NOT Tiled markers (hybrid decision).** give-item, set-flag, quest
+chains, the tutorial-catch trigger — they're logic, not spatial — so they stay
+authored inline/in code (the existing `script` MapObject). A stray `script_*` marker
+is warned + skipped, never wired.
+
+Tests: `tiledWiring.test.ts` (13 — npc/warp/sign/encounter/spawn resolution, spawn
+facing, missing-def + unknown-prefix + script warns, preservation, and the real
+`__TILED_TEST__` map: `npc_test`→(6,2), `warp_test`→(4,0), `encounter_test` rect
+(10,5)3×3 found by `findObjectAt`, `spawn_fromTest` facing up).
 
 ## Collision — a dedicated collision layer (self-describing)
 

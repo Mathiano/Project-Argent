@@ -8,10 +8,14 @@
 // hand-authored map uses (createOverworldScene reads map.objects / map.spawns).
 //
 // The naming convention IS the contract (Tiled = where, CC = what, joined by name):
-//   npc_<id>     → NPC_DEFS["npc_<id>"]    → an inline npc MapObject at the marker
-//   warp_<id>    → WARP_DEFS["warp_<id>"]  → a warp MapObject (target "MAP:spawn")
-//   spawn_<name> → map.spawns["<name>"]    → a spawn point warps can land on
-//   sign_<id>    → SIGN_DEFS["sign_<id>"]  → a sign MapObject (lines)
+//   npc_<id>       → NPC_DEFS["npc_<id>"]       → an inline npc MapObject at the marker
+//   warp_<id>      → WARP_DEFS["warp_<id>"]     → a warp MapObject (target "MAP:spawn")
+//   sign_<id>      → SIGN_DEFS["sign_<id>"]     → a sign MapObject (lines)
+//   encounter_<id> → ENCOUNTER_DEFS[...]        → an encounter_zone over the marker
+//                    RECTANGLE (x/y/w/h) with the def's species + rate
+//   spawn_<name>   → map.spawns["<name>"]       → a spawn point (facing from the
+//                    marker's `facing` property, default down) warps can land on
+//   script_<id>    → SKIPPED — scripts stay code-authored (logic, not spatial markers)
 // Unknown prefix / missing definition → WARN + skip (never crash) — same robustness
 // as the importer. See docs/tiled-importer.md §wiring.
 
@@ -22,11 +26,15 @@ import type { MapData, MapObject, Spawn } from './types';
 export type NpcDef = Omit<Extract<MapObject, { type: 'npc' }>, 'type' | 'x' | 'y'>;
 export type WarpDef = { readonly target: string };
 export type SignDef = Omit<Extract<MapObject, { type: 'sign' }>, 'type' | 'x' | 'y'>;
+// An encounter-zone def: the marker rectangle supplies x/y/w/h (where + how big),
+// the def supplies the wild table (what mons) + the per-step roll rate.
+export type EncounterDef = { readonly species: readonly string[]; readonly rate: number };
 
 export interface WiringDefs {
   readonly npc: { readonly [name: string]: NpcDef };
   readonly warp: { readonly [name: string]: WarpDef };
   readonly sign?: { readonly [name: string]: SignDef };
+  readonly encounter?: { readonly [name: string]: EncounterDef };
 }
 
 // CC-maintained marker definitions. Add an entry here to give a Tiled marker
@@ -45,6 +53,10 @@ export const DEFAULT_DEFS: WiringDefs = {
     // Trivial-but-real destination: HEARTHWICK has a "fromRoute" spawn. Stepping on
     // the warp tile transitions maps, proving the wired warp works.
     warp_test: { target: 'HEARTHWICK:fromRoute' },
+  },
+  encounter: {
+    // A small test wild zone (the marker rectangle decides where/how big).
+    encounter_test: { species: ['FLITPECK'], rate: 0.18 },
   },
 };
 
@@ -85,15 +97,32 @@ export function wireImportedMap(map: MapData, defs: WiringDefs = DEFAULT_DEFS): 
         continue;
       }
       objects.push({ type: 'sign', x: m.x, y: m.y, ...def });
+    } else if (prefix === 'encounter') {
+      const def = defs.encounter?.[m.name];
+      if (!def) {
+        warnings.push(`marker "${m.name}" at (${m.x},${m.y}) has no ENCOUNTER definition (add it to ENCOUNTER_DEFS) — skipped.`);
+        continue;
+      }
+      objects.push({
+        type: 'encounter_zone',
+        x: m.x, y: m.y, width: m.w, height: m.h,
+        species: def.species, rate: def.rate,
+      });
     } else if (prefix === 'spawn') {
       const spawnName = m.name.slice('spawn_'.length);
       if (!spawnName) {
         warnings.push(`marker "${m.name}" at (${m.x},${m.y}) — a spawn marker needs a name (spawn_<name>) — skipped.`);
         continue;
       }
-      spawns[spawnName] = { x: m.x, y: m.y, facing: 'down' };
+      // Facing from the marker's `facing` custom property (e.g. a south gate that
+      // should face up); defaults to 'down' when unset.
+      spawns[spawnName] = { x: m.x, y: m.y, facing: m.facing ?? 'down' };
+    } else if (prefix === 'script') {
+      // HYBRID DECISION: scripts (give-item, set-flag, quest chains, tutorial-catch)
+      // stay CODE-AUTHORED — they're logic, not spatial markers. Not wired from Tiled.
+      warnings.push(`marker "${m.name}" at (${m.x},${m.y}) — scripts are code-authored, not Tiled markers — skipped.`);
     } else {
-      warnings.push(`marker "${m.name}" at (${m.x},${m.y}) — unknown prefix (expected npc_/warp_/sign_/spawn_) — skipped.`);
+      warnings.push(`marker "${m.name}" at (${m.x},${m.y}) — unknown prefix (expected npc_/warp_/sign_/spawn_/encounter_) — skipped.`);
     }
   }
 
