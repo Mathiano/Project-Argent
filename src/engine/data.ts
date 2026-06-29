@@ -18,6 +18,31 @@ export const MOVES: { readonly [name: string]: Move } = {
   'FX VINE SLAM': { name: 'FX VINE SLAM', tier: 'heavy', type: 'Sprout' },
   'FX BUBBLE JET': { name: 'FX BUBBLE JET', tier: 'mid', type: 'Splash' },
   'FX TIDE CRASH': { name: 'FX TIDE CRASH', tier: 'heavy', type: 'Splash' },
+  // ── Effect-move SAMPLE (Increment 1a — the first 3 techniques) ────────────
+  // Techniques carry a `Move.effect`: they deal REDUCED chip damage and apply
+  // a status. DEBUFFS land only on a cast-stance read-win (else fizzle); BUFFS
+  // self-apply regardless of the read (exposure in the cast-stance is the cost).
+  // TYPELESS here on purpose — the canonical roster assigns SEAR→FLAME,
+  // STATIC HAZE→SPARK, BULWARK→FORGE, but type is orthogonal to the EFFECT this
+  // increment tests; their type is set when they attach to real species (1b).
+  SEAR: {
+    name: 'SEAR',
+    tier: 'light',
+    type: null,
+    effect: { status: 'burn', polarity: 'debuff', condition: 'readWin' },
+  },
+  'STATIC HAZE': {
+    name: 'STATIC HAZE',
+    tier: 'light',
+    type: null,
+    effect: { status: 'daze', polarity: 'debuff', condition: 'readWin' },
+  },
+  BULWARK: {
+    name: 'BULWARK',
+    tier: 'mid',
+    type: null,
+    effect: { status: 'bulwark', polarity: 'buff', condition: 'always' },
+  },
 };
 
 export const SPECIES: { readonly [name: string]: Species } = {

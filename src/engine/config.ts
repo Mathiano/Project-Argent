@@ -159,6 +159,21 @@ export const STATUS = {
   // read still chips ("a miss isn't a dead turn"). The Move.effect descriptor
   // may override per-move via `damageFactor`; this is the fallback.
   effectMoveDamageFactor: 0.5,
+  // ── Per-status effect magnitudes (Increment 1a sample wiring — PLACEHOLDER,
+  // sim-tuned) ──────────────────────────────────────────────────────────────
+  // Burn (SEAR): DoT per tick = this fraction of maxHp, each round the status
+  // is active (over baseDuration rounds). 0.08 → a landed 3-round Burn ≈ 24%
+  // maxHp, enough that a read-won Burn is a real reward (sim-tuned vs reader:
+  // makes occasional technique use viable rather than a tempo trap).
+  burnDotPct: 0.08,
+  // Bulwark (BULWARK buff): the bearer takes this fraction of incoming damage
+  // (= 15% less). SIM-TUNED (effectMoves.test.ts): a persistent buff cast safely
+  // in Guard has near-zero exposure cost, so its DR compounds over long attrition
+  // fights — at 0.75 a buff-turtle beat the reader 100%. 0.85 keeps BULWARK a
+  // real buff (a dedicated buff-user gets a ~56% edge) without dominance.
+  // Re-applying the SAME buff REFRESHES (diminishing-returns, applyPendingEffect)
+  // rather than stacking a 2nd multiplier; DISTINCT buffs still stack.
+  bulwarkDamageTaken: 0.85,
   // ★ cost to apply a status via a technique (placeholder — the two-pool /
   // momentum-economy increment sets the real economy).
   applicationCost: 1,

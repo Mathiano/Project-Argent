@@ -3,6 +3,14 @@ import { typeMult } from './data';
 import type { BattleEvent, CommitDescriptor, SideSnapshot } from './events';
 import type { RNG } from './rng';
 import { lookupMove, setActiveMember, validateActionTeam } from './state';
+import {
+  applyPendingEffect,
+  buffDamageTakenMult,
+  durationForStatus,
+  effectDamageFactor,
+  tickStatuses,
+} from './status';
+import type { PendingEffect } from './status';
 import type {
   Action,
   ArenaSchedule,
@@ -86,6 +94,11 @@ function rawHit(
   let d = (tier.power * att.species.atk) / def.species.dfn * COMBAT.dmgScale * variance;
   d *= eff;
   d *= traitMods(att, rhythm, traits).dmgMult;
+  // Technique chip-damage reduction (1.0 for the 43 damage moves → bit-identical).
+  // Keeps a technique's damage reduced in EVERY path; note this increment only
+  // APPLIES statuses in the single-step triangle (there is no stance-read to win
+  // against a focusing opponent), so a technique vs a focuser chips only.
+  d *= effectDamageFactor(move);
   return { d, eff };
 }
 
@@ -214,6 +227,10 @@ function gainMomentum(side: SideState, sideKey: Side, events: BattleEvent[]): Si
 interface StrikeResult {
   readonly attacker: SideState;
   readonly defender: SideState;
+  // Effect-move plumbing (Increment 1a): the status this strike will apply,
+  // resolved by resolveRound AFTER the end-of-round tick (so a fresh status
+  // does not tick on its cast round). Absent for the 43 damage moves.
+  readonly effect?: PendingEffect;
 }
 
 function resolveStrike(
@@ -241,6 +258,26 @@ function resolveStrike(
   const defSide = opposite(attSide);
   const eff = typeMult(typeChart, move.type, defender.species.types);
 
+  // ── Effect-move mechanism (Increment 1a) ──────────────────────────────────
+  // `effect` is set only for a TECHNIQUE (the 43 damage moves omit it → every
+  // factor below is 1.0 → bit-identical). A technique deals reduced chip
+  // damage, and on a cast-stance READ-WIN its status replaces the ★ (no
+  // double-win); a BUFF self-applies in every branch (exposure is the cost).
+  const effect = move.effect;
+  // The defender's active buffs (e.g. BULWARK) mitigate every incoming strike;
+  // 1.0 when the defender has no buffs.
+  const defTaken = buffDamageTakenMult(defender);
+  const makeBuffPending = (): PendingEffect | undefined =>
+    effect !== undefined && effect.polarity === 'buff'
+      ? { target: attSide, status: effect.status, polarity: 'buff', duration: durationForStatus(effect.status) }
+      : undefined;
+  const makeDebuffPending = (): PendingEffect | undefined =>
+    effect !== undefined && effect.polarity === 'debuff'
+      ? { target: defSide, status: effect.status, polarity: 'debuff', duration: durationForStatus(effect.status) }
+      : undefined;
+  // On a read-win (punish / opening) a buff lands on self OR a debuff on the foe.
+  const readWinPending = (): PendingEffect | undefined => makeBuffPending() ?? makeDebuffPending();
+
   const variance = COMBAT.damageVarianceMin + rng.next() * COMBAT.damageVarianceSpan;
   let d =
     (tier.power * attacker.species.atk) / defender.species.dfn * COMBAT.dmgScale * variance;
@@ -249,6 +286,8 @@ function resolveStrike(
   // Trait damage modifier (e.g., GUSTBORNE x1.3 on rhythm rounds).
   d *= traitMods(attacker, rhythm, traits).dmgMult;
   d *= attMult;
+  // Technique chip-damage reduction (1.0 for a normal attack).
+  d *= effectDamageFactor(move);
 
   // Extra damage a DAZED defender takes this round (thrice-repeat punish).
   // Applied to whichever damage branch lands below.
@@ -258,24 +297,29 @@ function resolveStrike(
   // committing dodger — a PUNISH (hard counter, was the Fluid dodge). Extra
   // damage + the AGGRESSOR charges ★ (the read-win flips with the edge).
   if (attStance === 'A' && defStance === 'F') {
-    let dd = d * COMBAT.punishMult * dazeMult;
+    let dd = d * COMBAT.punishMult * dazeMult * defTaken;
     if (defender.exhausted) dd *= COMBAT.exhTaken;
     const newDef: SideState = { ...defender, hp: Math.max(0, defender.hp - dd) };
     events.push({ kind: 'punish', side: attSide, damage: dd, effectiveness: eff });
-    const newAtt = gainMomentum(attacker, attSide, events);
+    // Effect move: the status REPLACES the read-win ★ (no double-win); a plain
+    // attack banks ★ exactly as before.
+    const newAtt = effect !== undefined ? attacker : gainMomentum(attacker, attSide, events);
     if (newDef.hp <= 0) events.push({ kind: 'ko', side: defSide });
-    return { attacker: newAtt, defender: newDef };
+    const pend = readWinPending();
+    return { attacker: newAtt, defender: newDef, ...(pend !== undefined ? { effect: pend } : {}) };
   }
 
   // F vs G — opening (no counter possible)
   if (attStance === 'F' && defStance === 'G') {
     const baseMit = defender.exhausted ? COMBAT.openTaken * COMBAT.exhTaken : COMBAT.openTaken;
-    const dd = d * COMBAT.openDmg * baseMit * dazeMult;
+    const dd = d * COMBAT.openDmg * baseMit * dazeMult * defTaken;
     const newDef: SideState = { ...defender, hp: Math.max(0, defender.hp - dd) };
     events.push({ kind: 'opening', side: attSide, damage: dd, effectiveness: eff });
-    const newAtt = gainMomentum(attacker, attSide, events);
+    // Effect move: status replaces the read-win ★ (see the punish branch).
+    const newAtt = effect !== undefined ? attacker : gainMomentum(attacker, attSide, events);
     if (newDef.hp <= 0) events.push({ kind: 'ko', side: defSide });
-    return { attacker: newAtt, defender: newDef };
+    const pend = readWinPending();
+    return { attacker: newAtt, defender: newDef, ...(pend !== undefined ? { effect: pend } : {}) };
   }
 
   // Normal hit (with defender mitigation). preMit stays PRE-daze so the
@@ -286,19 +330,25 @@ function resolveStrike(
   if (defStance === 'G') d *= COMBAT.guardTaken;
   if (defender.exhausted) d *= COMBAT.exhTaken;
   d *= dazeMult;
+  d *= defTaken;
 
   let newDef: SideState = { ...defender, hp: Math.max(0, defender.hp - d) };
   let newAtt: SideState = attacker;
   events.push({ kind: 'strike', side: attSide, move: moveName, damage: d, effectiveness: eff });
 
+  // A DEBUFF cast in a non-read-win stance FIZZLES here (only chip landed); a
+  // BUFF still self-applies (it never needed a read). No read-win ★ in this
+  // branch regardless, so nothing to suppress.
+  const buffPending = makeBuffPending();
+
   if (newDef.hp <= 0) {
     events.push({ kind: 'ko', side: defSide });
-    return { attacker: newAtt, defender: newDef };
+    return { attacker: newAtt, defender: newDef, ...(buffPending !== undefined ? { effect: buffPending } : {}) };
   }
 
   // G vs A — counter, only because defender survived
   if (defStance === 'G' && attStance === 'A') {
-    const reflect = preMit * COMBAT.reflect;
+    const reflect = preMit * COMBAT.reflect * buffDamageTakenMult(attacker);
     newAtt = {
       ...newAtt,
       hp: Math.max(0, newAtt.hp - reflect),
@@ -310,7 +360,7 @@ function resolveStrike(
     if (newAtt.hp <= 0) events.push({ kind: 'ko', side: attSide });
   }
 
-  return { attacker: newAtt, defender: newDef };
+  return { attacker: newAtt, defender: newDef, ...(buffPending !== undefined ? { effect: buffPending } : {}) };
 }
 
 function paySide(
@@ -392,6 +442,12 @@ export function resolveRound(
   if (activeMon(state.foe).focus === undefined) validateActionTeam(state.foe, foeAction);
 
   const events: BattleEvent[] = [];
+
+  // Effect-move plumbing (Increment 1a): statuses a technique resolved THIS
+  // round will apply, collected from resolveStrike and applied AFTER the
+  // end-of-round status tick (so a fresh status does not tick on its cast
+  // round). Empty for any round with no technique → bit-identical.
+  const pendingEffects: PendingEffect[] = [];
 
   // Team copies for write-back at the end.
   let playerTeam: Team = state.player;
@@ -755,6 +811,7 @@ export function resolveRound(
         const r = resolveStrike(pl, foe, plMove!, "A", "A", "player", rng, events, state.typeChart, state.traits, rhythm, foeDazed, plStrikeMult);
         pl = r.attacker;
         foe = r.defender;
+        if (r.effect !== undefined) pendingEffects.push(r.effect);
         if (foe.hp > 0) {
           foe = { ...foe, staggered: true };
           events.push({ kind: 'staggered', side: 'foe' });
@@ -765,6 +822,7 @@ export function resolveRound(
         const r = resolveStrike(foe, pl, foeMove!, "A", "A", "foe", rng, events, state.typeChart, state.traits, rhythm, plDazed, foeStrikeMult);
         foe = r.attacker;
         pl = r.defender;
+        if (r.effect !== undefined) pendingEffects.push(r.effect);
         if (pl.hp > 0) {
           pl = { ...pl, staggered: true };
           events.push({ kind: 'staggered', side: 'player' });
@@ -777,12 +835,31 @@ export function resolveRound(
           const r = resolveStrike(pl, foe, plMove, plStance, foeStance, "player", rng, events, state.typeChart, state.traits, rhythm, foeDazed, plStrikeMult);
           pl = r.attacker;
           foe = r.defender;
+          if (r.effect !== undefined) pendingEffects.push(r.effect);
         } else if (sideKey === 'foe' && foeMove !== null) {
           const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, "foe", rng, events, state.typeChart, state.traits, rhythm, plDazed, foeStrikeMult);
           foe = r.attacker;
           pl = r.defender;
+          if (r.effect !== undefined) pendingEffects.push(r.effect);
         }
       }
+    }
+  }
+
+  // ── Status lifecycle (Increment 1a) ──────────────────────────────────────
+  // TICK the statuses carried INTO this round (Burn DoT + duration decrement +
+  // expiry), THEN apply newly-cast statuses (so a fresh status does not tick on
+  // its own cast round — exposure is the cost; the payoff lands next round). DoT
+  // can KO → done before the faint computation below so the faint flow narrates
+  // it. Inert (no events, hp unchanged) for any side without statuses → the
+  // single-step path stays bit-identical.
+  pl = tickStatuses(pl, 'player', events);
+  foe = tickStatuses(foe, 'foe', events);
+  for (const pe of pendingEffects) {
+    if (pe.target === 'player') {
+      if (pl.hp > 0) pl = applyPendingEffect(pl, pe, 'player', events);
+    } else if (foe.hp > 0) {
+      foe = applyPendingEffect(foe, pe, 'foe', events);
     }
   }
 
