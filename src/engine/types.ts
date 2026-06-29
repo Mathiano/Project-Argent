@@ -166,6 +166,10 @@ export interface SideState {
   // The stacking BUFFS (multiple, per "buffs stack"), or ABSENT when none.
   // Read as `side.buffs ?? []` by the wiring increment. Unread today.
   readonly buffs?: readonly StatusInstance[];
+  // The last Call this mon successfully made (Wave A — for ECHO, the "false
+  // echo" that re-maps the foe's next Call to this one). Absent until the mon
+  // Calls; absent on every legacy/sim side that never Calls → bit-identical.
+  readonly lastCall?: CallKind;
   // Player-chosen display NICKNAME (game-layer cosmetic). The engine never
   // reads it — combat resolution is identity-agnostic — so it's absent on every
   // sim/legacy/foe side and the shape stays bit-identical. The GAME sets it at

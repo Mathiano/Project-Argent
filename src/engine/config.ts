@@ -174,6 +174,25 @@ export const STATUS = {
   // Re-applying the SAME buff REFRESHES (diminishing-returns, applyPendingEffect)
   // rather than stacking a 2nd multiplier; DISTINCT buffs still stack.
   bulwarkDamageTaken: 0.85,
+  // ── Momentum / Call-economy effect magnitudes (Wave A — PLACEHOLDER,
+  // sim-tuned). These manipulate ★ + Calls, the hold-vs-spend core. ───────────
+  // Sap Focus (THUNDERCLAP debuff): the foe loses this many ★ instantly on a
+  // read-win (the cleaner of "lose ★" vs "can't gain"; instant + self-bounding).
+  sapFocusAmount: 1,
+  // Second Wind (STONE buff): self-gain this many ★ (capped at momentumCap).
+  secondWindAmount: 1,
+  // Amplify (SWARM buff): the next read-win banks this many EXTRA ★ (so a +1
+  // read-win becomes +2). ⚠️ snowball-watched; bounded by momentumCap.
+  amplifyBonus: 1,
+  // Doubt (CREEPING DOUBT debuff): the foe's Calls cost this much extra ★ while
+  // active (a Call can be negated if they can't afford the inflated cost).
+  doubtSurcharge: 1,
+  // Attunement (KINDLE buff): the next Call costs this much less ★ (1 → free).
+  attunementDiscount: 1,
+  // Per-status durations (rounds); kinds absent here use baseDuration. Silence /
+  // Call Lock are bounded short (the foe can still ACT, only not Call — never a
+  // stun-lock); Echo is a single next-round re-map.
+  statusDurations: { silence: 2, callLock: 2, echo: 1 } as { readonly [k: string]: number },
   // ★ cost to apply a status via a technique (placeholder — the two-pool /
   // momentum-economy increment sets the real economy).
   applicationCost: 1,

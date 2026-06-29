@@ -1,4 +1,4 @@
-import { COMBAT, FOCUS, TIERS } from './config';
+import { COMBAT, FOCUS, STATUS, TIERS } from './config';
 import { typeMult } from './data';
 import type { BattleEvent, CommitDescriptor, SideSnapshot } from './events';
 import type { RNG } from './rng';
@@ -206,22 +206,78 @@ function initiative(
 
 function gainMomentum(side: SideState, sideKey: Side, events: BattleEvent[]): SideState {
   const jump = side.jumpstartArmed === true;
+  // AMPLIFY (SWARM buff, Wave A): the next read-win banks amplifyBonus EXTRA ★;
+  // consumed on this read-win (win or cap). Absent on every legacy/sim side
+  // (buffs undefined) → no bonus, no consumption → bit-identical.
+  const amplify = (side.buffs ?? []).some((b) => b.kind === 'amplify');
+  const dropAmplify = (s: SideState): SideState =>
+    amplify ? { ...s, buffs: (s.buffs ?? []).filter((b) => b.kind !== 'amplify') } : s;
   if (side.momentum >= COMBAT.momentumCap) {
-    // Already at cap: a normal read-win is inert. A jumpstart still "fires"
-    // (it's a once-per-battle perk) but the free ★ can't bank — disarm it
-    // so it doesn't linger to a later read-win.
-    return jump ? { ...side, jumpstartArmed: false } : side;
+    // Already at cap: a normal read-win is inert. A jumpstart / amplify still
+    // "fire" (once-off perks) but the free ★ can't bank — consume them so they
+    // don't linger to a later read-win.
+    let s = side;
+    if (jump) s = { ...s, jumpstartArmed: false };
+    if (amplify) { events.push({ kind: 'statusBreak', side: sideKey, status: 'amplify' }); s = dropAmplify(s); }
+    return s;
   }
   // Jumpstart (game arms it for a Familiar-tier mon): the FIRST read-win
   // banks one EXTRA ★ on top of the normal one, capped. Then it disarms.
-  const bonus = jump ? 1 : 0;
+  const bonus = (jump ? 1 : 0) + (amplify ? STATUS.amplifyBonus : 0);
   const total = Math.min(COMBAT.momentumCap, side.momentum + 1 + bonus);
   events.push({ kind: 'momentum', side: sideKey, total });
-  if (jump) {
-    events.push({ kind: 'bondJumpstart', side: sideKey });
-    return { ...side, momentum: total, jumpstartArmed: false };
+  if (jump) events.push({ kind: 'bondJumpstart', side: sideKey });
+  if (amplify) events.push({ kind: 'statusBreak', side: sideKey, status: 'amplify' });
+  let s: SideState = { ...side, momentum: total };
+  if (jump) s = { ...s, jumpstartArmed: false };
+  s = dropAmplify(s);
+  return s;
+}
+
+// ── Call-economy resolution (Wave A) ────────────────────────────────────────
+// Given a side's intended Call, apply the economy debuffs/buffs it carries and
+// return the EFFECTIVE call (null = NEGATED, the Call fizzles) + its ★ cost,
+// plus the side with any consumed one-shot statuses removed:
+//   SILENCE / CALL LOCK (debuff) → negate the Call entirely (no ★ spent). The
+//     mon can still ACT next round — only Calls are denied, never a stun-lock.
+//     (Mechanically twins this wave; distinct types/flavor per shared vocabulary.)
+//   ECHO (debuff) → re-map the Call to the mon's lastCall (the "false echo");
+//     consumed. (The cleanest fit for the current Call system — true action-
+//     forcing needs telegraph/intake machinery, deferred.)
+//   DOUBT (debuff) → Calls cost +doubtSurcharge ★ (persists; not consumed).
+//   ATTUNEMENT (buff) → the next Call costs −attunementDiscount ★; consumed.
+// A Call the mon can't afford under the effective cost is NEGATED. Inert for a
+// side with no economy status → returns the call unchanged at cost 1.
+function resolveCallEconomy(
+  side: SideState,
+  call: CallKind | null,
+  sideKey: Side,
+  events: BattleEvent[],
+): { side: SideState; call: CallKind | null; cost: number } {
+  if (call === null) return { side, call: null, cost: 0 };
+  const debuff = side.debuff;
+  if (debuff?.kind === 'silence' || debuff?.kind === 'callLock') {
+    return { side, call: null, cost: 0 }; // negated; the lock persists (ticks down)
   }
-  return { ...side, momentum: total };
+  const echoActive = debuff?.kind === 'echo' && side.lastCall !== undefined;
+  const effCall: CallKind = echoActive ? side.lastCall! : call;
+  const hasAttune = (side.buffs ?? []).some((b) => b.kind === 'attunement');
+  let cost = 1 + (debuff?.kind === 'doubt' ? STATUS.doubtSurcharge : 0);
+  if (hasAttune) cost = Math.max(0, cost - STATUS.attunementDiscount);
+  if (side.momentum < cost) {
+    return { side, call: null, cost: 0 }; // can't afford the (inflated) Call → negated
+  }
+  let s = side;
+  if (echoActive) {
+    const { debuff: _drop, ...rest } = s;
+    s = rest;
+    events.push({ kind: 'statusBreak', side: sideKey, status: 'echo' });
+  }
+  if (hasAttune) {
+    s = { ...s, buffs: (s.buffs ?? []).filter((b) => b.kind !== 'attunement') };
+    events.push({ kind: 'statusBreak', side: sideKey, status: 'attunement' });
+  }
+  return { side: s, call: effCall, cost };
 }
 
 interface StrikeResult {
@@ -534,8 +590,11 @@ export function resolveRound(
   // locked from last round's focus; an initiating side starts a Focus now).
   const plInitiating = playerAction.kind === 'move' && playerAction.commit === true && !plReleasing;
   const foeInitiating = foeAction.kind === 'move' && foeAction.commit === true && !foeReleasing;
-  const plCall: CallKind | null = !plReleasing && playerAction.kind === 'call' ? playerAction.call : null;
-  const foeCall: CallKind | null = !foeReleasing && foeAction.kind === 'call' ? foeAction.call : null;
+  // The intended Call (used for focusInvolved classification + the commit
+  // event). Wave A: the Call-economy may NEGATE or RE-MAP it below, after which
+  // plCall/foeCall hold the EFFECTIVE call used for the rest of the focus path.
+  let plCall: CallKind | null = !plReleasing && playerAction.kind === 'call' ? playerAction.call : null;
+  let foeCall: CallKind | null = !foeReleasing && foeAction.kind === 'call' ? foeAction.call : null;
   const focusInvolved =
     plReleasing || foeReleasing || plInitiating || foeInitiating || plCall !== null || foeCall !== null;
 
@@ -575,16 +634,30 @@ export function resolveRound(
 
   if (focusInvolved) {
     // ── Combat FOCUS resolution path ───────────────────────────────────────
-    // Spend ★ for any Calls (validated ≥1) and announce the override.
-    if (plCall !== null) {
-      pl = { ...pl, momentum: Math.max(0, pl.momentum - 1) };
-      events.push({ kind: 'call', side: 'player', call: plCall });
-      pl = applyRecover(pl, plCall, 'player', events);
+    // Spend ★ for any Calls (validated ≥1), AFTER the Wave-A Call-economy
+    // (Silence/Call Lock negate, Echo re-maps, Doubt/Attunement re-cost). The
+    // effective call (null = negated) is written back to plCall/foeCall so the
+    // downstream damage resolution (getAway/dodge negation via dealt()) and the
+    // CASE branches all see the post-economy call.
+    {
+      const eco = resolveCallEconomy(pl, plCall, 'player', events);
+      pl = eco.side;
+      plCall = eco.call;
+      if (eco.call !== null) {
+        pl = { ...pl, momentum: Math.max(0, pl.momentum - eco.cost), lastCall: eco.call };
+        events.push({ kind: 'call', side: 'player', call: eco.call });
+        pl = applyRecover(pl, eco.call, 'player', events);
+      }
     }
-    if (foeCall !== null) {
-      foe = { ...foe, momentum: Math.max(0, foe.momentum - 1) };
-      events.push({ kind: 'call', side: 'foe', call: foeCall });
-      foe = applyRecover(foe, foeCall, 'foe', events);
+    {
+      const eco = resolveCallEconomy(foe, foeCall, 'foe', events);
+      foe = eco.side;
+      foeCall = eco.call;
+      if (eco.call !== null) {
+        foe = { ...foe, momentum: Math.max(0, foe.momentum - eco.cost), lastCall: eco.call };
+        events.push({ kind: 'call', side: 'foe', call: eco.call });
+        foe = applyRecover(foe, eco.call, 'foe', events);
+      }
     }
     // Stagger consumed this round.
     pl = { ...pl, staggered: false };

@@ -1,6 +1,11 @@
-import { STATUS } from './config';
+import { COMBAT, STATUS } from './config';
 import type { BattleEvent } from './events';
 import type { Move, Side, SideState, StatusKind } from './types';
+
+// Wave A economy statuses that resolve INSTANTLY on application (an immediate ★
+// swing) and leave NO lingering status — so they don't occupy the one-debuff
+// slot or a buff entry. The rest are lingering (checked at the economy sites).
+const INSTANT_STATUSES: ReadonlySet<string> = new Set(['sapFocus', 'secondWind']);
 
 // ── Effect-move + status MECHANISM helpers (Increment 1a) ───────────────────
 // Pure + headless. resolveRound wires these into the EXISTING stance triangle
@@ -39,11 +44,10 @@ export function buffDamageTakenMult(side: SideState): number {
   return m;
 }
 
-// Base duration for a freshly-applied status. Control-class statuses (none of
-// the 3 samples) would use the short duration; the rest use the base. Kept a
-// function so the wiring increment can branch per-kind without touching callers.
-export function durationForStatus(_kind: StatusKind): number {
-  return STATUS.baseDuration;
+// Base duration for a freshly-applied status — per-kind via STATUS.statusDurations
+// (Silence/Call Lock bounded short, Echo a single round), else the base duration.
+export function durationForStatus(kind: StatusKind): number {
+  return STATUS.statusDurations[kind] ?? STATUS.baseDuration;
 }
 
 // Apply a pending status onto its target side. A DEBUFF REPLACES the single
@@ -60,6 +64,16 @@ export function applyPendingEffect(
   events: BattleEvent[],
 ): SideState {
   events.push({ kind: 'statusApply', side: sideKey, status: pe.status, duration: pe.duration });
+  // ── Instant ★ effects (Wave A) — apply the ★ swing now, leave no lingering
+  // status. SAP FOCUS (debuff): the foe loses ★. SECOND WIND (buff): self-gain ★.
+  if (INSTANT_STATUSES.has(pe.status)) {
+    const total =
+      pe.status === 'secondWind'
+        ? Math.min(COMBAT.momentumCap, side.momentum + STATUS.secondWindAmount)
+        : Math.max(0, side.momentum - STATUS.sapFocusAmount); // sapFocus
+    events.push({ kind: 'momentum', side: sideKey, total });
+    return { ...side, momentum: total };
+  }
   if (pe.polarity === 'debuff') {
     return { ...side, debuff: { kind: pe.status, duration: pe.duration } };
   }

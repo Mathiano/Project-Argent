@@ -43,6 +43,62 @@ export const MOVES: { readonly [name: string]: Move } = {
     type: null,
     effect: { status: 'bulwark', polarity: 'buff', condition: 'always' },
   },
+  // ── Momentum / Call-economy effect moves (Increment 1b Wave A) ────────────
+  // The highest-value layer — they manipulate ★ + Calls (the hold-vs-spend
+  // core). Same 1a mechanism: debuffs land on a cast-stance read-win (else
+  // fizzle), buffs self-cast. Typeless fixtures (canon: THUNDERCLAP→SPARK,
+  // DEAD SILENCE/CREEPING DOUBT→UMBRA, FALSE ECHO→PSI, WARCRY→BRAWN,
+  // SECOND WIND→STONE, KINDLE→FLAME, SWARM→INSECT) — types attach with species.
+  // Debuffs (read-win to land):
+  THUNDERCLAP: {
+    name: 'THUNDERCLAP',
+    tier: 'mid',
+    type: null,
+    effect: { status: 'sapFocus', polarity: 'debuff', condition: 'readWin' },
+  },
+  'DEAD SILENCE': {
+    name: 'DEAD SILENCE',
+    tier: 'heavy',
+    type: null,
+    effect: { status: 'silence', polarity: 'debuff', condition: 'readWin' },
+  },
+  'FALSE ECHO': {
+    name: 'FALSE ECHO',
+    tier: 'mid',
+    type: null,
+    effect: { status: 'echo', polarity: 'debuff', condition: 'readWin' },
+  },
+  WARCRY: {
+    name: 'WARCRY',
+    tier: 'heavy',
+    type: null,
+    effect: { status: 'callLock', polarity: 'debuff', condition: 'readWin' },
+  },
+  'CREEPING DOUBT': {
+    name: 'CREEPING DOUBT',
+    tier: 'mid',
+    type: null,
+    effect: { status: 'doubt', polarity: 'debuff', condition: 'readWin' },
+  },
+  // Buffs (self-cast):
+  'SECOND WIND': {
+    name: 'SECOND WIND',
+    tier: 'mid',
+    type: null,
+    effect: { status: 'secondWind', polarity: 'buff', condition: 'always' },
+  },
+  KINDLE: {
+    name: 'KINDLE',
+    tier: 'mid',
+    type: null,
+    effect: { status: 'attunement', polarity: 'buff', condition: 'always' },
+  },
+  SWARM: {
+    name: 'SWARM',
+    tier: 'heavy',
+    type: null,
+    effect: { status: 'amplify', polarity: 'buff', condition: 'always' },
+  },
 };
 
 export const SPECIES: { readonly [name: string]: Species } = {
