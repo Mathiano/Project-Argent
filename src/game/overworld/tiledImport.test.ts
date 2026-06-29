@@ -1,8 +1,9 @@
 // Tiled → Argent importer: GID translation, object snapping, robustness warnings,
 // and the real test-map.tmj snapshot (full coverage).
 import { describe, expect, test } from 'vitest';
-import { importTiledMap, defaultResolveSheet, basename } from './tiledImport';
+import { importTiledMap, defaultResolveSheet, basename, isCollisionLayerName } from './tiledImport';
 import type { TiledMapJson, SheetResolver } from './tiledImport';
+import { isWalkable } from './types';
 import testMapTmj from '../maps/tiled/test-map.tmj.json';
 import pctGrass from '../../../assets/tilesets/pct_grass.tileset.json';
 import pctPath02 from '../../../assets/tilesets/pct_path02.tileset.json';
@@ -139,7 +140,10 @@ describe('importTiledMap — real test-map.tmj snapshot (full coverage)', () => 
   test('every distinct painted GID maps to a tile that exists in its pct tileset', () => {
     const tmj = testMapTmj as unknown as TiledMapJson;
     const gids = new Set<number>();
-    for (const l of tmj.layers) if (l.type === 'tilelayer') for (const g of (l as unknown as { data: number[] }).data) if (g) gids.add(g & 0x1fffffff);
+    for (const l of tmj.layers) {
+      if (l.type !== 'tilelayer' || isCollisionLayerName((l as unknown as { name: string }).name)) continue;
+      for (const g of (l as unknown as { data: number[] }).data) if (g) gids.add(g & 0x1fffffff);
+    }
     expect(gids.size).toBe(19); // the documented 19 distinct GIDs
     // Reconstruct each ref from the imported layers and confirm it's a real tile.
     const seen = new Set<string>();
@@ -147,5 +151,47 @@ describe('importTiledMap — real test-map.tmj snapshot (full coverage)', () => 
       if (ref) { expect(RAW[ref.tileset]?.tiles[ref.tile]).toBeDefined(); seen.add(`${ref.tileset}:${ref.tile}`); }
     }
     expect(seen.size).toBeGreaterThanOrEqual(15); // distinct tiles actually placed
+  });
+
+  test("the collision layer feeds isWalkable: walls block, open tiles + the warp don't", () => {
+    expect(result.stats.collisionLayers).toBe(1);
+    expect(result.stats.collisionCells).toBeGreaterThan(0);
+    const m = result.map;
+    // Interior wall (row 8, cols 6-14) is solid; the spawn row below it is walkable.
+    expect(isWalkable(m, 10, 8)).toBe(false); // wall
+    expect(isWalkable(m, 10, 9)).toBe(true); // spawn (open)
+    // Border is solid; the warp tile (4,0) was excluded so it stays steppable.
+    expect(isWalkable(m, 0, 5)).toBe(false); // left border
+    expect(isWalkable(m, 4, 0)).toBe(true); // warp tile (excluded from collision)
+    expect(isWalkable(m, 8, 12)).toBe(true); // open interior
+  });
+});
+
+describe('importTiledMap — collision layer (unit)', () => {
+  const withCollision: TiledMapJson = {
+    width: 3, height: 1, tilewidth: 16, tileheight: 16,
+    tilesets: [{ firstgid: 1, source: 'x/g.tsx' }],
+    layers: [
+      { type: 'tilelayer', name: 'ground', width: 3, height: 1, data: [1, 1, 1] },
+      { type: 'tilelayer', name: 'Collision', width: 3, height: 1, data: [7, 0, 9] }, // any non-0 = solid; name case-insensitive
+    ],
+  };
+
+  test('collision layer → solid cells (presence, any GID), excluded from visual layers', () => {
+    const { map, stats } = importTiledMap(withCollision, { name: 'M', resolveSheet: grassResolver });
+    expect(stats.tileLayers).toBe(1); // only the ground layer is visual
+    expect(map.importedLayers!.map((l) => l.name)).toEqual(['ground']); // collision not rendered
+    expect(stats.collisionLayers).toBe(1);
+    expect(stats.collisionCells).toBe(2); // cells 0 and 2 painted
+    expect(isWalkable(map, 0, 0)).toBe(false); // painted → solid
+    expect(isWalkable(map, 1, 0)).toBe(true); // empty cell → walkable
+    expect(isWalkable(map, 2, 0)).toBe(false); // painted → solid
+  });
+
+  test('NO collision layer → all-walkable (no regression)', () => {
+    const { map, stats } = importTiledMap(oneLayer([1, 1], 2, 1), { name: 'M', resolveSheet: grassResolver });
+    expect(stats.collisionLayers).toBe(0);
+    expect(isWalkable(map, 0, 0)).toBe(true);
+    expect(isWalkable(map, 1, 0)).toBe(true);
   });
 });

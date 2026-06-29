@@ -78,6 +78,8 @@ export interface ImportStats {
   readonly gidsResolved: number;
   readonly gidsEmpty: number; // g===0 cells (intentionally empty)
   readonly gidsDropped: number; // resolved to nothing (warned) — rendered empty
+  readonly collisionLayers: number; // collision layers consumed (excluded from render)
+  readonly collisionCells: number; // cells marked solid from the collision layer(s)
 }
 export interface ImportResult {
   readonly map: MapData;
@@ -86,6 +88,15 @@ export interface ImportResult {
 }
 
 const FLIP_MASK = 0x1fffffff; // strip Tiled's 3 high flip bits (H/V/D)
+
+// Collision convention: a tile layer with one of these names (case-insensitive) is
+// the COLLISION layer — metadata, not art. Any non-empty cell = solid; it is NOT
+// added to the visual importedLayers. The tiles used to paint it don't matter
+// (presence = solid). `collision` is canonical. See docs/tiled-importer.md.
+const COLLISION_LAYER_NAMES = new Set(['collision', 'meta_collision']);
+export function isCollisionLayerName(name: string): boolean {
+  return COLLISION_LAYER_NAMES.has(name.trim().toLowerCase());
+}
 
 export function basename(p: string): string {
   const parts = p.split(/[\\/]/);
@@ -179,11 +190,32 @@ export function importTiledMap(tmj: TiledMapJson, opts: ImportOptions): ImportRe
     return { tileset: sheet.pct, tile: key };
   };
 
+  // Collision: false everywhere (= explicit walkable; imported maps have no base
+  // tile grid for isWalkable to fall through to). A collision layer flips its
+  // painted cells to true (solid). No collision layer → all-walkable (no regression).
+  const solid: boolean[][] = [];
+  for (let y = 0; y < H; y += 1) solid.push(new Array<boolean>(W).fill(false));
+  let collisionLayers = 0;
+  let collisionCells = 0;
+
   // Tile layers → ordered ImportedTileLayers (bottom→top, source order preserved).
+  // The collision layer is consumed into `solid` and EXCLUDED from the visual layers.
   const importedLayers: ImportedTileLayer[] = [];
   for (const layer of tmj.layers) {
     if (layer.type !== 'tilelayer') continue;
     const tl = layer as TiledTileLayer;
+    if (isCollisionLayerName(tl.name)) {
+      collisionLayers += 1;
+      for (let y = 0; y < H; y += 1) {
+        for (let x = 0; x < W; x += 1) {
+          if ((tl.data[y * W + x] ?? 0) !== 0) {
+            if (!solid[y]![x]) collisionCells += 1;
+            solid[y]![x] = true; // any painted cell = solid (presence, not GID)
+          }
+        }
+      }
+      continue; // metadata — not rendered
+    }
     const grid: (TileRef | null)[][] = [];
     for (let y = 0; y < H; y += 1) {
       const rowArr: (TileRef | null)[] = new Array(W).fill(null);
@@ -219,11 +251,9 @@ export function importTiledMap(tmj: TiledMapJson, opts: ImportOptions): ImportRe
     }
   }
 
-  // All-walkable collision for now (pct tiles are solid:false; solidity is a later
-  // wiring concern). solidOverrides=false everywhere lets the player roam to inspect
-  // the import without isWalkable needing a base tile grid.
-  const solidOverrides: (boolean | null)[][] = [];
-  for (let y = 0; y < H; y += 1) solidOverrides.push(new Array<boolean | null>(W).fill(false));
+  // solidOverrides feeds the EXISTING isWalkable (types.ts): true=solid, false=
+  // walkable. Built from the collision layer above; false elsewhere.
+  const solidOverrides: (boolean | null)[][] = solid;
 
   const spawn: Spawn = { x: Math.floor(W / 2), y: Math.floor(H / 2), facing: 'down' };
 
@@ -252,6 +282,8 @@ export function importTiledMap(tmj: TiledMapJson, opts: ImportOptions): ImportRe
       gidsResolved,
       gidsEmpty,
       gidsDropped,
+      collisionLayers,
+      collisionCells,
     },
   };
 }

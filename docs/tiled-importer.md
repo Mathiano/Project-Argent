@@ -84,10 +84,10 @@ through `createOverworldScene` emits real multi-colour per-pixel tile fills (PNG
 `tmp/tiled_import_render.png`): grass base, the Hills cobble path, composed tree
 clusters, and the `path_02` dirt all render whole and correctly layered.
 
-Tests: `tiledImport.test.ts` (11 — translation, flip-bit mask, layer order, object
-snapping, all 4 warn cases, full-fixture coverage) + `tiledRender.test.ts` (1 —
-production render) + `tiledWiring.test.ts` (8 — marker resolution, see below). Suite
-799 green.
+Tests: `tiledImport.test.ts` (14 — translation, flip-bit mask, layer order, object
+snapping, all 4 warn cases, full-fixture coverage, + collision) + `tiledRender.test.ts`
+(1 — production render) + `tiledWiring.test.ts` (8 — marker resolution, see below).
+Suite 802 green.
 
 ## Wiring layer — markers → real definitions (loop complete)
 
@@ -116,13 +116,37 @@ Tests: `tiledWiring.test.ts` (8 — npc/warp/spawn resolution, missing-def + unk
 prefix warns, preservation, and the real `__TILED_TEST__` map wiring `npc_test`→(6,2)
 / `warp_test`→(4,0)).
 
+## Collision — a dedicated collision layer (self-describing)
+
+A Tiled **tile layer named `collision`** (case-insensitive; `meta_collision` also
+accepted) is the collision layer: **any non-empty cell = solid**, empty = walkable.
+The tiles used to paint it don't matter (presence, not GID) — paint with any marker
+tile. It is **metadata, not art**: the importer consumes it into collision and
+**excludes it from the visual `importedLayers`** (never rendered).
+
+Feeds the EXISTING engine collision — `isWalkable` (types.ts) reads
+`map.solidOverrides[y][x]` (`true`=solid / `false`=walkable). The importer builds
+`solidOverrides`: `true` for painted collision cells, `false` elsewhere — so imported
+maps collide via the same movement code (`tryStartMove` → `isWalkable`) every
+hand-authored map uses. **No collision layer → all-`false` → all-walkable (no
+regression).** Wiring preserves `solidOverrides` untouched. Self-describing: the
+collision travels in the `.tmj`, so a layout change carries its own collision.
+
+Verified on the fixture (a `collision` layer paints the border — minus the warp tile
+— plus an interior wall at row 8, cols 6–14): `isWalkable` is false on the wall
+`(10,8)` and border `(0,5)`, true on the spawn `(10,9)`, the warp `(4,0)`, and open
+interior — and the collision layer does not render. Via `?skip=tiled-test` the player
+is blocked walking up into the wall.
+
 ## Seams / next
-- **Collision** — imported maps are fully walkable (no solidity yet). A later pass
-  derives collision (per-tile `solid` or a Tiled collision layer / object).
+- **Tile-property defaults** — a possible later convenience: mark always-solid tiles
+  (building walls) solid in the tileset so they needn't be painted on the collision
+  layer. The collision layer stays primary (per-cell, handles exceptions).
 - **Layer depth** — all imported layers draw below the player; Y-sorted walk-behind
   for "top" layers (tree canopies) is the big-object-lane refinement.
 - **Definitions library** — `DEFAULT_DEFS` holds the test markers; real maps grow it
   with their NPCs/warps (or per-map override defs). Animated tiles (bush-anim) import
   static for now.
 - **Snapshot** — `test-map.tmj.json` is a committed snapshot of a live working file;
-  re-snapshot when Mathias re-exports.
+  re-snapshot when Mathias re-exports. (Its `collision` layer is currently test-
+  authored — Mathias paints the real one in Tiled and re-exports.)
