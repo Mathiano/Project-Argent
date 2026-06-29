@@ -16,9 +16,16 @@ export type ReleaseKind = 'heavy' | 'feint' | 'hide';
 //   recover     — heal 50% maxHp (★1)
 //   dodge       — full evade: negate the incoming hit (★1; overlaps getAway by
 //                 design until the counter-window is added — banked)
+//   resolve     — the bond-gated status counterplay (status-engine scaffolding):
+//                 clears the bearer's status + grants brief immunity. Bond
+//                 Stage-4 gated (game-side). STUBBED this increment — no status
+//                 exists to clear yet, so nothing consumes this kind in
+//                 resolution (applyHp/applyRecover ignore it → no hp effect),
+//                 and no sim bot emits it → bit-identical. See
+//                 docs/status-engine-scope.md.
 // FULL POWER is NOT a CallKind — it's a `move` modifier (`fullPower: true`)
 // because it buffs an attack rather than resolving as a standalone Call.
-export type CallKind = 'getAway' | 'hangInThere' | 'recover' | 'dodge';
+export type CallKind = 'getAway' | 'hangInThere' | 'recover' | 'dodge' | 'resolve';
 
 // The default release a Focus falls back to when none is chosen (the internal
 // base stance the focus is tied to): Aggressive→HEAVY, Fluid→HIDE, Guard→FEINT.
@@ -67,10 +74,51 @@ export interface Tier {
   readonly delayNext?: boolean;
 }
 
+// ── Status engine scaffolding (docs/status-engine-scope.md) — INERT ────────
+// Increment 1 wires NO actual status: these shapes are the plumbing that the
+// effect-move / status increment plugs into. Nothing in resolveRound reads
+// them yet → every move/side is bit-identical to before. Status ids are
+// data-driven strings (like ElementType) so NO specific status is named or
+// committed here.
+export type StatusKind = string;
+
+// Whether a status helps its bearer (buff: self-cast, always lands) or harms a
+// foe (debuff: lands only on a read-win). Reserved for the wiring increment.
+export type StatusPolarity = 'buff' | 'debuff';
+
+// A live status instance carried on a SideState. `duration` = rounds left;
+// `applied` = how many times THIS status has hit THIS mon this battle (room
+// for the future diminishing-returns 3→2→1→resist curve). Absent on every
+// legacy/sim side this increment.
+export interface StatusInstance {
+  readonly kind: StatusKind;
+  readonly duration: number;
+  readonly applied?: number;
+}
+
+// An effect-move's effect descriptor. OPTIONAL on Move — the 43 damage moves
+// omit it and behave EXACTLY as today; nothing in resolveStrike/rawHit reads
+// it this increment. When wired: applies `status` (a debuff to the foe on a
+// read-win / a buff to self), dealing `damageFactor`× reduced damage.
+export interface MoveEffect {
+  readonly status: StatusKind;
+  readonly polarity: StatusPolarity;
+  // How the status lands: 'readWin' = only when the cast-stance wins the read
+  // (the locked debuff rule); 'always' = self-applied buff. Reserved.
+  readonly condition: 'readWin' | 'always';
+  // Effect moves deal REDUCED damage (× this) so a missed read still chips.
+  // Absent ⇒ the wiring increment falls back to STATUS.effectMoveDamageFactor.
+  readonly damageFactor?: number;
+}
+
 export interface Move {
   readonly name: string;
   readonly tier: TierName;
   readonly type: ElementType | null;
+  // ── Status engine scaffolding — OPTIONAL effect descriptor. Absent on every
+  // damage move ⇒ pure tier/type damage, bit-identical. Unread in resolution
+  // this increment. See docs/status-engine-scope.md.
+  readonly effect?: MoveEffect;
 }
 
 export interface Species {
@@ -107,6 +155,17 @@ export interface SideState {
   // RELEASES (R2, the chosen release) and the field is then cleared. Absent
   // (undefined) on every legacy/sim/single-step side → bit-identical shape.
   readonly focus?: { readonly stance: Stance; readonly move: string };
+  // ── Status engine scaffolding (docs/status-engine-scope.md) — INERT ──────
+  // The single active DEBUFF (one at a time, per the locked "1 debuff" rule),
+  // or ABSENT when none. A new debuff will REPLACE the old when wired.
+  // Following the jumpstartArmed/focus/nickname convention, the field is
+  // absent (not null) by default so the object shape is bit-identical; the
+  // wiring increment reads it as `side.debuff ?? null`. Unread in resolution
+  // this increment.
+  readonly debuff?: StatusInstance;
+  // The stacking BUFFS (multiple, per "buffs stack"), or ABSENT when none.
+  // Read as `side.buffs ?? []` by the wiring increment. Unread today.
+  readonly buffs?: readonly StatusInstance[];
   // Player-chosen display NICKNAME (game-layer cosmetic). The engine never
   // reads it — combat resolution is identity-agnostic — so it's absent on every
   // sim/legacy/foe side and the shape stays bit-identical. The GAME sets it at

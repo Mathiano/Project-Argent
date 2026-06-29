@@ -140,6 +140,34 @@ export const FOCUS = {
   },
 } as const;
 
+// ── Status engine scaffolding (docs/status-engine-scope.md) ────────────────
+// PLACEHOLDER tunables for the status system. NOTHING reads these this
+// increment (no active status is wired) — they are inert until the effect-move
+// wiring increment, when real values arrive WITH a sim re-gate. Centralized
+// here so they're sim-tunable from one place, like COMBAT/FOCUS.
+export const STATUS = {
+  // Base duration (rounds) a freshly-applied status lasts before it clears.
+  baseDuration: 3,
+  // Short-duration (control-class, e.g. a Taunt) statuses last this long.
+  shortDuration: 1,
+  // Diminishing-returns curve: successive applications of the SAME status to
+  // the same mon shorten its duration (3→2→1 rounds); applications beyond the
+  // array length RESIST (rejected → a `statusResist` event). Indexed by the
+  // prior application count.
+  diminishingDurations: [3, 2, 1] as readonly number[],
+  // Effect moves deal REDUCED damage (× this) vs a pure attack, so a missed
+  // read still chips ("a miss isn't a dead turn"). The Move.effect descriptor
+  // may override per-move via `damageFactor`; this is the fallback.
+  effectMoveDamageFactor: 0.5,
+  // ★ cost to apply a status via a technique (placeholder — the two-pool /
+  // momentum-economy increment sets the real economy).
+  applicationCost: 1,
+  // RESOLVE Call (bond Stage-4, STUBBED this increment): rounds of status
+  // immunity granted after it clears a status. Inert until there's a status
+  // to defend against.
+  resolveImmunityRounds: 2,
+} as const;
+
 // Nuke tier weight is not specified in CLAUDE.md or the spec — 1.30 is an assumption.
 export const TIERS: { readonly [K in TierName]: Tier } = {
   light: { name: 'light', power: 55, cost: 12, weight: 0.85 },

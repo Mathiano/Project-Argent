@@ -87,6 +87,22 @@ export type BattleEvent =
   // (★ spent). Marks WHY the strike hits harder; the strike event carries the
   // already-amplified damage. Player-only → absent in legacy/sim runs.
   | { readonly kind: 'fullPower'; readonly side: Side }
+  // ── Status engine scaffolding (docs/status-engine-scope.md) ────────────
+  // The replay/log channel for the status lifecycle. NOTHING emits these this
+  // increment (no active status exists) — they are the inert vocabulary the
+  // wiring increment will fire, so the game log + replay can narrate statuses.
+  // `status` is the status id (data-driven string); `side` is the bearer.
+  //   apply  — a status was applied (with its initial duration).
+  //   tick   — a turn-end tick: duration decremented to `remaining`, optional
+  //            DoT `damage` dealt this tick.
+  //   clear  — a status expired / was removed naturally.
+  //   break  — a status was forcibly ended (e.g. the Resolve Call).
+  //   resist — an application was REJECTED by diminishing returns.
+  | { readonly kind: 'statusApply'; readonly side: Side; readonly status: string; readonly duration: number }
+  | { readonly kind: 'statusTick'; readonly side: Side; readonly status: string; readonly remaining: number; readonly damage?: number }
+  | { readonly kind: 'statusClear'; readonly side: Side; readonly status: string }
+  | { readonly kind: 'statusBreak'; readonly side: Side; readonly status: string }
+  | { readonly kind: 'statusResist'; readonly side: Side; readonly status: string }
   | { readonly kind: 'staggered'; readonly side: Side }
   | { readonly kind: 'momentum'; readonly side: Side; readonly total: number }
   // The bond jumpstart fired: an armed mon's first read-win this battle

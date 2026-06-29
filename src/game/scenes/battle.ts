@@ -1043,6 +1043,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         ev.call === 'getAway' ? 'GET AWAY'
         : ev.call === 'hangInThere' ? 'HANG IN THERE'
         : ev.call === 'recover' ? 'RECOVER'
+        : ev.call === 'resolve' ? 'RESOLVE'
         : 'DODGE';
       calloutLine = `${label}!`;
       pushLog(`${who}: ${label}! (★ spent)`);
