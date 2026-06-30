@@ -143,6 +143,95 @@ export const MOVES: { readonly [name: string]: Move } = {
     type: null,
     effect: { status: 'corrode', polarity: 'debuff', condition: 'readWin' },
   },
+  // ── Buffs / heals / cleanse effect moves (Increment 1b Wave C) ────────────
+  // The lowest-degeneracy layer: buffs/heals don't disrupt the foe, so the only
+  // risk is SELF-value ("free value" — a heal that turtles, an all-upside buff).
+  // Heals self-apply (exposure in the cast-stance is the cost); SIPHON's heal is
+  // read-win-gated (lifesteal). Typeless fixtures (canon: TIDE MEND/UNDERTOW→
+  // AQUA, SIPHON/ENTANGLE→NATURE, WANE/VEIL→SPIRIT, STEADY/FOCUS UP→BASIC,
+  // REFORGE→FORGE, SET STANCE→STONE, GLASS EDGE→FROST). KINDLE (FLAME Attunement)
+  // already shipped in Wave A. All sim-gated in src/sim/sustainEffects.test.ts.
+  // Heals / sustain:
+  'TIDE MEND': {
+    name: 'TIDE MEND',
+    tier: 'mid',
+    type: null,
+    effect: { status: 'tideMend', polarity: 'buff', condition: 'always' },
+  },
+  UNDERTOW: {
+    name: 'UNDERTOW',
+    tier: 'mid',
+    type: null,
+    effect: { status: 'undertow', polarity: 'buff', condition: 'always' },
+  },
+  SIPHON: {
+    name: 'SIPHON',
+    tier: 'mid',
+    type: null,
+    // Lifesteal — heals ONLY on a cast-stance read-win (the chip lands amplified
+    // AND you steal life); lose the read → chip only. The read-win gate is the cost.
+    effect: { status: 'drain', polarity: 'buff', condition: 'readWin' },
+  },
+  ENTANGLE: {
+    name: 'ENTANGLE',
+    tier: 'mid',
+    type: null,
+    // NATURE's defensive sustain (vine-guard DR). A buff/heal-lane choice for the
+    // 2nd NATURE slot — a root would duplicate Wave B's stance-lock control.
+    effect: { status: 'entangle', polarity: 'buff', condition: 'always' },
+  },
+  // Cleanse:
+  WANE: {
+    name: 'WANE',
+    tier: 'light',
+    type: null,
+    // Low/no damage (damageFactor below the 0.5 default) — its value is the cleanse.
+    effect: { status: 'cleanse', polarity: 'buff', condition: 'always', damageFactor: 0.25 },
+  },
+  STEADY: {
+    name: 'STEADY',
+    tier: 'light',
+    type: null,
+    effect: { status: 'cleanse', polarity: 'buff', condition: 'always', damageFactor: 0.25 },
+  },
+  REFORGE: {
+    name: 'REFORGE',
+    tier: 'mid',
+    type: null,
+    effect: { status: 'reforge', polarity: 'buff', condition: 'always' },
+  },
+  // Self-buffs:
+  VEIL: {
+    name: 'VEIL',
+    tier: 'mid',
+    type: null,
+    // Shrouded — hides the bearer's intent tell (GAME-side info effect, like the
+    // daze/STATIC HAZE tell). Engine-inert combat-wise; carried as a bounded
+    // lingering buff (duration + refresh-not-stack DR + cast exposure bound it).
+    effect: { status: 'shrouded', polarity: 'buff', condition: 'always' },
+  },
+  'SET STANCE': {
+    name: 'SET STANCE',
+    tier: 'light',
+    type: null,
+    // Poker — stronger Brace (engine: guard-conditional mitigation), AND casting
+    // reveals you might Brace (the tell tradeoff is game-side).
+    effect: { status: 'setStance', polarity: 'buff', condition: 'always' },
+  },
+  'FOCUS UP': {
+    name: 'FOCUS UP',
+    tier: 'light',
+    type: null,
+    effect: { status: 'focusUp', polarity: 'buff', condition: 'always' },
+  },
+  'GLASS EDGE': {
+    name: 'GLASS EDGE',
+    tier: 'mid',
+    type: null,
+    // Glass cannon — your attacks deal more BUT you take more (a real, sim-
+    // measurable cost), for a short window.
+    effect: { status: 'glassEdge', polarity: 'buff', condition: 'always' },
+  },
 };
 
 export const SPECIES: { readonly [name: string]: Species } = {

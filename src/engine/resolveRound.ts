@@ -5,10 +5,12 @@ import type { RNG } from './rng';
 import { lookupMove, setActiveMember, validateActionTeam } from './state';
 import {
   applyPendingEffect,
+  buffDamageDealtMult,
   buffDamageTakenMult,
   clearDebuff,
   durationForStatus,
   effectDamageFactor,
+  guardBuffMult,
   tickStatuses,
 } from './status';
 import type { PendingEffect } from './status';
@@ -95,6 +97,9 @@ function rawHit(
   let d = (tier.power * att.species.atk) / def.species.dfn * COMBAT.dmgScale * variance;
   d *= eff;
   d *= traitMods(att, rhythm, traits).dmgMult;
+  // OFFENSE buffs (FOCUS UP / GLASS EDGE) amplify the releaser's strike here too
+  // (1.0 when the side has no offense buff → bit-identical for the focus ladder).
+  d *= buffDamageDealtMult(att);
   // Technique chip-damage reduction (1.0 for the 43 damage moves → bit-identical).
   // Keeps a technique's damage reduced in EVERY path; note this increment only
   // APPLIES statuses in the single-step triangle (there is no stance-read to win
@@ -364,10 +369,15 @@ function resolveStrike(
         : effect.status === 'taunt'
           ? 'A'
           : undefined;
-  const makeBuffPending = (): PendingEffect | undefined =>
-    effect !== undefined && effect.polarity === 'buff' && !corroded
-      ? { target: attSide, status: effect.status, polarity: 'buff', duration: durationForStatus(effect.status) }
-      : undefined;
+  // A self-buff pending. `gate` distinguishes the two call sites: the NORMAL/
+  // fizzle branch passes 'normal' and only ALWAYS-buffs land there; a READ-WIN
+  // branch passes 'readWin' and ANY buff lands (incl. a read-win-gated buff like
+  // SIPHON's lifesteal, which must win the read to steal life — else chip only).
+  const buffPendingFor = (gate: 'normal' | 'readWin'): PendingEffect | undefined => {
+    if (!(effect !== undefined && effect.polarity === 'buff' && !corroded)) return undefined;
+    if (gate === 'normal' && (effect.condition ?? 'always') !== 'always') return undefined;
+    return { target: attSide, status: effect.status, polarity: 'buff', duration: durationForStatus(effect.status) };
+  };
   const makeDebuffPending = (): PendingEffect | undefined => {
     if (!(effect !== undefined && effect.polarity === 'debuff' && !corroded)) return undefined;
     const stance = controlStance();
@@ -380,7 +390,7 @@ function resolveStrike(
     };
   };
   // On a read-win (punish / opening) a buff lands on self OR a debuff on the foe.
-  const readWinPending = (): PendingEffect | undefined => makeBuffPending() ?? makeDebuffPending();
+  const readWinPending = (): PendingEffect | undefined => buffPendingFor('readWin') ?? makeDebuffPending();
 
   const variance = COMBAT.damageVarianceMin + rng.next() * COMBAT.damageVarianceSpan;
   let d =
@@ -390,8 +400,16 @@ function resolveStrike(
   // Trait damage modifier (e.g., GUSTBORNE x1.3 on rhythm rounds).
   d *= traitMods(attacker, rhythm, traits).dmgMult;
   d *= attMult;
+  // OFFENSE buffs (FOCUS UP / GLASS EDGE) — the bearer's strikes deal more (1.0
+  // when none → bit-identical). Stacks multiplicatively with Full Power.
+  d *= buffDamageDealtMult(attacker);
   // Technique chip-damage reduction (1.0 for a normal attack).
   d *= effectDamageFactor(move);
+
+  // SET STANCE (STONE poker) — extra mitigation ONLY when the DEFENDER is
+  // bracing (Guard), so it strengthens Brace specifically rather than being a
+  // flat DR. 1.0 unless the defender holds a setStance buff AND is in Guard.
+  const defGuardMit = defStance === 'G' ? guardBuffMult(defender) : 1;
 
   // Extra damage a DAZED defender takes this round (thrice-repeat punish).
   // Applied to whichever damage branch lands below.
@@ -416,7 +434,7 @@ function resolveStrike(
   // F vs G — opening (no counter possible)
   if (attStance === 'F' && defStance === 'G') {
     const baseMit = defender.exhausted ? COMBAT.openTaken * COMBAT.exhTaken : COMBAT.openTaken;
-    const dd = d * COMBAT.openDmg * baseMit * dazeMult * defTaken;
+    const dd = d * COMBAT.openDmg * baseMit * dazeMult * defTaken * defGuardMit;
     const newDef: SideState = { ...defender, hp: Math.max(0, defender.hp - dd) };
     events.push({ kind: 'opening', side: attSide, damage: dd, effectiveness: eff });
     // Effect move: status replaces the read-win ★ (see the punish branch).
@@ -432,6 +450,7 @@ function resolveStrike(
   const preMit = d;
   if (defStance === 'A') d *= COMBAT.aggrTaken;
   if (defStance === 'G') d *= COMBAT.guardTaken;
+  d *= defGuardMit; // SET STANCE: stronger Brace (1.0 unless Guard + the buff)
   if (defender.exhausted) d *= COMBAT.exhTaken;
   d *= dazeMult;
   d *= defTaken;
@@ -440,10 +459,10 @@ function resolveStrike(
   let newAtt: SideState = attacker;
   events.push({ kind: 'strike', side: attSide, move: moveName, damage: d, effectiveness: eff });
 
-  // A DEBUFF cast in a non-read-win stance FIZZLES here (only chip landed); a
-  // BUFF still self-applies (it never needed a read). No read-win ★ in this
-  // branch regardless, so nothing to suppress.
-  const buffPending = makeBuffPending();
+  // A DEBUFF cast in a non-read-win stance FIZZLES here (only chip landed); an
+  // ALWAYS-buff still self-applies (it never needed a read), but a READ-WIN-gated
+  // buff (SIPHON lifesteal) fizzles too. No read-win ★ in this branch regardless.
+  const buffPending = buffPendingFor('normal');
 
   if (newDef.hp <= 0) {
     events.push({ kind: 'ko', side: defSide });

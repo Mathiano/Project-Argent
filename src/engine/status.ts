@@ -49,15 +49,46 @@ export function effectDamageFactor(move: Move): number {
   return e.damageFactor ?? STATUS.effectMoveDamageFactor;
 }
 
-// Incoming-damage multiplier from a side's active BUFFS (only BULWARK reduces
-// damage today; buffs stack → multiply). Returns 1 when the side has no buffs
-// → bit-identical for every legacy/sim side.
+// Incoming-damage multiplier from a side's active BUFFS — buffs stack → multiply.
+// BULWARK/ENTANGLE REDUCE incoming (defensive, <1); GLASS EDGE INCREASES it
+// (the glass-cannon's real, sim-measurable cost, >1). SET STANCE is NOT here —
+// it is GUARD-CONDITIONAL (guardBuffMult), not a flat DR. Returns 1 when the
+// side has no relevant buff → bit-identical for every legacy/sim side.
 export function buffDamageTakenMult(side: SideState): number {
   const buffs = side.buffs;
   if (buffs === undefined || buffs.length === 0) return 1;
   let m = 1;
-  for (const b of buffs) if (b.kind === 'bulwark') m *= STATUS.bulwarkDamageTaken;
+  for (const b of buffs) {
+    if (b.kind === 'bulwark') m *= STATUS.bulwarkDamageTaken;
+    else if (b.kind === 'entangle') m *= STATUS.entangleDamageTaken;
+    else if (b.kind === 'glassEdge') m *= STATUS.glassEdgeDamageTaken;
+  }
   return m;
+}
+
+// Outgoing-damage multiplier from a side's active OFFENSE buffs (FOCUS UP +
+// GLASS EDGE deal more; buffs stack → multiply). Applied to the attacker's
+// damage in both the single-step (resolveStrike) and focus (rawHit) paths.
+// Returns 1 when the side has no offense buff → bit-identical.
+export function buffDamageDealtMult(side: SideState): number {
+  const buffs = side.buffs;
+  if (buffs === undefined || buffs.length === 0) return 1;
+  let m = 1;
+  for (const b of buffs) {
+    if (b.kind === 'focusUp') m *= STATUS.focusUpDamageDealt;
+    else if (b.kind === 'glassEdge') m *= STATUS.glassEdgeDamageDealt;
+  }
+  return m;
+}
+
+// SET STANCE (STONE poker) — the extra mitigation a BRACING bearer gets. Returns
+// <1 only when the side holds a setStance buff (the caller applies it ONLY on
+// the Guard-defense path, so the buff strengthens Brace specifically rather than
+// being a flat DR); 1 otherwise → bit-identical.
+export function guardBuffMult(side: SideState): number {
+  const buffs = side.buffs;
+  if (buffs === undefined || buffs.length === 0) return 1;
+  return buffs.some((b) => b.kind === 'setStance') ? STATUS.setStanceGuardTaken : 1;
 }
 
 // Base duration for a freshly-applied status — per-kind via STATUS.statusDurations
@@ -96,6 +127,32 @@ export function applyPendingEffect(
       ...side,
       debuff: { kind: pe.status, duration: dur, applied, ...(pe.stance ? { stance: pe.stance } : {}) },
     };
+  }
+  // ── Wave C instant SELF-effects (heal / lifesteal / cleanse) ────────────────
+  // Resolve the swing NOW and leave NO lingering buff (so no buff entry, no
+  // statusApply). Reached via the buff path; SIPHON's 'drain' is read-win-gated
+  // at the CALL site (resolveStrike), so by here it has already earned its heal.
+  if (pe.status === 'tideMend' || pe.status === 'drain') {
+    const pct = pe.status === 'tideMend' ? STATUS.tideMendHealPct : STATUS.siphonHealPct;
+    const hp = Math.min(side.maxHp, side.hp + Math.round(side.maxHp * pct));
+    if (hp !== side.hp) events.push({ kind: 'recover', side: sideKey, healed: hp - side.hp });
+    return { ...side, hp };
+  }
+  // WANE / STEADY (cleanse) + REFORGE (cleanse + minor heal): clear the bearer's
+  // single active debuff (the non-Resolve counterplay valve), and REFORGE also
+  // patches a little HP. A statusBreak narrates the forcibly-ended debuff.
+  if (pe.status === 'cleanse' || pe.status === 'reforge') {
+    let s = side;
+    if (s.debuff !== undefined) {
+      events.push({ kind: 'statusBreak', side: sideKey, status: s.debuff.kind });
+      s = clearDebuff(s);
+    }
+    if (pe.status === 'reforge') {
+      const hp = Math.min(s.maxHp, s.hp + Math.round(s.maxHp * STATUS.reforgeHealPct));
+      if (hp !== s.hp) events.push({ kind: 'recover', side: sideKey, healed: hp - s.hp });
+      s = { ...s, hp };
+    }
+    return s;
   }
   events.push({ kind: 'statusApply', side: sideKey, status: pe.status, duration: pe.duration });
   // ── Instant effects — apply the swing now, leave no lingering status. ───────
@@ -187,6 +244,15 @@ export function tickStatuses(
     const kept: { kind: StatusKind; duration: number }[] = [];
     for (const b of buffs) {
       const remaining = b.duration - 1;
+      // UNDERTOW (AQUA HoT): heal a slice of maxHp each tick (regenerating tank).
+      // Bounded by duration + refresh-not-stack DR; clamped to maxHp.
+      if (b.kind === 'undertow' && s.hp > 0) {
+        const hp = Math.min(s.maxHp, s.hp + Math.round(s.maxHp * STATUS.undertowHealPct));
+        if (hp !== s.hp) {
+          events.push({ kind: 'recover', side: sideKey, healed: hp - s.hp });
+          s = { ...s, hp };
+        }
+      }
       events.push({
         kind: 'statusTick',
         side: sideKey,

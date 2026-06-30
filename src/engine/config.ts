@@ -195,6 +195,9 @@ export const STATUS = {
   // (Wave B) are bounded short for escapability: Frozen/Inception ≤2, Taunt 1.
   statusDurations: {
     silence: 2, callLock: 2, echo: 1, frozen: 2, inception: 2, taunt: 1,
+    // Wave C: GLASS EDGE is a SHORT risk/reward window (you're fragile while it
+    // lasts); the rest (undertow/shrouded/setStance/focusUp) use baseDuration.
+    glassEdge: 2,
   } as { readonly [k: string]: number },
   // ── Resource effects (Wave B) ──────────────────────────────────────────────
   // Drained (TOXIC SAP): stamina bled per round while active (offsets +8 regen
@@ -202,6 +205,56 @@ export const STATUS = {
   drainedStaminaDot: 10,
   // Sap (LEECH BITE): instant burst stamina-drain on the read-win.
   sapStaminaBurst: 20,
+  // ── Sustain / buff / cleanse magnitudes (Wave C — PLACEHOLDER, sim-tuned) ───
+  // The buffs/heals/cleanse layer. The watch-item is "FREE VALUE": a buff/heal
+  // doesn't disrupt the opponent, so the only degeneracy is SELF-value (an
+  // infinite-sustain turtle, an all-upside glass cannon). Each magnitude is
+  // bounded so heal-per-turn < safe-damage-per-turn (no turtle) and every
+  // tradeoff costs something. Sim-gated in src/sim/sustainEffects.test.ts.
+  //
+  // TIDE MEND (AQUA Recover): instant self-heal = this fraction of maxHp. A
+  // no-★ technique heal — bounded by the cast-stance EXPOSURE (you DON'T act,
+  // you cast in a stance the foe can punish) + magnitude, so a heal-turtle can't
+  // out-sustain a reader's damage. Smaller than the RECOVER Call (0.5) which
+  // costs a ★ but negates nothing extra.
+  // SIM RE-TUNE 0.30→0.10: at 0.30 (and even 0.16) a no-★ heal cast safely in
+  // Guard out-sustained the reader (heal-turtle won 100% — the BULWARK-turtle
+  // lesson, amplified: a heal converts any fight into a won attrition war).
+  tideMendHealPct: 0.1,
+  // UNDERTOW (AQUA HoT): heal this fraction of maxHp each round it ticks (a
+  // REGENERATING counter-tank, distinct from BULWARK's flat DR). A lingering
+  // buff → refresh-not-stack DR + duration bound the total. SIM RE-TUNE
+  // 0.08→0.03: the HoT heals EVERY round (incl. rests) → the worst free-value
+  // offender; kept small so it's a trickle, not a sustain engine.
+  undertowHealPct: 0.03,
+  // SIPHON (NATURE Drain/lifesteal): READ-WIN-gated self-heal = this fraction of
+  // maxHp. Offensive sustain — on a read-win the chip lands AMPLIFIED (punish/
+  // opening) AND you steal life; lose the read → chip only, no heal (the
+  // lifesteal fizzles, like a debuff). The read-gate is the cost.
+  siphonHealPct: 0.16,
+  // ENTANGLE (NATURE): defensive self-buff (vine-guard) — take this fraction of
+  // incoming damage while active (NATURE's defensive sustain partner to SIPHON's
+  // offense). Reuses the BULWARK DR mechanism with a milder magnitude; DISTINCT
+  // from bulwark so the two stack (a double-DR turtle is sim-gated).
+  entangleDamageTaken: 0.9,
+  // REFORGE (FORGE): cleanse + this fraction of maxHp minor heal (fortress
+  // endurance — clears a debuff AND patches a little HP).
+  reforgeHealPct: 0.15,
+  // FOCUS UP (BASIC): generic self-buff — the bearer's strikes deal ×this while
+  // active. A small PURE-UPSIDE offense buff (BASIC's honest floor), tuned weak
+  // + duration-bound so it is not free value.
+  focusUpDamageDealt: 1.1,
+  // GLASS EDGE (FROST glass-cannon): while active the bearer's attacks deal
+  // ×Dealt BUT it takes ×Taken incoming. The extra-damage-taken is the REAL,
+  // sim-measurable cost (not an ignorable flavour tell) — risk/reward, never
+  // all-upside.
+  glassEdgeDamageDealt: 1.3,
+  glassEdgeDamageTaken: 1.25,
+  // SET STANCE (STONE poker): while active, BRACE (Guard) takes ×this EXTRA
+  // mitigation — CONDITIONAL on actually bracing (a stronger Brace, not a flat
+  // DR). The "reveal you might Brace" downside is the GAME-side tell cost; the
+  // sim can't see a tell, so this is tuned non-dominant even ignoring it.
+  setStanceGuardTaken: 0.8,
   // ★ cost to apply a status via a technique (placeholder — the two-pool /
   // momentum-economy increment sets the real economy).
   applicationCost: 1,
