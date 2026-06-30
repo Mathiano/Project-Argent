@@ -21,7 +21,7 @@ GBC-*descended* monster-battler: Pokémon Silver reimagined with Combat 2.0 — 
 - Stances: Aggressive ×1.25 dealt / ×1.15 taken; Guard ×0.75 / ×0.60; Fluid neutral.
 - Guard › Aggressive: counter 0.5× reflect + stagger (next-round initiative ×0.5), if defender survives. Fluid › Guard: opening ×1.15 through ×0.85 guard, Fluid acts first, no counter. Aggressive › Fluid: **PUNISH ×1.35** — the aggressor catches the committing dodger + ★ (Combat Layer 1; flipped from the v0.3 speed-gated dodge `p = clamp((spdDef/spdAtk−1)×2, 0, 0.9)`). Aggr › Aggr: clash (p ∝ stamina×speed; loser whiffs + staggered).
 - Initiative: speed / move-weight (0.85 / 1.0 / 1.15); stagger halves it. **Evasion is emergent from SPD — there is no discrete evasion stat.**
-- ★ Momentum: +1 on read-wins, cap 2. Calls spend ★ (Catch Breath = rest, +35 ST).
+- ★ Momentum: +1 on read-wins, cap 3. Calls spend ★ (Catch Breath = rest, +50 ST).
 
 **Focus two-step layer** (the major addition since v0.3)
 - Shared wind-up (R1) + hidden release (R2) via the **rotation triangle: Heavy › Brace, Feint › Aggressive, Hide › Fluid** (each release beats one R2 stance, loses one, neutral one).
