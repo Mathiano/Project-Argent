@@ -271,3 +271,24 @@ export const TIERS: { readonly [K in TierName]: Tier } = {
   heavy: { name: 'heavy', power: 110, cost: 35, weight: 1.15 },
   nuke: { name: 'nuke', power: 140, cost: 55, weight: 1.3, delayNext: true },
 };
+
+// ── Phased-unlock (Spine-1, docs/combat-design-canonical.md §1) ──────────────
+// Held ★ gates ATTACK TIERS: an attack is legal only if its user holds at least
+// this many ★, ALONGSIDE the existing stamina + winded gates (all must pass).
+// One axis with the damage tier per the spec (a heavy costs 35 ST AND 2★) — maps
+// the existing Move.tier, no new per-move metadata. T0/light = 0★ is ALWAYS
+// available, so a mon at 0★ can always act its Basic (no soft-lock — every mon
+// carries a light). A SOFT FILTER: an under-★ attack is simply not offered (not
+// a backfire) — the player can't select it and the AI won't pick it (both
+// choose from affordableMoves). SIM NOTE: this is NOT bit-identical — battles
+// now open light-only at 0★ and unlock mid/heavy as ★ accrues (the intended
+// ramp); the ladders move accordingly. SCOPE: gates ATTACKS only (moves with no
+// `effect`); TECHNIQUES keep their current availability — the effect-move layer
+// is untouched. (Canonical §3 puts effect moves on the same ladder via the
+// two-pool "double-gate"; deferred to the two-pool increment.)
+export const MOMENTUM_REQ_BY_TIER: { readonly [K in TierName]: number } = {
+  light: 0,
+  mid: 1,
+  heavy: 2,
+  nuke: 3,
+};

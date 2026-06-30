@@ -123,7 +123,9 @@ describe('arena rhythm + GUSTBORNE trait (A3 + A4)', () => {
     // Rhythm: 35 + 8 = 43 cost, 14 regen, net -29 stamina shift.
     const card: BossCard = { species: SPECIES.EMBERCUB!, arenaSchedule: ARENA };
     const setup = createBattleState(
-      createSide(SPECIES.EMBERCUB!),
+      // Phased-unlock: FX FLAME RUSH is a heavy (2★) → bank the ★ so this isolates
+      // the arena STAMINA surcharge (the ★-gate is irrelevant here).
+      createSide(SPECIES.EMBERCUB!, undefined, { openingMomentum: 2 }),
       createSide(SPECIES.AQUAFIN!),
       { bossCard: card },
     );

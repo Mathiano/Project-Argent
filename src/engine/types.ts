@@ -295,6 +295,13 @@ export interface BossCard {
   // Variable team size — boss cards declare how big the lineup is.
   // Defaults to 1 when omitted (single-mon boss). Falkner ships at 2.
   readonly teamSize?: number;
+  // Opening ★ the boss "comes prepared" with (Spine-1 — phased-unlock). Under
+  // the ★-gate a boss whose signature is a heavy (Falkner's DIVE BOMB = 2★)
+  // would be ★-starved at 0★; a small banked opening ★ lets the signature reach
+  // the field. A TUNING lever — enough that the signature fires, not so much the
+  // boss is oppressive. Defaults to 0 (omitted) → non-boss / unprepared bosses
+  // are bit-identical. Applied to each of the boss's mons at creation.
+  readonly openingMomentum?: number;
 }
 
 export function isRhythmRound(

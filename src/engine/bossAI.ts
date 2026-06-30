@@ -5,6 +5,7 @@
 
 import { typeMult } from './data';
 import type { RNG } from './rng';
+import { MOMENTUM_REQ_BY_TIER } from './config';
 import { affordableMoves, forcedAction, lookupMove } from './state';
 import type { Action, BattleState, Side, SideState, Stance, Team } from './types';
 import { activeMon, isRhythmRound } from './types';
@@ -118,6 +119,24 @@ function worstIncoming(
 // lower). When winded the heavy is locked → he single-steps → natural variety.
 const FALKNER_GUST_FOCUS_RATE = 0.7;
 
+// Spine-1 (phased-unlock) — Falkner's banked opening ★. His signature DIVE BOMB
+// is a HEAVY (2★ under the ★-gate); without banked ★ he is ★-starved and never
+// fires it (he is Call-less, so his ★ only ever climbs from read-wins, and his
+// metronome phase-1 play earns few). 2 banked ★ "comes prepared" → the heavy is
+// available on the first gust, restoring his signature without making him read-
+// harder than designed (preserves the phase-1 metronome / phase-2 syncopation
+// character). A TUNING lever (calibrated to the gentlest-gym target); the boss
+// holds it (Call-less → it doesn't drain). The card carries this to createSide.
+export const FALKNER_OPENING_MOMENTUM = 2;
+
+// Spine-1 — Falkner's read rates (how often he plays the triangle-counter of the
+// player's modal stance vs. his metronome/dance). Phase 2 reads harder than
+// phase 1 (the syncopation escalation). Tuned so he CONTESTS enough to survive
+// to his signature under the ★-economy, but stays the gentlest gym (well below a
+// perfect reader). Calibrated in src/sim/falknerLadder.test.ts.
+const FALKNER_P1_READ_RATE = 0.45;
+const FALKNER_P2_READ_RATE = 0.6;
+
 export const falknerBossAI: BossPolicy = (state, side, rng) => {
   const myTeam = state[side];
   const me = activeMon(myTeam);
@@ -134,10 +153,17 @@ export const falknerBossAI: BossPolicy = (state, side, rng) => {
   const switchTo = bestSwitchTarget(myTeam, enemyActive.species.types, state.typeChart);
   if (switchTo !== null) return { kind: 'switch', toIndex: switchTo };
 
-  // Catch-breath if low ST and have momentum (the gym spec's tempo play).
-  // Leader Calls deferred to Bugsy slice per design ruling; Falkner AI
-  // intentionally Call-less. Phase-2 swing carried by gust-round DIVE BOMB.
-  if (me.momentum >= 1 && me.st < 25 && (state.phase ?? 1) === 1) {
+  // Catch-breath if low ST — but HOLD ★ for the signature (Spine-1 hold-vs-spend).
+  // Under phased-unlock a ★ double-duties as the heavy gate, so Catch Breath
+  // (spends 1 ★) must NOT drain him below the DIVE BOMB threshold (2★) — else he
+  // ★-starves his own signature and a stamina-pressuring foe rolls him. So he
+  // only spends a ★ on Catch Breath when he can SPARE one above the heavy req.
+  // (Leader Calls deferred to Bugsy; this is his sole Call, now economy-aware.)
+  if (
+    me.momentum > MOMENTUM_REQ_BY_TIER.heavy &&
+    me.st < 25 &&
+    (state.phase ?? 1) === 1
+  ) {
     return { kind: 'catchBreath' };
   }
 
@@ -159,9 +185,18 @@ export const falknerBossAI: BossPolicy = (state, side, rng) => {
 
   const move = pickFalknerMove(state, side, rhythm, rng);
 
+  // Spine-1: Falkner CONTESTS the read-war so he isn't ★-snowballed to death.
+  // Pre-phased-unlock he could be a near-pure metronome (phase-1 random, phase-2
+  // 15% reads) because the player couldn't snowball ★ into a runaway tier lead.
+  // Under the ★-economy a perfect-reader bursts a non-reading boss before his
+  // gust window (he never lands DIVE BOMB). A modest read rate lets him win some
+  // exchanges → bank ★, survive to his signature, and punish a careless player —
+  // WITHOUT becoming a wall (he's the gentlest gym; reads stay well below a
+  // tryhard's, and only kick in once there are 3 rounds of history to read).
   let stance: Stance;
-  if (phase >= 2 && rng.next() < 0.15) {
-    // 15% triangle read of player's modal stance from the last 3 rounds.
+  const readRate = phase >= 2 ? FALKNER_P2_READ_RATE : FALKNER_P1_READ_RATE;
+  if (rng.next() < readRate) {
+    // Triangle read of the player's modal stance over the last 3 rounds.
     const modal = modalPlayerStance(state);
     stance = modal ? triangleCounter(modal) : pickRandomFalknerStance(rng, rhythm);
   } else {

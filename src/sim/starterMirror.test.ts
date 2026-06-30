@@ -18,10 +18,14 @@ describe('starter-trio mirror-sim — budget-balanced ⇒ ~50% RPS each', () => 
     expect(STARTERS.length).toBe(3);
   });
 
-  test('every starter lands near 50% aggregate (44–56%)', () => {
+  // Spine-1 re-baseline (2026-06-30, phased-unlock): the ★-ramp opens battles
+  // light-only, mildly favouring the bulky Wall (KINDRAKE 56.0 vs 46.5/46.5) —
+  // bulk gets more value while offense is throttled early. Spread 9.5pp still
+  // honours the TIGHT (<10pp) contract below; band widened 44–56 → 43–57.
+  test('every starter lands near 50% aggregate (43–57%)', () => {
     for (const s of STARTERS) {
-      expect(res.aggregate[s]).toBeGreaterThanOrEqual(44);
-      expect(res.aggregate[s]).toBeLessThanOrEqual(56);
+      expect(res.aggregate[s]).toBeGreaterThanOrEqual(43);
+      expect(res.aggregate[s]).toBeLessThanOrEqual(57);
     }
   });
 

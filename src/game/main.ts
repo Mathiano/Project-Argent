@@ -6,6 +6,7 @@ import {
   createBattleState,
   createSide,
   createTeam,
+  FALKNER_OPENING_MOMENTUM,
   falknerBossAI,
   forcedAction,
   loadDex,
@@ -1290,12 +1291,18 @@ function buildFalknerTeam(): { team: ReturnType<typeof createTeam>; card: BossCa
     species: galehawk,
     statScale: { hp: 1.15 },
     arenaSchedule: FALKNER_ARENA,
-    breakBar: 2,
+    // Spine-1 re-baseline 2→4: phased-unlock let good readers Break-spam Falkner,
+    // resetting his gust cadence and starving DIVE BOMB. 4 holds the cadence so his
+    // signature fires (see src/sim/falknerLadder.ts).
+    breakBar: 4,
     teamSize: 2,
+    openingMomentum: FALKNER_OPENING_MOMENTUM,
   };
   const team = createTeam([
-    createSide(flitpeck),
-    createSide(galehawk, card.statScale),
+    // The boss "comes prepared" — both of Falkner's mons bank the opening ★ so
+    // their signature heavy (DIVE BOMB = 2★ under phased-unlock) reaches the field.
+    createSide(flitpeck, undefined, { openingMomentum: FALKNER_OPENING_MOMENTUM }),
+    createSide(galehawk, card.statScale, { openingMomentum: FALKNER_OPENING_MOMENTUM }),
   ]);
   // Phase 6.5 — facing the boss's mons registers them as SEEN too.
   markSeenAll(run.dex, [flitpeck.name, galehawk.name]);

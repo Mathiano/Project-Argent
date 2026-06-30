@@ -41,7 +41,10 @@ const CARD: BossCard = {
 function makeState(): BattleState {
   return createBattleState(
     createSide(SPECIES.EMBERCUB!),
-    createSide(GALEHAWK),
+    // Phased-unlock: DIVE BOMB is a heavy (2★). Falkner "comes prepared" with his
+    // banked opening ★ (FALKNER_OPENING_MOMENTUM = 2), so his signature is reachable
+    // — matching how the boss card creates him in the sim + game.
+    createSide(GALEHAWK, undefined, { openingMomentum: 2 }),
     { bossCard: CARD },
   );
 }
@@ -112,13 +115,26 @@ describe('Falkner boss AI (A6)', () => {
     expect(singles).toBeGreaterThan(15);
   });
 
-  test('low ST + momentum + phase 1 triggers Catch Breath', () => {
+  test('low ST + a SPARE ★ in phase 1 triggers Catch Breath (hold-vs-spend)', () => {
+    // Spine-1: Falkner only Catch-Breaths when he can spare a ★ ABOVE the heavy
+    // (DIVE BOMB = 2★) threshold — at 3★, spending 1 leaves 2★, signature intact.
     let s = makeState();
     s = atRound(s, 2, 1);
-    const patched = { ...activeMon(s.foe), momentum: 1, st: 20 };
+    const patched = { ...activeMon(s.foe), momentum: 3, st: 20 };
     s = { ...s, foe: setActiveMember(s.foe, patched) };
     const action = falknerBossAI(s, 'foe', mulberry32(1));
     expect(action.kind).toBe('catchBreath');
+  });
+
+  test('low ST but only the heavy-threshold ★ → HOLDS for DIVE BOMB (no Catch Breath)', () => {
+    // At exactly 2★, spending on Catch Breath would re-lock his signature, so he
+    // does NOT — he holds the charge (the phased-unlock hold-vs-spend choice).
+    let s = makeState();
+    s = atRound(s, 2, 1);
+    const patched = { ...activeMon(s.foe), momentum: 2, st: 20 };
+    s = { ...s, foe: setActiveMember(s.foe, patched) };
+    const action = falknerBossAI(s, 'foe', mulberry32(1));
+    expect(action.kind).not.toBe('catchBreath');
   });
 
   test('boss switches when active is at ≥1.5x type disadvantage and a resistant bench mon exists', () => {

@@ -1,4 +1,4 @@
-import { COMBAT, TIERS } from './config';
+import { COMBAT, MOMENTUM_REQ_BY_TIER, TIERS } from './config';
 import { LEGACY_TRAIT_TABLE, LEGACY_TYPE_CHART, MOVES } from './data';
 import type {
   Action,
@@ -20,6 +20,9 @@ export interface SideOpts {
   // The game sets this for a sufficiently-bonded mon; omitted everywhere
   // else, so the returned SideState shape is unchanged (bit-identical).
   readonly jumpstartArmed?: boolean;
+  // Banked opening ★ (Spine-1 — a boss "comes prepared"). Omitted ⇒ 0, so every
+  // non-boss side keeps the momentum:0 default → bit-identical.
+  readonly openingMomentum?: number;
 }
 
 export function createSide(species: Species, scale?: StatScale, opts?: SideOpts): SideState {
@@ -43,7 +46,7 @@ export function createSide(species: Species, scale?: StatScale, opts?: SideOpts)
     st: 100,
     exhausted: false,
     staggered: false,
-    momentum: 0,
+    momentum: opts?.openingMomentum ?? 0,
     // Conditional spread: when not armed, the field is ABSENT (not `false`),
     // so the object is identical to the pre-jumpstart shape → bit-identical.
     ...(opts?.jumpstartArmed ? { jumpstartArmed: true } : {}),
@@ -135,11 +138,23 @@ export function isWinded(side: SideState): boolean {
   return side.st <= COMBAT.winded;
 }
 
+// Phased-unlock (Spine-1): an ATTACK (a move with no `effect`) is ★-locked until
+// its user holds the tier's required momentum. Returns false for an under-★
+// attack; TECHNIQUES (move.effect set) are exempt — they keep their current
+// availability (the effect-move layer is untouched). 0★ ⇒ only light attacks,
+// but light needs 0★ so a mon can always act its Basic. Gates the SOFT filter
+// (affordableMoves) below + the hard validateAction gate.
+export function tierMomentumLocked(side: SideState, move: Move): boolean {
+  if (move.effect !== undefined) return false; // techniques are exempt (Spine-1)
+  return side.momentum < MOMENTUM_REQ_BY_TIER[move.tier];
+}
+
 export function moveLegal(side: SideState, moveName: string): boolean {
   if (!side.species.moves.includes(moveName)) return false;
   const move = MOVES[moveName] ?? REGISTERED_MOVES[moveName];
   if (!move) return false;
   if (isWinded(side) && (move.tier === 'heavy' || move.tier === 'nuke')) return false;
+  if (tierMomentumLocked(side, move)) return false; // phased-unlock ★-gate
   return canAfford(side, move);
 }
 
@@ -193,6 +208,9 @@ export function validateAction(side: SideState, action: Action): void {
   const move = lookupMove(action.move);
   if (isWinded(side) && (move.tier === 'heavy' || move.tier === 'nuke')) {
     throw new Error(`${move.tier} locked while winded`);
+  }
+  if (tierMomentumLocked(side, move)) {
+    throw new Error(`${move.tier} locked — needs ≥${MOMENTUM_REQ_BY_TIER[move.tier]} momentum`);
   }
   if (!canAfford(side, move)) {
     throw new Error(`Cannot afford ${action.move}`);

@@ -49,7 +49,9 @@ describe('validateAction throw paths', () => {
   test('throws when a move cannot be afforded', () => {
     // FX EMBER SNAP costs 22; at ST=5 it should be unaffordable but not winded
     // (winded threshold is ≤25; affordability throws before winded would).
-    const side = patched({ st: 5 });
+    // Phased-unlock: a mid needs 1★ — grant it so the ★-gate passes and this
+    // isolates the AFFORDABILITY throw (not the ★-lock).
+    const side = patched({ st: 5, momentum: 1 });
     expect(() =>
       validateAction(side, { kind: 'move', move: 'FX EMBER SNAP', stance: 'A' }),
     ).toThrow(/Cannot afford/);

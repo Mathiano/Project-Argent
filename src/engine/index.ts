@@ -46,7 +46,7 @@ export {
   kamonChaffScale,
   buildKamonTeam,
 } from './rivalCard';
-export { falknerBossAI } from './bossAI';
+export { falknerBossAI, FALKNER_OPENING_MOMENTUM } from './bossAI';
 export type { BossPolicy } from './bossAI';
 export {
   trainerPolicy,

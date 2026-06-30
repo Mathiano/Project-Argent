@@ -75,12 +75,26 @@ function tierOf(player: string): Tier {
 //   · KINDRAKE (fair, the held anchor) essentially unchanged (~71/72/100/100/92).
 // The FAIR-vs-HARD contract is intact for every reading archetype. Bands
 // re-locked to the seed=0x1f measured values.
+// ── INTENTIONAL SPINE-1 RE-BASELINE (2026-06-30, phased-unlock + Falkner ★-econ)
+// Phased-unlock (★ gates attack tiers) made battles open light-only and ramp as
+// ★ accrues — core combat math, so ALL cells moved. It also ★-starved Falkner
+// (his DIVE BOMB is a heavy = 2★), so he was adapted to LIVE in the ★-economy:
+// (1) banked opening ★ (FALKNER_OPENING_MOMENTUM = 2 — "comes prepared"), (2) a
+// hold-vs-spend Catch Breath (won't drain ★ below the heavy gate), (3) a modest
+// read rate so he contests instead of being ★-snowballed, and — the key fix —
+// (4) breakBar 2→4: at 2 a perfect reader Break-spammed him every ~2 rounds,
+// resetting his gust cadence so DIVE BOMB NEVER fired (a 100% pushover). At 4 the
+// gust holds and DIVE BOMB fires in EVERY matchup (~1.3/fight). Result: a fair,
+// GENTLE tutorial boss. The FAIR-vs-HARD contract is intact and now cleaner —
+// every fair cell ≫ its hard cell, and on the hard path mashing is still punished
+// below reading (button 8.8 / brute 5.0 < naive 16.5 / stamina 14.4 / human 14.7).
+// Bands re-locked to the seed=0x1f measured values.
 const BANDS: { readonly [a: string]: { readonly [t in Tier]: readonly [number, number] } } = {
-  'button-masher': { fair: [50, 76], hard: [6, 16] }, // KIND 71.5 / SILT 54.5 fair · 10.9 hard
-  brute: { fair: [57, 79], hard: [3, 13] }, // KIND 72.4 / SILT 63.0 fair · 7.3 hard
-  'naive-triangle': { fair: [94, 100], hard: [20, 33] }, // 100 / 100 fair · 26.7 hard
-  'stamina-reader': { fair: [92, 100], hard: [13, 25] }, // KIND 100 / SILT 97.2 fair · 18.7 hard
-  'human-ish': { fair: [78, 97], hard: [8, 18] }, // KIND 91.8 / SILT 82.3 fair · 12.8 hard
+  'button-masher': { fair: [42, 70], hard: [3, 16] }, // KIND 63.0 / SILT 47.8 fair · 8.8 hard
+  brute: { fair: [40, 60], hard: [1, 12] }, // KIND 50.6 / SILT 47.1 fair · 5.0 hard
+  'naive-triangle': { fair: [50, 85], hard: [10, 24] }, // KIND 78.2 / SILT 56.7 fair · 16.5 hard
+  'stamina-reader': { fair: [49, 83], hard: [8, 22] }, // KIND 75.3 / SILT 56.6 fair · 14.4 hard
+  'human-ish': { fair: [51, 86], hard: [8, 22] }, // KIND 78.3 / SILT 58.3 fair · 14.7 hard
 };
 
 describe('Falkner ladder regression (n=2000, seed=0x1f, gust=1.4 hp=1.15) — designed bands', () => {

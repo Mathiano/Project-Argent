@@ -8,6 +8,7 @@ import typeChartData from '../../docs/typechart.json';
 import {
   createBattleState,
   createSide,
+  FALKNER_OPENING_MOMENTUM,
   falknerBossAI,
   isTeamWiped,
   LEGACY_TRAIT_TABLE,
@@ -71,7 +72,13 @@ export function buildFalknerAce(opts: { aceHpMult: number; gustBorneDmgMult?: nu
     species: speciesWithTrait,
     statScale: { hp: opts.aceHpMult },
     arenaSchedule: ARENA,
-    breakBar: 2,
+    // Spine-1 re-baseline 2→4: under phased-unlock a perfect reader Break-spammed
+    // Falkner every ~2 rounds, and each Break resets rhythmAnchor → his gust
+    // cadence (and DIVE BOMB) was starved (never fired vs naive/stamina). At 4 the
+    // break is earned over more reads, the gust holds, and DIVE BOMB fires in
+    // every matchup — turning a 100% pushover into the fair, gentle gym.
+    breakBar: 4,
+    openingMomentum: FALKNER_OPENING_MOMENTUM,
   };
   const traits: TraitTable =
     opts.gustBorneDmgMult === undefined
@@ -103,7 +110,7 @@ function runMatch(
 ): MatchOutcome {
   let state: BattleState = createBattleState(
     createSide(playerSpecies),
-    createSide(card.species, card.statScale),
+    createSide(card.species, card.statScale, { openingMomentum: FALKNER_OPENING_MOMENTUM }),
     { bossCard: card, typeChart: TYPECHART, traits },
   );
   for (let i = 0; i < maxRounds; i += 1) {

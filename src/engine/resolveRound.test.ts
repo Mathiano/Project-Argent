@@ -109,7 +109,8 @@ describe('turn order — initiative (speed ÷ move weight) + the Fluid exception
     // is CORRECT by the spec (Initiative: speed / move weight) — the
     // "SLOWER acted first" the player saw is the design, not a bug.
     const r = resolveRound(
-      makeState('SPROUTLE', 'EMBERCUB'),
+      // Phased-unlock: FX FLAME RUSH is a heavy (2★) → grant the foe the ★.
+      patchFoe(makeState('SPROUTLE', 'EMBERCUB'), { momentum: 2 }),
       { kind: 'move', move: 'TACKLE', stance: 'G' },
       { kind: 'move', move: 'FX FLAME RUSH', stance: 'G' },
       mulberry32(7),
@@ -261,7 +262,9 @@ describe('winded lock', () => {
   });
 
   test('mid moves are still allowed while winded', () => {
-    const state = patchPlayer(makeState(), { st: COMBAT.winded });
+    // Phased-unlock: a mid needs 1★ — grant it so this isolates the WINDED gate
+    // (winded locks only heavy/nuke; mid stays legal).
+    const state = patchPlayer(makeState(), { st: COMBAT.winded, momentum: 1 });
     expect(() =>
       validateAction(pl(state), { kind: 'move', move: 'FX EMBER SNAP', stance: 'A' }),
     ).not.toThrow();
@@ -419,7 +422,11 @@ describe('Catch Breath call', () => {
 describe('injected type chart (A1)', () => {
   test('a custom chart applied at battle setup changes effectiveness', () => {
     // Both EMBERCUB (Flame) so the foe's FX EMBER SNAP fires Flame-into-Flame.
-    const mirror = createBattleState(createSide(SPECIES.EMBERCUB!), createSide(SPECIES.EMBERCUB!));
+    // Phased-unlock: the foe's FX EMBER SNAP is a mid (1★) → grant the foe the ★.
+    const mirror = patchFoe(
+      createBattleState(createSide(SPECIES.EMBERCUB!), createSide(SPECIES.EMBERCUB!)),
+      { momentum: 1 },
+    );
     const baseline = resolveRound(
       mirror,
       { kind: 'move', move: 'TACKLE', stance: 'A' },
@@ -437,10 +444,11 @@ describe('injected type chart (A1)', () => {
     const flameAmplifier = {
       Flame: { Flame: 2 },
     };
-    const stateWithChart = createBattleState(
-      createSide(SPECIES.EMBERCUB!),
-      createSide(SPECIES.EMBERCUB!),
-      { typeChart: flameAmplifier },
+    const stateWithChart = patchFoe(
+      createBattleState(createSide(SPECIES.EMBERCUB!), createSide(SPECIES.EMBERCUB!), {
+        typeChart: flameAmplifier,
+      }),
+      { momentum: 1 },
     );
     const result = resolveRound(
       stateWithChart,

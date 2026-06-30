@@ -20,9 +20,11 @@ function engineFirst(
   foeMove: string,
   foeStance: Stance,
 ): 'player' | 'foe' | null {
+  // Phased-unlock: these cases use mid/heavy moves to exercise initiative; bank
+  // both sides the ★ so the ★-gate never blocks (it doesn't affect turn order).
   const state: BattleState = createBattleState(
-    createSide(SPECIES[playerKey]!),
-    createSide(SPECIES[foeKey]!),
+    createSide(SPECIES[playerKey]!, undefined, { openingMomentum: 2 }),
+    createSide(SPECIES[foeKey]!, undefined, { openingMomentum: 2 }),
   );
   const r = resolveRound(
     state,
