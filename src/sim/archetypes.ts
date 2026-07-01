@@ -1,7 +1,7 @@
 // Canonical sim archetypes — see docs/sim-archetypes.md.
 // These are measurement instruments; do not "improve" without a design ruling.
 
-import { activeMon, affordableMoves, forcedAction, lookupMove, trainerPolicy, TRAINER_PROFILES } from '../engine';
+import { activeMon, affordableAttacks, affordableMoves, forcedAction, lookupMove, trainerPolicy, TRAINER_PROFILES } from '../engine';
 import type { Action, BattleState, RNG, Side, SideState, Stance } from '../engine';
 
 export interface BotArchetype {
@@ -11,8 +11,20 @@ export interface BotArchetype {
 
 const STANCES: readonly Stance[] = ['A', 'G', 'F'];
 
+// The yardsticks are PURE-DAMAGE instruments: they pick from the ATTACKS pool
+// only. This matters under phased-unlock — at low ★ the mid/heavy ATTACKS are
+// ★-locked while a mid TECHNIQUE is ★-exempt, so an unfiltered `find(tier)` would
+// pick the technique (a heal/buff), corrupting the measurement. Attacks-only
+// restores the pre-two-pool behavior (a fixture/tech-less mon is bit-identical;
+// `affordableAttacks === affordableMoves`). Fallback to the full list only if no
+// attack is affordable (a degenerate pool the integrity gate forbids).
+function affAttacks(side: SideState): readonly string[] {
+  const atk = affordableAttacks(side);
+  return atk.length > 0 ? atk : affordableMoves(side);
+}
+
 function pickMidOrLight(side: SideState): string {
-  const aff = affordableMoves(side);
+  const aff = affAttacks(side);
   if (aff.length === 0) throw new Error('pickMidOrLight: no affordable moves');
   const mid = aff.find((n) => lookupMove(n).tier === 'mid');
   if (mid) return mid;
@@ -22,7 +34,7 @@ function pickMidOrLight(side: SideState): string {
 }
 
 function pickHeaviest(side: SideState): string {
-  const aff = affordableMoves(side);
+  const aff = affAttacks(side);
   if (aff.length === 0) throw new Error('pickHeaviest: no affordable moves');
   const heavy = aff.find((n) => lookupMove(n).tier === 'heavy');
   if (heavy) return heavy;
@@ -55,7 +67,7 @@ export const buttonMasher: BotArchetype = {
     const me = activeMon(state[side]);
     const forced = forcedAction(me);
     if (forced) return forced;
-    const aff = affordableMoves(me);
+    const aff = affAttacks(me); // ATTACKS only — the masher is a pure-damage instrument
     const move = aff[Math.floor(rng.next() * aff.length)]!;
     return { kind: 'move', move, stance: pickRandomStance(rng) };
   },
@@ -165,7 +177,7 @@ function modalCounter(history: readonly Stance[]): Stance | null {
 }
 
 function rivalMovePick(side: SideState): string {
-  const aff = affordableMoves(side);
+  const aff = affAttacks(side); // ATTACKS only (see pickMidOrLight)
   if (aff.length === 0) throw new Error('rivalMovePick: no affordable moves');
   if (side.st > 70) {
     const heavy = aff.find((n) => lookupMove(n).tier === 'heavy');

@@ -162,6 +162,60 @@ export function affordableMoves(side: SideState): string[] {
   return side.species.moves.filter((m) => moveLegal(side, m));
 }
 
+// ── The two-pool model (docs/combat-design-canonical.md §2) ─────────────────
+// A mon's moveset is ONE flat `species.moves` list that the engine serves
+// (moveLegal/affordableMoves/lookupMove all read it unchanged), split into two
+// PURPOSEFUL pools by whether a move carries an `effect`:
+//   ATTACKS (no effect)     — 4 slots; ★-gated by tier (phased-unlock). MUST
+//                             include ≥1 Tier-0/light Basic (the momentum-
+//                             independent floor — a mon with no Basic can't act
+//                             at 0★, since every higher tier is ★-locked).
+//   TECHNIQUES (effect set) — 2 slots; cast-in-stance via the effect mechanism,
+//                             ★-exempt (see tierMomentumLocked).
+// These accessors expose the split for the battle UI (two-row layout, a later
+// task) + the pool-integrity gate below; serving stays the flat list.
+function moveOf(name: string): Move | undefined {
+  return MOVES[name] ?? REGISTERED_MOVES[name];
+}
+
+export function isTechnique(name: string): boolean {
+  return moveOf(name)?.effect !== undefined;
+}
+
+// The mon's ATTACK / TECHNIQUE pools (all learned moves, not just affordable).
+export function attackPool(species: Species): string[] {
+  return species.moves.filter((m) => !isTechnique(m));
+}
+export function techniquePool(species: Species): string[] {
+  return species.moves.filter((m) => isTechnique(m));
+}
+
+// Affordable-and-legal ATTACKS only — for AI DAMAGE selection (a technique must
+// never be chosen as a damage move; the AI casts techniques through an explicit
+// branch). Attacks obey the ★/stamina/winded gates via moveLegal.
+export function affordableAttacks(side: SideState): string[] {
+  return affordableMoves(side).filter((m) => !isTechnique(m));
+}
+// Affordable-and-legal TECHNIQUES only — for the AI's explicit technique-cast.
+export function affordableTechniques(side: SideState): string[] {
+  return affordableMoves(side).filter((m) => isTechnique(m));
+}
+
+// Pool-integrity check (authoring gate; enforced by a test over the dex). Returns
+// a list of violations (empty = valid). Hard rules: ≥1 light Basic attack,
+// ATTACKS ≤ 4, TECHNIQUES ≤ 2. A malformed learnset is a data bug, not a runtime
+// path — the engine already routes a Basic-less 0★ mon to a forced rest.
+export function movePoolIssues(species: Species): string[] {
+  const issues: string[] = [];
+  const attacks = attackPool(species);
+  const techs = techniquePool(species);
+  const hasLightBasic = attacks.some((m) => moveOf(m)?.tier === 'light');
+  if (!hasLightBasic) issues.push(`${species.name}: no Tier-0/light Basic in the ATTACKS pool`);
+  if (attacks.length > 4) issues.push(`${species.name}: ${attacks.length} attacks (max 4)`);
+  if (techs.length > 2) issues.push(`${species.name}: ${techs.length} techniques (max 2)`);
+  return issues;
+}
+
 // Returns a forced action if the side cannot freely choose, else null.
 export function forcedAction(side: SideState): Action | null {
   if (side.exhausted) return { kind: 'rest' };

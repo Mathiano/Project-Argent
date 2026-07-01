@@ -32,6 +32,14 @@
    {
     "move": "HEADBUTT",
     "level": 13
+   },
+   {
+    "move": "SEAR",
+    "level": 1
+   },
+   {
+    "move": "KINDLE",
+    "level": 1
    }
   ],
   "evoLine": {
@@ -89,6 +97,14 @@
    {
     "move": "SCRATCH",
     "level": 24
+   },
+   {
+    "move": "SEAR",
+    "level": 1
+   },
+   {
+    "move": "KINDLE",
+    "level": 1
    }
   ],
   "evoLine": {
@@ -155,6 +171,14 @@
    {
     "move": "WYRM FURY",
     "level": 40
+   },
+   {
+    "move": "SEAR",
+    "level": 1
+   },
+   {
+    "move": "KINDLE",
+    "level": 1
    }
   ],
   "evoLine": {
@@ -204,6 +228,14 @@
    {
     "move": "HEADBUTT",
     "level": 13
+   },
+   {
+    "move": "SIPHON",
+    "level": 1
+   },
+   {
+    "move": "ENTANGLE",
+    "level": 1
    }
   ],
   "evoLine": {
@@ -261,6 +293,14 @@
    {
     "move": "SCRATCH",
     "level": 24
+   },
+   {
+    "move": "SIPHON",
+    "level": 1
+   },
+   {
+    "move": "ENTANGLE",
+    "level": 1
    }
   ],
   "evoLine": {
@@ -322,6 +362,14 @@
    {
     "move": "__SIGNATURE_RESERVED__",
     "level": 34
+   },
+   {
+    "move": "SIPHON",
+    "level": 1
+   },
+   {
+    "move": "ENTANGLE",
+    "level": 1
    }
   ],
   "evoLine": {
@@ -371,6 +419,14 @@
    {
     "move": "HEADBUTT",
     "level": 13
+   },
+   {
+    "move": "TIDE MEND",
+    "level": 1
+   },
+   {
+    "move": "UNDERTOW",
+    "level": 1
    }
   ],
   "evoLine": {
@@ -428,6 +484,14 @@
    {
     "move": "SCRATCH",
     "level": 24
+   },
+   {
+    "move": "TIDE MEND",
+    "level": 1
+   },
+   {
+    "move": "UNDERTOW",
+    "level": 1
    }
   ],
   "evoLine": {
@@ -489,6 +553,14 @@
    {
     "move": "__SIGNATURE_RESERVED__",
     "level": 34
+   },
+   {
+    "move": "TIDE MEND",
+    "level": 1
+   },
+   {
+    "move": "UNDERTOW",
+    "level": 1
    }
   ],
   "evoLine": {
@@ -538,6 +610,14 @@
    {
     "move": "HEADBUTT",
     "level": 13
+   },
+   {
+    "move": "STATIC HAZE",
+    "level": 1
+   },
+   {
+    "move": "SECOND WIND",
+    "level": 1
    }
   ],
   "evoLine": {
@@ -585,16 +665,20 @@
     "level": 7
    },
    {
-    "move": "HEADBUTT",
-    "level": 13
-   },
-   {
     "move": "DIVE BOMB",
     "level": 13
    },
    {
     "move": "SCRATCH",
     "level": 24
+   },
+   {
+    "move": "STATIC HAZE",
+    "level": 1
+   },
+   {
+    "move": "SECOND WIND",
+    "level": 1
    }
   ],
   "evoLine": {
@@ -644,6 +728,14 @@
    {
     "move": "HEADBUTT",
     "level": 13
+   },
+   {
+    "move": "BULWARK",
+    "level": 1
+   },
+   {
+    "move": "TOXIC SAP",
+    "level": 1
    }
   ],
   "evoLine": {
@@ -701,6 +793,14 @@
    {
     "move": "SCRATCH",
     "level": 24
+   },
+   {
+    "move": "BULWARK",
+    "level": 1
+   },
+   {
+    "move": "TOXIC SAP",
+    "level": 1
    }
   ],
   "evoLine": {
@@ -762,6 +862,14 @@
    {
     "move": "__SIGNATURE_RESERVED__",
     "level": 34
+   },
+   {
+    "move": "BULWARK",
+    "level": 1
+   },
+   {
+    "move": "TOXIC SAP",
+    "level": 1
    }
   ],
   "evoLine": {
@@ -809,12 +917,16 @@
     "level": 7
    },
    {
-    "move": "HEADBUTT",
+    "move": "TIDE CRASH",
     "level": 13
    },
    {
-    "move": "TIDE CRASH",
-    "level": 13
+    "move": "TIDE MEND",
+    "level": 1
+   },
+   {
+    "move": "UNDERTOW",
+    "level": 1
    }
   ],
   "evoLine": {

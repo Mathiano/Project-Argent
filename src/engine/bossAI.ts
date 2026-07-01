@@ -6,7 +6,7 @@
 import { typeMult } from './data';
 import type { RNG } from './rng';
 import { MOMENTUM_REQ_BY_TIER } from './config';
-import { affordableMoves, forcedAction, lookupMove } from './state';
+import { affordableAttacks, forcedAction, lookupMove } from './state';
 import type { Action, BattleState, Side, SideState, Stance, Team } from './types';
 import { activeMon, isRhythmRound } from './types';
 
@@ -14,28 +14,30 @@ export type BossPolicy = (state: BattleState, side: Side, rng: RNG) => Action;
 
 function pickFalknerMove(state: BattleState, side: Side, rhythm: boolean, rng: RNG): string {
   const me = activeMon(state[side]);
-  const aff = affordableMoves(me);
-  if (aff.length === 0) return me.species.moves[0]!;
+  // Falkner's damage picks are ATTACKS only (his 2 TECHNIQUE slots sit in-pool;
+  // his bespoke gust-AI plays his signature kit, it does not cast generics).
+  const atk = affordableAttacks(me);
+  if (atk.length === 0) return me.species.moves[0]!;
   const phase = state.phase ?? 1;
 
   if (rhythm) {
     // Phase 1: DIVE BOMB only on gust rounds; intended kill window.
-    if (phase === 1 && aff.includes('DIVE BOMB')) return 'DIVE BOMB';
+    if (phase === 1 && atk.includes('DIVE BOMB')) return 'DIVE BOMB';
     // Phase 2: 50% bait with WING CUT, otherwise DIVE BOMB.
     if (phase >= 2) {
-      if (aff.includes('WING CUT') && aff.includes('DIVE BOMB')) {
+      if (atk.includes('WING CUT') && atk.includes('DIVE BOMB')) {
         return rng.next() < 0.5 ? 'WING CUT' : 'DIVE BOMB';
       }
-      if (aff.includes('DIVE BOMB')) return 'DIVE BOMB';
+      if (atk.includes('DIVE BOMB')) return 'DIVE BOMB';
     }
   }
 
   // Off-rhythm: prefer mid, then light. Heavy stays parked for gusts.
-  const mid = aff.find((n) => lookupMove(n).tier === 'mid');
+  const mid = atk.find((n) => lookupMove(n).tier === 'mid');
   if (mid) return mid;
-  const light = aff.find((n) => lookupMove(n).tier === 'light');
+  const light = atk.find((n) => lookupMove(n).tier === 'light');
   if (light) return light;
-  return aff[0]!;
+  return atk[0]!;
 }
 
 function triangleCounter(stance: Stance): Stance {
@@ -178,8 +180,8 @@ export const falknerBossAI: BossPolicy = (state, side, rng) => {
   // single-step (DIVE BOMB) below. (Pure policy; the engine math is untouched,
   // so the ladder shift here is an intended re-baseline, not a regression.)
   if (rhythm && rng.next() < FALKNER_GUST_FOCUS_RATE) {
-    const aff = affordableMoves(me);
-    const heavy = aff.find((n) => lookupMove(n).tier === 'heavy');
+    // The charged gust rides a heavy ATTACK's power (never a technique).
+    const heavy = affordableAttacks(me).find((n) => lookupMove(n).tier === 'heavy');
     if (heavy) return { kind: 'move', move: heavy, stance: 'A', commit: true };
   }
 

@@ -14,7 +14,14 @@
 // DATA with hooks in the tree — their behavior lands in later stages (per the
 // catalog's mid/elite tiers).
 
-import { affordableMoves, forcedAction, isWinded, lookupMove } from './state';
+import {
+  affordableAttacks,
+  affordableMoves,
+  affordableTechniques,
+  forcedAction,
+  isWinded,
+  lookupMove,
+} from './state';
 import type { RNG } from './rng';
 import type { Action, BattleState, ReleaseKind, Side, SideState, Stance } from './types';
 import { activeMon, defaultReleaseForStance } from './types';
@@ -133,18 +140,27 @@ function drawStance(mix: readonly [number, number, number], rng: RNG): Stance {
   return 'F';
 }
 
-// A committed Focus wants the heaviest affordable move (the wind-up pays its
+// Rate at which a profiled trainer casts a technique from its 2 TECHNIQUE slots
+// (two-pool §2) on a non-focus single-step round, when one is affordable. Low —
+// so battles FEATURE techniques without a trainer turtling on a buff/heal. A
+// starting value (Part A); smarter tech-AI is the AI-refinement pass.
+const TECH_CAST_RATE = 0.25;
+
+// The pickers below choose a DAMAGE move — always from the ATTACKS pool (a
+// technique is never a damage pick; the tree casts techniques via an explicit
+// branch). Callers pass affordableAttacks(me).
+// A committed Focus wants the heaviest affordable ATTACK (the wind-up pays its
 // move cost; the release strike then rides that move's power).
-function pickFocusMove(aff: readonly string[]): string {
-  return aff.find((n) => lookupMove(n).tier === 'heavy') ?? pickSustainableMove(aff);
+function pickFocusMove(atk: readonly string[]): string {
+  return atk.find((n) => lookupMove(n).tier === 'heavy') ?? pickSustainableMove(atk);
 }
 
-// A single-step wants a sustainable mid/light move (stamina-frugal).
-function pickSustainableMove(aff: readonly string[]): string {
+// A single-step wants a sustainable mid/light ATTACK (stamina-frugal).
+function pickSustainableMove(atk: readonly string[]): string {
   return (
-    aff.find((n) => lookupMove(n).tier === 'mid') ??
-    aff.find((n) => lookupMove(n).tier === 'light') ??
-    aff[0]!
+    atk.find((n) => lookupMove(n).tier === 'mid') ??
+    atk.find((n) => lookupMove(n).tier === 'light') ??
+    atk[0]!
   );
 }
 
@@ -202,21 +218,35 @@ export function trainerPolicy(profile: TrainerProfile): TrainerPolicy {
 
     const aff = affordableMoves(me);
     if (aff.length === 0) return { kind: 'rest' };
+    const atk = affordableAttacks(me); // damage picks are ATTACKS only
 
     // 4. ESCALATION CHECK — two-step roll per tendency. A focus commits a base
     //    stance tied to the release model's SIGNATURE (or a drawn stance when
-    //    no model is set); the actual R2 release is picked above on release.
-    if (twoSteps && rng.next() < focusRate) {
+    //    no model is set); the actual R2 release is picked above on release. The
+    //    wind-up rides an ATTACK's power (never a technique).
+    if (twoSteps && atk.length > 0 && rng.next() < focusRate) {
       const baseStance = profile.release
         ? STANCE_FOR_RELEASE[signatureRelease(profile.release)]
         : drawStance(STANCE_MIX[profile.stance], rng);
-      return { kind: 'move', move: pickFocusMove(aff), stance: baseStance, commit: true };
+      return { kind: 'move', move: pickFocusMove(atk), stance: baseStance, commit: true };
+    }
+
+    // 4b. TECHNIQUE CAST (two-pool §2) — occasionally cast from the 2 TECHNIQUE
+    //     slots so battles FEATURE techniques. Buffs cast in Guard (low exposure);
+    //     debuffs in Aggressive (a chance to land the read on a dodger). The `&&`
+    //     short-circuits the rng draw when there is no technique → bit-identical
+    //     for tech-less mons (fixtures). Not brilliant by design (Part A).
+    const techs = affordableTechniques(me);
+    if (techs.length > 0 && rng.next() < TECH_CAST_RATE) {
+      const tech = techs[Math.floor(rng.next() * techs.length)]!;
+      const isBuff = lookupMove(tech).effect?.polarity === 'buff';
+      return { kind: 'move', move: tech, stance: isBuff ? 'G' : 'A' };
     }
 
     // 5. BASE STANCE — weighted by tendency (+ terrain bias later), avoiding
-    //    the thrice-repeat self-daze.
+    //    the thrice-repeat self-daze. Single-step damage is an ATTACK.
     const stance = avoidSelfDaze(drawStance(STANCE_MIX[profile.stance], rng), state, side);
-    return { kind: 'move', move: pickSustainableMove(aff), stance };
+    return { kind: 'move', move: pickSustainableMove(atk), stance };
   };
 }
 

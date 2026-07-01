@@ -768,11 +768,12 @@ describe('battle move list — cursor wrap + rejection paths + B-back', () => {
   test('UP wraps from move 0 to the last move; DOWN wraps from last to 0', () => {
     const { scene } = buildScene();
     scene.input?.('a'); // FIGHT
-    // GRUBLEAF: ['TACKLE', 'THORN FLICK', 'LEAF LASH', 'HEADBUTT']
-    scene.input?.('up'); // wraps to index 3 → HEADBUTT
+    // GRUBLEAF two-pool moveset (4 ATTACKS + 2 TECHNIQUES = 6 served in one list):
+    // ['TACKLE', 'THORN FLICK', 'LEAF LASH', 'HEADBUTT', 'SIPHON', 'ENTANGLE']
+    scene.input?.('up'); // wraps to the LAST move (index 5) → ENTANGLE
     const ctx = stubCtx();
     scene.draw(ctx);
-    expect(ctx.texts.some((t) => t.startsWith('>HEADBUTT'))).toBe(true);
+    expect(ctx.texts.some((t) => t.startsWith('>ENTANGLE'))).toBe(true);
     scene.input?.('down'); // wraps back to index 0 → TACKLE
     ctx.reset();
     scene.draw(ctx);
