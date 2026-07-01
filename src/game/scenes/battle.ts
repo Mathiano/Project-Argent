@@ -2443,32 +2443,43 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   }
 
   // ---- DEV TOOL: dev combat-log overlay --------------------------------
-  // The rolling log, drawn LAST (over the HUD) so nothing occludes it. Newest
-  // line at the bottom. Deliberately drawn with a raw small monospace font (not
-  // the 16px UI font) for line density — it's a debug readout. No-op when off.
+  // The rolling log, drawn LAST (over the HUD) so nothing occludes it. Bounded
+  // to a FIXED on-screen box: the visible line count is derived from the box
+  // geometry (clamped to the 320×180 viewport), so the log can NEVER grow off
+  // the bottom — as events arrive, the oldest scroll out the top and the newest
+  // stay pinned at the bottom (always visible). Deliberately drawn with a raw
+  // small monospace font (not the 16px UI font) for density — a debug readout.
   function drawDevLog(ctx: CanvasRenderingContext2D): void {
     if (!showDevLog) return;
-    const lines = devLog.slice(-DEV_LOG_VISIBLE);
     const pad = 3;
     const lh = 9;
     const x = 3;
-    const y = 42;
+    const top = 40;
+    const bottom = LOGICAL_H - 4; // hard stop inside the 180px viewport
     const w = 252;
-    const h = pad * 2 + (lines.length + 1) * lh;
+    const headerH = lh;
+    // How many event lines fit the FIXED box (after the header). The display is
+    // bounded by the BOX, not the buffer — capped at DEV_LOG_VISIBLE but never
+    // more than the viewport allows, so it can't overflow off-screen.
+    const fit = Math.floor((bottom - top - pad * 2 - headerH) / lh);
+    const maxLines = Math.max(1, Math.min(DEV_LOG_VISIBLE, fit));
+    const lines = devLog.slice(-maxLines); // rolling: only the newest that fit
+    const h = pad * 2 + headerH + lines.length * lh;
     ctx.fillStyle = 'rgba(0,0,0,0.82)';
-    ctx.fillRect(x, y, w, h);
+    ctx.fillRect(x, top, w, h);
     ctx.strokeStyle = '#57e08a';
     ctx.lineWidth = 1;
-    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.strokeRect(x + 0.5, top + 0.5, w - 1, h - 1);
     ctx.font = '8px monospace';
     ctx.letterSpacing = '0px';
     ctx.textAlign = 'start';
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#57e08a';
-    ctx.fillText('DEV COMBAT-LOG  (` toggle)', x + pad, y + pad);
+    // Header notes the buffer total so it's clear older lines rolled off-window.
+    ctx.fillText(`DEV COMBAT-LOG (\` toggle) · ${devLog.length} events`, x + pad, top + pad);
     ctx.fillStyle = '#d6f5e2';
     for (let i = 0; i < lines.length; i += 1) {
-      ctx.fillText(lines[i]!, x + pad, y + pad + (i + 1) * lh);
+      ctx.fillText(lines[i]!, x + pad, top + pad + headerH + i * lh);
     }
   }
 

@@ -1435,4 +1435,66 @@ describe('DEV TOOL — dev combat-log overlay (opt-in; surfaces BattleEvents)', 
     // the first event of every resolve).
     expect(screen).toContain('round 1');
   });
+
+  // A ctx that records each fillText's Y so we can assert the overlay stays
+  // within the 180px viewport (the layout-overflow fix). Everything else no-ops.
+  function yCapturingCtx(): CanvasRenderingContext2D & { ys: number[] } {
+    const noop = () => {};
+    const ys: number[] = [];
+    return new Proxy(
+      { ys },
+      {
+        get(target, prop) {
+          if (prop === 'ys') return (target as { ys: number[] }).ys;
+          if (prop === 'fillText') return (_t: string, _x: number, y: number) => ys.push(y);
+          if (prop === 'beginPath') return () => ({ fill: noop, stroke: noop, ellipse: noop });
+          if (prop === 'measureText') return () => ({ width: 10 });
+          if (prop === 'canvas') return { width: 320, height: 180 };
+          return noop;
+        },
+        set: () => true,
+      },
+    ) as unknown as CanvasRenderingContext2D & { ys: number[] };
+  }
+
+  test('stays within the 180px viewport after many events — nothing renders off the bottom', () => {
+    // Drive several rounds so the buffer overflows the fixed window (>15 lines,
+    // the count that used to run off-screen). Then assert every drawn glyph's
+    // bottom (y + 8px line) sits inside the viewport.
+    const player = CH1.GRUBLEAF!;
+    const foe = CH1.FLITPECK!;
+    const state = createBattleState(
+      createTeam([createSide(player)]),
+      createTeam([createSide(foe)]),
+    );
+    const scene = createBattleScene({
+      state,
+      rng: mulberry32(1),
+      chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'A' }),
+      intro: [],
+      catchBreathUnlocked: false,
+      canRun: true,
+      onResolve: () => {},
+      devLog: true,
+    });
+    scene.update?.(0.01); // → menu
+    // Two full rounds' worth of events (well past the visible window).
+    for (let r = 0; r < 2; r += 1) {
+      scene.input?.('a'); // FIGHT
+      scene.input?.('a'); // commit → resolve
+      drainResolve(scene); // finish the round → back to menu (or end)
+    }
+    // Re-enter resolve so both the HUD log AND the (now-full) dev log render.
+    scene.input?.('a');
+    scene.input?.('a');
+    scene.update?.(0.05);
+
+    const ctx = yCapturingCtx();
+    scene.draw(ctx);
+    // The dev log captured more than one visible window of events...
+    expect(ctx.ys.length).toBeGreaterThan(0);
+    // ...and NOTHING is drawn below the viewport (8px glyph height + top y).
+    const maxBottom = Math.max(...ctx.ys) + 8;
+    expect(maxBottom).toBeLessThanOrEqual(180);
+  });
 });
