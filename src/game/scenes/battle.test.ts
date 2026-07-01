@@ -982,18 +982,19 @@ describe('FOCUS outcome callouts (combat-focus-rebuild)', () => {
 });
 
 describe('momentum visibility (playtest-polish-3)', () => {
-  test('foe ★/momentum is HIDDEN; the player’s is labeled MOMENTUM', () => {
+  test('BOTH the player’s and the foe’s ★/momentum meters render (the differential is visible)', () => {
     const { scene } = buildScene({ playerPatch: { momentum: 2 } });
     const ctx = stubCtx();
     scene.draw(ctx); // at the battle menu — panels visible
     const screen = ctx.texts.join('|');
-    // Your meter is clearly labelled (the full word, gold).
+    // Each meter is labelled MOMENTUM (the full word) — one per panel.
     expect(screen).toContain('MOMENTUM');
-    // Only the PLAYER's ★ meter renders (the foe's is hidden). The meter is a
-    // 3-slot triangle (apex + 2 base), so 3 ★ glyphs draw (2 filled gold + 1 dim
-    // at momentum 2) — not 6 (which would mean the foe's showed too).
+    // Playtest change: the foe's ★ is now SHOWN too (the mechanics run on the
+    // momentum DIFFERENTIAL — behind-penalty + phased-unlock). Each meter is a
+    // 3-slot triangle, so 6 ★ glyphs draw (3 player + 3 foe) — was 3 when the
+    // foe's was hidden.
     const pips = ctx.texts.filter((t) => t === '★').length;
-    expect(pips).toBe(3);
+    expect(pips).toBe(6);
   });
 });
 

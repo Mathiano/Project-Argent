@@ -168,7 +168,8 @@ export interface BattleSceneOpts {
   // shows the ACTIVE mon's standing (stage + progress). STATIC during the
   // fight (bond doesn't move mid-round); it advances on the post-fight
   // victory beat, XP-style. Omitted (sim / isolated tests) → no bar drawn.
-  // Foe bond is intentionally hidden (consistent with the hidden foe ★).
+  // Foe bond is intentionally hidden (bond stays private; the foe's ★ IS now
+  // shown — its differential is load-bearing for the behind-penalty/tier-access).
   readonly playerBond?: readonly number[];
   // This fight's challenge context, so the bar can compute its post-win
   // advance via the SAME pure bond pipeline the authoritative award uses
@@ -1943,9 +1944,17 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     else if (display.foe.dazed) drawText(ctx, 'DAZE', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpCrit);
     else if (display.foe.staggered) drawText(ctx, 'STAG', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
     if (display.foe.exhausted) drawText(ctx, 'EXH', FOE_PANEL.x + 108, FOE_PANEL.y + 6, PALETTE.hpCrit);
-    // FOE ★/momentum is HIDDEN (playtest-polish-3): you don't know the
-    // opponent's resource state — can they Call? — which adds bluff tension.
-    // (Foundation of the info-warfare layer; foe INTENT stays shown.)
+    // FOE ★/momentum is now SHOWN, mirroring the player's meter (same visual
+    // language). Playtest finding: the core mechanics run on the momentum
+    // DIFFERENTIAL — the behind-penalty (how far behind you are → your damage
+    // reduction) and phased-unlock (the foe's tier access, e.g. Falkner climbing
+    // to DIVE BOMB's 2★) — so the player can't reason about either without seeing
+    // the foe's ★. This REVERSES the playtest-polish-3 "hidden for bluff tension"
+    // call: legibility of the load-bearing differential wins. The info-warfare
+    // layer keeps its OTHER hidden info (foe bond, the intent tells). Display-only
+    // — reads the foe's existing momentum, changes no combat logic.
+    else drawText(ctx, 'MOMENTUM', FOE_PANEL.x + 100, FOE_PANEL.y + 6, PALETTE.stanceG);
+    drawMomentum(ctx, FOE_PANEL.x + 152, FOE_PANEL.y + 3, display.foe.momentum);
     // Break meter moved to the dedicated boss strip below the panel
     // (BUG 3 — the in-panel pips were too small to notice).
 
@@ -2031,7 +2040,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (display.player.exhausted) drawText(ctx, 'EXH', PL_PANEL.x + 108, PL_PANEL.y + 6, PALETTE.hpCrit);
     // Label YOUR ★ pips clearly (playtest-polish-3 — "MOM" was too terse): the
     // player should immediately read this as their momentum meter. (The foe's
-    // is hidden; only yours is shown.) Skipped while EXH occupies the row.
+    // now mirrors it on the top panel — the differential is what the mechanics
+    // read.) Skipped while EXH occupies the row.
     // The ★ meter HEADER — deep slate blue (matching the mon names), a confident
     // header colour; the gold ★ pips beside it carry the value.
     else drawText(ctx, 'MOMENTUM', PL_PANEL.x + 100, PL_PANEL.y + 6, PALETTE.stanceG);

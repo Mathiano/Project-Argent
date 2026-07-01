@@ -66,6 +66,11 @@ The battle UI rebuilt at **640×360** (the overworld + rest of the game STAYS GB
 ### The invisible-status gap
 Statuses currently have NO player-facing indicator — the dev-log is dev-only. The shipping solution is status icons/indicators on the mons in the 640×360 UI. Until then the depth is real but illegible to a player.
 
+### Playtest banks (from live play)
+- **Foe momentum now SHOWN** (shipped this session, current UI): the player's own ★ read well, but the foe's was hidden — a load-bearing gap, since the mechanics run on the momentum DIFFERENTIAL (the behind-penalty = how far behind you are → your damage reduction; phased-unlock = the foe's tier access, e.g. is Falkner climbing toward DIVE BOMB's 2★?). The foe's ★ meter now mirrors the player's (same visual language, display-only — reads existing momentum, no combat-logic change). REVERSES the earlier "hidden for bluff tension" call — legibility of the load-bearing differential wins; the info-warfare layer keeps its other hidden info (foe bond, intent tells). Sibling to the invisible-status gap.
+- **Readability-spectrum testing** — the read-war only BITES vs. hard-to-read opponents; testing only vs. a readable trainer doesn't stress it. Test across readable → semi-readable (Falkner: banked ★ + gust cadence) → Elite-tier (unbuilt — comes with content / the AI-remodel). Falkner is the testable "semi-readable" case now. (KAMON/rival is also less-readable but is a quarantined swingy fight — not a clean test.)
+- **Reassess feel post-animation** — the read-war mechanically WORKS (playtest-validated), but moment-to-moment feel resolves instantly (mechanical) → the full feel-reassessment wants the in-battle animation lane (banked). Don't force a feel-verdict on an unanimated system.
+
 ---
 
 ## The holistic potency/feel tuning pass (#5) — scope
