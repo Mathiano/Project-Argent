@@ -80,6 +80,27 @@ const RELEASES: readonly { readonly kind: ReleaseKind; readonly name: string; re
 // display never touches combat resolution (ladders stay bit-identical).
 const INTENT_DISPLAY_SEED = 0x1a7e11;
 
+// DEV TOOL — dev combat-log overlay geometry + buffer size (see BattleSceneOpts
+// .devLog). A rolling text overlay: keep the last DEV_LOG_MAX lines, show the
+// newest DEV_LOG_VISIBLE. Rendered small (8px monospace) for density — it's a
+// debug readout, legibility of the mechanics over aesthetics.
+const DEV_LOG_MAX = 400;
+const DEV_LOG_VISIBLE = 15;
+const DEV_LOG_LINE_CAP = 60; // truncate very long lines to fit the overlay
+
+// DEV TOOL — read the `?log=1` URL hook (mirrors main.ts's `?calls=all`). Read
+// here (game layer, DOM allowed) so EVERY battle entry point honours it without
+// threading a prop through each createBattleScene call site. Guarded so headless
+// / test contexts (no window) simply return false.
+function devLogUrlFlag(): boolean {
+  if (typeof window === 'undefined' || !window.location) return false;
+  try {
+    return new URLSearchParams(window.location.search).get('log') === '1';
+  } catch {
+    return false;
+  }
+}
+
 const FOE_PANEL = { x: 2, y: 2, w: 170, h: 36 } as const;
 const FOE_SLOT = { x: 222, y: 2 } as const;
 const INTENT = { x: 0, y: 60, w: 320, h: 12 } as const;
@@ -104,6 +125,15 @@ export interface BattleSceneOpts {
   // bypassing the bond gate, so the effects can be tested. The shipping default
   // is bond-gated (this is false); never ship with it on.
   readonly devUnlockAllCalls?: boolean;
+  // DEV TOOL — the toggleable dev combat-log. When true (or the `?log=1` URL
+  // hook / the `~` runtime toggle), an overlay narrates the raw BattleEvents
+  // (strikes, ★ changes + why, status apply/tick/clear, technique casts, Calls)
+  // as they resolve, so the invisible combat depth is legible for playtesting
+  // and debugging. OFF by default — it's a dev tool, NOT the shipping
+  // player-facing status UI (that arrives with the 640×360 battle-UI upgrade).
+  // Pure display: it reads the events the engine already emits and changes no
+  // combat logic. Explicit opt for tests; the shipping paths use the URL hook.
+  readonly devLog?: boolean;
   readonly canRun: boolean;
   // Intent reliability ramp (Phase 6.7-A) — how truthfully the FOE INTENT
   // bar shows the foe's STANCE. Defaults HONEST (wild mons + every legacy
@@ -647,6 +677,18 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let callCursor = 0;
   let tick = 0;
 
+  // ---- DEV TOOL: dev combat-log ----------------------------------------
+  // A rolling record of the raw BattleEvents as they resolve, surfaced in an
+  // overlay so the invisible combat depth (statuses, ★ economy, techniques) is
+  // legible for playtesting/debugging. Pure display — reads the events the
+  // engine already emits, mutates no combat state. Hooks: opts.devLog (tests),
+  // `?log=1` (URL, matching ?calls=all), or the `~` runtime toggle.
+  let showDevLog = opts.devLog ?? devLogUrlFlag();
+  const devLog: string[] = [];
+  // The last read-win reason (COUNTER/OPENING/…), consumed by the momentum
+  // event that follows it, so a ★ gain names WHY it was earned.
+  let devLogMomentumReason: string | null = null;
+
   // ---- Bond legibility (Lane A) — presentation state -------------------
   // Post-win bond-bar advance (XP-style). On a player win, the active mon's
   // bar fills from its pre-fight value toward the post-fight value (capped at
@@ -787,6 +829,129 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     feint: 'catches',
   };
 
+  // ---- DEV TOOL: dev combat-log recorder -------------------------------
+  // Format ONE BattleEvent into a dev-log line (or null to skip pure noise),
+  // then push it to the rolling buffer. Reads-only — it never touches combat
+  // state. Called from the top of applyEvent so every event the engine emits
+  // flows through here while the log is on. `damage`/heal amounts are rounded
+  // for readability (the underlying floats are unchanged).
+  function devLogPush(line: string): void {
+    devLog.push(line.length > DEV_LOG_LINE_CAP ? line.slice(0, DEV_LOG_LINE_CAP - 1) + '…' : line);
+    if (devLog.length > DEV_LOG_MAX) devLog.shift();
+  }
+  function devEff(e: number): string {
+    return e > 1 ? ' [super]' : e < 1 ? ' [resist]' : '';
+  }
+  function formatDevEvent(ev: BattleEvent): string | null {
+    const r = Math.round;
+    switch (ev.kind) {
+      case 'roundStart':
+        return `— round ${ev.round} —`;
+      case 'commit': {
+        const who = monName(ev.side);
+        const a = ev.action;
+        if (a.kind === 'move') return `${who} commits ${a.move} [${a.stance}]`;
+        if (a.kind === 'focus') return `${who} FOCUS (winds up — release hidden)`;
+        if (a.kind === 'release') return `${who} releases ${a.release.toUpperCase()}`;
+        if (a.kind === 'call') return `${who} CALL ${a.call}`;
+        if (a.kind === 'rest') return `${who} rest (${a.reason})`;
+        if (a.kind === 'catchBreath') return `${who} catch breath`;
+        if (a.kind === 'throwBall') return `${who} throws ball`;
+        return `${who} commits`;
+      }
+      case 'initiative':
+        return `init: you ${r(ev.playerInit)} vs foe ${r(ev.foeInit)} → first ${ev.first ?? 'tie'}`;
+      case 'catchBreath':
+        return `${monName(ev.side)} catches breath (+${ev.restored} ST, −1★)`;
+      case 'clash':
+        devLogMomentumReason = 'clash';
+        return `CLASH — ${monName(ev.winner)} breaks through`;
+      case 'strike':
+        return `${monName(ev.side)} → ${ev.move}: ${r(ev.damage)} dmg${devEff(ev.effectiveness)}`;
+      case 'dodge':
+        return `${monName(ev.side)} DODGE (legacy)`;
+      case 'punish':
+        devLogMomentumReason = 'punish A>F';
+        return `${monName(ev.side)} PUNISH (A>F): ${r(ev.damage)} dmg${devEff(ev.effectiveness)}`;
+      case 'dazed':
+        return `${monName(ev.side)} DAZED (predictable → takes extra dmg)`;
+      case 'opening':
+        devLogMomentumReason = 'opening F>G';
+        return `${monName(ev.side)} OPENING (F>G): ${r(ev.damage)} dmg${devEff(ev.effectiveness)}`;
+      case 'counter':
+        devLogMomentumReason = 'counter G>A';
+        return `${monName(ev.side)} COUNTER (G>A): ${r(ev.damage)} reflected`;
+      case 'focus':
+        return `${monName(ev.side)} FOCUS (gathering; took ${r(ev.costDamage)})`;
+      case 'release': {
+        if (ev.outcome === 'win') devLogMomentumReason = `release ${ev.release}`;
+        const ctx = ev.vsFocus ? ' vs focus' : ev.vsStance ? ` vs ${ev.vsStance}` : '';
+        return `${monName(ev.side)} RELEASE ${ev.release.toUpperCase()} → ${ev.outcome}: ${r(ev.damage)} dmg${devEff(ev.effectiveness)}${ctx}`;
+      }
+      case 'flipResolve':
+        if (ev.winner && ev.winnerRelease && ev.loserRelease) {
+          devLogMomentumReason = 'flip win';
+          return `FLIP: ${monName(ev.winner)} ${ev.winnerRelease.toUpperCase()} ${FLIP_VERB[ev.winnerRelease]} ${ev.loserRelease.toUpperCase()}`;
+        }
+        return 'FLIP: mirror — clash cancels';
+      case 'call':
+        return `${monName(ev.side)} CALL ${ev.call} (−1★)`;
+      case 'recover':
+        return `${monName(ev.side)} RECOVER heals ${r(ev.healed)}`;
+      case 'fullPower':
+        return `${monName(ev.side)} FULL POWER (+50%, −${COMBAT.fullPowerCost}★)`;
+      case 'statusApply':
+        return `${monName(ev.side)} +STATUS ${ev.status} (${ev.duration} turns)`;
+      case 'statusTick':
+        return `${monName(ev.side)} status ${ev.status} ticks${ev.damage ? `, ${r(ev.damage)} dmg` : ''} (${ev.remaining} left)`;
+      case 'statusClear':
+        return `${monName(ev.side)} status ${ev.status} expired`;
+      case 'statusBreak':
+        return `${monName(ev.side)} status ${ev.status} BROKEN`;
+      case 'statusResist':
+        return `${monName(ev.side)} RESISTED ${ev.status} (diminishing returns)`;
+      case 'staggered':
+        return `${monName(ev.side)} staggered (next init ×0.5)`;
+      case 'momentum': {
+        const delta = ev.total - display[ev.side].momentum;
+        const sign = delta >= 0 ? `+${delta}` : `${delta}`;
+        const why = devLogMomentumReason ? ` (${devLogMomentumReason})` : '';
+        devLogMomentumReason = null;
+        return `${monName(ev.side)} ★ ${sign} → ${ev.total}${why}`;
+      }
+      case 'bondJumpstart':
+        devLogMomentumReason = 'bond jumpstart';
+        return `${monName(ev.side)} bond JUMPSTART — free ★`;
+      case 'stamina':
+        return `${monName(ev.side)} ST ${r(ev.before)}→${r(ev.after)} (${ev.netDelta >= 0 ? '+' : ''}${r(ev.netDelta)})`;
+      case 'winded':
+        return `${monName(ev.side)} WINDED (heavy/nuke locked)`;
+      case 'exhausted':
+        return `${monName(ev.side)} EXHAUSTED (forced rest next round)`;
+      case 'ko':
+        return `${monName(ev.side)} KO'd`;
+      case 'breakProgress':
+        return `BREAK meter ${ev.progress}/${ev.threshold}`;
+      case 'break':
+        return `BREAK! → phase ${ev.newPhase}`;
+      case 'switchOut':
+        return `${ev.side === 'player' ? 'You' : 'Foe'} withdrew ${ev.species}`;
+      case 'switchIn':
+        return `${ev.side === 'player' ? 'You' : 'Foe'} sent ${ev.species}`;
+      case 'faint':
+        return `${ev.side === 'player' ? '' : 'Foe '}${ev.species} fainted`;
+      case 'forcedSwitch':
+        return `${ev.side === 'player' ? 'You' : 'Foe'} forced switch → ${ev.species}`;
+      default:
+        return null;
+    }
+  }
+  function recordDevLog(ev: BattleEvent): void {
+    if (!showDevLog) return; // OFF by default → zero cost
+    const line = formatDevEvent(ev);
+    if (line !== null) devLogPush(line);
+  }
+
   // A line is "consequential" when it carries information the player
   // needs to actually read before the round resolves: which move was
   // committed, type-effective hits, the read-vs-read events (dodge,
@@ -821,6 +986,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   }
 
   function applyEvent(ev: BattleEvent): void {
+    // DEV TOOL — narrate the event first (reads-only; must run BEFORE the
+    // handler mutates `display`, so the momentum-delta line reads the pre-event
+    // ★ total). No effect when the dev log is off.
+    recordDevLog(ev);
     if (ev.kind === 'roundStart') {
       // roundStart's snapshot is of the PRE-resolve active mon — before
       // any in-round switch fires. Preserve display.species (which is
@@ -2273,6 +2442,47 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
   }
 
+  // ---- DEV TOOL: dev combat-log overlay --------------------------------
+  // The rolling log, drawn LAST (over the HUD) so nothing occludes it. Newest
+  // line at the bottom. Deliberately drawn with a raw small monospace font (not
+  // the 16px UI font) for line density — it's a debug readout. No-op when off.
+  function drawDevLog(ctx: CanvasRenderingContext2D): void {
+    if (!showDevLog) return;
+    const lines = devLog.slice(-DEV_LOG_VISIBLE);
+    const pad = 3;
+    const lh = 9;
+    const x = 3;
+    const y = 42;
+    const w = 252;
+    const h = pad * 2 + (lines.length + 1) * lh;
+    ctx.fillStyle = 'rgba(0,0,0,0.82)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#57e08a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.font = '8px monospace';
+    ctx.letterSpacing = '0px';
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#57e08a';
+    ctx.fillText('DEV COMBAT-LOG  (` toggle)', x + pad, y + pad);
+    ctx.fillStyle = '#d6f5e2';
+    for (let i = 0; i < lines.length; i += 1) {
+      ctx.fillText(lines[i]!, x + pad, y + pad + (i + 1) * lh);
+    }
+  }
+
+  // DEV TOOL — the `~`/backtick runtime toggle. Registered on the window (game
+  // layer, DOM allowed) and torn down in exit() so it never leaks past the
+  // battle. Guarded so headless/test contexts (no window) simply skip it. The
+  // URL hook (?log=1) and opts.devLog seed the initial state above.
+  const onDevLogKey = (e: KeyboardEvent): void => {
+    if (e.key === '`' || e.key === '~') showDevLog = !showDevLog;
+  };
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('keydown', onDevLogKey);
+  }
+
   // No-intro mode: jump straight into the first turn.
   if (textQueue.length === 0) {
     textNext = null;
@@ -2419,6 +2629,16 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       else if (phase === 'spare') drawBottomSpare(ctx);
       else if (phase === 'party') drawBottomParty(ctx);
       else if (phase === 'resolve' || phase === 'end') drawBottomLog(ctx);
+
+      drawDevLog(ctx); // DEV TOOL — over everything; no-op when off
+    },
+
+    exit() {
+      // DEV TOOL — tear down the runtime-toggle listener so it never leaks
+      // past this battle.
+      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        window.removeEventListener('keydown', onDevLogKey);
+      }
     },
   };
 }

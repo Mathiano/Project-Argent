@@ -1464,6 +1464,12 @@ function showTestBattle2v2(): void {
 //   ?calls=all                 (Lane B) unlocks every BUILT Call now,
 //                              bypassing the bond-tier gate, to playtest
 //                              the Call effects. Shipping default is gated.
+//   ?log=1                     DEV TOOL — opens the dev combat-log overlay
+//                              (narrates raw BattleEvents: strikes, ★ economy,
+//                              statuses, techniques, Calls). Toggle at runtime
+//                              with the `~`/backtick key. Read in battle.ts so
+//                              it works at every battle entry point. Off by
+//                              default; display-only (no combat-logic change).
 const url = new URLSearchParams(window.location.search);
 const skip = url.get('skip');
 const starterName = url.get('starter');

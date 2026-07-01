@@ -1389,3 +1389,50 @@ describe('FOCUS tell — phase-aware verbs, consistent lens', () => {
     expect(infoLevelToReliability('opaque')).toBe('opaque');
   });
 });
+
+describe('DEV TOOL — dev combat-log overlay (opt-in; surfaces BattleEvents)', () => {
+  // Drive one committed round so the engine emits its event stream, which the
+  // dev log records as it resolves. Returns the scene mid-resolve.
+  function driveOneRound(devLog: boolean): ReturnType<typeof createBattleScene> {
+    const player = CH1.GRUBLEAF!;
+    const foe = CH1.FLITPECK!;
+    const state = createBattleState(
+      createTeam([createSide(player)]),
+      createTeam([createSide(foe)]),
+    );
+    const scene = createBattleScene({
+      state,
+      rng: mulberry32(1),
+      chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'A' }),
+      intro: [],
+      catchBreathUnlocked: false,
+      canRun: true,
+      onResolve: () => {},
+      devLog,
+    });
+    scene.update?.(0.01); // → phase=menu
+    scene.input?.('a'); // FIGHT → move list
+    scene.input?.('a'); // commit move[0] → phase=resolve
+    scene.update?.(0.05); // apply the first batch of events (recordDevLog runs)
+    return scene;
+  }
+
+  test('OFF by default: no overlay is drawn (nothing added to combat, engine untouched)', () => {
+    const scene = driveOneRound(false);
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).not.toContain('DEV COMBAT-LOG');
+  });
+
+  test('ON (opts.devLog): the overlay header + a narrated round event are drawn', () => {
+    const scene = driveOneRound(true);
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    // The overlay header renders...
+    expect(screen).toContain('DEV COMBAT-LOG');
+    // ...and it surfaces the raw engine events (the round-start separator is
+    // the first event of every resolve).
+    expect(screen).toContain('round 1');
+  });
+});
