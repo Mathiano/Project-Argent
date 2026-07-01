@@ -81,6 +81,16 @@ function stanceOutMult(stance: Stance): number {
 }
 
 // Raw pre-stance damage (the shared damage core, no triangle/mitigation).
+// Behind-penalty (Spine-2): the attacker deals less the further it trails the
+// defender on ★ (the anti-snowball). behind ∈ {0..3} (bounded by momentumCap);
+// even/ahead (behind=0) → 1.0 (no penalty). Clamped to the FLOOR. Read-clean:
+// both sides' momentum is on SideState, so this needs no extra plumbing.
+function behindPenalty(att: SideState, def: SideState): number {
+  const behind = Math.max(0, def.momentum - att.momentum);
+  if (behind === 0) return 1;
+  return Math.max(COMBAT.behindPenaltyFloor, 1 - COMBAT.behindPenaltyPerStar * behind);
+}
+
 function rawHit(
   att: SideState,
   def: SideState,
@@ -105,6 +115,11 @@ function rawHit(
   // APPLIES statuses in the single-step triangle (there is no stance-read to win
   // against a focusing opponent), so a technique vs a focuser chips only.
   d *= effectDamageFactor(move);
+  // Behind-penalty (Spine-2) applied LAST (after type + trait + buff + chip) so
+  // the momentum factor composes over everything. Covers all focus-release /
+  // counter / mismatch paths (the callers scale outcome mults on top). 1.0 when
+  // even/ahead → bit-identical for the focus ladder.
+  d *= behindPenalty(att, def);
   return { d, eff };
 }
 
@@ -405,6 +420,12 @@ function resolveStrike(
   d *= buffDamageDealtMult(attacker);
   // Technique chip-damage reduction (1.0 for a normal attack).
   d *= effectDamageFactor(move);
+  // Behind-penalty (Spine-2) applied LAST in the attacker-outgoing block, BEFORE
+  // preMit is snapshotted — so the Guard counter-reflect is scaled too (a behind
+  // aggressor's reflected counter is weaker; being behind weakens EVERYTHING you
+  // do). Status APPLICATION below is untouched (only this chip/strike number is
+  // scaled) → the comeback lane. 1.0 when even/ahead → bit-identical.
+  d *= behindPenalty(attacker, defender);
 
   // SET STANCE (STONE poker) — extra mitigation ONLY when the DEFENDER is
   // bracing (Guard), so it strengthens Brace specifically rather than being a

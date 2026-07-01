@@ -54,27 +54,39 @@ const SEED = 1;
 // bit longer (static-guard cells rise). The effect-move layer is untouched here
 // (no rival bot casts a technique); only attack availability changed. Exact at
 // seed=1.
+// ── INTENTIONAL SPINE-2 RE-BASELINE (2026-07-01, behind-penalty) ──────────────
+// The behind-penalty (damage × max(FLOOR, 1 − perStar×momentum-behind); perStar
+// 0.04) — core damage math, so cells moved (an intended re-baseline, NOT drift).
+// The thesis shows CLEANLY: every moved cell ROSE (never fell). The player is the
+// reading/type-advantaged side vs the WEAK fixed non-reading rival, so it banks a
+// ★-lead the rival can't answer → the rival eats the behind-penalty → the player
+// wins more. Biggest movers are the two paths where reading most out-runs the
+// rival: EMBERCUB→AQUAFIN (the type-DISADVANTAGED cell — reading claws past the
+// type wall) static-guard 586→752 & human 1181→1305. Reader cells already at/near
+// the 2000 cap barely move. This is the anti-snowball rewarding the ★-leader vs a
+// punching-bag; the COMPETITIVE gates (Falkner fair cells, reader-mirror) stay in
+// band (sim-swept: perStar 0.04 keeps every Falkner fair cell fair). Exact at seed=1.
 const BASELINE: ReadonlyArray<{
   player: string;
   foe: string;
   archetype: BotArchetype;
   wins: number;
 }> = [
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: staticGuard, wins: 1605 },
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: brute, wins: 392 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: staticGuard, wins: 1630 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: brute, wins: 403 },
   { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: naiveTriangle, wins: 2000 },
   { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: staminaReader, wins: 2000 },
-  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: humanIsh, wins: 1726 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: staticGuard, wins: 586 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: brute, wins: 241 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: naiveTriangle, wins: 1981 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: staminaReader, wins: 1974 },
-  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: humanIsh, wins: 1181 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: staticGuard, wins: 1620 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: brute, wins: 328 },
+  { player: 'SPROUTLE', foe: 'EMBERCUB', archetype: humanIsh, wins: 1766 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: staticGuard, wins: 752 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: brute, wins: 253 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: naiveTriangle, wins: 1993 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: staminaReader, wins: 1986 },
+  { player: 'EMBERCUB', foe: 'AQUAFIN', archetype: humanIsh, wins: 1305 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: staticGuard, wins: 1671 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: brute, wins: 343 },
   { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: naiveTriangle, wins: 2000 },
   { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: staminaReader, wins: 2000 },
-  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: humanIsh, wins: 1702 },
+  { player: 'AQUAFIN', foe: 'SPROUTLE', archetype: humanIsh, wins: 1748 },
 ];
 
 describe('rival ladder regressions (n=2000, seed=1)', () => {

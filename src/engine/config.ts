@@ -59,6 +59,30 @@ export const COMBAT = {
   // Breath, reader Get Away) — none requires ≥2 or banks to the cap — so the
   // raise is behaviourally inert for the ladders (player-facing economy change).
   momentumCap: 3,
+  // ── Behind-penalty (Spine-2, docs/combat-design-canonical.md §1) ─────────────
+  // The ANTI-SNOWBALL: the more ★ the FOE holds over you, the less damage you
+  // deal. behind = max(0, foe.momentum − self.momentum) ∈ {0..3} (bounded by
+  // momentumCap); penalty = max(FLOOR, 1 − perStar × behind), a multiplier on the
+  // attacker's OUTGOING damage applied last (after stance + type). behind=0
+  // (even/ahead) → 1.0 → no penalty. Composes into BOTH damage functions so every
+  // path (punish/opening/normal/focus-release/counter/mismatch) inherits it, and
+  // the Guard counter-reflect (from preMit) is scaled too (being behind weakens
+  // EVERYTHING you do). Status APPLICATION is NOT penalized — only chip damage is
+  // scaled — so the trailing side keeps a comeback lane via the read-war.
+  // ⚠️ PLAYTEST KNOBS: these are STARTING values (sim-sane); Mathias tunes by
+  // feel. Snowball too hard → lower perStar and/or raise FLOOR.
+  // SIM-GATED START (Spine-2, 2026-07-01): perStar TUNED 0.10→0.04. The design
+  // wanted 0.10 (behind=3 → 0.70), but Spine-1's tier-gate is ALREADY the primary
+  // anti-snowball, so the penalty is a SECONDARY nudge — and at 0.10 it compounds
+  // with Falkner's banked 2★ opening (the player eats the penalty persistently)
+  // and drops his GENTLE-tutorial fair cells below band (button-masher 34% vs the
+  // 42% floor). 0.04 keeps every Falkner fair cell in-band (button 42.7) while
+  // still nudging ★-differentials (behind=3 → 0.88). FLOOR 0.65 is the safety
+  // clamp — inert for behind∈{0..3} at this X (min 0.88), it binds only if Mathias
+  // raises perStar past ~0.12. Headroom to push perStar UP lives with a future
+  // Falkner opening-★/band re-tune (a boss decision, not this increment).
+  behindPenaltyPerStar: 0.04,
+  behindPenaltyFloor: 0.65,
   staggerInitMult: 0.5,
   restInitiative: -1,
 
