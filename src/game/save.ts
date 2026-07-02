@@ -119,7 +119,8 @@ export function fromSavedSide(
   return {
     ...fresh,
     hp: Math.max(0, Math.min(fresh.maxHp, saved.hp)),
-    st: Math.max(0, Math.min(100, saved.st)),
+    // Clamp to the mon's OWN max stamina (per-mon now; fresh.maxSt from species).
+    st: Math.max(0, Math.min(fresh.maxSt, saved.st)),
     momentum: Math.max(0, Math.min(2, saved.momentum)),
     // Restore the nickname when present (absent on old saves → species name).
     ...(saved.nickname ? { nickname: saved.nickname } : {}),

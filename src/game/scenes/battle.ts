@@ -408,6 +408,10 @@ interface DisplaySide {
   hp: number;
   maxHp: number;
   st: number;
+  // The mon's max stamina — per-mon now (stat-foundation), so the ST bar scales
+  // to the real pool instead of a hardcoded 100 (a Glass nuke's full bar would
+  // otherwise read 75%). Static across the battle; carried via the snapshot spread.
+  maxSt: number;
   momentum: number;
   exhausted: boolean;
   staggered: boolean;
@@ -435,6 +439,7 @@ function snapshot(side: SideState): DisplaySide {
     hp: side.hp,
     maxHp: side.maxHp,
     st: side.st,
+    maxSt: side.maxSt,
     momentum: side.momentum,
     exhausted: side.exhausted,
     staggered: side.staggered,
@@ -2174,11 +2179,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       FOE_PANEL.y + 53,
       FOE_PANEL.w - 54,
       display.foe.st,
-      100,
+      display.foe.maxSt,
       PALETTE.stamina,
       BATTLE_BAR_H,
     );
-    drawWindedNotch(ctx, FOE_PANEL.x + 40, FOE_PANEL.y + 53, FOE_PANEL.w - 54, BATTLE_BAR_H);
+    drawWindedNotch(ctx, FOE_PANEL.x + 40, FOE_PANEL.y + 53, FOE_PANEL.w - 54, BATTLE_BAR_H, COMBAT.winded / display.foe.maxSt);
     // Bench indicators (S5): tucked just under the panel, 4×4 dots
     // tinted by status (active / alive / fainted). For 1-mon "teams"
     // nothing draws — the row stays empty and clean. Suppressed for a
@@ -2294,11 +2299,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       PL_PANEL.y + 53,
       PL_PANEL.w - 54,
       display.player.st,
-      100,
+      display.player.maxSt,
       PALETTE.stamina,
       BATTLE_BAR_H,
     );
-    drawWindedNotch(ctx, PL_PANEL.x + 40, PL_PANEL.y + 53, PL_PANEL.w - 54, BATTLE_BAR_H);
+    drawWindedNotch(ctx, PL_PANEL.x + 40, PL_PANEL.y + 53, PL_PANEL.w - 54, BATTLE_BAR_H, COMBAT.winded / display.player.maxSt);
     // Bench dots + the bond meter share the slim row under the panel — see
     // drawPlayerUnderPanel (bench relocated to the right so it clears the bar).
   }

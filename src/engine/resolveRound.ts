@@ -516,12 +516,12 @@ function paySide(
   if (action.kind === 'rest') {
     return {
       ...side,
-      st: Math.min(100, side.st + COMBAT.restRegen),
+      st: Math.min(side.maxSt, side.st + COMBAT.restRegen),
       exhausted: false,
     };
   }
   if (action.kind === 'catchBreath') {
-    return { ...side, st: Math.min(100, side.st + CATCH_BREATH_RESTORE) };
+    return { ...side, st: Math.min(side.maxSt, side.st + CATCH_BREATH_RESTORE) };
   }
   if (action.kind === 'release') {
     // A release strike is free (energy was spent on the focus); a releasing
@@ -552,7 +552,7 @@ function paySide(
   if (rhythm && arena && tier.name === 'heavy') cost += arena.heavyExtraCost;
   let st = side.st - cost + COMBAT.regen + (action.stance === 'G' ? COMBAT.guardRegen : 0);
   const exhausted = st <= 0;
-  st = exhausted ? 0 : Math.min(100, st);
+  st = exhausted ? 0 : Math.min(side.maxSt, st);
   return { ...side, st, exhausted };
 }
 
@@ -1047,7 +1047,7 @@ export function resolveRound(
     // Layer 2 — a RELEASE strike is free (energy was spent on the wind-up):
     // just regen. A Call spends ★ (no stamina change). A wind-up (commit move)
     // pays its move cost via the normal paySide path.
-    if (plReleasing) pl = { ...pl, st: Math.min(100, pl.st + COMBAT.regen) };
+    if (plReleasing) pl = { ...pl, st: Math.min(pl.maxSt, pl.st + COMBAT.regen) };
     else if (playerAction.kind === 'call') { /* ★ already spent; no stamina */ }
     else pl = paySide(pl, playerAction, rhythm, arena);
     if (pl.st !== plBefore.st) {
@@ -1063,7 +1063,7 @@ export function resolveRound(
   }
   if (!foeFainted) {
     const foeBefore = foe;
-    if (foeReleasing) foe = { ...foe, st: Math.min(100, foe.st + COMBAT.regen) };
+    if (foeReleasing) foe = { ...foe, st: Math.min(foe.maxSt, foe.st + COMBAT.regen) };
     else if (foeAction.kind === 'call') { /* ★ already spent; no stamina */ }
     else foe = paySide(foe, foeAction, rhythm, arena);
     if (foe.st !== foeBefore.st) {

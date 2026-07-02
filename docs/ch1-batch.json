@@ -11,7 +11,8 @@
    "hp": 66,
    "atk": 86,
    "dfn": 119,
-   "spd": 59
+   "spd": 59,
+   "stamina": 108
   },
   "archetype": "Wall",
   "rarity": "starter",
@@ -68,7 +69,8 @@
    "hp": 76,
    "atk": 100,
    "dfn": 140,
-   "spd": 66
+   "spd": 66,
+   "stamina": 119
   },
   "archetype": "Wall",
   "rarity": "starter",
@@ -134,7 +136,8 @@
    "hp": 90,
    "atk": 116,
    "dfn": 164,
-   "spd": 74
+   "spd": 74,
+   "stamina": 133
   },
   "archetype": "Wall",
   "rarity": "starter",
@@ -207,7 +210,8 @@
    "hp": 68,
    "atk": 88,
    "dfn": 84,
-   "spd": 90
+   "spd": 90,
+   "stamina": 108
   },
   "archetype": "Dodger",
   "rarity": "starter",
@@ -264,7 +268,8 @@
    "hp": 63,
    "atk": 110,
    "dfn": 81,
-   "spd": 147
+   "spd": 147,
+   "stamina": 119
   },
   "archetype": "Dodger",
   "rarity": "starter",
@@ -329,7 +334,8 @@
    "hp": 74,
    "atk": 128,
    "dfn": 93,
-   "spd": 171
+   "spd": 171,
+   "stamina": 133
   },
   "archetype": "Dodger",
   "rarity": "starter",
@@ -398,7 +404,8 @@
    "hp": 66,
    "atk": 88,
    "dfn": 98,
-   "spd": 78
+   "spd": 78,
+   "stamina": 108
   },
   "archetype": "Counter-tank",
   "rarity": "starter",
@@ -455,7 +462,8 @@
    "hp": 73,
    "atk": 106,
    "dfn": 134,
-   "spd": 74
+   "spd": 74,
+   "stamina": 119
   },
   "archetype": "Counter-tank",
   "rarity": "starter",
@@ -520,7 +528,8 @@
    "hp": 86,
    "atk": 134,
    "dfn": 144,
-   "spd": 86
+   "spd": 86,
+   "stamina": 133
   },
   "archetype": "Counter-tank",
   "rarity": "starter",
@@ -589,7 +598,8 @@
    "hp": 46,
    "atk": 84,
    "dfn": 50,
-   "spd": 106
+   "spd": 106,
+   "stamina": 75
   },
   "archetype": "Glass nuke",
   "rarity": "uncommon",
@@ -646,7 +656,8 @@
    "hp": 56,
    "atk": 117,
    "dfn": 59,
-   "spd": 122
+   "spd": 122,
+   "stamina": 84
   },
   "archetype": "Glass nuke",
   "rarity": "uncommon",
@@ -707,7 +718,8 @@
    "hp": 50,
    "atk": 66,
    "dfn": 70,
-   "spd": 78
+   "spd": 78,
+   "stamina": 90
   },
   "archetype": "Trickster",
   "rarity": "common",
@@ -764,7 +776,8 @@
    "hp": 62,
    "atk": 79,
    "dfn": 84,
-   "spd": 95
+   "spd": 95,
+   "stamina": 100
   },
   "archetype": "Trickster",
   "rarity": "common",
@@ -829,7 +842,8 @@
    "hp": 76,
    "atk": 102,
    "dfn": 92,
-   "spd": 112
+   "spd": 112,
+   "stamina": 112
   },
   "archetype": "Trickster",
   "rarity": "common",
@@ -898,7 +912,8 @@
    "hp": 58,
    "atk": 104,
    "dfn": 74,
-   "spd": 64
+   "spd": 64,
+   "stamina": 105
   },
   "archetype": "Brawler",
   "rarity": "common",

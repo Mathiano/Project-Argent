@@ -15,6 +15,10 @@ export interface DexEntryJson {
     readonly atk: number;
     readonly dfn: number;
     readonly spd: number;
+    // Per-mon stamina = archetype endurance (stat-foundation part 1). Optional so
+    // an unauthored row / test fixture stays bit-identical (→ 100 in createSide);
+    // every authored CH1 row sets it.
+    readonly stamina?: number;
   };
   readonly archetype: string;
   readonly rarity: string;
@@ -115,6 +119,8 @@ export function loadSpeciesAt(entry: DexEntryJson, level: number): Species {
     atk: entry.stats.atk,
     dfn: entry.stats.dfn,
     spd: entry.stats.spd,
+    // exactOptionalPropertyTypes: omit the key when unauthored (→ 100 default).
+    ...(entry.stats.stamina !== undefined ? { stamina: entry.stats.stamina } : {}),
     moves,
     spr: entry.name,
   };

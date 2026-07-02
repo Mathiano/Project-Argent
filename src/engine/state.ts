@@ -39,11 +39,15 @@ export function createSide(species: Species, scale?: StatScale, opts?: SideOpts)
   // ratio lever — broad, never per-mon). Species data stays static; per-mon
   // `scale.hp` already composed into sp.hp above, so this multiplies on top.
   const maxHp = Math.round(sp.hp * COMBAT.hpScale);
+  // Per-mon stamina (stat-foundation part 1): the mon's endurance ceiling +
+  // starting pool. Legacy/sim/fixture species omit `stamina` → 100 (bit-identical).
+  const maxSt = sp.stamina ?? 100;
   return {
     species: sp,
     hp: maxHp,
     maxHp,
-    st: 100,
+    st: maxSt,
+    maxSt,
     exhausted: false,
     staggered: false,
     momentum: opts?.openingMomentum ?? 0,

@@ -385,7 +385,7 @@ function resolveSpecies(name: string): Species {
 function writebackParty(finalState: BattleState): void {
   run.party = finalState.player.members.map((m) => ({
     ...fromSavedSide(toSavedSide(m), resolveSpecies),
-    st: 100, // full stamina between fights
+    st: m.maxSt, // full stamina between fights (the mon's OWN max — per-mon now)
     momentum: 0, // ★ is per-battle — never banked into the overworld
   }));
 }
@@ -889,7 +889,7 @@ function healPartyInPlace(): void {
     run.party[i] = {
       ...s,
       hp: s.maxHp,
-      st: 100,
+      st: s.maxSt, // heal to the mon's OWN full stamina (per-mon now)
       momentum: 0,
       exhausted: false,
       staggered: false,

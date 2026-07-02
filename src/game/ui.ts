@@ -289,8 +289,12 @@ export function drawWindedNotch(
   y: number,
   w: number,
   barH: number = BAR_HEIGHT,
+  // Fraction of the bar the winded threshold sits at. Defaults to 0.25 (the
+  // 25-of-100 case); per-mon stamina passes winded/maxSt so the notch tracks the
+  // real threshold on a bigger/smaller pool.
+  frac: number = 0.25,
 ): void {
-  const notchX = x + Math.round(w * 0.25);
+  const notchX = x + Math.round(w * frac);
   ctx.fillStyle = PALETTE.ink;
   ctx.fillRect(notchX, y - 1, 1, barH + 2);
 }

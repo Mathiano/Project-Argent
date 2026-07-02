@@ -89,12 +89,23 @@ function tierOf(player: string): Tier {
 // every fair cell ≫ its hard cell, and on the hard path mashing is still punished
 // below reading (button 8.8 / brute 5.0 < naive 16.5 / stamina 14.4 / human 14.7).
 // Bands re-locked to the seed=0x1f measured values.
+// ── INTENTIONAL PER-MON-STAMINA RE-BASELINE (2026-07-02, stat-foundation p1) ──
+// Per-mon stamina shipped (stat-foundation-stamina-design.md): Falkner's team is
+// two Glass nukes (FLITPECK 75 / GALEHAWK 84 stamina) — exactly the archetype the
+// change makes FADE under sustained pressure. So the player now outlasts his
+// offense and the GRUBLEAF (hard) cells ROSE ~10pp. Sanctioned (Decision B): a
+// re-baseline, NOT a regression — Falkner is the deliberately-easiest gym and his
+// glass-nukes fading is on-thesis. ONLY the GRUBLEAF-hard cells moved out of band;
+// every FAIR cell (KINDRAKE/SILTSKIP) held in-band, and KINDRAKE (fair) stamina-
+// reader self-corrected (its starter stamina 120→108 under Decision A's starter
+// equalisation). Fair-vs-hard contract intact (every hard cell ≪ its fair cell).
+// Only the four hard bands below are re-locked to the new seed=0x1f values.
 const BANDS: { readonly [a: string]: { readonly [t in Tier]: readonly [number, number] } } = {
-  'button-masher': { fair: [42, 70], hard: [3, 16] }, // KIND 63.0 / SILT 47.8 fair · 8.8 hard
-  brute: { fair: [40, 60], hard: [1, 12] }, // KIND 50.6 / SILT 47.1 fair · 5.0 hard
-  'naive-triangle': { fair: [50, 85], hard: [10, 24] }, // KIND 78.2 / SILT 56.7 fair · 16.5 hard
-  'stamina-reader': { fair: [49, 83], hard: [8, 22] }, // KIND 75.3 / SILT 56.6 fair · 14.4 hard
-  'human-ish': { fair: [51, 86], hard: [8, 22] }, // KIND 78.3 / SILT 58.3 fair · 14.7 hard
+  'button-masher': { fair: [42, 70], hard: [3, 16] }, // KIND 63.0 / SILT 47.8 fair · hard in-band
+  brute: { fair: [40, 60], hard: [6, 26] }, // hard 15.2 (stamina re-baseline)
+  'naive-triangle': { fair: [50, 85], hard: [24, 46] }, // hard 34.3 (stamina re-baseline)
+  'stamina-reader': { fair: [49, 83], hard: [24, 46] }, // hard 34.3 (stamina re-baseline)
+  'human-ish': { fair: [51, 86], hard: [17, 38] }, // hard 26.8 (stamina re-baseline)
 };
 
 describe('Falkner ladder regression (n=2000, seed=0x1f, gust=1.4 hp=1.15) — designed bands', () => {

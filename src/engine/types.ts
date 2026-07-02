@@ -132,6 +132,12 @@ export interface Species {
   readonly atk: number;
   readonly dfn: number;
   readonly spd: number;
+  // Per-mon STAMINA = archetype endurance (the mon's working ST ceiling + starting
+  // pool). OPTIONAL for the bit-identical-shape convention: legacy / sim / fixture
+  // Species that omit it default to 100 in createSide, so their SideState is
+  // numerically identical to the pre-stamina model. Authored dex mons set it
+  // (DexEntryJson.stats.stamina → loadSpeciesAt). Stat-foundation part 1.
+  readonly stamina?: number;
   readonly moves: readonly string[];
   readonly spr?: string;
   // Optional trait id (e.g., 'GUSTBORNE'). Trait effects fire on conditions
@@ -144,6 +150,10 @@ export interface SideState {
   readonly hp: number;
   readonly maxHp: number;
   readonly st: number;
+  // The mon's max stamina — its endurance CEILING (regen / rest / Catch Breath
+  // clamp to this, the way maxHp bounds HP). Derived from species.stamina (?? 100)
+  // at creation. Stat-foundation part 1.
+  readonly maxSt: number;
   readonly exhausted: boolean;
   readonly staggered: boolean;
   readonly momentum: number;
