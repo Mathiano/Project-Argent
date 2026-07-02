@@ -154,6 +154,27 @@ function dealt(defHp: number, dmg: number, call: CallKind | null): { hp: number;
   return { hp, applied: defHp - hp };
 }
 
+// BOND-MOMENT — a stage-6+ bond mon survives an otherwise-lethal hit at 1 HP,
+// ONCE per battle (the bond thesis made mechanical; reuses the retired HANG IN
+// THERE floor, now bond-earned instead of ★-spent). Replaces the inline
+// `if (hp <= 0) push 'ko'` at every strike site: if the defender's hp reached 0
+// this hit AND its bond-moment flag is armed → floor to 1, CONSUME the flag, and
+// emit `bondMoment` INSTEAD of `ko` (so the mon survives + the game narrates the
+// beat; the surviving-defender counter still fires downstream, exactly like the
+// HANG IN THERE floor did). The flag is only ever armed on the PLAYER side, and
+// absent by default → this emits `ko` and returns the side unchanged → bit-identical
+// for every fixture/sim/foe side that never bonds.
+function koOrBondMoment(side: SideState, sideKey: Side, events: BattleEvent[]): SideState {
+  if (side.hp > 0) return side;
+  if (side.bondMomentArmed === true) {
+    events.push({ kind: 'bondMoment', side: sideKey });
+    const { bondMomentArmed: _drop, ...rest } = side;
+    return { ...rest, hp: 1 };
+  }
+  events.push({ kind: 'ko', side: sideKey });
+  return side;
+}
+
 // RECOVER Call (Lane B) — heal recoverPct of maxHp, clamped, and emit the
 // heal so the game raises the hp bar. Applied at call-resolution time (before
 // the round's strikes), so the caller recovers and THEN takes any incoming hit
@@ -442,12 +463,12 @@ function resolveStrike(
   if (attStance === 'A' && defStance === 'F') {
     let dd = d * COMBAT.punishMult * dazeMult * defTaken;
     if (defender.exhausted) dd *= COMBAT.exhTaken;
-    const newDef: SideState = { ...defender, hp: Math.max(0, defender.hp - dd) };
+    let newDef: SideState = { ...defender, hp: Math.max(0, defender.hp - dd) };
     events.push({ kind: 'punish', side: attSide, damage: dd, effectiveness: eff });
     // Effect move: the status REPLACES the read-win ★ (no double-win); a plain
     // attack banks ★ exactly as before.
     const newAtt = effect !== undefined ? attacker : gainMomentum(attacker, attSide, events);
-    if (newDef.hp <= 0) events.push({ kind: 'ko', side: defSide });
+    newDef = koOrBondMoment(newDef, defSide, events);
     const pend = readWinPending();
     return { attacker: newAtt, defender: newDef, ...(pend !== undefined ? { effect: pend } : {}), ...(corroded ? { consumeCorrode: true } : {}) };
   }
@@ -456,11 +477,11 @@ function resolveStrike(
   if (attStance === 'F' && defStance === 'G') {
     const baseMit = defender.exhausted ? COMBAT.openTaken * COMBAT.exhTaken : COMBAT.openTaken;
     const dd = d * COMBAT.openDmg * baseMit * dazeMult * defTaken * defGuardMit;
-    const newDef: SideState = { ...defender, hp: Math.max(0, defender.hp - dd) };
+    let newDef: SideState = { ...defender, hp: Math.max(0, defender.hp - dd) };
     events.push({ kind: 'opening', side: attSide, damage: dd, effectiveness: eff });
     // Effect move: status replaces the read-win ★ (see the punish branch).
     const newAtt = effect !== undefined ? attacker : gainMomentum(attacker, attSide, events);
-    if (newDef.hp <= 0) events.push({ kind: 'ko', side: defSide });
+    newDef = koOrBondMoment(newDef, defSide, events);
     const pend = readWinPending();
     return { attacker: newAtt, defender: newDef, ...(pend !== undefined ? { effect: pend } : {}), ...(corroded ? { consumeCorrode: true } : {}) };
   }
@@ -485,8 +506,10 @@ function resolveStrike(
   // buff (SIPHON lifesteal) fizzles too. No read-win ★ in this branch regardless.
   const buffPending = buffPendingFor('normal');
 
+  newDef = koOrBondMoment(newDef, defSide, events);
   if (newDef.hp <= 0) {
-    events.push({ kind: 'ko', side: defSide });
+    // Actually KO'd (not bond-saved) → no counter; a bond-saved defender (hp 1)
+    // falls through to the G-vs-A counter below, exactly as a survivor should.
     return { attacker: newAtt, defender: newDef, ...(buffPending !== undefined ? { effect: buffPending } : {}), ...(corroded ? { consumeCorrode: true } : {}) };
   }
 
@@ -501,7 +524,7 @@ function resolveStrike(
     events.push({ kind: 'counter', side: defSide, damage: reflect });
     events.push({ kind: 'staggered', side: attSide });
     newDef = gainMomentum(newDef, defSide, events);
-    if (newAtt.hp <= 0) events.push({ kind: 'ko', side: attSide });
+    newAtt = koOrBondMoment(newAtt, attSide, events);
   }
 
   return { attacker: newAtt, defender: newDef, ...(buffPending !== undefined ? { effect: buffPending } : {}), ...(corroded ? { consumeCorrode: true } : {}) };
@@ -777,14 +800,14 @@ export function resolveRound(
           if (foe.exhausted) dd *= COMBAT.exhTaken;
           const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
           events.push({ kind: 'release', side: 'player', release: a, outcome: winner === 'player' ? 'win' : winner === 'foe' ? 'lose' : 'neutral', damage: r.applied, effectiveness: eff });
-          if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
+          foe = koOrBondMoment(foe, 'foe', events);
         } else {
           const { d, eff } = rawHit(foe, pl, foeMv, rng, state.typeChart, state.traits, rhythm);
           let dd = d * FOCUS.releaseBase * (winner === 'foe' ? FOCUS.flipWin : winner === 'player' ? FOCUS.flipLose : 1);
           if (pl.exhausted) dd *= COMBAT.exhTaken;
           const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
           events.push({ kind: 'release', side: 'foe', release: b, outcome: winner === 'foe' ? 'win' : winner === 'player' ? 'lose' : 'neutral', damage: r.applied, effectiveness: eff });
-          if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
+          pl = koOrBondMoment(pl, 'player', events);
         }
       }
       // Flip verdict AFTER the strikes so its callout lands; award the ★.
@@ -850,7 +873,8 @@ export function resolveRound(
         if (oppSide === 'player') pl = { ...pl, hp: r.hp };
         else foe = { ...foe, hp: r.hp };
         events.push({ kind: 'release', side: relSide, release: rel, outcome, damage: r.applied, effectiveness: eff, ...(oppStance ? { vsStance: oppStance } : {}), ...(oppInit ? { vsFocus: true } : {}) });
-        if ((oppSide === 'player' ? pl.hp : foe.hp) <= 0) events.push({ kind: 'ko', side: oppSide });
+        if (oppSide === 'player') pl = koOrBondMoment(pl, 'player', events);
+        else foe = koOrBondMoment(foe, 'foe', events);
       };
       const doCounter = (): void => {
         if (!oppSingle || oppMove === null) return;
@@ -868,7 +892,8 @@ export function resolveRound(
         if (relSide === 'player') pl = { ...pl, hp: r.hp };
         else foe = { ...foe, hp: r.hp };
         events.push({ kind: 'strike', side: oppSide, move: oppMove, damage: r.applied, effectiveness: eff });
-        if ((relSide === 'player' ? pl.hp : foe.hp) <= 0) events.push({ kind: 'ko', side: relSide });
+        if (relSide === 'player') pl = koOrBondMoment(pl, 'player', events);
+        else foe = koOrBondMoment(foe, 'foe', events);
       };
       if (releaserFirst) { doRelease(); doCounter(); } else { doCounter(); doRelease(); }
 
@@ -901,7 +926,7 @@ export function resolveRound(
           const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
           if (foeInitiating) foeFocusCost = r.applied;
           else events.push({ kind: 'strike', side: 'player', move: plMove!, damage: r.applied, effectiveness: eff });
-          if (foe.hp <= 0) events.push({ kind: 'ko', side: 'foe' });
+          foe = koOrBondMoment(foe, 'foe', events);
         } else if (sk === 'foe' && foeStrikes) {
           const { d, eff } = rawHit(foe, pl, foeMove!, rng, state.typeChart, state.traits, rhythm);
           let dd = d * stanceOutMult(foeStance) * foeStrikeMult; // Full Power buffs this strike too
@@ -910,7 +935,7 @@ export function resolveRound(
           const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
           if (plInitiating) plFocusCost = r.applied;
           else events.push({ kind: 'strike', side: 'foe', move: foeMove!, damage: r.applied, effectiveness: eff });
-          if (pl.hp <= 0) events.push({ kind: 'ko', side: 'player' });
+          pl = koOrBondMoment(pl, 'player', events);
         }
       }
       // Announce the Focus (generic — release hidden) + its cost.

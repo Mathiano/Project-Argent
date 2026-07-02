@@ -4,6 +4,7 @@ import {
   brute,
   humanIsh,
   naiveTriangle,
+  reader,
   rivalAI,
   staminaReader,
   staticGuard,
@@ -154,5 +155,49 @@ describe('bond ≤3% ladder gate — ★-SPENDING probe (n=2000, seed=1)', () =>
         `\n\nMax |Δ| (★-spending probe): ${maxShift.toFixed(2)}pp (gate ${GATE_PP}pp)\n`,
     );
     expect(maxShift).toBeLessThanOrEqual(GATE_PP);
+  });
+});
+
+// ── BOND-MOMENT sanity (Part 2) ─────────────────────────────────────────────
+// Unlike the jumpstart NUDGE (gated ≤3pp), the bond-moment is REAL power — a free
+// once-per-battle survival — so this is a SANITY BAND, not a tight gate. In a
+// MIRROR (reader vs reader, same species) the baseline is ~48%; arming the
+// player's bond-moment shifts it to ~74% (measured Δ ≈ +25pp, consistent across all
+// three fixtures): you steal the games you'd have lost to a single lethal hit. That
+// is STRONG but BOUNDED — one survival, consumed once (74%, never domination), and
+// a mirror is the MAX-sensitivity case (close races hinge on that one hit). It is a
+// real comeback lane, not a runaway CLIFF. NOTE (feel-pending): whether ~25pp reads
+// as "earned deep-bond payoff" or "too strong" is Mathias's playtest call — the
+// levers if it's too strong are the stage gate (6→7) or an HP-conditional trigger.
+describe('bond-moment sanity — a stage-6 survive-at-1HP is a comeback chance, not a cliff', () => {
+  const report: string[] = [];
+  let maxShift = 0;
+  for (const sp of ['EMBERCUB', 'SPROUTLE', 'AQUAFIN'] as const) {
+    test(`${sp} mirror — bond-moment shift is modest (reader vs reader)`, () => {
+      const base = runLadder({ player: { archetype: reader, species: sp }, foe: { archetype: reader, species: sp } }, N, SEED);
+      const armed = runLadder(
+        { player: { archetype: reader, species: sp, bondMoment: true }, foe: { archetype: reader, species: sp } },
+        N,
+        SEED,
+      );
+      const shift = armed.playerWinPct - base.playerWinPct;
+      maxShift = Math.max(maxShift, shift);
+      report.push(
+        `${sp.padEnd(9)} mirror  base ${base.playerWinPct.toFixed(1).padStart(5)}%  ` +
+          `armed ${armed.playerWinPct.toFixed(1).padStart(5)}%  Δ ${(shift >= 0 ? '+' : '') + shift.toFixed(2)}pp`,
+      );
+      expect(shift).toBeGreaterThan(0); // it HELPS — a real comeback lane
+      expect(shift).toBeLessThan(40); // bounded — one survival, not a runaway
+      expect(armed.playerWinPct).toBeLessThan(85); // no domination (a chance, not a cliff)
+    });
+  }
+
+  test('report the bond-moment sanity shift', () => {
+    console.log(
+      '\n── Bond-MOMENT sanity — survive-at-1HP (player armed vs baseline, mirror) ──\n' +
+        report.join('\n') +
+        `\n\nMax +Δ across mirrors: ${maxShift.toFixed(2)}pp — a modest comeback lane (not a cliff)\n`,
+    );
+    expect(true).toBe(true);
   });
 });

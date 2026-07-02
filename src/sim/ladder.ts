@@ -17,6 +17,19 @@ export interface SideSpec {
   // Arm the bond jumpstart on this side (B5 ≤3% ladder gate). Default off →
   // createSide produces the legacy SideState shape → bit-identical ladders.
   readonly jumpstart?: boolean;
+  // Arm the once-per-battle bond-moment (survive a lethal hit at 1 HP). Default
+  // off → absent field → bit-identical. Used by the bond-moment sanity sim.
+  readonly bondMoment?: boolean;
+}
+
+// Build the createSide opts for a side spec — undefined (the legacy shape) unless
+// a bond perk is armed, so an un-perked side stays bit-identical.
+function sideOpts(s: SideSpec): { jumpstartArmed?: true; bondMomentArmed?: true } | undefined {
+  if (!s.jumpstart && !s.bondMoment) return undefined;
+  return {
+    ...(s.jumpstart ? { jumpstartArmed: true } : {}),
+    ...(s.bondMoment ? { bondMomentArmed: true } : {}),
+  };
 }
 
 export interface MatchSpec {
@@ -39,16 +52,8 @@ export interface MatchResult {
 export function runMatch(spec: MatchSpec, rng: RNG): MatchResult {
   const maxRounds = spec.maxRounds ?? 200;
   let state: BattleState = createBattleState(
-    createSide(
-      SPECIES[spec.player.species]!,
-      spec.player.scale,
-      spec.player.jumpstart ? { jumpstartArmed: true } : undefined,
-    ),
-    createSide(
-      SPECIES[spec.foe.species]!,
-      spec.foe.scale,
-      spec.foe.jumpstart ? { jumpstartArmed: true } : undefined,
-    ),
+    createSide(SPECIES[spec.player.species]!, spec.player.scale, sideOpts(spec.player)),
+    createSide(SPECIES[spec.foe.species]!, spec.foe.scale, sideOpts(spec.foe)),
   );
   let pExh = false;
   let fExh = false;

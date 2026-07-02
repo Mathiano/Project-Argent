@@ -119,6 +119,10 @@ export type BattleEvent =
   | { readonly kind: 'winded'; readonly side: Side }
   | { readonly kind: 'exhausted'; readonly side: Side }
   | { readonly kind: 'ko'; readonly side: Side }
+  // BOND-MOMENT — a stage-6+ bond mon just survived an otherwise-lethal hit at
+  // 1 HP (once per battle). Fires INSTEAD of `ko` for that hit; the game narrates
+  // the dramatic beat + routes it to the SFX/animation lanes.
+  | { readonly kind: 'bondMoment'; readonly side: Side }
   | {
       readonly kind: 'breakProgress';
       readonly progress: number;

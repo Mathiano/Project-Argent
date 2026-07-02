@@ -163,6 +163,11 @@ export interface SideState {
   // (bond-track-v2.md Call-tier I "Familiar"). Omitted (undefined) on every
   // legacy/sim side, so the field is absent → behaviour is bit-identical.
   readonly jumpstartArmed?: boolean;
+  // BOND-MOMENT flag (same bond-agnostic pattern as jumpstartArmed): when armed,
+  // the FIRST otherwise-lethal hit this battle is survived at 1 HP, then the flag
+  // disarms (once per battle). The GAME arms it for a stage-6+ ("Kindred") bond
+  // mon; the engine only knows the flag. Omitted → absent → bit-identical.
+  readonly bondMomentArmed?: boolean;
   // Combat FOCUS model — a pending focus. Set on the FOCUS round (R1) when this
   // mon initiates a Focus (tied to `stance` internally; `move` is the strike it
   // releases with). Present at the start of the next round means this mon

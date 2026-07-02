@@ -27,6 +27,9 @@ export type GameEvent =
   | { readonly kind: 'dialogue-advance' }
   | { readonly kind: 'hit-landed'; readonly side: Side; readonly effectiveness: number }
   | { readonly kind: 'ko'; readonly side: Side }
+  // BOND-MOMENT — a stage-6+ bond mon just survived a lethal hit at 1 HP. Routed
+  // here so the future SFX + animation lanes can hit the dramatic beat.
+  | { readonly kind: 'bondMoment'; readonly side: Side }
   | { readonly kind: 'catch-attempt' }
   // Reserved: the ball-wiggle animation isn't built yet (catch resolves in
   // text today). The emit site lands with the catch-sequence visual pass.

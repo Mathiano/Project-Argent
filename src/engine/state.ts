@@ -20,6 +20,9 @@ export interface SideOpts {
   // The game sets this for a sufficiently-bonded mon; omitted everywhere
   // else, so the returned SideState shape is unchanged (bit-identical).
   readonly jumpstartArmed?: boolean;
+  // Arm the BOND-MOMENT (survive one lethal hit at 1 HP this battle). The game
+  // sets this for a stage-6+ bond mon; omitted everywhere else → bit-identical.
+  readonly bondMomentArmed?: boolean;
   // Banked opening ★ (Spine-1 — a boss "comes prepared"). Omitted ⇒ 0, so every
   // non-boss side keeps the momentum:0 default → bit-identical.
   readonly openingMomentum?: number;
@@ -54,6 +57,7 @@ export function createSide(species: Species, scale?: StatScale, opts?: SideOpts)
     // Conditional spread: when not armed, the field is ABSENT (not `false`),
     // so the object is identical to the pre-jumpstart shape → bit-identical.
     ...(opts?.jumpstartArmed ? { jumpstartArmed: true } : {}),
+    ...(opts?.bondMomentArmed ? { bondMomentArmed: true } : {}),
   };
 }
 

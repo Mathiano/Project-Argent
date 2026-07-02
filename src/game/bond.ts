@@ -185,6 +185,24 @@ export function bondUnlocksCalls(bondValue: number): boolean {
   return bondStage(bondValue) >= CALLS_UNLOCK_STAGE;
 }
 
+// The BOND-MOMENT (survive one otherwise-lethal hit at 1 HP, once per battle) is
+// earned at bond stage 6, "Kindred" — a deep-bond payoff, mirroring the jumpstart
+// pattern (the game arms the engine flag; the engine stays bond-agnostic). The
+// stage-6 bond-TELL (Focus warning) unlocks alongside it. Fixtures/sim never bond
+// → never armed → bit-identical.
+export const BOND_MOMENT_STAGE = 6;
+
+export function hasBondMoment(bondValue: number): boolean {
+  return bondStage(bondValue) >= BOND_MOMENT_STAGE;
+}
+
+// BOND-TELLS (Part 1, presentation only — the sim never reads the intent display):
+// stage 4 ("In Sync") = your partner reads the foe MORE reliably (intent clarity
+// bumped one tier); stage 6 ("Kindred", = BOND_MOMENT_STAGE) = the Focus warning
+// (the partner senses a committed Focus). These gate the game-side intent display;
+// no engine effect.
+export const BOND_TELL_STAGE = 4;
+
 // Did applying bond XP cross into a new named stage? Returns the from/to
 // stage numbers when it did, else null — the trigger for the post-battle
 // stage-crossing beat (Issue 1). Pure: the caller maps stage → name + shows

@@ -20,7 +20,7 @@ Tempo was NARROW (KO-race only — in the simultaneous triangle, order only affe
 (Historical: FROST's original weak tempo move Cold Snap was cut earlier for the same thinness → replaced with GLASS EDGE.)
 
 ## Momentum/Call-economy effects — placement so far
-Sap Focus→SPARK, Silence→UMBRA, Echo→PSI, Second Wind→STONE, Attunement→FLAME, Call Lock→BRAWN, Amplify→INSECT (batch 2), tempo→TERRA. The core economy is touched by many types (good spread).
+Sap Focus→SPARK, Silence→UMBRA, Echo→PSI, Second Wind→STONE, Attunement→FLAME, Call Lock→BRAWN, Amplify→INSECT (batch 2). The core economy is touched by many types (good spread). (tempo→TERRA was here — CUT, see above.)
 
 ## STILL TO DESIGN (batch 2+)
 - INSECT (Sap + Amplify/SWARM), GALE, AQUA, NATURE, BASIC, SPIRIT, DRAKE, FORGE.
@@ -31,7 +31,7 @@ Sap Focus→SPARK, Silence→UMBRA, Echo→PSI, Second Wind→STONE, Attunement�
 # KEY REFRAME — statuses are a SHARED VOCABULARY, not type-exclusive (Mathias)
 
 Earlier framing (1 type = 1 status, 1:1) was OVER-CONSTRAINED. Correct model:
-- There's a shared VOCABULARY of effects (Daze, Burn, heal, stamina-drain, tempo, the momentum/Call-economy ones, etc.).
+- There's a shared VOCABULARY of effects (Daze, Burn, heal, stamina-drain, the momentum/Call-economy ones, etc.). [tempo was in this pool — CUT.]
 - Each type has a SIGNATURE anchor (its locked status from combat-depth-types-status.md) — but that's a thematic anchor, NOT an exclusivity rule.
 - A status can be delivered by MULTIPLE types (Daze on SPARK AND GALE; healing on AQUA AND GALE). A type's 2 technique slots can MIX from the shared pool as fits its character.
 - Richer + less one-trick + better coverage (several types can answer the same need). Mirrors how Pokémon actually distributes effects.

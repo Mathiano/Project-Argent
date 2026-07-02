@@ -37,7 +37,7 @@ import { monDisplayName } from '../monName';
 import { fleeTelegraphed, bondStage } from '../catching';
 import type { CatchWindow } from '../catching';
 import { drawBondBar } from '../bondBar';
-import { bondAfterFight, powerIndex, stageCeiling } from '../bond';
+import { BOND_MOMENT_STAGE, BOND_TELL_STAGE, bondAfterFight, powerIndex, stageCeiling } from '../bond';
 import type { FightKind } from '../bond';
 import {
   TUTORIAL_CORRECTION,
@@ -769,13 +769,38 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // display cannot perturb the engine stream → ladders stay bit-identical.
   const reliability: IntentReliability = opts.intentReliability ?? 'honest';
   const intentRng: RNG = mulberry32(INTENT_DISPLAY_SEED);
-  let shownIntent: ShownIntent = degradeIntent(
-    foeAction,
-    activeMon(state.foe).species.name,
-    reliability,
-    intentRng,
-    opts.foeFocusInfo,
-  );
+  // ---- BOND-TELLS (Part 1) — your mon helps you read the foe -----------------
+  // PRESENTATION ONLY: the intent display never feeds the engine (the feint roll
+  // uses INTENT_DISPLAY_SEED, decoupled from opts.rng), and the sim reads the
+  // committed foe action directly, so none of this touches the ladders. Gated on
+  // the ACTIVE player mon's own bond stage (read live so it tracks switches).
+  const activeBondStage = (): number => bondStage(opts.playerBond?.[state.player.active] ?? 0);
+  // Stage 4+ ("In Sync"): the partner reads the foe MORE reliably — bump the
+  // intent one clarity tier (opaque→ambiguous→honest). Reduces the degradation.
+  const bondTellReliability = (base: IntentReliability): IntentReliability => {
+    if (activeBondStage() < BOND_TELL_STAGE) return base;
+    return base === 'opaque' ? 'ambiguous' : 'honest';
+  };
+  // Flavour the bond-sourced tell so it reads as YOUR PARTNER reading, not a UI
+  // upgrade. Stage 6+ ("Kindred") adds the Focus WARNING — the partner senses a
+  // committed Focus (wind-up or release), which the foe's info-discipline might
+  // otherwise hide.
+  const bondFlavorIntent = (shown: ShownIntent, foeAct: Action): ShownIntent => {
+    const stage = activeBondStage();
+    if (stage < BOND_TELL_STAGE || shown.line === null) return shown;
+    const partner = activeMon(state.player).species.name;
+    const focusing = foeAct.kind === 'release' || (foeAct.kind === 'move' && foeAct.commit === true);
+    if (stage >= BOND_MOMENT_STAGE && focusing) {
+      return { ...shown, line: `${partner} bristles — ${shown.line}` };
+    }
+    return { ...shown, line: `${partner} reads — ${shown.line}` };
+  };
+  const bondIntent = (foeAct: Action): ShownIntent =>
+    bondFlavorIntent(
+      degradeIntent(foeAct, activeMon(state.foe).species.name, bondTellReliability(reliability), intentRng, opts.foeFocusInfo),
+      foeAct,
+    );
+  let shownIntent: ShownIntent = bondIntent(foeAction);
   let display: Display = {
     player: snapshot(activeMon(state.player)),
     foe: snapshot(activeMon(state.foe)),
@@ -958,13 +983,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // degraded) display for this turn. forcedAction draws no RNG, so moving
     // the choose ahead of the forced check leaves the engine stream intact.
     foeAction = opts.chooseFoeAction(state, opts.rng);
-    shownIntent = degradeIntent(
-      foeAction,
-      activeMon(state.foe).species.name,
-      reliability,
-      intentRng,
-      opts.foeFocusInfo,
-    );
+    shownIntent = bondIntent(foeAction);
     const forced = forcedAction(activeMon(state.player));
     if (forced) {
       // EXHAUSTED / softlock: the player CAN'T input this round. Explain WHY
@@ -1124,6 +1143,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         return `${monName(ev.side)} EXHAUSTED (forced rest next round)`;
       case 'ko':
         return `${monName(ev.side)} KO'd`;
+      case 'bondMoment':
+        return `${monName(ev.side)} BOND-MOMENT — survives at 1 HP!`;
       case 'breakProgress':
         return `BREAK meter ${ev.progress}/${ev.threshold}`;
       case 'break':
@@ -1172,6 +1193,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (ev.kind === 'counter') return true;
     if (ev.kind === 'clash') return true;
     if (ev.kind === 'faint') return true;
+    if (ev.kind === 'bondMoment') return true; // the survival beat MUST land
     if (ev.kind === 'break') return true;
     // S4 — hold on Catch Breath so the player reads the restore + sees
     // the ST bar at its new value (it used to flash past).
@@ -1516,6 +1538,21 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       emitGameEvent({ kind: 'ko', side: ev.side });
       return;
     }
+    if (ev.kind === 'bondMoment') {
+      // THE BOND-MOMENT (stage-6+): the mon just survived an otherwise-lethal hit
+      // at 1 HP. This MUST land — the big center callout + a distinct log line,
+      // and route it to the SFX/animation lanes. The engine already clamped hp to
+      // 1; reflect it on the display bar. (Player-only — the flag is never armed
+      // foe-side.)
+      const who = display[ev.side].species.name;
+      display[ev.side].hp = 1;
+      calloutLine = `${who} refuses to fall!`;
+      pushLog(`${who} refuses to fall!`);
+      animKind = 'clash';
+      animT = 0.5;
+      emitGameEvent({ kind: 'bondMoment', side: ev.side });
+      return;
+    }
     if (ev.kind === 'switchOut') {
       const who = ev.side === 'player' ? ev.species : `Foe ${ev.species}`;
       pushLog(`${who} withdrew.`);
@@ -1634,6 +1671,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     return (
       ev.kind === 'faint' ||
       ev.kind === 'ko' ||
+      ev.kind === 'bondMoment' ||
       ev.kind === 'break' ||
       ev.kind === 'call' ||
       // FOCUS outcomes LAND — the read moments the player must see.

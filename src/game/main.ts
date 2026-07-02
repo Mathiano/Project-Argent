@@ -94,6 +94,7 @@ import {
   bondStageCrossing,
   bondUnlocksCalls,
   bondXp,
+  hasBondMoment,
   hasJumpstart,
   powerIndex,
 } from './bond';
@@ -358,9 +359,15 @@ function buildPlayerTeam(): ReturnType<typeof createTeam> {
   // switch. freshBattleSide already cleared round-local flags.
   const fresh = run.party.map((mon, i) => {
     const side = freshBattleSide(mon);
-    return hasJumpstart(run.partyBond[i] ?? 0)
-      ? { ...side, jumpstartArmed: true }
-      : side;
+    const bond = run.partyBond[i] ?? 0;
+    // Arm the per-mon bond combat perks from THIS mon's bond stage: the ★-jumpstart
+    // (stage 5) and the once-per-battle BOND-MOMENT survive-at-1HP (stage 6). Both
+    // are conditional spreads so an under-bonded mon's side shape is unchanged.
+    return {
+      ...side,
+      ...(hasJumpstart(bond) ? { jumpstartArmed: true } : {}),
+      ...(hasBondMoment(bond) ? { bondMomentArmed: true } : {}),
+    };
   });
   return createTeam(fresh);
 }
