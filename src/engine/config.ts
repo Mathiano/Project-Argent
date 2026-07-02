@@ -213,6 +213,19 @@ export const STATUS = {
   doubtSurcharge: 1,
   // Attunement (KINDLE buff): the next Call costs this much less ★ (1 → free).
   attunementDiscount: 1,
+  // Updraft (GALE buff): while active, ATTACK-TIER ACCESS reads as if the caster
+  // held this many EXTRA ★ (a mon at 1★ reaches T2's gate, etc.). The GALE
+  // identity — punch above your ★-weight temporarily. SURGICAL: it touches ONLY
+  // the phased-unlock tier-gate (state.ts tierMomentumLocked); it does NOT grant
+  // actual ★ (no momentum gain — deliberately NOT the SECOND WIND degeneracy) and
+  // does NOT affect the behind-penalty (which reads the real momentum differential
+  // — the caster is not "less behind"). Bounded by the cast-turn tempo cost + the
+  // short window (updraft duration below). SIM-CAPPED at MID access (state.ts): the
+  // boost reaches up to the mid tier only, NOT heavy/nuke — early top-tier access
+  // wins the fragile glass-mirror race (measured: a 0%-strategy → 74% purely off
+  // early heavies); capping to mid keeps the identity (throw your typed mid a beat
+  // early) while killing the degeneracy (in-Guard-abuse 74% → 0%, pure use ~29%).
+  updraftTierBoost: 1,
   // Per-status durations (rounds); kinds absent here use baseDuration. Silence /
   // Call Lock are bounded short (the foe can still ACT, only not Call — never a
   // stun-lock); Echo is a single next-round re-map. CONTROL stance-locks
@@ -222,6 +235,10 @@ export const STATUS = {
     // Wave C: GLASS EDGE is a SHORT risk/reward window (you're fragile while it
     // lasts); the rest (undertow/shrouded/setStance/focusUp) use baseDuration.
     glassEdge: 2,
+    // Updraft (GALE): a SHORT tier-access window — the gust is momentary. 2 active
+    // turns per cast, so the cast-turn tempo cost (deal 0, cast in a punishable
+    // stance) is a real brake on chaining it. (Sim-gated in sim/updraft.test.ts.)
+    updraft: 2,
   } as { readonly [k: string]: number },
   // ── Resource effects (Wave B) ──────────────────────────────────────────────
   // Drained (TOXIC SAP): stamina bled per round while active (offsets +8 regen

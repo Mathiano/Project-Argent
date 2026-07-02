@@ -1,4 +1,4 @@
-import { COMBAT, MOMENTUM_REQ_BY_TIER, TIERS } from './config';
+import { COMBAT, MOMENTUM_REQ_BY_TIER, STATUS, TIERS } from './config';
 import { LEGACY_TRAIT_TABLE, LEGACY_TYPE_CHART, MOVES } from './data';
 import type {
   Action,
@@ -146,7 +146,18 @@ export function isWinded(side: SideState): boolean {
 // (affordableMoves) below + the hard validateAction gate.
 export function tierMomentumLocked(side: SideState, move: Move): boolean {
   if (move.effect !== undefined) return false; // techniques are exempt (Spine-1)
-  return side.momentum < MOMENTUM_REQ_BY_TIER[move.tier];
+  // UPDRAFT (GALE): while the buff is active, tier ACCESS reads as if the caster
+  // held +updraftTierBoost ★. SURGICAL — this is the ONLY place the boost applies:
+  // it does NOT change `side.momentum` (no actual ★ gain) and does NOT touch the
+  // behind-penalty (resolveRound reads the real momentum differential). So a mon
+  // can punch above its ★-weight on access WITHOUT becoming "less behind."
+  const req = MOMENTUM_REQ_BY_TIER[move.tier];
+  // The boost reaches UP TO MID only — it lets a GALE mon throw its typed mid a
+  // beat early (the identity), but NOT swing a heavy/nuke before earning the real
+  // ★ (sim-degenerate: early top-tier access wins the fragile glass-mirror race).
+  const updraftActive = (side.buffs ?? []).some((b) => b.kind === 'updraft');
+  const updraft = updraftActive && req <= MOMENTUM_REQ_BY_TIER.mid ? STATUS.updraftTierBoost : 0;
+  return side.momentum + updraft < req;
 }
 
 export function moveLegal(side: SideState, moveName: string): boolean {

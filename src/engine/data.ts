@@ -232,6 +232,18 @@ export const MOVES: { readonly [name: string]: Move } = {
     // measurable cost), for a short window.
     effect: { status: 'glassEdge', polarity: 'buff', condition: 'always' },
   },
+  // ── GALE identity technique (deferred until the Spine-1 tier-gate existed) ──
+  UPDRAFT: {
+    name: 'UPDRAFT',
+    tier: 'mid',
+    type: null,
+    // Self-buff: while active, ATTACK-TIER ACCESS reads as if +updraftTierBoost ★
+    // (punch above your ★-weight). Touches ONLY the phased-unlock gate — no actual
+    // ★ gain, no behind-penalty effect (see config.ts updraftTierBoost + state.ts
+    // tierMomentumLocked). A generic lingering buff (no special-casing in status.ts
+    // — self-applies via applyPendingEffect, expires via tickStatuses).
+    effect: { status: 'updraft', polarity: 'buff', condition: 'always' },
+  },
 };
 
 export const SPECIES: { readonly [name: string]: Species } = {
