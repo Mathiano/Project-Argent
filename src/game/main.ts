@@ -38,7 +38,7 @@ import type {
 import ch1BatchData from '../../docs/ch1-batch.json';
 import movesData from '../../docs/moves.json';
 import typechartData from '../../docs/typechart.json';
-import { mountCanvas } from './canvas';
+import { LOGICAL_H, LOGICAL_W, mountCanvas } from './canvas';
 import { loadUiFont } from './font';
 import { createPctTileTestScene } from './scenes/pctTileTest';
 import { createInputDispatcher } from './input';
@@ -125,7 +125,8 @@ import type { SaveState } from './save';
 const host = document.getElementById('app');
 if (!host) throw new Error('Argent: #app element missing in index.html');
 
-const { ctx } = mountCanvas(host);
+const canvasHost = mountCanvas(host);
+const { ctx } = canvasHost;
 
 // Dev gate. Vite sets import.meta.env.DEV true under `npm run dev`, false in a
 // production build. Read defensively so the strict tsconfig needs no vite/client
@@ -2329,6 +2330,13 @@ function frame(now: number): void {
   const dt = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
   scenes.update(dt);
+  // Per-scene logical resolution: swap the canvas backing size to match the scene
+  // on top of the stack (battle → 640×360; the overworld + every menu → the base
+  // 320×180). setLogicalSize is idempotent, so steady-state frames are a no-op and
+  // only an actual scene change resizes. Applied BEFORE draw so the scene paints at
+  // its declared size this frame.
+  const size = scenes.top()?.logicalSize;
+  canvasHost.setLogicalSize(size?.width ?? LOGICAL_W, size?.height ?? LOGICAL_H);
   scenes.draw(ctx);
   requestAnimationFrame(frame);
 }

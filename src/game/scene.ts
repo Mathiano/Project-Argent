@@ -11,6 +11,13 @@ export interface Scene {
   // gamepad `InputKey` mapping for that keypress, so typing 'z' enters a 'z'
   // instead of firing the 'a' button. Absent on every gameplay scene → unchanged.
   textInput?(key: string): boolean;
+  // The scene's logical drawing resolution. Omitted → the base 320×180 (LOGICAL_W
+  // ×LOGICAL_H), which every existing scene uses. A scene that declares a larger
+  // size (the 640×360 battle-UI rebuild) makes the shared canvas swap to that
+  // backing size while the scene is on top of the stack; the canvas restores the
+  // base size when a default (no logicalSize) scene returns to the top. Read once
+  // per frame by the main loop — a static property, not re-read mid-scene.
+  readonly logicalSize?: { readonly width: number; readonly height: number };
   draw(ctx: CanvasRenderingContext2D): void;
 }
 

@@ -22,7 +22,7 @@ import type {
   Stance,
   Team,
 } from '../../engine';
-import { LOGICAL_H, LOGICAL_W } from '../canvas';
+import { BATTLE_LOGICAL_H, BATTLE_LOGICAL_W, LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
 import { monDisplayName } from '../monName';
@@ -2511,6 +2511,12 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   }
 
   return {
+    // Battle-UI rebuild (Part 1): the battle scene runs at 640×360. The shared
+    // canvas swaps to this size while the battle is on top and restores the base
+    // 320×180 on exit. NOTE: the HUD draw code below is still authored in 320×180
+    // coordinates, so at 640×360 it renders in the top-left quarter — that's
+    // expected for Part 1 (the layout re-authoring is Part 2); nothing crashes.
+    logicalSize: { width: BATTLE_LOGICAL_W, height: BATTLE_LOGICAL_H },
     update(dt) {
       tick += dt;
       if (breakFlashT > 0) breakFlashT = Math.max(0, breakFlashT - dt);
