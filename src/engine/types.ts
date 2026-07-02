@@ -23,9 +23,32 @@ export type ReleaseKind = 'heavy' | 'feint' | 'hide';
 //                 resolution (applyHp/applyRecover ignore it → no hp effect),
 //                 and no sim bot emits it → bit-identical. See
 //                 docs/status-engine-scope.md.
+// ── The Calls increment (docs/calls-expansion-design.md) — info-war + tempo ──
+//   shakeOff — the owed CLEANSE: clears the bearer's active debuff (★1). Forgoes
+//              the strike; no evade. (Replaces the retired hangInThere UI slot.)
+//   readThem — BUY THE TRUTH (★1): a KNOW-vs-ACT Call — presentation-layer only,
+//              mechanically INERT in the engine (forgoes the strike, spends ★).
+//              The GAME reveals the foe's HONEST intent this round. No sim bot
+//              emits it → bit-identical.
+//   throwOff — PLANT THE LIE (★1): forgoes the strike; the round's recorded
+//              history logs `plantStance` (below) instead of null, poisoning a
+//              history-reading foe (KAMON's modal-read).
+//   comeBack — the PROTECTED SWITCH (★1): recall + send `toIndex` (below) WITHOUT
+//              conceding the free hit a menu-switch eats (negated like Dodge). The
+//              distinguishing value is the team swap, not the evade (needs a
+//              bench survivor → not a universal dodge).
 // FULL POWER is NOT a CallKind — it's a `move` modifier (`fullPower: true`)
 // because it buffs an attack rather than resolving as a standalone Call.
-export type CallKind = 'getAway' | 'hangInThere' | 'recover' | 'dodge' | 'resolve';
+export type CallKind =
+  | 'getAway'
+  | 'hangInThere'
+  | 'recover'
+  | 'dodge'
+  | 'resolve'
+  | 'shakeOff'
+  | 'readThem'
+  | 'throwOff'
+  | 'comeBack';
 
 // The default release a Focus falls back to when none is chosen (the internal
 // base stance the focus is tied to): Aggressive→HEAVY, Fluid→HIDE, Guard→FEINT.
@@ -286,11 +309,14 @@ export type Action =
   // acts normally, no stamina change. Sim bots never throw, so the
   // ladders stay bit-identical (this branch is dead code for them).
   | { readonly kind: 'throwBall' }
-  // Layer 2 — a ★-powered Call OVERRIDE. The ONLY escape from a committed
-  // enemy Charge (not a stance): GET AWAY = guaranteed no-hit this round;
-  // HANG IN THERE = cannot drop below 1 hp this round. Spends 1 ★ (momentum);
-  // the caller forgoes its strike. Sim/legacy bots never call → bit-identical.
-  | { readonly kind: 'call'; readonly call: CallKind };
+  // Layer 2 — a ★-powered Call OVERRIDE. Spends 1 ★ (momentum); the caller
+  // forgoes its strike. Sim/legacy bots never call → bit-identical.
+  //   plantStance — THROW THEM OFF: the fake stance logged into this round's
+  //     history (in place of the null a Call normally records). Absent for every
+  //     other Call → history recording is bit-identical.
+  //   toIndex — COME BACK: the bench member to send in (the protected switch).
+  //     Absent for every other Call.
+  | { readonly kind: 'call'; readonly call: CallKind; readonly plantStance?: Stance; readonly toIndex?: number };
 
 export interface StatScale {
   readonly hp?: number;

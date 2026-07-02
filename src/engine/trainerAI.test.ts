@@ -174,6 +174,39 @@ describe('CH1 floor stamps — BRUISER / SKIRMISHER (docs/trainer-sets-ch1.md)',
   });
 });
 
+// ── Part C — future-adopt Call flags (DATA ONLY, unread by the tree) ─────────
+describe('dormant catalog profiles + future-adopt Call flags', () => {
+  test('the 5 mid/elite profiles encode bond + callUse (dormant — no shipped flag)', () => {
+    const expected: { readonly [id: string]: readonly [string, string] } = {
+      charger: ['mid', 'clutch'],
+      trickster: ['mid', 'liberal'],
+      stonewall: ['high', 'defensive'],
+      drifter: ['mid', 'clutch'],
+      duelist: ['high', 'clutch'],
+    };
+    for (const [id, [bond, callUse]] of Object.entries(expected)) {
+      const p = TRAINER_PROFILES[id]!;
+      expect(p.bond).toBe(bond);
+      expect(p.callUse).toBe(callUse);
+    }
+  });
+
+  test('the info-war / team-tempo Calls are flagged future-adopt but NOT cast now', () => {
+    // trickster (Reactive-lite) adopts the info-war pair; drifter/duelist (+ team).
+    expect(TRAINER_PROFILES.trickster!.futureCalls).toEqual(['readThem', 'throwOff']);
+    expect(TRAINER_PROFILES.duelist!.futureCalls).toContain('comeBack');
+    // …but the tree casts ONLY the classic toolkit — never a future-adopt Call.
+    const future = new Set(['readThem', 'throwOff', 'comeBack']);
+    for (const id of ['trickster', 'drifter', 'duelist'] as const) {
+      const pol = trainerPolicy(TRAINER_PROFILES[id]!);
+      for (let seed = 0; seed < 300; seed += 1) {
+        const a = pol(freshState(), 'foe', mulberry32(seed));
+        if (a.kind === 'call') expect(future.has(a.call)).toBe(false);
+      }
+    }
+  });
+});
+
 describe('release variability (kickoff knob) — fixed-Heavy vs variable feint-mix', () => {
   function midFocus(profile: TrainerProfile, seed: number): Action {
     let s = freshState();
@@ -245,6 +278,99 @@ describe('the engine resolves a TRAINER focus/release the same as the player', (
     expect(rel.kind).toBe('release');
     const r2 = resolveRound(state, { kind: 'move', move: 'TACKLE', stance: 'A' }, rel, mulberry32(2));
     expect(r2.events.some((e) => e.kind === 'release' && e.side === 'foe')).toBe(true);
+  });
+
+  // ── STAGE 2 — trainer Calls resolve FOE-SIDE (symmetry check) ──────────────
+  // The Call machinery (getAway/recover/dodge/fullPower + catchBreath) was built
+  // player-first; a trainer casts these as the FOE, so verify each resolves
+  // correctly on the foe side (no player-side assumption). Catch Breath is
+  // already known-good; the new four are gated here.
+  describe('trainer Calls resolve correctly foe-side (symmetry)', () => {
+    function stateWithFoe(patch: Partial<ReturnType<typeof activeMon>>): BattleState {
+      const s = freshState();
+      return { ...s, foe: setActiveMember(s.foe, { ...activeMon(s.foe), ...patch }) };
+    }
+    const plAttack: Action = { kind: 'move', move: 'TACKLE', stance: 'A' };
+
+    test('foe RECOVER heals the foe and spends ★ (recover event side:foe)', () => {
+      const st = stateWithFoe({ hp: 20, momentum: 2 });
+      const before = activeMon(st.foe);
+      const r = resolveRound(st, plAttack, { kind: 'call', call: 'recover' }, mulberry32(1));
+      expect(r.events.some((e) => e.kind === 'recover' && e.side === 'foe')).toBe(true);
+      const after = activeMon(r.state.foe);
+      expect(after.hp).toBeGreaterThan(before.hp); // healed (then took the player hit)
+      expect(after.momentum).toBe(before.momentum - 1); // ★ spent
+    });
+
+    test('foe DODGE negates the player strike (foe takes 0)', () => {
+      const st = stateWithFoe({ hp: 50, momentum: 1 });
+      const r = resolveRound(st, plAttack, { kind: 'call', call: 'dodge' }, mulberry32(2));
+      const after = activeMon(r.state.foe);
+      expect(after.hp).toBe(50); // clean evade
+      expect(after.momentum).toBe(0);
+    });
+
+    test('foe GET AWAY grazes (takes reduced, not full, damage)', () => {
+      const st = stateWithFoe({ hp: 50, momentum: 1 });
+      const dodged = resolveRound(stateWithFoe({ hp: 50, momentum: 1 }), plAttack, { kind: 'call', call: 'dodge' }, mulberry32(3));
+      const grazed = resolveRound(st, plAttack, { kind: 'call', call: 'getAway' }, mulberry32(3));
+      const gHp = activeMon(grazed.state.foe).hp;
+      expect(gHp).toBeLessThan(50); // took SOME damage (the graze)
+      expect(gHp).toBeLessThan(activeMon(dodged.state.foe).hp); // but a clean dodge takes even less (0)
+    });
+
+    test('foe FULL POWER scales the foe strike and spends 2★ (fullPower event side:foe)', () => {
+      // Player braces (Guard) so it takes the foe's strike — same mitigation in
+      // both runs, isolating the +50%. (rest is illegal with affordable moves.)
+      const plGuard: Action = { kind: 'move', move: 'TACKLE', stance: 'G' };
+      const st = stateWithFoe({ momentum: 2 });
+      const normal = resolveRound(freshState(), plGuard, { kind: 'move', move: 'TACKLE', stance: 'A' }, mulberry32(4));
+      const buffed = resolveRound(st, plGuard, { kind: 'move', move: 'TACKLE', stance: 'A', fullPower: true }, mulberry32(4));
+      expect(buffed.events.some((e) => e.kind === 'fullPower' && e.side === 'foe')).toBe(true);
+      expect(activeMon(buffed.state.foe).momentum).toBe(0); // 2★ spent
+      const nDmg = activeMon(freshState().player).hp - activeMon(normal.state.player).hp;
+      const bDmg = activeMon(freshState().player).hp - activeMon(buffed.state.player).hp;
+      expect(bDmg).toBeGreaterThan(nDmg); // +50% landed on the player
+    });
+  });
+
+  // The reader yardstick never opens a Focus, so the trainer's escape-Calls
+  // (Get Away / Dodge, gated on a feared foe release) can't fire in the sim.
+  // Verify the POLICY selection directly: put the PLAYER mid-focus (about to
+  // release) and confirm the trainer reaches for the right escape by policy.
+  describe('trainer Call POLICY selection (bond-gated toolkit + personality)', () => {
+    function playerWindingUp(profile: TrainerProfile, starForFoe: number): Action {
+      let s = freshState();
+      // Player carries a focus → it RELEASES this round (the foe fears it).
+      s = { ...s, player: setActiveMember(s.player, { ...activeMon(s.player), focus: { stance: 'A' as Stance, move: 'TACKLE' } }) };
+      s = { ...s, foe: setActiveMember(s.foe, { ...activeMon(s.foe), momentum: starForFoe }) };
+      return trainerPolicy(profile)(s, 'foe', mulberry32(1));
+    }
+    const clutch: TrainerProfile = { name: 'C', stance: 'aggressor', twoStep: 'occasional', bond: 'mid', callUse: 'clutch' };
+    const defensive: TrainerProfile = { name: 'D', stance: 'bulwark', twoStep: 'single-only', bond: 'high', callUse: 'defensive' };
+    const liberalFull: TrainerProfile = { name: 'L', stance: 'aggressor', twoStep: 'occasional', bond: 'high', callUse: 'liberal' };
+    const noBond: TrainerProfile = { name: 'N', stance: 'aggressor', twoStep: 'occasional' };
+
+    test('clutch (mid kit) escapes a feared release with GET AWAY', () => {
+      const a = playerWindingUp(clutch, 2);
+      expect(a.kind === 'call' && a.call).toBe('getAway');
+    });
+    test('defensive (full kit) escapes with GET AWAY (never Dodge/Full Power)', () => {
+      const a = playerWindingUp(defensive, 2);
+      expect(a.kind === 'call' && a.call).toBe('getAway');
+    });
+    test('liberal (full kit) escapes with the clean DODGE', () => {
+      const a = playerWindingUp(liberalFull, 2);
+      expect(a.kind === 'call' && a.call).toBe('dodge');
+    });
+    test('a no-bond trainer NEVER Calls (toolkit none) even facing a release', () => {
+      const a = playerWindingUp(noBond, 3);
+      expect(a.kind).not.toBe('call');
+    });
+    test('with 0★ a Call-capable trainer cannot escape (self-gated) → no Call', () => {
+      const a = playerWindingUp(clutch, 0);
+      expect(a.kind).not.toBe('call');
+    });
   });
 
   test('BOTH-focus → the flipped triangle resolves vs a trainer (flipResolve emitted)', () => {

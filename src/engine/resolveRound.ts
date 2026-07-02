@@ -139,7 +139,10 @@ function stripFocus(side: SideState): SideState {
 //   HANG IN THERE = floored at 1 hp.  RECOVER does NOT negate the hit (its heal
 //                 is applied separately, before the strike) → normal damage.
 function applyHp(defHp: number, dmg: number, call: CallKind | null): number {
-  if (call === 'dodge') return defHp;
+  // DODGE + COME BACK both fully negate the incoming hit. COME BACK's evade is
+  // the same clean no-hit, but it REQUIRES a team swap (resolved in the round) —
+  // so it is not a universal dodge (no bench survivor → the Call is unavailable).
+  if (call === 'dodge' || call === 'comeBack') return defHp;
   if (call === 'getAway') return Math.max(0, defHp - dmg * COMBAT.getAwayGraze);
   const hp = defHp - dmg;
   if (call === 'hangInThere') return Math.max(1, hp);
@@ -189,6 +192,36 @@ function applyRecover(
   const healed = Math.min(side.maxHp, side.hp + Math.round(side.maxHp * COMBAT.recoverPct));
   events.push({ kind: 'recover', side: sideKey, healed: healed - side.hp });
   return { ...side, hp: healed };
+}
+
+// SHAKE IT OFF Call (the Calls increment) — the owed CLEANSE: clear the caller's
+// single active debuff and narrate it (statusBreak), applied at call-resolution
+// time (before strikes). No-op for any non-shakeOff call, or a caller with no
+// debuff → other Calls / clean callers are untouched. SPAM-BOUND by the ★-economy
+// (1★ each, cap 3, ★ only from read-wins) — the same throttle as every Call; it
+// is NOT self-escalation-DR'd (that DR covers repeatable STATUS moves, not Calls).
+function applyShakeOff(
+  side: SideState,
+  call: CallKind,
+  sideKey: Side,
+  events: BattleEvent[],
+): SideState {
+  if (call !== 'shakeOff' || side.debuff === undefined) return side;
+  events.push({ kind: 'statusBreak', side: sideKey, status: side.debuff.kind });
+  return clearDebuff(side);
+}
+
+// The stance recorded into this round's history for a side. Single-step moves
+// record their stance; THROW THEM OFF records its player-chosen `plantStance`
+// (the lie a history-reading foe consults); everything else (focus commit,
+// release, other Calls, rest, switch, throwBall) records null. For every action
+// WITHOUT a throwOff plant this is bit-identical to the prior inline expression.
+function recordedStance(action: Action): Stance | null {
+  if (action.kind === 'move' && action.commit !== true) return action.stance;
+  if (action.kind === 'call' && action.call === 'throwOff' && action.plantStance !== undefined) {
+    return action.plantStance;
+  }
+  return null;
 }
 
 function actionStance(action: Action): Stance {
@@ -765,6 +798,20 @@ export function resolveRound(
         pl = { ...pl, momentum: Math.max(0, pl.momentum - eco.cost), lastCall: eco.call };
         events.push({ kind: 'call', side: 'player', call: eco.call });
         pl = applyRecover(pl, eco.call, 'player', events);
+        pl = applyShakeOff(pl, eco.call, 'player', events);
+        // COME BACK — the PROTECTED SWITCH. Persist the recalled mon (with its ★
+        // spent), then swap in `toIndex`; the incoming mon takes the round's hit
+        // NEGATED (applyHp treats comeBack like Dodge), so the swap eats no free
+        // hit. Guarded on a present toIndex → any comeBack without one just
+        // no-op-evades (never a stray swap).
+        if (eco.call === 'comeBack' && playerAction.kind === 'call' && playerAction.toIndex !== undefined) {
+          playerTeam = setActiveMember(playerTeam, pl);
+          const fromIndex = playerTeam.active;
+          events.push({ kind: 'switchOut', side: 'player', fromIndex, species: pl.species.name });
+          playerTeam = { ...playerTeam, active: playerAction.toIndex };
+          pl = activeMon(playerTeam);
+          events.push({ kind: 'switchIn', side: 'player', toIndex: playerAction.toIndex, species: pl.species.name });
+        }
       }
     }
     {
@@ -775,6 +822,15 @@ export function resolveRound(
         foe = { ...foe, momentum: Math.max(0, foe.momentum - eco.cost), lastCall: eco.call };
         events.push({ kind: 'call', side: 'foe', call: eco.call });
         foe = applyRecover(foe, eco.call, 'foe', events);
+        foe = applyShakeOff(foe, eco.call, 'foe', events);
+        if (eco.call === 'comeBack' && foeAction.kind === 'call' && foeAction.toIndex !== undefined) {
+          foeTeam = setActiveMember(foeTeam, foe);
+          const fromIndex = foeTeam.active;
+          events.push({ kind: 'switchOut', side: 'foe', fromIndex, species: foe.species.name });
+          foeTeam = { ...foeTeam, active: foeAction.toIndex };
+          foe = activeMon(foeTeam);
+          events.push({ kind: 'switchIn', side: 'foe', toIndex: foeAction.toIndex, species: foe.species.name });
+        }
       }
     }
     // Stagger consumed this round.
@@ -1187,9 +1243,11 @@ export function resolveRound(
         {
           // FOCUS model — only SINGLE-STEP moves feed thrice-daze; a focus
           // initiation (commit) and a release are commitments, not single-step
-          // stances → recorded as null (calls/rest also null).
-          player: playerAction.kind === 'move' && playerAction.commit !== true ? playerAction.stance : null,
-          foe: foeAction.kind === 'move' && foeAction.commit !== true ? foeAction.stance : null,
+          // stances → recorded as null (calls/rest also null). THROW THEM OFF is
+          // the one Call that records a stance — the player-chosen LIE it plants
+          // (recordedStance); bit-identical for every other action.
+          player: recordedStance(playerAction),
+          foe: recordedStance(foeAction),
         },
       ],
     },

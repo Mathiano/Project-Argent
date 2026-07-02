@@ -296,7 +296,7 @@ export interface BattleSceneOpts {
   readonly rng: RNG;
   readonly chooseFoeAction: (state: BattleState, rng: RNG) => Action;
   readonly intro: readonly string[];
-  // Gates Catch Breath / Get Away / Hang In There (the Warming bond moment).
+  // Gates Catch Breath / Get Away (the Warming bond moment; other Calls gate on bond stage).
   readonly catchBreathUnlocked: boolean;
   // Lane B — the active mon's bond value (0–100), gating the newly-built Calls
   // per CALL_UNLOCK_STAGE (Recover/Dodge/Full Power). Omitted → stage 1 → those
@@ -718,23 +718,29 @@ export interface CallDef {
   // +50% buff and returns to the attack menu to pick the move that gets it.
   // Marked here so the menu dispatches to the arm flow instead of fireCall.
   readonly armsAttack?: boolean;
+  // THROW THEM OFF is a TWO-STEP Call: confirming opens a stance PLANT picker
+  // (which lie to log into history) before it fires.
+  readonly picksStance?: boolean;
+  // COME BACK is a TWO-STEP Call: confirming opens the PARTY picker (which bench
+  // mon to send) before it fires the protected switch.
+  readonly picksSwitch?: boolean;
 }
 export const CALL_SET: readonly CallDef[] = [
   { id: 'catch-breath', name: 'Catch Breath', starCost: 1, built: true, shout: '{MON}, catch your breath!' },
-  // Layer 2 — the two Calls that ESCAPE a committed enemy Charge (the only way
-  // out, never a stance): GET AWAY = guaranteed no-hit; HANG IN THERE = can't
-  // die this round. Both spend 1 ★ and forgo the strike.
+  // Layer 2 — GET AWAY escapes a committed enemy release (1 ★, forgo the strike).
   { id: 'get-away', name: 'Get Away', starCost: 1, built: true, shout: '{MON}, get away!' },
-  // Hang In There (survive-at-1HP) is RETIRED from play (bad design — see
-  // call-effects-design.md). The design repurposes this slot to "Shake It Off"
-  // (clear a status), BLOCKED on the status system → it stays a locked
-  // placeholder. Left as-is here (flag, not force): flipping it broke
-  // battle.test.ts (asserts it selectable); the engine effect stays dormant.
-  { id: 'hang-in', name: 'Hang In There', starCost: 1, built: true, shout: '{MON}, hang in there!' },
+  // The Calls increment — SHAKE IT OFF: the owed CLEANSE, filling the retired
+  // Hang In There slot (its survive-at-1HP effect is now the bond-MOMENT). Clears
+  // the active debuff via the engine's clearDebuff. Bond-gated (CALL_UNLOCK_STAGE).
+  { id: 'shake-off', name: 'Shake It Off', starCost: 1, built: true, shout: '{MON}, shake it off!' },
   // Lane B — newly BUILT. Bond-tier gated (see CALL_UNLOCK_STAGE); each spends ★.
   { id: 'recover', name: 'Recover', starCost: 1, built: true, shout: 'Easy, {MON} — recover!' },
   { id: 'dodge', name: 'Dodge', starCost: 1, built: true, shout: '{MON}, dodge it!' },
   { id: 'full-power', name: 'Full Power', starCost: 2, built: true, shout: 'Now — {MON}, full power!', armsAttack: true },
+  // The Calls increment — the INFO-WAR pair + the TEAM-TEMPO lane (all ★1).
+  { id: 'read-them', name: 'Read Them', starCost: 1, built: true, shout: '{MON}, read them!' },
+  { id: 'throw-off', name: 'Throw Them Off', starCost: 1, built: true, shout: '{MON}, throw them off!', picksStance: true },
+  { id: 'come-back', name: 'Come Back', starCost: 1, built: true, shout: '{MON}, come back!', picksSwitch: true },
 ];
 
 // Lane B — the bond-stage at which each newly-built Call unlocks (the real,
@@ -745,9 +751,15 @@ export const CALL_SET: readonly CallDef[] = [
 // PLACEMENT IS A TUNING DETAIL (bond-track-v2 leaves exact stage→Call to
 // Mathias) — data here so a retune is a one-line change, not a rewrite.
 const CALL_UNLOCK_STAGE: { readonly [id: string]: number } = {
+  'shake-off': 3, // the owed cleanse — arrives with the status era
   recover: 3,
   dodge: 4,
   'full-power': 5,
+  // The Calls increment — the info-war + team-tempo lanes (placement is a TUNING
+  // detail; the info-war pair is the higher-skill spend, the team lane mid-bond).
+  'read-them': 4,
+  'throw-off': 5,
+  'come-back': 4,
 };
 
 export function callShout(call: CallDef, monName: string): string {
@@ -800,6 +812,16 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       degradeIntent(foeAct, activeMon(state.foe).species.name, bondTellReliability(reliability), intentRng, opts.foeFocusInfo),
       foeAct,
     );
+  // READ THEM (the Calls increment) — the HONEST intent line, bypassing BOTH the
+  // stance degradation (reliability → 'honest') AND the foe's focus info-discipline
+  // (forced 'open') for this one round. Presentation-only: it reads the true
+  // committed foeAction, never feeds the engine (the 'readThem' Call is inert).
+  const honestIntentLine = (foeAct: Action): string | null => {
+    const openFocus = opts.foeFocusInfo
+      ? { ...opts.foeFocusInfo, discipline: 'open' as InfoLevel }
+      : undefined;
+    return degradeIntent(foeAct, activeMon(state.foe).species.name, 'honest', intentRng, openFocus).line;
+  };
   let shownIntent: ShownIntent = bondIntent(foeAction);
   let display: Display = {
     player: snapshot(activeMon(state.player)),
@@ -826,7 +848,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let situationAlpha = 0;
   const SITUATION_FADE_SEC = 0.18; // fade-in/out speed; the dwell is the beat hold
 
-  let phase: 'text' | 'menu' | 'move' | 'call' | 'release' | 'spare' | 'party' | 'resolve' | 'end' = 'text';
+  let phase: 'text' | 'menu' | 'move' | 'call' | 'release' | 'throwoff' | 'spare' | 'party' | 'resolve' | 'end' = 'text';
+  // THROW THEM OFF — the stance-plant picker cursor (indexes STANCES).
+  let throwOffCursor = 0;
   // Phase 6a catch state (wild only). pendingReadWindow = a player
   // read-win opened a 1-round window last round; wariness rises on
   // out-of-window throws → flee telegraph; spareCursor drives the
@@ -843,7 +867,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // next mon — choosing the next survivor is a tactical READ per the
   // Phase 1 ruling, not just a confirmation). On a forced switch we
   // resume the resolve drain after the player confirms.
-  let partyMode: 'voluntary' | 'forced' | null = null;
+  let partyMode: 'voluntary' | 'forced' | 'comeback' | null = null;
   let partyCursor = 0;
   let resumeResolveAfterParty = false;
   // Dismissable dialogs (e.g. "Calls unlock", "Too winded") let B back
@@ -1429,6 +1453,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         : ev.call === 'hangInThere' ? 'HANG IN THERE'
         : ev.call === 'recover' ? 'RECOVER'
         : ev.call === 'resolve' ? 'RESOLVE'
+        : ev.call === 'shakeOff' ? 'SHAKE IT OFF'
+        : ev.call === 'readThem' ? 'READ THEM'
+        : ev.call === 'throwOff' ? 'THROW THEM OFF'
+        : ev.call === 'comeBack' ? 'COME BACK'
         : 'DODGE';
       calloutLine = `${label}!`;
       pushLog(`${who}: ${label}! (★ spent)`);
@@ -1867,7 +1895,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     const m = team.members[idx];
     if (!m) return false;
     if (m.hp <= 0) return false;
-    if (partyMode === 'voluntary' && idx === team.active) return false;
+    if ((partyMode === 'voluntary' || partyMode === 'comeback') && idx === team.active) return false;
     return true;
   }
 
@@ -1915,6 +1943,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       if (partyMode === 'voluntary') {
         partyMode = null;
         phase = 'menu';
+      } else if (partyMode === 'comeback') {
+        partyMode = null;
+        phase = 'call'; // back out to the Call submenu
       }
     } else if (key === 'a' || key === 'start') {
       if (!isPartySelectable(partyCursor)) return;
@@ -1923,6 +1954,18 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       if (mode === 'voluntary') {
         // Switching is a turn action — commit it and the round resolves.
         commit({ kind: 'switch', toIndex: partyCursor });
+        return;
+      }
+      if (mode === 'comeback') {
+        // COME BACK — the PROTECTED switch (a ★-Call). Shout (recalling the
+        // OUTGOING mon), then commit; the incoming mon eats no free hit (engine-
+        // negated). toIndex is the chosen bench mon.
+        const cb = CALL_SET.find((c) => c.id === 'come-back')!;
+        const toIndex = partyCursor;
+        playerParticipated.add(toIndex); // the mon brought in fought
+        setText([callShout(cb, monDisplayName(activeMon(state.player)))], () =>
+          commit({ kind: 'call', call: 'comeBack', toIndex }),
+        );
         return;
       }
       if (mode === 'forced') {
@@ -2049,9 +2092,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (!call.built) return false;
     // Dev/playtest override (?calls=all) — unlock every built Call now.
     if (opts.devUnlockAllCalls) return true;
-    // Catch Breath + the two Layer-2 escape Calls unlock together (the run's
-    // Calls-unlocked gate ≈ the Warming bond moment); they each still cost ★.
-    if (call.id === 'catch-breath' || call.id === 'get-away' || call.id === 'hang-in') {
+    // Catch Breath + Get Away unlock together (the run's Calls-unlocked gate ≈
+    // the Warming bond moment); they each still cost ★. Everything else gates on
+    // the active mon's bond STAGE (CALL_UNLOCK_STAGE below).
+    if (call.id === 'catch-breath' || call.id === 'get-away') {
       return opts.catchBreathUnlocked;
     }
     // Lane B — the newly-built Calls gate on the active mon's bond STAGE
@@ -2085,9 +2129,17 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     setText([callShout(call, monName)], () => {
       if (call.id === 'catch-breath') commit({ kind: 'catchBreath' });
       else if (call.id === 'get-away') commit({ kind: 'call', call: 'getAway' });
-      else if (call.id === 'hang-in') commit({ kind: 'call', call: 'hangInThere' });
+      else if (call.id === 'shake-off') commit({ kind: 'call', call: 'shakeOff' });
       else if (call.id === 'recover') commit({ kind: 'call', call: 'recover' });
       else if (call.id === 'dodge') commit({ kind: 'call', call: 'dodge' });
+      else if (call.id === 'read-them') {
+        // READ THEM — buy the truth: reveal the foe's HONEST intent this round
+        // (bypassing degradeIntent's degradation AND the foe info-discipline),
+        // then the KNOW-vs-ACT Call resolves (forgoes the strike). Presentation
+        // only — the engine 'readThem' Call is inert (see types.ts).
+        const honest = honestIntentLine(foeAction) ?? `${activeMon(state.foe).species.name} — nothing hidden.`;
+        setText([honest], () => commit({ kind: 'call', call: 'readThem' }));
+      }
       else phase = 'menu';
     });
   }
@@ -2126,8 +2178,42 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         return;
       }
       if (call.armsAttack) armFullPower(call);
+      else if (call.picksStance) openThrowOff(call);
+      else if (call.picksSwitch) openComeBack(call);
       else fireCall(call);
     }
+  }
+
+  // THROW THEM OFF — the two-step plant: pick WHICH stance to log into history
+  // (the lie a history-reading foe consults), then fire.
+  function openThrowOff(_call: CallDef): void {
+    throwOffCursor = 0;
+    phase = 'throwoff';
+  }
+  function handleThrowOffInput(key: InputKey): void {
+    if (key === 'up') { throwOffCursor = (throwOffCursor + STANCES.length - 1) % STANCES.length; emitGameEvent({ kind: 'menu-move' }); }
+    else if (key === 'down') { throwOffCursor = (throwOffCursor + 1) % STANCES.length; emitGameEvent({ kind: 'menu-move' }); }
+    else if (key === 'b') phase = 'call';
+    else if (key === 'a' || key === 'start') {
+      const call = CALL_SET.find((c) => c.id === 'throw-off')!;
+      const plant = STANCES[throwOffCursor]!;
+      setText([callShout(call, monDisplayName(activeMon(state.player)))], () =>
+        commit({ kind: 'call', call: 'throwOff', plantStance: plant }),
+      );
+    }
+  }
+
+  // COME BACK — the two-step protected switch: pick WHICH bench mon to send, then
+  // fire (the incoming mon eats no free hit — engine-negated). Needs a bench
+  // survivor (its value is the swap, not a universal evade).
+  function openComeBack(_call: CallDef): void {
+    if (!hasBenchSurvivor(state.player)) {
+      setText(['No other mon', 'to bring in!'], () => { phase = 'call'; }, { dismissable: true });
+      return;
+    }
+    partyMode = 'comeback';
+    partyCursor = stepPartyCursor(state.player.active, 1);
+    phase = 'party';
   }
 
   function handleTextInput(key: InputKey): void {
@@ -2730,18 +2816,19 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function drawBottomCall(ctx: CanvasRenderingContext2D): void {
     drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
-    // Two columns (the full set is 6) so the player sees the Calls they
-    // grow into. Locked + unaffordable render greyed; only Catch Breath
-    // is selectable for now.
+    // Two columns (the full set is 9 — the classic kit + the info-war/tempo
+    // lanes) so the player sees the Calls they grow into. Locked + unaffordable
+    // render greyed; the cursor skips locked rows.
+    const perCol = Math.ceil(CALL_SET.length / 2); // 5 left, 4 right
     CALL_SET.forEach((call, i) => {
       const unlocked = callUnlocked(call);
       const greyed = !unlocked || !callAffordable(call);
       const color = greyed ? PALETTE.frameInkDim : PALETTE.frameInk;
-      const col = i < 3 ? 0 : 1;
-      const row = i % 3;
+      const col = i < perCol ? 0 : 1;
+      const row = i < perCol ? i : i - perCol;
       const x = BOTTOM.x + 16 + col * 306;
-      const y = BOTTOM.y + 14 + row * 20;
-      if (callCursor === i) drawRowHighlight(ctx, x - 4, y - 2, 300, 19);
+      const y = BOTTOM.y + 10 + row * 18;
+      if (callCursor === i) drawRowHighlight(ctx, x - 4, y - 2, 300, 17);
       const marker = callCursor === i ? '>' : ' ';
       const tag = !unlocked ? ' ·LOCKED' : '';
       drawText(ctx, `${marker}${call.name}${tag}`, x, y, color);
@@ -2754,6 +2841,24 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       BOTTOM.y + BOTTOM.h - 18,
       PALETTE.frameInkDim,
     );
+  }
+
+  // THROW THEM OFF — the stance-plant picker. The player chooses which STANCE to
+  // log into history as a lie (the surface a history-reading foe consults).
+  function drawBottomThrowOff(ctx: CanvasRenderingContext2D): void {
+    drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+    drawText(ctx, 'THROW THEM OFF — plant a false read', BOTTOM.x + 16, BOTTOM.y + 12, PALETTE.frameInk);
+    drawText(ctx, 'Which stance should they THINK you played?', BOTTOM.x + 16, BOTTOM.y + 30, PALETTE.frameInkSoft);
+    const labels: { readonly [k in Stance]: string } = {
+      A: 'AGGRESSIVE', G: 'GUARD', F: 'FLUID',
+    };
+    STANCES.forEach((s, i) => {
+      const y = BOTTOM.y + 52 + i * 18;
+      const on = throwOffCursor === i;
+      if (on) drawRowHighlight(ctx, BOTTOM.x + 12, y - 2, 300, 17);
+      drawText(ctx, `${on ? '>' : ' '}Feign ${labels[s]}`, BOTTOM.x + 16, y, on ? PALETTE.frameInk : PALETTE.frameInkSoft);
+    });
+    drawText(ctx, 'A=plant · B back', BOTTOM.x + 16, BOTTOM.y + BOTTOM.h - 18, PALETTE.frameInkDim);
   }
 
   function drawBottomSpare(ctx: CanvasRenderingContext2D): void {
@@ -2904,6 +3009,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         handleReleaseInput(key);
         return;
       }
+      if (phase === 'throwoff') {
+        handleThrowOffInput(key);
+        return;
+      }
       if (phase === 'spare') {
         handleSpareInput(key);
         return;
@@ -2962,7 +3071,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       drawStatusChips(ctx, FOE_PANEL.x + 72, FOE_PANEL.y + 7, sideChips(activeMon(state.foe)), FOE_PANEL.x + 146);
       drawStatusChips(ctx, PL_PANEL.x + 72, PL_PANEL.y + 7, sideChips(activeMon(state.player)), PL_PANEL.x + 146);
 
-      if (phase === 'menu' || phase === 'move' || phase === 'call' || phase === 'release') drawIntent(ctx);
+      if (phase === 'menu' || phase === 'move' || phase === 'call' || phase === 'release' || phase === 'throwoff') drawIntent(ctx);
       // S1 — the read-war callout occupies the intent slot during resolve. Drawn
       // whenever it's visible (situationAlpha > 0) so its fade-out completes even
       // a beat or two after resolve ends; drawCallout no-ops when faded out.
@@ -2981,6 +3090,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       else if (phase === 'move') drawBottomMoves(ctx);
       else if (phase === 'call') drawBottomCall(ctx);
       else if (phase === 'release') drawBottomRelease(ctx);
+      else if (phase === 'throwoff') drawBottomThrowOff(ctx);
       else if (phase === 'spare') drawBottomSpare(ctx);
       else if (phase === 'party') drawBottomParty(ctx);
       else if (phase === 'resolve' || phase === 'end') drawBottomLog(ctx);

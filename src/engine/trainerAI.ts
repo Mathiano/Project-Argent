@@ -14,6 +14,7 @@
 // DATA with hooks in the tree — their behavior lands in later stages (per the
 // catalog's mid/elite tiers).
 
+import { COMBAT } from './config';
 import {
   affordableAttacks,
   affordableMoves,
@@ -81,6 +82,13 @@ export interface TrainerProfile {
   readonly terrain?: string;
   // 8. ADAPTIVITY — reads the player back. [DATA; behavior Stage 2/3]
   readonly adaptive?: boolean;
+  // FUTURE-ADOPT Calls (Part C) — DATA ONLY, UNREAD by the tree this increment.
+  // The trainer casts only the CLASSIC toolkit now (trainerCall below). The
+  // info-war pair (readThem/throwOff) enters trainer policy at part-B/Reactive
+  // (a trainer READ THEM has nothing to act on until Reactive reads exist);
+  // COME BACK enters when multi-mon trainer switching AI lands. Flagged here so
+  // that increment ADOPTS by reading this field, not by re-deciding per profile.
+  readonly futureCalls?: readonly ('readThem' | 'throwOff' | 'comeBack')[];
 }
 
 // Base-stance weights [A, G, F] per stance tendency.
@@ -183,6 +191,69 @@ function avoidSelfDaze(want: Stance, state: BattleState, side: Side): Stance {
   return want;
 }
 
+// HP fraction at/below which a clutch/defensive trainer reaches for RECOVER.
+const TRAINER_RECOVER_HP_PCT = 0.4;
+
+// ── STAGE 2 — bond-gated trainer Calls ──────────────────────────────────────
+// A trainer's Call TOOLKIT is gated by its bond with its mon, and its SPENDING
+// PERSONALITY by callUse — same ★ costs as the player (symmetric + baitable):
+//   TOOLKIT   none → no Calls · mid → Catch Breath + Get Away · high → the full
+//             classic kit (+ Recover, Dodge, Full Power).
+//   PERSONALITY  clutch  hoards ★ (escape a feared release; heal only when low;
+//                        bank ST when winded) · liberal spends freely (Dodge on
+//                        a feared release; Full Power dump — in the tree) ·
+//                        defensive survival-only (Get Away / Recover / Catch
+//                        Breath, NEVER Full Power).
+// PLAYER-EXCLUSIVE mechanics (bond JUMPSTART, the bond-MOMENT) are SideState
+// flags the game arms, never foe Actions — so there is nothing to gate foe-side.
+// The three player-exclusive Calls (readThem/throwOff/comeBack) are Part-B/-C
+// future-adopt (futureCalls) — a trainer casts none of them this increment.
+//
+// DETERMINISTIC (no RNG) so a profile's Call behavior is CONSISTENT — the sprite
+// tell extends to Calls. GATED on bond mid/high FIRST → a no-bond trainer takes
+// this branch to `null` drawing ZERO rng, so every shipped (no-bond) trainer is
+// bit-identical. Returns a Call Action, or null to fall through to normal play.
+// (Full Power is a fullPower MOVE, not a Call → handled in the tree where the
+// affordable ATTACK pool is known.)
+function trainerCall(profile: TrainerProfile, state: BattleState, side: Side): Action | null {
+  const bond = profile.bond;
+  if (bond !== 'mid' && bond !== 'high') return null; // toolkit: none → no Calls
+  const use = profile.callUse;
+  if (use === undefined || use === 'never') return null;
+  const me = activeMon(state[side]);
+  if (me.exhausted) return null; // the engine forbids a Call / Catch Breath while exhausted
+  if (me.momentum < 1) return null; // every Call costs ≥1★
+  const opp = activeMon(state[side === 'player' ? 'foe' : 'player']);
+  const full = bond === 'high'; // the full classic kit (Recover / Dodge / Full Power)
+  // The opponent carries a focus → it RELEASES this round; escape the hit.
+  const oppReleasing = opp.focus !== undefined;
+  const lowHp = me.hp <= me.maxHp * TRAINER_RECOVER_HP_PCT;
+
+  // Escape a feared release: liberal spends the clean DODGE (full kit); everyone
+  // else the cheaper GET AWAY graze (mid kit). (Reader-bot's proven escape logic.)
+  if (oppReleasing) {
+    return full && use === 'liberal'
+      ? { kind: 'call', call: 'dodge' }
+      : { kind: 'call', call: 'getAway' };
+  }
+  // Survival heal — RECOVER is HELD from the trainer kit this increment (a
+  // deliberate hold, per the standing rule). SIM FINDING: a 50%-maxHP heal is
+  // NOT bounded by the #5 self-escalation DR (Recover is a ★-Call, not a self-
+  // escalation STATUS), and vs the reader it makes a high-bond clutch/defensive
+  // profile a 93–96% WALL (well above the fair 20–75% band) — a single decisive
+  // heal on an already-mitigating profile, not a loop. Recover ADOPTION waits on
+  // a foe-side BOUND (the "hard cooldown" config already banks — a design call
+  // for Mathias). The gate below is retained (dead) so it re-enables in one line.
+  const RECOVER_ADOPTED = false; // ← flip when Recover gets its foe-side bound
+  if (RECOVER_ADOPTED && full && lowHp && (use === 'clutch' || use === 'defensive')) {
+    return { kind: 'call', call: 'recover' };
+  }
+  // Bank stamina when winded (UNIFIES the existing stamina-aware Catch Breath —
+  // a bond trainer routes through here; a no-bond two-stepper through the tree).
+  if (isWinded(me)) return { kind: 'catchBreath' };
+  return null;
+}
+
 // The shared decision tree (the IF-THEN logic from the design doc, Stage-1
 // dimensions only), parameterized by a profile.
 export function trainerPolicy(profile: TrainerProfile): TrainerPolicy {
@@ -199,8 +270,11 @@ export function trainerPolicy(profile: TrainerProfile): TrainerPolicy {
       return { kind: 'release', release: pickRelease(profile.release, me.focus.stance, rng) };
     }
 
-    // 1. THREAT CHECK (Call) — STAGE 2 hook: bond-gated Calls (escape a feared
-    //    player Charge) go here, gated on profile.bond + profile.callUse.
+    // 1. THREAT / CALL CHECK (Stage 2) — bond-gated Calls (escape a feared
+    //    release, heal when low, bank stamina when winded), gated on
+    //    profile.bond + profile.callUse. No-bond → null (bit-identical, no rng).
+    const call = trainerCall(profile, state, side);
+    if (call) return call;
     // 3. READ THE PLAYER — STAGE 2/3 hook: a profile.adaptive trainer biases
     //    toward the counter of the player's recent pattern here.
 
@@ -219,6 +293,20 @@ export function trainerPolicy(profile: TrainerProfile): TrainerPolicy {
     const aff = affordableMoves(me);
     if (aff.length === 0) return { kind: 'rest' };
     const atk = affordableAttacks(me); // damage picks are ATTACKS only
+
+    // FULL POWER dump (liberal, full kit) — a liberal high-bond trainer "rarely
+    // banks past 2★": on an attack round with ≥fullPowerCost ★ it spends them on
+    // a +50% strike instead of hoarding. A fullPower MOVE (engine resolves it
+    // foe-side via foeStrikeMult), never a release. Gated on high-bond+liberal →
+    // dead for every shipped (no-bond) trainer → bit-identical.
+    if (
+      profile.bond === 'high' &&
+      profile.callUse === 'liberal' &&
+      atk.length > 0 &&
+      me.momentum >= COMBAT.fullPowerCost
+    ) {
+      return { kind: 'move', move: pickSustainableMove(atk), stance: 'A', fullPower: true };
+    }
 
     // 4. ESCALATION CHECK — two-step roll per tendency. A focus commits a base
     //    stance tied to the release model's SIGNATURE (or a drawn stance when
@@ -285,6 +373,37 @@ export const TRAINER_PROFILES: { readonly [id: string]: TrainerProfile } = {
   // bond-factor 0.85 is the bespoke team modifier (applied at team build, not
   // here). Knobs match the floor Aggressor today; kept distinct for the arc.
   kamon: { name: 'KAMON', stance: 'aggressor', twoStep: 'single-only', infoLevel: 'open' },
+  // ── DORMANT mid/elite catalog profiles (docs/trainer-archetype-catalog.md) ──
+  // Bond + callUse ENCODED as data so the Call system has real trainers to drive
+  // when they're wired (the mid/elite tiers stamp later). NOT in
+  // TRAINER_PROFILE_BY_FLAG → no shipped trainer uses them → the CH1 ladders stay
+  // bit-identical. `futureCalls` (Part C) flags the Reactive/team-tempo Calls a
+  // profile ADOPTS in a later increment (unread now). adaptive is likewise DATA.
+  charger: {
+    name: 'CHARGER', stance: 'aggressor', twoStep: 'signature',
+    release: { feintRate: 0.35, signature: 'heavy' }, infoLevel: 'veiled',
+    bond: 'mid', callUse: 'clutch',
+  },
+  trickster: {
+    name: 'TRICKSTER', stance: 'evader', twoStep: 'signature',
+    release: { feintRate: 0.35, signature: 'feint' }, infoLevel: 'veiled',
+    bond: 'mid', callUse: 'liberal', adaptive: true, futureCalls: ['readThem', 'throwOff'],
+  },
+  stonewall: {
+    name: 'STONEWALL', stance: 'bulwark', twoStep: 'occasional',
+    release: { feintRate: 0.3, signature: 'heavy' }, infoLevel: 'veiled',
+    bond: 'high', callUse: 'defensive',
+  },
+  drifter: {
+    name: 'DRIFTER', stance: 'balanced', twoStep: 'occasional',
+    release: { feintRate: 0.3, signature: 'heavy' }, infoLevel: 'veiled',
+    bond: 'mid', callUse: 'clutch', adaptive: true, futureCalls: ['readThem', 'throwOff', 'comeBack'],
+  },
+  duelist: {
+    name: 'DUELIST', stance: 'evader', twoStep: 'frequent',
+    release: { feintRate: 0.3, signature: 'heavy' }, infoLevel: 'veiled',
+    bond: 'high', callUse: 'clutch', adaptive: true, futureCalls: ['readThem', 'throwOff', 'comeBack'],
+  },
 };
 
 // Which trainer (by its overworld win-flag) gets which profile. The game maps a

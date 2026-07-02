@@ -310,6 +310,20 @@ export function validateActionTeam(team: Team, action: Action): void {
     if (target.hp <= 0) throw new Error('Cannot switch to fainted mon');
     return;
   }
+  // COME BACK — the protected switch (a Call carrying a team target). It needs
+  // the same target checks as a plain switch AND the active mon's Call gate
+  // (≥1★, not exhausted). Distinguishes the Call from a universal dodge: no
+  // valid bench target → the Call is illegal (its value IS the team swap).
+  if (action.kind === 'call' && action.call === 'comeBack') {
+    if (action.toIndex === undefined) throw new Error('Come Back needs a switch target');
+    if (action.toIndex < 0 || action.toIndex >= team.members.length) {
+      throw new Error(`Come Back target ${action.toIndex} out of range`);
+    }
+    if (action.toIndex === team.active) throw new Error('Cannot Come Back to the active mon');
+    if (team.members[action.toIndex]!.hp <= 0) throw new Error('Cannot Come Back to a fainted mon');
+    validateAction(activeMon(team), action); // the ★ / exhaustion Call gate
+    return;
+  }
   validateAction(activeMon(team), action);
 }
 

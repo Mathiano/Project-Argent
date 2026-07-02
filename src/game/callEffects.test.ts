@@ -182,16 +182,24 @@ describe('Recover message (Fix 2) — no raw decimal', () => {
   });
 });
 
-describe('Shake It Off — repurpose deferred (flag only, not built)', () => {
-  test('no Shake It Off Call is wired; the Hang In There slot is the placeholder', () => {
-    expect(CALL_SET.some((c) => /shake/i.test(c.name))).toBe(false);
-    expect(CALL_SET.some((c) => c.id === 'hang-in')).toBe(true);
+describe('The Calls increment — Shake It Off filled + info-war/tempo lanes BUILT', () => {
+  test('Shake It Off now fills the retired Hang In There slot (built)', () => {
+    expect(CALL_SET.some((c) => c.id === 'shake-off' && c.built)).toBe(true);
+    expect(CALL_SET.some((c) => c.id === 'hang-in')).toBe(false); // retired from the UI
   });
 
-  test('Recover / Dodge / Full Power are now BUILT', () => {
+  test('Recover / Dodge / Full Power are BUILT', () => {
     const built = (id: string) => CALL_SET.find((c) => c.id === id)?.built === true;
     expect(built('recover')).toBe(true);
     expect(built('dodge')).toBe(true);
     expect(built('full-power')).toBe(true);
+  });
+
+  test('the four new Calls are BUILT (Read Them / Throw Them Off / Come Back / Shake It Off)', () => {
+    for (const id of ['read-them', 'throw-off', 'come-back', 'shake-off']) {
+      expect(CALL_SET.find((c) => c.id === id)?.built).toBe(true);
+    }
+    // The full roster is 9 (two columns of 4–5).
+    expect(CALL_SET.length).toBe(9);
   });
 });

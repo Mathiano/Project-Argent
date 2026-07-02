@@ -568,6 +568,10 @@ interface SceneBuildOpts {
   readonly intro?: readonly string[];
   readonly foeAction?: Action;
   readonly onResolve?: (w: 'player' | 'foe') => void;
+  // The Calls increment — extra passthroughs for the new Call flows.
+  readonly devUnlockAllCalls?: boolean;
+  readonly foeFocusInfo?: FocusIntentInfo;
+  readonly bench?: boolean; // add a 2nd player mon (for COME BACK)
 }
 
 function buildScene(opts: SceneBuildOpts = {}): {
@@ -576,8 +580,9 @@ function buildScene(opts: SceneBuildOpts = {}): {
 } {
   const player = CH1.GRUBLEAF!;
   const foe = CH1.FLITPECK!;
+  const members = opts.bench ? [createSide(player), createSide(SPECIES.EMBERCUB!)] : [createSide(player)];
   let state = createBattleState(
-    createTeam([createSide(player)]),
+    createTeam(members),
     createTeam([createSide(foe)]),
   );
   if (opts.playerPatch) {
@@ -592,6 +597,8 @@ function buildScene(opts: SceneBuildOpts = {}): {
     intro: opts.intro ?? [],
     catchBreathUnlocked: opts.catchBreathUnlocked ?? false,
     canRun: opts.canRun ?? true,
+    ...(opts.devUnlockAllCalls ? { devUnlockAllCalls: true } : {}),
+    ...(opts.foeFocusInfo ? { foeFocusInfo: opts.foeFocusInfo } : {}),
     onResolve: (w) => {
       resolved.winner = w;
       opts.onResolve?.(w);
@@ -599,6 +606,106 @@ function buildScene(opts: SceneBuildOpts = {}): {
   });
   return { scene, resolved };
 }
+
+// ── The Calls increment — the four new player-Call FLOWS ─────────────────────
+describe('The Calls increment — new player Call flows', () => {
+  // Navigate FIGHT menu → CALL submenu → step callCursor to a target Call by name.
+  function openCallOn(scene: ReturnType<typeof createBattleScene>, name: string): RecordingCtx {
+    scene.input?.('down'); // CALL row
+    scene.input?.('a'); // open submenu
+    const ctx = stubCtx();
+    for (let i = 0; i < 12; i += 1) {
+      ctx.reset();
+      scene.draw(ctx);
+      if (ctx.texts.join('|').includes(`>${name}`)) return ctx;
+      scene.input?.('down');
+    }
+    return ctx;
+  }
+
+  test('READ THEM reveals the foe HONEST intent even through OPAQUE focus discipline', () => {
+    const { scene } = buildScene({
+      catchBreathUnlocked: true,
+      devUnlockAllCalls: true,
+      playerPatch: { momentum: 2 },
+      foeAction: { kind: 'move', move: 'TACKLE', stance: 'A', commit: true }, // foe FOCUSES
+      foeFocusInfo: { discipline: 'opaque', releases: ['heavy'] },
+    });
+    const ctx = openCallOn(scene, 'Read Them');
+    expect(ctx.texts.join('|')).toContain('>Read Them');
+    scene.input?.('a'); // shout
+    scene.input?.('a'); // advance shout → the honest reveal line
+    ctx.reset();
+    scene.draw(ctx);
+    // Opaque would read "is FOCUSING" / "gathering"; the honest bypass reveals the
+    // open focus tell ("charging to …"). So the reveal must NOT be the opaque line.
+    const screen = ctx.texts.join('|');
+    expect(screen).toContain('charging');
+  });
+
+  test('THROW THEM OFF opens the stance-plant picker; confirming resolves the round', () => {
+    const { scene } = buildScene({ catchBreathUnlocked: true, devUnlockAllCalls: true, playerPatch: { momentum: 2 } });
+    openCallOn(scene, 'Throw Them Off');
+    scene.input?.('a'); // open the plant picker
+    let ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('plant a false read');
+    scene.input?.('down'); // pick a different stance (Guard)
+    scene.input?.('a'); // shout → commit throwOff
+    scene.input?.('a'); // advance the shout
+    // The round resolved (we left the picker into the resolve/log flow).
+    ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).not.toContain('plant a false read');
+  });
+
+  test('THROW THEM OFF can be backed out of (B → Call submenu)', () => {
+    const { scene } = buildScene({ catchBreathUnlocked: true, devUnlockAllCalls: true, playerPatch: { momentum: 2 } });
+    openCallOn(scene, 'Throw Them Off');
+    scene.input?.('a'); // open picker
+    scene.input?.('b'); // back out
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('Throw Them Off'); // back in the Call submenu
+  });
+
+  test('COME BACK opens the party picker and swaps in the bench mon', () => {
+    const { scene } = buildScene({ catchBreathUnlocked: true, devUnlockAllCalls: true, bench: true, playerPatch: { momentum: 2 } });
+    openCallOn(scene, 'Come Back');
+    scene.input?.('a'); // open the party picker (has a bench survivor)
+    scene.input?.('a'); // pick the bench mon → shout
+    scene.input?.('a'); // advance the shout → commit comeBack
+    // Drain the resolve; the incoming mon (EMBERCUB) should now be active.
+    for (let i = 0; i < 60; i += 1) {
+      scene.update?.(0.2);
+      const ctx = stubCtx();
+      scene.draw(ctx);
+      if (ctx.texts.join('|').includes('EMBERCUB')) { expect(true).toBe(true); return; }
+      scene.input?.('a');
+    }
+    throw new Error('COME BACK did not surface the swapped-in mon');
+  });
+
+  test('COME BACK is unavailable with no bench survivor (toast, no crash)', () => {
+    const { scene } = buildScene({ catchBreathUnlocked: true, devUnlockAllCalls: true, playerPatch: { momentum: 2 } }); // 1-mon team
+    openCallOn(scene, 'Come Back');
+    scene.input?.('a'); // attempt → should toast, not open a picker
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).toContain('No other mon');
+  });
+
+  test('SHAKE IT OFF is selectable when unlocked and fires without crashing', () => {
+    const { scene } = buildScene({ catchBreathUnlocked: true, devUnlockAllCalls: true, playerPatch: { momentum: 2 } });
+    const ctx = openCallOn(scene, 'Shake It Off');
+    expect(ctx.texts.join('|')).toContain('>Shake It Off');
+    scene.input?.('a'); // shout
+    scene.input?.('a'); // commit shakeOff → resolve
+    ctx.reset();
+    scene.draw(ctx);
+    expect(ctx.texts.join('|')).not.toContain('>Shake It Off'); // left the submenu
+  });
+});
 
 function drainResolve(scene: ReturnType<typeof createBattleScene>): void {
   // Resolve presents one beat at a time. ROUTINE beats auto-advance; the
@@ -706,10 +813,14 @@ describe('battle menu — CALL paths (Call-menu sprint: submenu + shout + exit)'
     scene.draw(ctx);
     screen = ctx.texts.join('|');
     expect(screen).toContain('>Get Away');
+    // Shake It Off (the repurposed slot) is bond-gated → renders LOCKED at bond 0.
+    expect(screen).toContain('Shake It Off ·LOCKED');
+    // Only Catch Breath + Get Away are unlocked here, so DOWN WRAPS back to the
+    // top (the cursor skips every locked row: Shake It Off / Recover / … / Come Back).
     scene.input?.('down');
     ctx.reset();
     scene.draw(ctx);
-    expect(ctx.texts.join('|')).toContain('>Hang In There');
+    expect(ctx.texts.join('|')).toContain('>Catch Breath');
   });
 
   test('Catch Breath resolves with a VISIBLE stamina effect (+50) — legibility (S4)', () => {
