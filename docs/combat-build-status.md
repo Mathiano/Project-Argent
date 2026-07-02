@@ -2,6 +2,13 @@
 
 **Status:** The mechanical combat **SYSTEM is COMPLETE.** The effect-move/status layer, the momentum spine (Spine-1 phased-unlock + Spine-2 behind-penalty — Spine-3's hard ceiling was DROPPED, folded into HP-tuning), the two-pool move model (Part A), and Updraft are all shipped and sim-gated; tempo (UPHEAVAL/TREMOR) is CUT. Everything remaining is **content, UI, and tuning**: the 640×360 battle UI, the stat-foundation (which now also carries one-shot prevention), and the holistic balance pass. This doc is the running checkpoint; **the ordered plan lives in `docs/combat-roadmap.md`** (this doc is the "what happened + why + what's banked" companion).
 
+> **⛳ COMBAT CLOSED at `70e229b`** (bond-in-combat — the final combat addition before content). Tuning pass #5 finalized balance (the 6 quarantines killed via self-escalation diminishing-returns); per-mon stamina + the bond-in-combat layer (bond-tells + the bond-moment) landed on top. **The session's decision docs (land the *why* + the banked follow-ups):**
+> - `docs/tuning-pass-5-decisions.md` — the #5 rulings (extend the DR mechanism; accept the bimodal spam-probe outcome; provisional rival bands).
+> - `docs/stat-foundation-stamina-design.md` — the 8-archetype stamina spread, **including the unpopulated Pacer/Drainer values** needed when those ~44 CH2+ lines are authored.
+> - `docs/fable-repo-recon-findings.md` — the dormant-asset map + the event-stream / Daily-Puzzle banking (biggest sleeping asset).
+> - `docs/animation-pipeline-plan.md` — the verified post-#5 animation lane (the `gameEvents.ts` seam; CD authors animation JSON, harness feel-gate).
+> - Still-open design threads reserved for their own passes: the **stage-7 bond design** (Track-B rewards on-hold; `bond-track-v2.md`), and the **bond-moment feel-check** (~25pp mirror shift — playtest-pending).
+
 **Source-of-truth reminder:** `docs/combat-design-canonical.md` = the canonical spec; live knobs in `src/engine/config.ts`; `combat-focus-AS-BUILT.md` = the two-step code-truth. Docs win over code; flag conflicts, never silently change design numbers.
 
 ---
