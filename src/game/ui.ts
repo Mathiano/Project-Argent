@@ -193,10 +193,10 @@ export function drawBattlePanel(
   h: number,
 ): void {
   const r = PANEL_RADIUS;
-  // Drop shadow — the panel floats over the arena.
-  ctx.fillStyle = 'rgba(40,26,14,0.18)';
+  // Drop shadow — the panel floats over the arena (a touch deeper for depth, 2b-2 tune).
+  ctx.fillStyle = 'rgba(40,26,14,0.24)';
   fillRoundRect(ctx, x + 3, y + 4, w, h, r);
-  ctx.fillStyle = 'rgba(40,26,14,0.34)';
+  ctx.fillStyle = 'rgba(40,26,14,0.44)';
   fillRoundRect(ctx, x + 2, y + 2, w, h, r);
   // Dark-wood outer edge → wood frame band → parchment body (a ~2px warm frame).
   ctx.fillStyle = PALETTE.frameWoodDark;

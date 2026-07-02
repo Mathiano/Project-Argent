@@ -60,11 +60,12 @@ export const PALETTE = {
   silverMid: '#c9ced6',
   silverDim: '#8b93a3',
 
-  // Gold — the momentum ★ meters ONLY (legendary treasure).
-  momentumGold: '#e8c04a',
-  momentumGoldHi: '#f6e6a8',
+  // Gold — the momentum ★ meters AND the BREAK pips (the "precious/legendary"
+  // language). Punchier/brighter (2b-2 tune) so the precious element sings.
+  momentumGold: '#f6c92e', // brighter, more saturated (was #e8c04a)
+  momentumGoldHi: '#fff2b8', // bright pale-gold — the ★ sheen + the BREAK tick flash
   momentumGoldDim: '#a8842e',
-  momentumOff: '#8f7d55', // unlit ★ — warm dim (not the cold starOff)
+  momentumOff: '#8f7d55', // unlit ★ / empty BREAK pip — warm dim (not the cold starOff)
 
   // Velvet / brass — technique cells + selection highlight.
   velvet: '#9e4a3a',

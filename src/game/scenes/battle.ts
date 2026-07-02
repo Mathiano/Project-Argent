@@ -124,7 +124,7 @@ function devLogUrlFlag(): boolean {
 //   ┌───────────── BOTTOM (full-width command / narration) ─────────────┐
 const FOE_PANEL = { x: 8, y: 8, w: 340, h: 74 } as const; // upper-left
 const FOE_SLOT = { x: 472, y: 12 } as const; // upper-right sprite slot
-const INTENT = { x: 8, y: 112, w: 456, h: 22 } as const; // mid strip (clear of foe sprite)
+const INTENT = { x: 8, y: 112, w: 340, h: 22 } as const; // mid strip — left-anchored, sized to sit under the foe panel, clear of the upper-right sprite (472)
 const PL_SLOT = { x: 96, y: 140 } as const; // mid-left sprite slot
 const PL_PANEL = { x: 300, y: 150, w: 332, h: 72 } as const; // mid-right
 const BOTTOM = { x: 4, y: 238, w: 632, h: 118 } as const; // full-width bottom
@@ -226,7 +226,7 @@ function drawMoveCell(
   ctx.fillStyle = PALETTE.frameParchmentDim;
   ctx.fillRect(x, y, w, h);
   if (selected) {
-    ctx.fillStyle = 'rgba(158,74,58,0.28)'; // velvet selection wash
+    ctx.fillStyle = 'rgba(158,74,58,0.5)'; // velvet selection wash — stronger for clear hierarchy (2b-2 tune)
     ctx.fillRect(x, y, w, h);
   }
   // Technique cells carry a velvet accent stripe down the left edge (the two
@@ -2208,12 +2208,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       y + 5,
       breakPipFlashT > 0 ? PALETTE.momentumGoldHi : PALETTE.frameInkDim,
     );
-    // BREAK pips — jewel-sapphire when filled, gold flash on the newest tick.
+    // BREAK pips — GOLD when filled (same precious gold as the momentum ★; ruby
+    // read as brown on the warm frame), a bright pale-gold flash on the newest
+    // tick, and the ★'s unlit warm-dim for an empty slot.
     const pipX = x + 150;
     for (let i = 0; i < breakThreshold; i += 1) {
       const filled = i < displayBreakProgress;
       const isNewest = breakPipFlashT > 0 && i === Math.max(0, displayBreakProgress - 1);
-      ctx.fillStyle = isNewest ? PALETTE.momentumGoldHi : filled ? PALETTE.jewelSapphire : PALETTE.frameWoodDark;
+      ctx.fillStyle = isNewest ? PALETTE.momentumGoldHi : filled ? PALETTE.momentumGold : PALETTE.momentumOff;
       ctx.fillRect(pipX + i * 16, y + 5, 12, 12);
       ctx.strokeStyle = PALETTE.silverDim;
       ctx.lineWidth = 1;
