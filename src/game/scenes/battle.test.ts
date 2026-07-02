@@ -847,6 +847,41 @@ describe('battle move list — cursor wrap + rejection paths + B-back', () => {
     expect(screen).toContain('FIGHT');
     expect(screen).not.toContain('>TACKLE');
   });
+
+  test('a TECHNIQUE cannot enter the Focus two-step; an ATTACK still can', () => {
+    // A technique Focused would have its status effect silently discarded (the
+    // Focus path is rawHit-only) — so the charge/commit two-step is BLOCKED on a
+    // technique. The ▶FOCUS indicator is drawn as separate '▶' + 'FOCUS' runs
+    // (the symbol pass), so we assert on the 'FOCUS' text run.
+    // GRUBLEAF grid: TACKLE/THORN FLICK/LEAF LASH/HEADBUTT (attacks 0–3),
+    // SIPHON/ENTANGLE (techniques 4–5).
+    const hasFocus = (ctx: ReturnType<typeof stubCtx>): boolean => ctx.texts.some((t) => t.includes('FOCUS'));
+    const { scene } = buildScene();
+    scene.input?.('a'); // FIGHT → grid, cursor on TACKLE (attack)
+    scene.input?.('left'); // toggle charge ON (attack → chargeable)
+    let ctx = stubCtx();
+    scene.draw(ctx);
+    expect(hasFocus(ctx)).toBe(true); // an ATTACK can Focus
+
+    // Navigate to a TECHNIQUE (SIPHON, index 4).
+    for (let i = 0; i < 4; i += 1) scene.input?.('down');
+    ctx.reset();
+    scene.draw(ctx);
+    expect(ctx.texts.some((t) => t.startsWith('>SIPHON'))).toBe(true);
+    expect(hasFocus(ctx)).toBe(false); // ▶FOCUS hidden on a technique
+
+    // The charge toggle no-ops on a technique — still no ▶FOCUS.
+    scene.input?.('left');
+    ctx.reset();
+    scene.draw(ctx);
+    expect(hasFocus(ctx)).toBe(false);
+
+    // Back to an ATTACK (TACKLE) — Focus is available again (the toggle persisted).
+    for (let i = 0; i < 4; i += 1) scene.input?.('up');
+    ctx.reset();
+    scene.draw(ctx);
+    expect(hasFocus(ctx)).toBe(true);
+  });
 });
 
 describe('battle resolve + end-text', () => {

@@ -7,6 +7,7 @@ import {
   forcedAction,
   hasBenchSurvivor,
   isTeamWiped,
+  isTechnique,
   lookupMove,
   moveLegal,
   mulberry32,
@@ -1923,6 +1924,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // FULL POWER is a direct strike — the focus commit-modifier is disabled
       // while it's armed (the two are mutually exclusive).
       if (pendingFullPower) return;
+      // A TECHNIQUE cannot enter the two-step: the Focus path is rawHit-only and
+      // silently discards the technique's status effect (the documented deferred
+      // two-pool limitation). So the charge toggle no-ops on a technique — the
+      // player still casts it single-step (A), which applies its effect correctly.
+      if (isTechnique(moves[moveCursor]!)) return;
       // Layer 2 — toggle the COMMIT modifier: confirm now initiates the
       // current stance's two-step (CHARGE/HIDE/FEINT) instead of a single step.
       committing = !committing;
@@ -1960,9 +1966,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // FULL POWER takes priority over the focus commit (they're exclusive; the
       // UI already blocks committing while armed). The engine spends the 2★ +
       // applies +50% when this strike resolves.
+      // A technique can never carry the commit modifier (guard: even if `committing`
+      // was toggled ON for an attack and the cursor then moved to a technique, the
+      // technique casts single-step so its effect isn't discarded).
+      const chargeable = committing && !isTechnique(moveName);
       const modifier = pendingFullPower
         ? { fullPower: true as const }
-        : committing
+        : chargeable
           ? { commit: true as const }
           : {};
       pendingFullPower = false;
@@ -2609,7 +2619,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // Current stance name, and the commit indicator (FULL POWER / FOCUS).
     drawText(ctx, STANCE_NAME[stance], rx + 60, sy + 1, PALETTE.frameInk);
     if (pendingFullPower) drawText(ctx, '▶FULL+50%', rx + 116, sy + 1, PALETTE.momentumGold);
-    else if (committing) drawText(ctx, '▶FOCUS', rx + 116, sy + 1, PALETTE.hpCrit);
+    // ▶FOCUS only shows for a chargeable move — a technique can't Focus (its
+    // effect would be discarded), so the indicator hides on a technique.
+    else if (committing && sel && !sel.isTech) drawText(ctx, '▶FOCUS', rx + 116, sy + 1, PALETTE.hpCrit);
 
     // Turn-order preview — the HONEST "who acts first" for THIS move (initiative
     // = speed ÷ move weight, with the Fluid-vs-Guard override), and the controls.
