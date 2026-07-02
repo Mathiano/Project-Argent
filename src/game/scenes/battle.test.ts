@@ -1438,7 +1438,7 @@ describe('DEV TOOL — dev combat-log overlay (opt-in; surfaces BattleEvents)', 
   });
 
   // A ctx that records each fillText's Y so we can assert the overlay stays
-  // within the 180px viewport (the layout-overflow fix). Everything else no-ops.
+  // within the 360px battle viewport (the layout-overflow fix). Everything else no-ops.
   function yCapturingCtx(): CanvasRenderingContext2D & { ys: number[] } {
     const noop = () => {};
     const ys: number[] = [];
@@ -1458,7 +1458,7 @@ describe('DEV TOOL — dev combat-log overlay (opt-in; surfaces BattleEvents)', 
     ) as unknown as CanvasRenderingContext2D & { ys: number[] };
   }
 
-  test('stays within the 180px viewport after many events — nothing renders off the bottom', () => {
+  test('stays within the 360px battle viewport after many events — nothing renders off the bottom', () => {
     // Drive several rounds so the buffer overflows the fixed window (>15 lines,
     // the count that used to run off-screen). Then assert every drawn glyph's
     // bottom (y + 8px line) sits inside the viewport.
@@ -1495,7 +1495,9 @@ describe('DEV TOOL — dev combat-log overlay (opt-in; surfaces BattleEvents)', 
     // The dev log captured more than one visible window of events...
     expect(ctx.ys.length).toBeGreaterThan(0);
     // ...and NOTHING is drawn below the viewport (8px glyph height + top y).
+    // Battle-UI rebuild Part 2a: the battle scene runs at 640×360, so the dev-log
+    // overlay (and the whole HUD) is bounded by the 360px battle viewport now.
     const maxBottom = Math.max(...ctx.ys) + 8;
-    expect(maxBottom).toBeLessThanOrEqual(180);
+    expect(maxBottom).toBeLessThanOrEqual(360);
   });
 });

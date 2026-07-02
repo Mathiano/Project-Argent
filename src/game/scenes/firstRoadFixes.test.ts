@@ -57,7 +57,7 @@ describe('S2 — RUN renders on-screen (not clipped off the bottom)', () => {
     ) as unknown as CanvasRenderingContext2D & { calls: Array<{ text: string; y: number }> };
   }
 
-  test('the RUN row sits within the 180px screen', () => {
+  test('the RUN row sits within the 360px battle screen', () => {
     const state = createBattleState(createTeam([createSide(CH1.GRUBLEAF!)]), createTeam([createSide(CH1.FLITPECK!)]));
     const scene = createBattleScene({
       state,
@@ -75,8 +75,9 @@ describe('S2 — RUN renders on-screen (not clipped off the bottom)', () => {
     scene.draw(ctx);
     const run = ctx.calls.find((c) => c.text.includes('RUN'));
     expect(run, 'RUN label is drawn').toBeTruthy();
-    // 8px font, top baseline → must end by the screen edge (180).
-    expect(run!.y + 8).toBeLessThanOrEqual(180);
+    // Battle-UI rebuild Part 2a: the battle scene runs at 640×360, so the bottom
+    // command menu (RUN is its last row) is bounded by the 360px battle screen.
+    expect(run!.y + 8).toBeLessThanOrEqual(360);
   });
 });
 

@@ -22,7 +22,7 @@ import type {
   Stance,
   Team,
 } from '../../engine';
-import { BATTLE_LOGICAL_H, BATTLE_LOGICAL_W, LOGICAL_H, LOGICAL_W } from '../canvas';
+import { BATTLE_LOGICAL_H, BATTLE_LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
 import { monDisplayName } from '../monName';
@@ -39,7 +39,6 @@ import {
 import { emitGameEvent } from '../gameEvents';
 import { drawSpeciesInSlot } from '../sprites';
 import {
-  BAR_HEIGHT_TALL,
   STANCE_NAME,
   UI_FONT,
   drawBar,
@@ -101,12 +100,30 @@ function devLogUrlFlag(): boolean {
   }
 }
 
-const FOE_PANEL = { x: 2, y: 2, w: 170, h: 36 } as const;
-const FOE_SLOT = { x: 222, y: 2 } as const;
-const INTENT = { x: 0, y: 60, w: 320, h: 12 } as const;
-const PL_SLOT = { x: 30, y: 74 } as const;
-const PL_PANEL = { x: 144, y: 82, w: 172, h: 36 } as const;
-const BOTTOM = { x: 2, y: 132, w: 316, h: 46 } as const;
+// ── Battle HUD layout — the 640×360 layout map (battle-UI rebuild Part 2a) ─────
+// The classic Pokémon arrangement, re-authored to FILL the 640×360 battle canvas
+// (Part 1 gave the scene its own logical resolution; this fills it). These 6
+// blocks are the tuning surface — the draw functions position everything relative
+// to them. The FONT stays 16px (m3x6) so the bigger panels read as roomier, not
+// bigger-text. Part 2b adds the new elements (status chips, stance selector, 2×3
+// move grid) and the warm-parchment / soft-green / silver-inlay skin on top.
+//
+//   ┌ FOE_PANEL (upper-left) ┐              [ FOE_SLOT ] (upper-right sprite)
+//   [ BOSS strip (boss only) ]
+//   [ INTENT strip (mid) ]
+//   [ PL_SLOT ]              ┌ PL_PANEL (mid-right) ┐
+//   (mid-left sprite)        [ bond + bench under-strip ]
+//   ┌───────────── BOTTOM (full-width command / narration) ─────────────┐
+const FOE_PANEL = { x: 8, y: 8, w: 340, h: 74 } as const; // upper-left
+const FOE_SLOT = { x: 472, y: 12 } as const; // upper-right sprite slot
+const INTENT = { x: 8, y: 112, w: 456, h: 22 } as const; // mid strip (clear of foe sprite)
+const PL_SLOT = { x: 96, y: 140 } as const; // mid-left sprite slot
+const PL_PANEL = { x: 300, y: 150, w: 332, h: 72 } as const; // mid-right
+const BOTTOM = { x: 4, y: 238, w: 632, h: 118 } as const; // full-width bottom
+// Battle-scaled draw sizes: the sprite slot (was the 56px default) and the HP/ST
+// bar height (was BAR_HEIGHT_TALL 6) grow for the bigger canvas.
+const BATTLE_SLOT = 96;
+const BATTLE_BAR_H = 12;
 
 
 export interface BattleSceneOpts {
@@ -1939,11 +1956,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawPanel(ctx, FOE_PANEL.x, FOE_PANEL.y, FOE_PANEL.w, FOE_PANEL.h);
     // Mon name in a deep, confident slate blue (locked palette) so it pops as a
     // header, like the coloured HP/ST labels.
-    drawText(ctx, display.foe.species.name, FOE_PANEL.x + 8, FOE_PANEL.y + 6, PALETTE.stanceG);
-    if (display.foe.focusing) drawText(ctx, 'FOCUS', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
-    else if (display.foe.dazed) drawText(ctx, 'DAZE', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpCrit);
-    else if (display.foe.staggered) drawText(ctx, 'STAG', FOE_PANEL.x + 78, FOE_PANEL.y + 6, PALETTE.hpWarn);
-    if (display.foe.exhausted) drawText(ctx, 'EXH', FOE_PANEL.x + 108, FOE_PANEL.y + 6, PALETTE.hpCrit);
+    drawText(ctx, display.foe.species.name, FOE_PANEL.x + 12, FOE_PANEL.y + 8, PALETTE.stanceG);
+    if (display.foe.focusing) drawText(ctx, 'FOCUS', FOE_PANEL.x + 150, FOE_PANEL.y + 8, PALETTE.hpWarn);
+    else if (display.foe.dazed) drawText(ctx, 'DAZE', FOE_PANEL.x + 150, FOE_PANEL.y + 8, PALETTE.hpCrit);
+    else if (display.foe.staggered) drawText(ctx, 'STAG', FOE_PANEL.x + 150, FOE_PANEL.y + 8, PALETTE.hpWarn);
+    if (display.foe.exhausted) drawText(ctx, 'EXH', FOE_PANEL.x + 220, FOE_PANEL.y + 8, PALETTE.hpCrit);
     // FOE ★/momentum is now SHOWN, mirroring the player's meter (same visual
     // language). Playtest finding: the core mechanics run on the momentum
     // DIFFERENTIAL — the behind-penalty (how far behind you are → your damage
@@ -1953,40 +1970,40 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // call: legibility of the load-bearing differential wins. The info-warfare
     // layer keeps its OTHER hidden info (foe bond, the intent tells). Display-only
     // — reads the foe's existing momentum, changes no combat logic.
-    else drawText(ctx, 'MOMENTUM', FOE_PANEL.x + 100, FOE_PANEL.y + 6, PALETTE.stanceG);
-    drawMomentum(ctx, FOE_PANEL.x + 152, FOE_PANEL.y + 3, display.foe.momentum);
+    else drawText(ctx, 'MOMENTUM', FOE_PANEL.x + 210, FOE_PANEL.y + 8, PALETTE.stanceG);
+    drawMomentum(ctx, FOE_PANEL.x + FOE_PANEL.w - 34, FOE_PANEL.y + 5, display.foe.momentum);
     // Break meter moved to the dedicated boss strip below the panel
     // (BUG 3 — the in-panel pips were too small to notice).
 
-    drawText(ctx, 'HP', FOE_PANEL.x + 8, FOE_PANEL.y + 18, PALETTE.hpOk);
+    drawText(ctx, 'HP', FOE_PANEL.x + 12, FOE_PANEL.y + 32, PALETTE.hpOk);
     drawBar(
       ctx,
-      FOE_PANEL.x + 26,
-      FOE_PANEL.y + 19,
-      FOE_PANEL.w - 36,
+      FOE_PANEL.x + 40,
+      FOE_PANEL.y + 33,
+      FOE_PANEL.w - 54,
       display.foe.hp,
       display.foe.maxHp,
       hpColor(display.foe.hp, display.foe.maxHp),
-      BAR_HEIGHT_TALL,
+      BATTLE_BAR_H,
     );
-    drawText(ctx, 'ST', FOE_PANEL.x + 8, FOE_PANEL.y + 26, PALETTE.stamina);
+    drawText(ctx, 'ST', FOE_PANEL.x + 12, FOE_PANEL.y + 52, PALETTE.stamina);
     drawBar(
       ctx,
-      FOE_PANEL.x + 26,
-      FOE_PANEL.y + 27,
-      FOE_PANEL.w - 36,
+      FOE_PANEL.x + 40,
+      FOE_PANEL.y + 53,
+      FOE_PANEL.w - 54,
       display.foe.st,
       100,
       PALETTE.stamina,
-      BAR_HEIGHT_TALL,
+      BATTLE_BAR_H,
     );
-    drawWindedNotch(ctx, FOE_PANEL.x + 26, FOE_PANEL.y + 27, FOE_PANEL.w - 36, BAR_HEIGHT_TALL);
+    drawWindedNotch(ctx, FOE_PANEL.x + 40, FOE_PANEL.y + 53, FOE_PANEL.w - 54, BATTLE_BAR_H);
     // Bench indicators (S5): tucked just under the panel, 4×4 dots
     // tinted by status (active / alive / fainted). For 1-mon "teams"
     // nothing draws — the row stays empty and clean. Suppressed for a
     // boss fight, where the boss strip owns that row.
     if (breakThreshold === 0) {
-      drawBenchIndicators(ctx, FOE_PANEL.x + 8, FOE_PANEL.y + FOE_PANEL.h + 2, state.foe);
+      drawBenchIndicators(ctx, FOE_PANEL.x + 12, FOE_PANEL.y + FOE_PANEL.h + 4, state.foe);
     }
   }
 
@@ -1995,84 +2012,83 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // plus a compact bench row. Only for boss fights (breakThreshold > 0).
   function drawBossStrip(ctx: CanvasRenderingContext2D): void {
     const x = FOE_PANEL.x;
-    const y = FOE_PANEL.y + FOE_PANEL.h + 1;
+    const y = FOE_PANEL.y + FOE_PANEL.h + 2;
     const w = FOE_PANEL.w;
     ctx.fillStyle = 'rgba(28,30,46,0.92)';
-    ctx.fillRect(x, y, w, 11);
-    drawText(ctx, `PHASE ${displayPhase}`, x + 3, y + 2, PALETTE.paper);
+    ctx.fillRect(x, y, w, 22);
+    drawText(ctx, `PHASE ${displayPhase}`, x + 6, y + 5, PALETTE.paper);
     drawText(
       ctx,
       'BREAK',
-      x + 50,
-      y + 2,
+      x + 96,
+      y + 5,
       breakPipFlashT > 0 ? '#ffd76a' : PALETTE.paperShadow,
     );
-    const pipX = x + 84;
+    const pipX = x + 150;
     for (let i = 0; i < breakThreshold; i += 1) {
       const filled = i < displayBreakProgress;
       const isNewest = breakPipFlashT > 0 && i === Math.max(0, displayBreakProgress - 1);
       ctx.fillStyle = isNewest ? '#fff4c2' : filled ? '#e23a1e' : '#4a3c24';
-      ctx.fillRect(pipX + i * 9, y + 2, 7, 7);
+      ctx.fillRect(pipX + i * 16, y + 5, 12, 12);
       ctx.strokeStyle = PALETTE.ink;
       ctx.lineWidth = 1;
-      ctx.strokeRect(pipX + i * 9 + 0.5, y + 2 + 0.5, 6, 6);
+      ctx.strokeRect(pipX + i * 16 + 0.5, y + 5 + 0.5, 11, 11);
     }
     // Compact bench row at the far right (always visible for the boss).
     const foe = state.foe;
     if (foe.members.length > 1) {
-      const bx = x + w - foe.members.length * 6 - 3;
+      const bx = x + w - foe.members.length * 10 - 4;
       for (let i = 0; i < foe.members.length; i += 1) {
         const mon = foe.members[i]!;
         ctx.fillStyle = mon.hp <= 0 ? '#1d1d28' : i === foe.active ? PALETTE.hpOk : PALETTE.paperDim;
-        ctx.fillRect(bx + i * 6, y + 3, 4, 4);
+        ctx.fillRect(bx + i * 10, y + 7, 6, 6);
         ctx.strokeStyle = PALETTE.ink;
-        ctx.strokeRect(bx + i * 6 + 0.5, y + 3 + 0.5, 3, 3);
+        ctx.strokeRect(bx + i * 10 + 0.5, y + 7 + 0.5, 5, 5);
       }
     }
   }
 
   function drawPlayerPanel(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, PL_PANEL.x, PL_PANEL.y, PL_PANEL.w, PL_PANEL.h);
-    drawText(ctx, monDisplayName(display.player), PL_PANEL.x + 8, PL_PANEL.y + 6, PALETTE.stanceG);
-    if (display.player.focusing) drawText(ctx, 'FOCUS', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
-    else if (display.player.dazed) drawText(ctx, 'DAZE', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpCrit);
-    else if (display.player.staggered) drawText(ctx, 'STAG', PL_PANEL.x + 78, PL_PANEL.y + 6, PALETTE.hpWarn);
-    if (display.player.exhausted) drawText(ctx, 'EXH', PL_PANEL.x + 108, PL_PANEL.y + 6, PALETTE.hpCrit);
+    drawText(ctx, monDisplayName(display.player), PL_PANEL.x + 12, PL_PANEL.y + 8, PALETTE.stanceG);
+    if (display.player.focusing) drawText(ctx, 'FOCUS', PL_PANEL.x + 150, PL_PANEL.y + 8, PALETTE.hpWarn);
+    else if (display.player.dazed) drawText(ctx, 'DAZE', PL_PANEL.x + 150, PL_PANEL.y + 8, PALETTE.hpCrit);
+    else if (display.player.staggered) drawText(ctx, 'STAG', PL_PANEL.x + 150, PL_PANEL.y + 8, PALETTE.hpWarn);
+    if (display.player.exhausted) drawText(ctx, 'EXH', PL_PANEL.x + 220, PL_PANEL.y + 8, PALETTE.hpCrit);
     // Label YOUR ★ pips clearly (playtest-polish-3 — "MOM" was too terse): the
     // player should immediately read this as their momentum meter. (The foe's
     // now mirrors it on the top panel — the differential is what the mechanics
     // read.) Skipped while EXH occupies the row.
     // The ★ meter HEADER — deep slate blue (matching the mon names), a confident
     // header colour; the gold ★ pips beside it carry the value.
-    else drawText(ctx, 'MOMENTUM', PL_PANEL.x + 100, PL_PANEL.y + 6, PALETTE.stanceG);
-    // ★ triangle (3 slots: apex + 2 base). y nudged up so the ~13px triangle
-    // clears the HP bar below; fills with the live momentum (cap-2 today → apex
-    // empty until the cap-3 change).
-    drawMomentum(ctx, PL_PANEL.x + 152, PL_PANEL.y + 3, display.player.momentum);
+    else drawText(ctx, 'MOMENTUM', PL_PANEL.x + 210, PL_PANEL.y + 8, PALETTE.stanceG);
+    // ★ triangle (3 slots: apex + 2 base), right-aligned in the header row; fills
+    // with the live momentum (cap-2 today → apex empty until the cap-3 change).
+    drawMomentum(ctx, PL_PANEL.x + PL_PANEL.w - 34, PL_PANEL.y + 5, display.player.momentum);
 
-    drawText(ctx, 'HP', PL_PANEL.x + 8, PL_PANEL.y + 18, PALETTE.hpOk);
+    drawText(ctx, 'HP', PL_PANEL.x + 12, PL_PANEL.y + 32, PALETTE.hpOk);
     drawBar(
       ctx,
-      PL_PANEL.x + 26,
-      PL_PANEL.y + 19,
-      PL_PANEL.w - 36,
+      PL_PANEL.x + 40,
+      PL_PANEL.y + 33,
+      PL_PANEL.w - 54,
       display.player.hp,
       display.player.maxHp,
       hpColor(display.player.hp, display.player.maxHp),
-      BAR_HEIGHT_TALL,
+      BATTLE_BAR_H,
     );
-    drawText(ctx, 'ST', PL_PANEL.x + 8, PL_PANEL.y + 26, PALETTE.stamina);
+    drawText(ctx, 'ST', PL_PANEL.x + 12, PL_PANEL.y + 52, PALETTE.stamina);
     drawBar(
       ctx,
-      PL_PANEL.x + 26,
-      PL_PANEL.y + 27,
-      PL_PANEL.w - 36,
+      PL_PANEL.x + 40,
+      PL_PANEL.y + 53,
+      PL_PANEL.w - 54,
       display.player.st,
       100,
       PALETTE.stamina,
-      BAR_HEIGHT_TALL,
+      BATTLE_BAR_H,
     );
-    drawWindedNotch(ctx, PL_PANEL.x + 26, PL_PANEL.y + 27, PL_PANEL.w - 36, BAR_HEIGHT_TALL);
+    drawWindedNotch(ctx, PL_PANEL.x + 40, PL_PANEL.y + 53, PL_PANEL.w - 54, BATTLE_BAR_H);
     // Bench dots + the bond meter share the slim row under the panel — see
     // drawPlayerUnderPanel (bench relocated to the right so it clears the bar).
   }
@@ -2084,10 +2100,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // (their own size/phase suppression) so a caller without bond data — sim /
   // isolated tests — still shows team status; only the meter needs the thread.
   function drawPlayerUnderPanel(ctx: CanvasRenderingContext2D): void {
-    const stripY = PL_PANEL.y + PL_PANEL.h; // 118 — just under the panel
+    const stripY = PL_PANEL.y + PL_PANEL.h; // just under the panel
     const benchShown =
       state.player.members.length > 1 && phase !== 'resolve' && phase !== 'end' && phase !== 'text';
-    const benchW = benchShown ? state.player.members.length * 6 + 4 : 0;
+    const benchW = benchShown ? state.player.members.length * 10 + 6 : 0;
     if (opts.playerBond) {
       const base = opts.playerBond[state.player.active] ?? 0;
       let value = base;
@@ -2097,13 +2113,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         value = bondAdvanceFrom + (bondAdvanceTo - bondAdvanceFrom) * eased;
       }
       ctx.fillStyle = 'rgba(28,30,46,0.92)';
-      ctx.fillRect(PL_PANEL.x, stripY, PL_PANEL.w, 9);
-      drawBondBar(ctx, PL_PANEL.x + 4, stripY + 1, PL_PANEL.w - 8 - benchW, value);
+      ctx.fillRect(PL_PANEL.x, stripY, PL_PANEL.w, 14);
+      drawBondBar(ctx, PL_PANEL.x + 6, stripY + 2, PL_PANEL.w - 12 - benchW, value);
     }
     // Right-aligned bench dots (relocated from the panel-left so they clear
     // the bond meter). drawBenchIndicators no-ops for ≤1 mon / resolve phases.
-    const benchX = PL_PANEL.x + PL_PANEL.w - state.player.members.length * 6 - 2;
-    drawBenchIndicators(ctx, benchX, PL_PANEL.y + PL_PANEL.h + 2, state.player);
+    const benchX = PL_PANEL.x + PL_PANEL.w - state.player.members.length * 10 - 4;
+    drawBenchIndicators(ctx, benchX, PL_PANEL.y + PL_PANEL.h + 3, state.player);
   }
 
   // Surface ③ — the read-win mon reaction. A soft, brief bond-tinted spark
@@ -2114,7 +2130,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (readReactT <= 0) return;
     const t = 1 - readReactT / READ_REACT_SEC; // 0→1 across the reaction
     const alpha = Math.max(0, 1 - t);
-    const cx = PL_SLOT.x + 28 + spriteOffset('player');
+    const cx = PL_SLOT.x + BATTLE_SLOT / 2 + spriteOffset('player');
     const topY = PL_SLOT.y + 4;
     ctx.globalAlpha = alpha * 0.45;
     ctx.strokeStyle = PALETTE.bond;
@@ -2148,18 +2164,18 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       else if (isActive) fill = PALETTE.hpOk;
       else fill = PALETTE.paperDim;
       ctx.fillStyle = fill;
-      ctx.fillRect(x + i * 6, y, 4, 4);
+      ctx.fillRect(x + i * 10, y, 6, 6);
       ctx.strokeStyle = PALETTE.ink;
       ctx.lineWidth = 1;
-      ctx.strokeRect(x + i * 6 + 0.5, y + 0.5, 3, 3);
+      ctx.strokeRect(x + i * 10 + 0.5, y + 0.5, 5, 5);
     }
   }
 
   function drawIntent(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = 'rgba(32,32,44,0.92)';
     ctx.fillRect(INTENT.x, INTENT.y, INTENT.w, INTENT.h);
-    const intentLabelX = INTENT.x + 4;
-    drawText(ctx, 'FOE INTENT:', intentLabelX, INTENT.y + 2, PALETTE.hpWarn);
+    const intentLabelX = INTENT.x + 8;
+    drawText(ctx, 'FOE INTENT:', intentLabelX, INTENT.y + 4, PALETTE.hpWarn);
     // Plain-language intent (honest, precision degraded per the reliability
     // ramp). A null line = OPAQUE: show a blank dash, no read. The SPD readout
     // below stays honest — speed isn't hidden, the foe's STANCE intent is.
@@ -2167,7 +2183,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // proportional font can't collide label and value (the old fixed x+60 did).
     ctx.font = UI_FONT;
     const intentValueX = Math.round(intentLabelX + ctx.measureText('FOE INTENT:').width + 6);
-    drawText(ctx, shownIntent.line ?? '———', intentValueX, INTENT.y + 2, PALETTE.paper);
+    drawText(ctx, shownIntent.line ?? '———', intentValueX, INTENT.y + 4, PALETTE.paper);
     // Base-SPEED relationship: the dodge lever + the initiative NUMERATOR.
     // It is NOT the turn-order verdict — order = speed ÷ move weight, with
     // the Fluid override, shown move-by-move as "NEXT:" in the move menu.
@@ -2176,14 +2192,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     const sl = speedLabel(activeMon(state.player).species.spd, activeMon(state.foe).species.spd);
     const slColor =
       sl === 'YOU FASTER' ? PALETTE.hpOk : sl === 'YOU SLOWER' ? PALETTE.hpCrit : PALETTE.paperShadow;
-    drawTextRight(ctx, `BASE SPD: ${sl}`, INTENT.x + INTENT.w - 4, INTENT.y + 2, slColor);
+    drawTextRight(ctx, `BASE SPD: ${sl}`, INTENT.x + INTENT.w - 8, INTENT.y + 4, slColor);
     // TUTORIAL live prompt — surface the read while the player is deciding.
     // An opening exists -> "NOW — throw!"; otherwise the read tell ("Brace to
     // force an opening"). Scripted guided catch only (opts.tutorial); a single
     // additive line, so wild/trainer battles are untouched.
     if (opts.tutorial && (phase === 'menu' || phase === 'move')) {
       const prompt = currentWindow() !== 'none' ? TUTORIAL_WINDOW_PROMPT : TUTORIAL_FOE_PROMPT;
-      drawText(ctx, prompt, INTENT.x + 4, INTENT.y + INTENT.h + 3, PALETTE.hpOk);
+      drawText(ctx, prompt, INTENT.x + 8, INTENT.y + INTENT.h + 4, PALETTE.hpOk);
     }
   }
 
@@ -2193,16 +2209,16 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // Use the FADED display state (situationShown/Alpha), not calloutLine, so the
     // banner fades in/out instead of jumping.
     if (situationShown === null || situationAlpha <= 0) return;
-    const h = 14;
+    const h = 20;
     const y = INTENT.y;
     // Text pass re-fit (m3x6): SIZE the banner to the now-proportional text via
     // measureUiText (+ padding, capped to the screen), CENTER it, and draw with
     // drawTextCenter (applies the UI vertical offset + renders the inline ★ from
     // starTag small). Was a fixed 300px box + raw center fillText → off after the
     // font swap (text sat low, the box was too wide, the ★ towered).
-    const cx = LOGICAL_W / 2;
+    const cx = BATTLE_LOGICAL_W / 2;
     const textW = measureUiText(ctx, situationShown);
-    const w = Math.min(LOGICAL_W - 8, Math.ceil(textW) + 16);
+    const w = Math.min(BATTLE_LOGICAL_W - 8, Math.ceil(textW) + 16);
     const x = Math.round(cx - w / 2);
     const prevA = ctx.globalAlpha;
     ctx.globalAlpha = prevA * situationAlpha; // fade the whole banner
@@ -2211,17 +2227,17 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     ctx.strokeStyle = PALETTE.ink;
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-    drawTextCenter(ctx, situationShown, cx, y + 4, PALETTE.ink);
+    drawTextCenter(ctx, situationShown, cx, y + 6, PALETTE.ink);
     ctx.globalAlpha = prevA;
   }
 
   function drawBottomDialog(ctx: CanvasRenderingContext2D, lines: readonly string[]): void {
     drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
-    for (let i = 0; i < Math.min(3, lines.length); i += 1) {
-      drawText(ctx, lines[i]!, BOTTOM.x + 8, BOTTOM.y + 8 + i * 12);
+    for (let i = 0; i < Math.min(4, lines.length); i += 1) {
+      drawText(ctx, lines[i]!, BOTTOM.x + 16, BOTTOM.y + 14 + i * 20);
     }
     if (Math.floor(tick * 2) % 2 === 0) {
-      drawText(ctx, '▼', BOTTOM.x + BOTTOM.w - 14, BOTTOM.y + BOTTOM.h - 12, PALETTE.ink);
+      drawText(ctx, '▼', BOTTOM.x + BOTTOM.w - 22, BOTTOM.y + BOTTOM.h - 20, PALETTE.ink);
     }
   }
 
@@ -2248,14 +2264,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // canRun is false). FIGHT always lit.
       let dim = !it.enabled;
       if (it.kind === 'call' && (!opts.catchBreathUnlocked || me.momentum < 1)) dim = true;
-      // 5 rows (FIGHT/PKMN/BALL/CALL/RUN) at 8px pitch fit the 46px panel
-      // (last row at y≈169, +8px text < 180 screen edge).
-      const rowY = BOTTOM.y + 5 + i * 8;
-      if (menuCursor === i) drawRowHighlight(ctx, BOTTOM.x + 6, rowY - 1, 108, 9);
+      // 5 rows (FIGHT/PKMN/BALL/CALL/RUN) at 20px pitch in the left column of
+      // the full-width bottom panel.
+      const rowY = BOTTOM.y + 14 + i * 20;
+      if (menuCursor === i) drawRowHighlight(ctx, BOTTOM.x + 12, rowY - 2, 240, 19);
       drawText(
         ctx,
         `${menuCursor === i ? '>' : ' '} ${labels[it.kind]}`,
-        BOTTOM.x + 10,
+        BOTTOM.x + 18,
         rowY,
         dim ? PALETTE.paperDim : PALETTE.ink,
       );
@@ -2264,13 +2280,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // Legibility #2 — when the player has no ★, teach what charges it (the
     // cause/effect the callouts now also show: win a read → +★).
     if (me.momentum === 0) {
-      drawText(ctx, 'win a read to charge ★', BOTTOM.x + 120, BOTTOM.y + 6, PALETTE.paperDim);
+      drawText(ctx, 'win a read to charge ★', BOTTOM.x + 280, BOTTOM.y + 14, PALETTE.paperDim);
     }
     drawText(
       ctx,
       'A confirm  B back',
-      BOTTOM.x + 120,
-      BOTTOM.y + BOTTOM.h - 12,
+      BOTTOM.x + 280,
+      BOTTOM.y + BOTTOM.h - 20,
       PALETTE.paperDim,
     );
   }
@@ -2280,8 +2296,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawText(
       ctx,
       partyMode === 'forced' ? 'SEND OUT WHO?' : 'PARTY',
-      BOTTOM.x + 8,
-      BOTTOM.y + 4,
+      BOTTOM.x + 16,
+      BOTTOM.y + 8,
       PALETTE.paperShadow,
     );
     const team = state.player;
@@ -2294,10 +2310,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const hpStr = `HP ${Math.round(side.hp)}/${side.maxHp}`;
       const tag = fainted ? 'FNT' : isActive ? 'ACT' : '';
       const row = `${cursor}${monDisplayName(side).padEnd(10, ' ')} ${hpStr.padEnd(10, ' ')} ${tag}`;
-      drawText(ctx, row, BOTTOM.x + 8, BOTTOM.y + 14 + i * 9, color);
+      drawText(ctx, row, BOTTOM.x + 16, BOTTOM.y + 30 + i * 16, color);
     });
     const help = partyMode === 'forced' ? 'A: send out' : 'A: switch  B: back';
-    drawText(ctx, help, BOTTOM.x + 10, BOTTOM.y + BOTTOM.h - 12, PALETTE.paperDim);
+    drawText(ctx, help, BOTTOM.x + 16, BOTTOM.y + BOTTOM.h - 20, PALETTE.paperDim);
   }
 
   function drawBottomMoves(ctx: CanvasRenderingContext2D): void {
@@ -2315,25 +2331,25 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         (activeMon(state.player).st <= COMBAT.winded && (move.tier === 'heavy' || move.tier === 'nuke')) ||
         activeMon(state.player).st < tier.cost;
       const color = locked ? PALETTE.paperDim : PALETTE.ink;
-      const y = BOTTOM.y + 6 + (i - moveScroll) * 8;
-      if (moveCursor === i) drawRowHighlight(ctx, BOTTOM.x + 6, y - 1, 158, 9);
-      drawText(ctx, `${moveCursor === i ? '>' : ' '}${m}`, BOTTOM.x + 8, y, color);
-      drawTextRight(ctx, `ST${tier.cost}`, BOTTOM.x + 150, y, color);
+      const y = BOTTOM.y + 14 + (i - moveScroll) * 20;
+      if (moveCursor === i) drawRowHighlight(ctx, BOTTOM.x + 12, y - 2, 300, 19);
+      drawText(ctx, `${moveCursor === i ? '>' : ' '}${m}`, BOTTOM.x + 18, y, color);
+      drawTextRight(ctx, `ST${tier.cost}`, BOTTOM.x + 300, y, color);
     }
     // Scroll indicators (only when there's more off-window).
-    if (moveScroll > 0) drawText(ctx, '▲', BOTTOM.x + 158, BOTTOM.y + 4, PALETTE.paperDim);
-    if (end < moves.length) drawText(ctx, '▼', BOTTOM.x + 158, BOTTOM.y + BOTTOM.h - 12, PALETTE.paperDim);
+    if (moveScroll > 0) drawText(ctx, '▲', BOTTOM.x + 316, BOTTOM.y + 10, PALETTE.paperDim);
+    if (end < moves.length) drawText(ctx, '▼', BOTTOM.x + 316, BOTTOM.y + BOTTOM.h - 20, PALETTE.paperDim);
 
     const stance = STANCES[stanceIdx]!;
-    drawStanceBadge(ctx, BOTTOM.x + 170, BOTTOM.y + 8, stance);
+    drawStanceBadge(ctx, BOTTOM.x + 356, BOTTOM.y + 14, stance);
     // FULL POWER armed (Lane B) takes the indicator slot — the next attack is
     // buffed +50%. Else FOCUS (commit-modifier) / plain stance name.
     if (pendingFullPower) {
-      drawText(ctx, '▶FULL+50%', BOTTOM.x + 182, BOTTOM.y + 8, PALETTE.star);
+      drawText(ctx, '▶FULL+50%', BOTTOM.x + 372, BOTTOM.y + 14, PALETTE.star);
     } else if (committing) {
-      drawText(ctx, '▶FOCUS', BOTTOM.x + 182, BOTTOM.y + 8, PALETTE.hpCrit);
+      drawText(ctx, '▶FOCUS', BOTTOM.x + 372, BOTTOM.y + 14, PALETTE.hpCrit);
     } else {
-      drawText(ctx, STANCE_NAME[stance], BOTTOM.x + 182, BOTTOM.y + 8);
+      drawText(ctx, STANCE_NAME[stance], BOTTOM.x + 372, BOTTOM.y + 14);
     }
 
     // Turn-order preview — the HONEST "who acts first" for THIS move
@@ -2357,11 +2373,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawText(
       ctx,
       `NEXT: ${order}${fluidFirst ? ' ·FLUID' : ''}`,
-      BOTTOM.x + 170,
-      BOTTOM.y + 22,
+      BOTTOM.x + 356,
+      BOTTOM.y + 44,
       fluidFirst ? PALETTE.stanceF : PALETTE.paperShadow,
     );
-    drawText(ctx, 'SEL=stance ←→=commit B=back', BOTTOM.x + 170, BOTTOM.y + BOTTOM.h - 12, PALETTE.paperDim);
+    drawText(ctx, 'SEL=stance ←→=commit B=back', BOTTOM.x + 356, BOTTOM.y + BOTTOM.h - 20, PALETTE.paperDim);
   }
 
   // FOCUS R2 — the release picker (the hidden release is chosen NOW).
@@ -2372,18 +2388,18 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // line at the same x — "RELEASE:" collided with ">HEAVY" and its hint.
   function drawBottomRelease(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
-    drawText(ctx, 'RELEASE:', BOTTOM.x + 8, BOTTOM.y + 5, PALETTE.paperShadow);
+    drawText(ctx, 'RELEASE:', BOTTOM.x + 16, BOTTOM.y + 10, PALETTE.paperShadow);
     RELEASES.forEach((r, i) => {
-      const y = BOTTOM.y + 16 + i * 10; // rows below the header (16/26/36)
+      const y = BOTTOM.y + 34 + i * 20; // rows below the header
       const marker = releaseCursor === i ? '>' : ' ';
       const color = releaseCursor === i ? PALETTE.ink : PALETTE.paperShadow;
-      drawText(ctx, `${marker}${r.name}`, BOTTOM.x + 8, y, color);
+      drawText(ctx, `${marker}${r.name}`, BOTTOM.x + 18, y, color);
     });
     // The selected release's rotation hint — right column, aligned with the
     // first row (clear of the left-column move names).
     const sel = RELEASES[releaseCursor]!;
-    drawText(ctx, `${sel.name} ${sel.beats}`, BOTTOM.x + 96, BOTTOM.y + 16, PALETTE.paperShadow);
-    drawText(ctx, 'A=release', BOTTOM.x + 96, BOTTOM.y + BOTTOM.h - 12, PALETTE.paperDim);
+    drawText(ctx, `${sel.name} ${sel.beats}`, BOTTOM.x + 300, BOTTOM.y + 34, PALETTE.paperShadow);
+    drawText(ctx, 'A=release', BOTTOM.x + 300, BOTTOM.y + BOTTOM.h - 20, PALETTE.paperDim);
   }
 
   function drawBottomCall(ctx: CanvasRenderingContext2D): void {
@@ -2397,19 +2413,19 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const color = greyed ? PALETTE.paperDim : PALETTE.ink;
       const col = i < 3 ? 0 : 1;
       const row = i % 3;
-      const x = BOTTOM.x + 8 + col * 154;
-      const y = BOTTOM.y + 5 + row * 10;
-      if (callCursor === i) drawRowHighlight(ctx, x - 2, y - 1, 152, 9);
+      const x = BOTTOM.x + 16 + col * 306;
+      const y = BOTTOM.y + 14 + row * 20;
+      if (callCursor === i) drawRowHighlight(ctx, x - 4, y - 2, 300, 19);
       const marker = callCursor === i ? '>' : ' ';
       const tag = !unlocked ? ' ·LOCKED' : '';
       drawText(ctx, `${marker}${call.name}${tag}`, x, y, color);
-      drawTextRight(ctx, `★${call.starCost}`, x + 148, y, color);
+      drawTextRight(ctx, `★${call.starCost}`, x + 290, y, color);
     });
     drawText(
       ctx,
       `Your ★${activeMon(state.player).momentum}   A use · B back`,
-      BOTTOM.x + 8,
-      BOTTOM.y + BOTTOM.h - 10,
+      BOTTOM.x + 16,
+      BOTTOM.y + BOTTOM.h - 18,
       PALETTE.paperDim,
     );
   }
@@ -2417,20 +2433,20 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function drawBottomSpare(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     const foeName = display.foe.species.name;
-    drawText(ctx, `The wild ${foeName} fell.`, BOTTOM.x + 8, BOTTOM.y + 6);
-    drawText(ctx, 'Tend it with medicine — show mercy?', BOTTOM.x + 8, BOTTOM.y + 16, PALETTE.paperShadow);
+    drawText(ctx, `The wild ${foeName} fell.`, BOTTOM.x + 16, BOTTOM.y + 12);
+    drawText(ctx, 'Tend it with medicine — show mercy?', BOTTOM.x + 16, BOTTOM.y + 32, PALETTE.paperShadow);
     drawText(
       ctx,
       `${spareCursor === 0 ? '>' : ' '} YES — spare it`,
-      BOTTOM.x + 12,
-      BOTTOM.y + 30,
+      BOTTOM.x + 20,
+      BOTTOM.y + 64,
       spareCursor === 0 ? PALETTE.ink : PALETTE.paperDim,
     );
     drawText(
       ctx,
       `${spareCursor === 1 ? '>' : ' '} NO — claim the win`,
-      BOTTOM.x + 160,
-      BOTTOM.y + 30,
+      BOTTOM.x + 320,
+      BOTTOM.y + 64,
       spareCursor === 1 ? PALETTE.ink : PALETTE.paperDim,
     );
   }
@@ -2443,12 +2459,12 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       if (i === log.length - 1 && line === beatMsg && reveal < beatMsg.length) {
         line = line.slice(0, Math.floor(reveal));
       }
-      drawText(ctx, line, BOTTOM.x + 8, BOTTOM.y + 8 + i * 12);
+      drawText(ctx, line, BOTTOM.x + 16, BOTTOM.y + 14 + i * 18);
     }
     // The "press to continue" prompt — only once the current beat is fully
     // revealed (so the player knows a press now advances, not skips text).
     if (resolveHeld && reveal >= beatMsg.length && Math.floor(tick * 2) % 2 === 0) {
-      drawText(ctx, '▼', BOTTOM.x + BOTTOM.w - 14, BOTTOM.y + BOTTOM.h - 12, PALETTE.ink);
+      drawText(ctx, '▼', BOTTOM.x + BOTTOM.w - 22, BOTTOM.y + BOTTOM.h - 20, PALETTE.ink);
     }
   }
 
@@ -2463,10 +2479,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     if (!showDevLog) return;
     const pad = 3;
     const lh = 9;
-    const x = 3;
-    const top = 40;
-    const bottom = LOGICAL_H - 4; // hard stop inside the 180px viewport
-    const w = 252;
+    const x = 6;
+    const top = 96;
+    const bottom = BATTLE_LOGICAL_H - 6; // hard stop inside the 360px battle viewport
+    const w = 460;
     const headerH = lh;
     // How many event lines fit the FIXED box (after the header). The display is
     // bounded by the BOX, not the buffer — capped at DEV_LOG_VISIBLE but never
@@ -2578,17 +2594,19 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
     draw(ctx) {
       ctx.fillStyle = PALETTE.battleSky;
-      ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+      ctx.fillRect(0, 0, BATTLE_LOGICAL_W, BATTLE_LOGICAL_H);
+      // Arena ground band — the horizon the fighters stand on, just above the
+      // bottom command panel (BOTTOM.y 238).
       ctx.fillStyle = PALETTE.battleGround;
-      ctx.fillRect(0, 124, LOGICAL_W, 8);
+      ctx.fillRect(0, 214, BATTLE_LOGICAL_W, 24);
 
-      // Platforms under each fighter
+      // Platforms under each fighter (centered on the BATTLE_SLOT sprite).
       ctx.fillStyle = PALETTE.platform;
       ctx.beginPath();
-      ctx.ellipse(FOE_SLOT.x + 28, FOE_SLOT.y + 56, 30, 5, 0, 0, Math.PI * 2);
+      ctx.ellipse(FOE_SLOT.x + BATTLE_SLOT / 2, FOE_SLOT.y + BATTLE_SLOT, 52, 9, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.beginPath();
-      ctx.ellipse(PL_SLOT.x + 28, PL_SLOT.y + 56, 32, 6, 0, 0, Math.PI * 2);
+      ctx.ellipse(PL_SLOT.x + BATTLE_SLOT / 2, PL_SLOT.y + BATTLE_SLOT, 56, 10, 0, 0, Math.PI * 2);
       ctx.fill();
 
       drawSpeciesInSlot(
@@ -2596,14 +2614,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         { name: display.foe.species.name, type: display.foe.species.types[0] ?? null },
         FOE_SLOT.x + spriteOffset('foe'),
         FOE_SLOT.y,
-        { facing: 'left' },
+        { facing: 'left', slotSize: BATTLE_SLOT },
       );
       drawSpeciesInSlot(
         ctx,
         { name: monDisplayName(display.player), type: display.player.species.types[0] ?? null },
         PL_SLOT.x + spriteOffset('player'),
         PL_SLOT.y,
-        { facing: 'right' },
+        { facing: 'right', slotSize: BATTLE_SLOT },
       );
 
       drawReadReaction(ctx); // surface ③ — over the mon, under the HUD panels
@@ -2630,22 +2648,26 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         const activeRound = phase === 'resolve' ? state.round - 1 : state.round;
         const currentIsGust = (activeRound - anchor) % arena.rhythmEveryN === 0;
         const nextIsGust = (state.round + 1 - anchor) % arena.rhythmEveryN === 0;
+        // Transient full-width gust banner, in the band between the foe panel and
+        // the INTENT strip. (2a: it can overlap the boss strip on a Falkner gust
+        // round — a transient pulse over a thin strip; integrating the gust cue
+        // into the boss strip is a 2b refinement.)
         if (currentIsGust && (phase === 'menu' || phase === 'move' || phase === 'resolve')) {
           const pulse = 0.7 + 0.3 * Math.sin(tick * 6);
           ctx.fillStyle = `rgba(70,150,230,${pulse})`;
-          ctx.fillRect(0, 14, LOGICAL_W, 12);
-          drawText(ctx, '~~ GUST ROUND — heavies cost +ST, gale bites harder ~~', 16, 16, PALETTE.paper);
+          ctx.fillRect(0, 88, BATTLE_LOGICAL_W, 20);
+          drawText(ctx, '~~ GUST ROUND — heavies cost +ST, gale bites harder ~~', 32, 90, PALETTE.paper);
         } else if (nextIsGust && (phase === 'menu' || phase === 'move')) {
           ctx.fillStyle = 'rgba(80,140,210,0.7)';
-          ctx.fillRect(0, 14, LOGICAL_W, 12);
-          drawText(ctx, '~~ the wind is rising... GUST next round ~~', 40, 16, PALETTE.paper);
+          ctx.fillRect(0, 88, BATTLE_LOGICAL_W, 20);
+          drawText(ctx, '~~ the wind is rising... GUST next round ~~', 80, 90, PALETTE.paper);
         }
       }
 
       if (breakFlashT > 0) {
         const a = breakFlashT / 0.6;
         ctx.fillStyle = `rgba(255,240,200,${0.6 * a})`;
-        ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+        ctx.fillRect(0, 0, BATTLE_LOGICAL_W, BATTLE_LOGICAL_H);
       }
 
       if (phase === 'text') drawBottomDialog(ctx, textQueue);
