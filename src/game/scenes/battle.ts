@@ -50,7 +50,7 @@ import {
   UI_FONT,
   drawBar,
   drawMomentum,
-  drawPanel,
+  drawBattlePanel,
   drawRowHighlight,
   drawStanceBadge,
   drawText,
@@ -148,6 +148,14 @@ const TIER_WORD: { readonly [k in TierName]: string } = {
   heavy: 'heavy',
   nuke: 'devastating',
 };
+// Jewel tones per tier for the grid badges (2b-2 skin) — escalating: teal →
+// sapphire → purple → velvet as the tier climbs.
+const TIER_BADGE_COLOR: { readonly [k in TierName]: string } = {
+  light: PALETTE.jewelTeal,
+  mid: PALETTE.jewelSapphire,
+  heavy: PALETTE.jewelPurple,
+  nuke: PALETTE.velvet,
+};
 // Short chip labels for the effect-layer statuses (the debuff/buff `kind` strings
 // from engine data.ts). Display-only abbreviations — the exact wording is a 2b-2
 // tuning detail; unknown kinds fall back to an uppercase truncation.
@@ -202,7 +210,8 @@ function moveCellInfo(side: SideState, name: string): MoveCellInfo {
 }
 
 // A move cell in the 2×3 grid: tier badge + name + (ST cost / effect tag), or the
-// lock reason for an unavailable move. Plain colors (2b-2 skins it).
+// lock reason for an unavailable move. 2b-2 skin: inset parchment cell, jewel tier
+// badge, a velvet accent stripe + brass tag for techniques, a velvet selection wash.
 function drawMoveCell(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -212,14 +221,25 @@ function drawMoveCell(
   info: MoveCellInfo,
   selected: boolean,
 ): void {
-  ctx.fillStyle = selected ? 'rgba(90,74,42,0.34)' : 'rgba(246,239,218,0.6)';
+  // Inset parchment cell (a shade down from the panel body).
+  ctx.fillStyle = PALETTE.frameParchmentDim;
   ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = PALETTE.ink;
+  if (selected) {
+    ctx.fillStyle = 'rgba(158,74,58,0.28)'; // velvet selection wash
+    ctx.fillRect(x, y, w, h);
+  }
+  // Technique cells carry a velvet accent stripe down the left edge (the two
+  // pools read apart at a glance).
+  if (info.isTech) {
+    ctx.fillStyle = PALETTE.velvet;
+    ctx.fillRect(x, y, 3, h);
+  }
+  ctx.strokeStyle = selected ? PALETTE.velvet : PALETTE.frameWoodDark;
   ctx.lineWidth = 1;
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
   const ty = y + Math.round(h / 2) - 6;
-  const nameColor = info.legal ? PALETTE.ink : PALETTE.paperDim;
-  const badgeColor = info.legal ? (info.isTech ? PALETTE.stanceG : PALETTE.paperShadow) : PALETTE.paperDim;
+  const nameColor = info.legal ? PALETTE.frameInk : PALETTE.frameInkDim;
+  const badgeColor = info.legal ? TIER_BADGE_COLOR[info.tier] : PALETTE.frameInkDim;
   drawText(ctx, info.badge, x + 8, ty, badgeColor);
   // Cursor + name as one string so the selected move reads ">NAME".
   drawText(ctx, `${selected ? '>' : ' '}${info.name}`, x + 30, ty, nameColor);
@@ -227,7 +247,7 @@ function drawMoveCell(
     drawTextRight(ctx, info.lockLabel, x + w - 5, ty, PALETTE.hpCrit);
   } else {
     const right = info.effectTag ? `${info.effectTag}·ST${info.cost}` : `ST${info.cost}`;
-    drawTextRight(ctx, right, x + w - 5, ty, info.isTech ? PALETTE.stanceG : PALETTE.paperShadow);
+    drawTextRight(ctx, right, x + w - 5, ty, info.isTech ? PALETTE.brass : PALETTE.frameInkSoft);
   }
 }
 
@@ -242,31 +262,30 @@ function sideChips(side: SideState): ReadonlyArray<{ readonly label: string; rea
   return out;
 }
 
-// Draw the status chips near a mon. Debuffs read red, buffs read blue (plain
-// palette — 2b-2 restyles). `vertical` stacks them; otherwise a left-to-right row.
+// Draw the status chips on/near a mon's PANEL (2b-2: repositioned off the sprite).
+// 2b-2 skin: buffs read jewel-teal, debuffs velvet, with a silver-trim outline —
+// small "gemstone" tags on the parchment header. A horizontal row stops before
+// `maxRight` so it can't run into the panel's status-tag / momentum area.
 function drawStatusChips(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   chips: ReadonlyArray<{ readonly label: string; readonly buff: boolean }>,
-  vertical: boolean,
+  maxRight: number,
 ): void {
   let cx = x;
-  let cy = y;
-  // A horizontal row (foe, under the sprite) fits fewer before the canvas edge
-  // than a vertical stack (player, in the side gap) — cap accordingly.
-  for (const chip of chips.slice(0, vertical ? 4 : 3)) {
-    ctx.font = UI_FONT;
-    const w = Math.ceil(ctx.measureText(chip.label).width) + 10;
-    const h = 14;
-    ctx.fillStyle = chip.buff ? PALETTE.stanceG : PALETTE.hpCrit;
-    ctx.fillRect(cx, cy, w, h);
-    ctx.strokeStyle = PALETTE.ink;
+  ctx.font = UI_FONT;
+  for (const chip of chips) {
+    const w = Math.ceil(ctx.measureText(chip.label).width) + 8;
+    if (cx + w > maxRight) break; // never overrun the panel's tag/momentum area
+    const h = 12;
+    ctx.fillStyle = chip.buff ? PALETTE.jewelTeal : PALETTE.velvet;
+    ctx.fillRect(cx, y, w, h);
+    ctx.strokeStyle = PALETTE.silverMid; // silver trim
     ctx.lineWidth = 1;
-    ctx.strokeRect(cx + 0.5, cy + 0.5, w - 1, h - 1);
-    drawText(ctx, chip.label, cx + 5, cy + 1, PALETTE.paper);
-    if (vertical) cy += h + 2;
-    else cx += w + 3;
+    ctx.strokeRect(cx + 0.5, y + 0.5, w - 1, h - 1);
+    drawText(ctx, chip.label, cx + 4, y, PALETTE.paper);
+    cx += w + 3;
   }
 }
 
@@ -2105,7 +2124,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // ---------- draw ----------
 
   function drawFoePanel(ctx: CanvasRenderingContext2D): void {
-    drawPanel(ctx, FOE_PANEL.x, FOE_PANEL.y, FOE_PANEL.w, FOE_PANEL.h);
+    drawBattlePanel(ctx, FOE_PANEL.x, FOE_PANEL.y, FOE_PANEL.w, FOE_PANEL.h);
     // Mon name in a deep, confident slate blue (locked palette) so it pops as a
     // header, like the coloured HP/ST labels.
     drawText(ctx, display.foe.species.name, FOE_PANEL.x + 12, FOE_PANEL.y + 8, PALETTE.stanceG);
@@ -2166,23 +2185,27 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     const x = FOE_PANEL.x;
     const y = FOE_PANEL.y + FOE_PANEL.h + 2;
     const w = FOE_PANEL.w;
-    ctx.fillStyle = 'rgba(28,30,46,0.92)';
+    // Warm-dark leather strip (2b-2) with a silver top inlay line.
+    ctx.fillStyle = 'rgba(46,32,20,0.93)';
     ctx.fillRect(x, y, w, 22);
-    drawText(ctx, `PHASE ${displayPhase}`, x + 6, y + 5, PALETTE.paper);
+    ctx.fillStyle = PALETTE.silverDim;
+    ctx.fillRect(x + 2, y, w - 4, 1);
+    drawText(ctx, `PHASE ${displayPhase}`, x + 6, y + 5, PALETTE.silver);
     drawText(
       ctx,
       'BREAK',
       x + 96,
       y + 5,
-      breakPipFlashT > 0 ? '#ffd76a' : PALETTE.paperShadow,
+      breakPipFlashT > 0 ? PALETTE.momentumGoldHi : PALETTE.frameInkDim,
     );
+    // BREAK pips — jewel-sapphire when filled, gold flash on the newest tick.
     const pipX = x + 150;
     for (let i = 0; i < breakThreshold; i += 1) {
       const filled = i < displayBreakProgress;
       const isNewest = breakPipFlashT > 0 && i === Math.max(0, displayBreakProgress - 1);
-      ctx.fillStyle = isNewest ? '#fff4c2' : filled ? '#e23a1e' : '#4a3c24';
+      ctx.fillStyle = isNewest ? PALETTE.momentumGoldHi : filled ? PALETTE.jewelSapphire : PALETTE.frameWoodDark;
       ctx.fillRect(pipX + i * 16, y + 5, 12, 12);
-      ctx.strokeStyle = PALETTE.ink;
+      ctx.strokeStyle = PALETTE.silverDim;
       ctx.lineWidth = 1;
       ctx.strokeRect(pipX + i * 16 + 0.5, y + 5 + 0.5, 11, 11);
     }
@@ -2192,9 +2215,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const bx = x + w - foe.members.length * 10 - 4;
       for (let i = 0; i < foe.members.length; i += 1) {
         const mon = foe.members[i]!;
-        ctx.fillStyle = mon.hp <= 0 ? '#1d1d28' : i === foe.active ? PALETTE.hpOk : PALETTE.paperDim;
+        ctx.fillStyle = mon.hp <= 0 ? '#1d1d28' : i === foe.active ? PALETTE.hpOk : PALETTE.frameInkDim;
         ctx.fillRect(bx + i * 10, y + 7, 6, 6);
-        ctx.strokeStyle = PALETTE.ink;
+        ctx.strokeStyle = PALETTE.frameInk;
         ctx.strokeRect(bx + i * 10 + 0.5, y + 7 + 0.5, 5, 5);
       }
     }
@@ -2215,7 +2238,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         const pulse = currentIsGust ? 0.55 + 0.4 * Math.sin(tick * 6) : 0.5;
         ctx.fillStyle = currentIsGust ? `rgba(70,150,230,${pulse})` : 'rgba(80,140,210,0.5)';
         ctx.fillRect(gustX, y + 4, gustW, 14);
-        ctx.strokeStyle = PALETTE.ink;
+        ctx.strokeStyle = PALETTE.frameInk;
         ctx.lineWidth = 1;
         ctx.strokeRect(gustX + 0.5, y + 4.5, gustW - 1, 13);
         drawText(ctx, currentIsGust ? 'GUST NOW' : 'GUST NEXT', gustX + 6, y + 5, PALETTE.paper);
@@ -2224,7 +2247,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   }
 
   function drawPlayerPanel(ctx: CanvasRenderingContext2D): void {
-    drawPanel(ctx, PL_PANEL.x, PL_PANEL.y, PL_PANEL.w, PL_PANEL.h);
+    drawBattlePanel(ctx, PL_PANEL.x, PL_PANEL.y, PL_PANEL.w, PL_PANEL.h);
     drawText(ctx, monDisplayName(display.player), PL_PANEL.x + 12, PL_PANEL.y + 8, PALETTE.stanceG);
     if (display.player.focusing) drawText(ctx, 'FOCUS', PL_PANEL.x + 150, PL_PANEL.y + 8, PALETTE.hpWarn);
     else if (display.player.dazed) drawText(ctx, 'DAZE', PL_PANEL.x + 150, PL_PANEL.y + 8, PALETTE.hpCrit);
@@ -2287,8 +2310,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         const eased = 1 - (1 - t) * (1 - t); // ease-out — the bar settles in
         value = bondAdvanceFrom + (bondAdvanceTo - bondAdvanceFrom) * eased;
       }
-      ctx.fillStyle = 'rgba(28,30,46,0.92)';
+      ctx.fillStyle = 'rgba(46,32,20,0.9)'; // warm leather strip (2b-2)
       ctx.fillRect(PL_PANEL.x, stripY, PL_PANEL.w, 14);
+      ctx.fillStyle = PALETTE.silverDim; // silver inlay line
+      ctx.fillRect(PL_PANEL.x + 2, stripY, PL_PANEL.w - 4, 1);
       drawBondBar(ctx, PL_PANEL.x + 6, stripY + 2, PL_PANEL.w - 12 - benchW, value);
     }
     // Right-aligned bench dots (relocated from the panel-left so they clear
@@ -2337,18 +2362,20 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       let fill: string;
       if (fainted) fill = '#1d1d28';
       else if (isActive) fill = PALETTE.hpOk;
-      else fill = PALETTE.paperDim;
+      else fill = PALETTE.frameInkDim;
       ctx.fillStyle = fill;
       ctx.fillRect(x + i * 10, y, 6, 6);
-      ctx.strokeStyle = PALETTE.ink;
+      ctx.strokeStyle = PALETTE.frameInk;
       ctx.lineWidth = 1;
       ctx.strokeRect(x + i * 10 + 0.5, y + 0.5, 5, 5);
     }
   }
 
   function drawIntent(ctx: CanvasRenderingContext2D): void {
-    ctx.fillStyle = 'rgba(32,32,44,0.92)';
+    ctx.fillStyle = 'rgba(46,32,20,0.92)'; // warm leather strip (2b-2)
     ctx.fillRect(INTENT.x, INTENT.y, INTENT.w, INTENT.h);
+    ctx.fillStyle = PALETTE.silverDim; // silver inlay line
+    ctx.fillRect(INTENT.x + 2, INTENT.y, INTENT.w - 4, 1);
     const intentLabelX = INTENT.x + 8;
     drawText(ctx, 'FOE INTENT:', intentLabelX, INTENT.y + 4, PALETTE.hpWarn);
     // Plain-language intent (honest, precision degraded per the reliability
@@ -2392,25 +2419,25 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     ctx.globalAlpha = prevA * situationAlpha; // fade the whole banner
     ctx.fillStyle = 'rgba(255, 215, 90, 0.94)';
     ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = PALETTE.ink;
+    ctx.strokeStyle = PALETTE.frameInk;
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-    drawTextCenter(ctx, situationShown, cx, y + 6, PALETTE.ink);
+    drawTextCenter(ctx, situationShown, cx, y + 6, PALETTE.frameInk);
     ctx.globalAlpha = prevA;
   }
 
   function drawBottomDialog(ctx: CanvasRenderingContext2D, lines: readonly string[]): void {
-    drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+    drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     for (let i = 0; i < Math.min(4, lines.length); i += 1) {
       drawText(ctx, lines[i]!, BOTTOM.x + 16, BOTTOM.y + 14 + i * 20);
     }
     if (Math.floor(tick * 2) % 2 === 0) {
-      drawText(ctx, '▼', BOTTOM.x + BOTTOM.w - 22, BOTTOM.y + BOTTOM.h - 20, PALETTE.ink);
+      drawText(ctx, '▼', BOTTOM.x + BOTTOM.w - 22, BOTTOM.y + BOTTOM.h - 20, PALETTE.frameInk);
     }
   }
 
   function drawBottomMenu(ctx: CanvasRenderingContext2D): void {
-    drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+    drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     const me = activeMon(state.player);
     // CD menu labels (2b-1): FIGHT / CALLS / MONS / BALLS / RUN, with the
     // informative suffixes kept (ball count, Call ★/lock reason).
@@ -2443,39 +2470,39 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         `${menuCursor === i ? '>' : ' '} ${labels[it.kind]}`,
         BOTTOM.x + 18,
         rowY,
-        dim ? PALETTE.paperDim : PALETTE.ink,
+        dim ? PALETTE.frameInkDim : PALETTE.frameInk,
       );
     });
     // (Removed the dim "R{round}" debug round-counter — not player-facing.)
     // Legibility #2 — when the player has no ★, teach what charges it (the
     // cause/effect the callouts now also show: win a read → +★).
     if (me.momentum === 0) {
-      drawText(ctx, 'win a read to charge ★', BOTTOM.x + 280, BOTTOM.y + 14, PALETTE.paperDim);
+      drawText(ctx, 'win a read to charge ★', BOTTOM.x + 280, BOTTOM.y + 14, PALETTE.frameInkDim);
     }
     drawText(
       ctx,
       'A confirm  B back',
       BOTTOM.x + 280,
       BOTTOM.y + BOTTOM.h - 20,
-      PALETTE.paperDim,
+      PALETTE.frameInkDim,
     );
   }
 
   function drawBottomParty(ctx: CanvasRenderingContext2D): void {
-    drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+    drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     drawText(
       ctx,
       partyMode === 'forced' ? 'SEND OUT WHO?' : 'PARTY',
       BOTTOM.x + 16,
       BOTTOM.y + 8,
-      PALETTE.paperShadow,
+      PALETTE.frameInkSoft,
     );
     const team = state.player;
     team.members.forEach((side, i) => {
       const isActive = i === team.active;
       const fainted = side.hp <= 0;
       const selectable = isPartySelectable(i);
-      const color = !selectable ? PALETTE.paperDim : PALETTE.ink;
+      const color = !selectable ? PALETTE.frameInkDim : PALETTE.frameInk;
       const cursor = partyCursor === i ? '>' : ' ';
       const hpStr = `HP ${Math.round(side.hp)}/${side.maxHp}`;
       const tag = fainted ? 'FNT' : isActive ? 'ACT' : '';
@@ -2483,7 +2510,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       drawText(ctx, row, BOTTOM.x + 16, BOTTOM.y + 30 + i * 16, color);
     });
     const help = partyMode === 'forced' ? 'A: send out' : 'A: switch  B: back';
-    drawText(ctx, help, BOTTOM.x + 16, BOTTOM.y + BOTTOM.h - 20, PALETTE.paperDim);
+    drawText(ctx, help, BOTTOM.x + 16, BOTTOM.y + BOTTOM.h - 20, PALETTE.frameInkDim);
   }
 
   // The CD-format move view (2b-1): a 2×3 grid — 4 ATTACKS (2 columns) + 2
@@ -2491,7 +2518,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // move-detail panel + the A/G/F stance selector in the right column. Plain
   // colors (2b-2 skins it). Reads the two-pool + tier-gate engine truth.
   function drawBottomMoves(ctx: CanvasRenderingContext2D): void {
-    drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+    drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     const side = activeMon(state.player);
     const attacks = attackPool(side.species);
     const techs = techniquePool(side.species);
@@ -2501,7 +2528,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     const gx = BOTTOM.x + 12;
     const cellW = 158;
     const cellGX = 164;
-    drawText(ctx, 'ATTACKS', gx, BOTTOM.y + 6, PALETTE.paperShadow);
+    drawText(ctx, 'ATTACKS', gx, BOTTOM.y + 6, PALETTE.frameInkSoft);
     for (let i = 0; i < attacks.length; i += 1) {
       const col = i % 2;
       const row = Math.floor(i / 2);
@@ -2515,7 +2542,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         moveCursor === i,
       );
     }
-    drawText(ctx, 'TECHNIQUES', gx, BOTTOM.y + 78, PALETTE.paperShadow);
+    drawText(ctx, 'TECHNIQUES', gx, BOTTOM.y + 78, PALETTE.frameInkSoft);
     for (let j = 0; j < techs.length; j += 1) {
       drawMoveCell(
         ctx,
@@ -2529,21 +2556,21 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
 
     // Divider between the grid and the detail/stance column.
-    ctx.fillStyle = PALETTE.paperShadow;
+    ctx.fillStyle = PALETTE.frameInkSoft;
     ctx.fillRect(BOTTOM.x + 344, BOTTOM.y + 8, 1, BOTTOM.h - 16);
 
     // ── RIGHT column: SELECTED detail + stance selector ──────────────────────
     const rx = BOTTOM.x + 356;
     const sel = moves[moveCursor] ? moveCellInfo(side, moves[moveCursor]!) : null;
-    drawText(ctx, 'SELECTED', rx, BOTTOM.y + 6, PALETTE.paperShadow);
+    drawText(ctx, 'SELECTED', rx, BOTTOM.y + 6, PALETTE.frameInkSoft);
     if (sel) {
-      drawText(ctx, sel.name, rx, BOTTOM.y + 20, sel.legal ? PALETTE.ink : PALETTE.paperDim);
+      drawText(ctx, sel.name, rx, BOTTOM.y + 20, sel.legal ? PALETTE.frameInk : PALETTE.frameInkDim);
       drawText(
         ctx,
         `${sel.badge} ${sel.isTech ? 'TECHNIQUE' : 'ATTACK'} · ${sel.type ?? 'NEUTRAL'} · ST${sel.cost}`,
         rx,
         BOTTOM.y + 38,
-        PALETTE.paperShadow,
+        PALETTE.frameInkSoft,
       );
       const move = lookupMove(sel.name);
       let desc: string;
@@ -2564,8 +2591,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         if ((l1 + ' ' + w).trim().length <= 40 || !l1) l1 = (l1 + ' ' + w).trim();
         else l2 = (l2 + ' ' + w).trim();
       }
-      drawText(ctx, l1, rx, BOTTOM.y + 54, sel.legal ? PALETTE.ink : PALETTE.hpCrit);
-      if (l2) drawText(ctx, l2, rx, BOTTOM.y + 68, sel.legal ? PALETTE.ink : PALETTE.hpCrit);
+      drawText(ctx, l1, rx, BOTTOM.y + 54, sel.legal ? PALETTE.frameInk : PALETTE.hpCrit);
+      if (l2) drawText(ctx, l2, rx, BOTTOM.y + 68, sel.legal ? PALETTE.frameInk : PALETTE.hpCrit);
     }
 
     // Stance selector — the three stance badges, current one boxed + named.
@@ -2580,8 +2607,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       drawStanceBadge(ctx, bx, sy, STANCES[i]!);
     }
     // Current stance name, and the commit indicator (FULL POWER / FOCUS).
-    drawText(ctx, STANCE_NAME[stance], rx + 60, sy + 1, PALETTE.ink);
-    if (pendingFullPower) drawText(ctx, '▶FULL+50%', rx + 116, sy + 1, PALETTE.star);
+    drawText(ctx, STANCE_NAME[stance], rx + 60, sy + 1, PALETTE.frameInk);
+    if (pendingFullPower) drawText(ctx, '▶FULL+50%', rx + 116, sy + 1, PALETTE.momentumGold);
     else if (committing) drawText(ctx, '▶FOCUS', rx + 116, sy + 1, PALETTE.hpCrit);
 
     // Turn-order preview — the HONEST "who acts first" for THIS move (initiative
@@ -2594,11 +2621,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       `NEXT: ${order}${fluidFirst ? ' ·FLUID' : ''}`,
       rx,
       BOTTOM.y + 102,
-      fluidFirst ? PALETTE.stanceF : PALETTE.paperShadow,
+      fluidFirst ? PALETTE.stanceF : PALETTE.frameInkSoft,
     );
     // Controls hint — right-aligned so it can't overflow the panel; ASCII only
     // (m3x6 lacks the ←→ arrows). SEL cycles stance, L/R toggles the FOCUS commit.
-    drawTextRight(ctx, 'SEL stance · L/R commit · B back', BOTTOM.x + BOTTOM.w - 8, BOTTOM.y + 102, PALETTE.paperDim);
+    drawTextRight(ctx, 'SEL stance · L/R commit · B back', BOTTOM.x + BOTTOM.w - 8, BOTTOM.y + 102, PALETTE.frameInkDim);
   }
 
   // FOCUS R2 — the release picker (the hidden release is chosen NOW).
@@ -2608,30 +2635,30 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // rows. Previously the header (y+4) and the first row (y+5) drew on the same
   // line at the same x — "RELEASE:" collided with ">HEAVY" and its hint.
   function drawBottomRelease(ctx: CanvasRenderingContext2D): void {
-    drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
-    drawText(ctx, 'RELEASE:', BOTTOM.x + 16, BOTTOM.y + 10, PALETTE.paperShadow);
+    drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+    drawText(ctx, 'RELEASE:', BOTTOM.x + 16, BOTTOM.y + 10, PALETTE.frameInkSoft);
     RELEASES.forEach((r, i) => {
       const y = BOTTOM.y + 34 + i * 20; // rows below the header
       const marker = releaseCursor === i ? '>' : ' ';
-      const color = releaseCursor === i ? PALETTE.ink : PALETTE.paperShadow;
+      const color = releaseCursor === i ? PALETTE.frameInk : PALETTE.frameInkSoft;
       drawText(ctx, `${marker}${r.name}`, BOTTOM.x + 18, y, color);
     });
     // The selected release's rotation hint — right column, aligned with the
     // first row (clear of the left-column move names).
     const sel = RELEASES[releaseCursor]!;
-    drawText(ctx, `${sel.name} ${sel.beats}`, BOTTOM.x + 300, BOTTOM.y + 34, PALETTE.paperShadow);
-    drawText(ctx, 'A=release', BOTTOM.x + 300, BOTTOM.y + BOTTOM.h - 20, PALETTE.paperDim);
+    drawText(ctx, `${sel.name} ${sel.beats}`, BOTTOM.x + 300, BOTTOM.y + 34, PALETTE.frameInkSoft);
+    drawText(ctx, 'A=release', BOTTOM.x + 300, BOTTOM.y + BOTTOM.h - 20, PALETTE.frameInkDim);
   }
 
   function drawBottomCall(ctx: CanvasRenderingContext2D): void {
-    drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+    drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     // Two columns (the full set is 6) so the player sees the Calls they
     // grow into. Locked + unaffordable render greyed; only Catch Breath
     // is selectable for now.
     CALL_SET.forEach((call, i) => {
       const unlocked = callUnlocked(call);
       const greyed = !unlocked || !callAffordable(call);
-      const color = greyed ? PALETTE.paperDim : PALETTE.ink;
+      const color = greyed ? PALETTE.frameInkDim : PALETTE.frameInk;
       const col = i < 3 ? 0 : 1;
       const row = i % 3;
       const x = BOTTOM.x + 16 + col * 306;
@@ -2647,33 +2674,33 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       `Your ★${activeMon(state.player).momentum}   A use · B back`,
       BOTTOM.x + 16,
       BOTTOM.y + BOTTOM.h - 18,
-      PALETTE.paperDim,
+      PALETTE.frameInkDim,
     );
   }
 
   function drawBottomSpare(ctx: CanvasRenderingContext2D): void {
-    drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+    drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     const foeName = display.foe.species.name;
     drawText(ctx, `The wild ${foeName} fell.`, BOTTOM.x + 16, BOTTOM.y + 12);
-    drawText(ctx, 'Tend it with medicine — show mercy?', BOTTOM.x + 16, BOTTOM.y + 32, PALETTE.paperShadow);
+    drawText(ctx, 'Tend it with medicine — show mercy?', BOTTOM.x + 16, BOTTOM.y + 32, PALETTE.frameInkSoft);
     drawText(
       ctx,
       `${spareCursor === 0 ? '>' : ' '} YES — spare it`,
       BOTTOM.x + 20,
       BOTTOM.y + 64,
-      spareCursor === 0 ? PALETTE.ink : PALETTE.paperDim,
+      spareCursor === 0 ? PALETTE.frameInk : PALETTE.frameInkDim,
     );
     drawText(
       ctx,
       `${spareCursor === 1 ? '>' : ' '} NO — claim the win`,
       BOTTOM.x + 320,
       BOTTOM.y + 64,
-      spareCursor === 1 ? PALETTE.ink : PALETTE.paperDim,
+      spareCursor === 1 ? PALETTE.frameInk : PALETTE.frameInkDim,
     );
   }
 
   function drawBottomLog(ctx: CanvasRenderingContext2D): void {
-    drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+    drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     for (let i = 0; i < log.length; i += 1) {
       let line = log[i]!;
       // Stream the current beat's line (the newest): reveal it progressively.
@@ -2685,7 +2712,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // The "press to continue" prompt — only once the current beat is fully
     // revealed (so the player knows a press now advances, not skips text).
     if (resolveHeld && reveal >= beatMsg.length && Math.floor(tick * 2) % 2 === 0) {
-      drawText(ctx, '▼', BOTTOM.x + BOTTOM.w - 22, BOTTOM.y + BOTTOM.h - 20, PALETTE.ink);
+      drawText(ctx, '▼', BOTTOM.x + BOTTOM.w - 22, BOTTOM.y + BOTTOM.h - 20, PALETTE.frameInk);
     }
   }
 
@@ -2850,11 +2877,12 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       if (breakThreshold > 0) drawBossStrip(ctx);
       drawPlayerPanel(ctx);
       drawPlayerUnderPanel(ctx); // bond meter + bench dots (Lane A)
-      // Status chips (2b-1) — the previously-invisible effect-layer statuses
-      // (debuff + stacking buffs) as chips near each mon, from live engine state.
-      // Foe: a row under the foe sprite; player: a stack right of the player sprite.
-      drawStatusChips(ctx, FOE_SLOT.x, FOE_SLOT.y + BATTLE_SLOT + 2, sideChips(activeMon(state.foe)), false);
-      drawStatusChips(ctx, PL_SLOT.x + BATTLE_SLOT + 6, PL_SLOT.y + 8, sideChips(activeMon(state.player)), true);
+      // Status chips (2b-2) — the effect-layer statuses (debuff + stacking buffs)
+      // as gemstone tags ON the mon's PANEL header (repositioned off the sprite
+      // feet), from live engine state. The row sits after the name and stops before
+      // the panel's status-tag / momentum area.
+      drawStatusChips(ctx, FOE_PANEL.x + 72, FOE_PANEL.y + 7, sideChips(activeMon(state.foe)), FOE_PANEL.x + 146);
+      drawStatusChips(ctx, PL_PANEL.x + 72, PL_PANEL.y + 7, sideChips(activeMon(state.player)), PL_PANEL.x + 146);
 
       if (phase === 'menu' || phase === 'move' || phase === 'call' || phase === 'release') drawIntent(ctx);
       // S1 — the read-war callout occupies the intent slot during resolve. Drawn

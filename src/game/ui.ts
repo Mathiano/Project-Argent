@@ -180,6 +180,52 @@ export function drawPanel(
   ctx.fillRect(x + r, y + 1, w - 2 * r, 1);
 }
 
+// The BATTLE panel — a warm "cabinet" (parchment body, aged-wood frame) with a
+// silver inlay line + corner rivets ("jewelry on warm leather"). Battle-ONLY, so
+// the shared drawPanel (every menu / overworld box) stays exactly as it was — the
+// battle scene has its own palette (Part 2b-2). Same rounded-rect + drop-shadow
+// construction as drawPanel; only the palette + the silver-inlay detail differ.
+export function drawBattlePanel(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): void {
+  const r = PANEL_RADIUS;
+  // Drop shadow — the panel floats over the arena.
+  ctx.fillStyle = 'rgba(40,26,14,0.18)';
+  fillRoundRect(ctx, x + 3, y + 4, w, h, r);
+  ctx.fillStyle = 'rgba(40,26,14,0.34)';
+  fillRoundRect(ctx, x + 2, y + 2, w, h, r);
+  // Dark-wood outer edge → wood frame band → parchment body (a ~2px warm frame).
+  ctx.fillStyle = PALETTE.frameWoodDark;
+  fillRoundRect(ctx, x, y, w, h, r);
+  ctx.fillStyle = PALETTE.frameWood;
+  fillRoundRect(ctx, x + 1, y + 1, w - 2, h - 2, r);
+  ctx.fillStyle = PALETTE.frameParchment;
+  fillRoundRect(ctx, x + 3, y + 3, w - 6, h - 6, Math.max(1, r - 1));
+  // Silver inlay line just inside the top of the wood frame.
+  ctx.fillStyle = PALETTE.silverMid;
+  ctx.fillRect(x + r + 1, y + 2, w - 2 * r - 2, 1);
+  // Warm top highlight inside the parchment (lit-from-above).
+  ctx.fillStyle = 'rgba(255,250,235,0.45)';
+  ctx.fillRect(x + r + 1, y + 4, w - 2 * r - 2, 1);
+  // Silver corner rivets — 2×2 studs inset from each corner.
+  ctx.fillStyle = PALETTE.silver;
+  for (const [rx, ry] of [
+    [x + 4, y + 4],
+    [x + w - 6, y + 4],
+    [x + 4, y + h - 6],
+    [x + w - 6, y + h - 6],
+  ] as ReadonlyArray<readonly [number, number]>) {
+    ctx.fillRect(rx, ry, 2, 2);
+    ctx.fillStyle = PALETTE.silverDim;
+    ctx.fillRect(rx, ry + 1, 2, 1);
+    ctx.fillStyle = PALETTE.silver;
+  }
+}
+
 // A selection-row tint behind the cursor's menu row — code-drawn hierarchy (no
 // new solid colour, no art): a paperShadow wash darkens the focused row over the
 // light panel so it reads as selected, reinforcing the '>' marker. Strengthened
@@ -303,8 +349,10 @@ export function drawMomentum(
     [x + 8, y + 6],
     [x + 4, y],
   ];
+  // GOLD — the momentum meter is the "legendary treasure" accent (battle-only
+  // caller). Lit pips gold, unlit a warm dim (Part 2b-2 skin).
   for (let i = 0; i < slots.length; i += 1) {
-    ctx.fillStyle = i < count ? PALETTE.star : PALETTE.starOff;
+    ctx.fillStyle = i < count ? PALETTE.momentumGold : PALETTE.momentumOff;
     ctx.fillText('★', slots[i]![0], slots[i]![1]);
   }
 }

@@ -37,6 +37,44 @@ export const PALETTE = {
   // bond meter reads as the relationship axis, not a combat resource.
   bond: '#c0608a',
   bondDim: '#5d2f44',
+
+  // ── Battle-UI skin (Part 2b-2) — "a warm artifact, silver-inlaid" ───────────
+  // The battle scene has its OWN palette, distinct from the overworld terrain.
+  // Mood: warm, cozy, ancient, legendary — NOT cold metal, NOT muddy brown.
+  // ⚠️ THESE HEXES ARE TUNED LIVE with Mathias — this is the STARTING POINT (CD
+  // reference values, biased a touch warmer/brighter). Adjust freely here; the
+  // battle draws reference these keys, so tuning is a one-file edit. The SEMANTIC
+  // bars above (hp/st/bond/stance) are NOT part of this skin — leave them.
+
+  // Warm structural — the parchment / aged-wood / leather "cabinet" (frames+panels)
+  frameParchment: '#f6e7c2', // panel body — warm, bright (brighter than CD #f3e2bd)
+  frameParchmentDim: '#ecd6a6', // inset/cell parchment (a shade down)
+  frameWood: '#a9713f', // wood/leather mid — the frame band (warmer than CD #8f6244)
+  frameWoodDark: '#734b2c', // frame outer edge — dark warm
+  frameInk: '#3a2a1c', // warm dark — text + outlines (replaces the cold ink in battle)
+  frameInkSoft: '#7c5637', // softer warm — secondary text / labels
+  frameInkDim: '#b09068', // dim warm — disabled / hint text
+
+  // Silver — INLAY / TRIM / RIVETS only (never a surface fill). "Jewelry on leather."
+  silver: '#eef1f4',
+  silverMid: '#c9ced6',
+  silverDim: '#8b93a3',
+
+  // Gold — the momentum ★ meters ONLY (legendary treasure).
+  momentumGold: '#e8c04a',
+  momentumGoldHi: '#f6e6a8',
+  momentumGoldDim: '#a8842e',
+  momentumOff: '#8f7d55', // unlit ★ — warm dim (not the cold starOff)
+
+  // Velvet / brass — technique cells + selection highlight.
+  velvet: '#9e4a3a',
+  velvetDark: '#7c3328',
+  brass: '#c9772e',
+
+  // Jewel tones — tier badges, the BREAK bar, boss aura.
+  jewelTeal: '#3d7a72',
+  jewelSapphire: '#35558f',
+  jewelPurple: '#6d5aa8',
 } as const;
 
 export type PaletteKey = keyof typeof PALETTE;
