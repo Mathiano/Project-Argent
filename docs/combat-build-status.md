@@ -1,6 +1,6 @@
 # Combat Build — Status & Next Steps (session checkpoint)
 
-**Status:** The combat SPINE is largely built. The effect-move/status layer, the momentum-economy phased-unlock + behind-penalty, and the two-pool move model (Part A) are all shipped and sim-gated. What remains is the damage ceiling, the deferred specials, the 640×360 battle UI, the stat-foundation, and the holistic balance pass. This doc is the running checkpoint; **the ordered plan lives in `docs/combat-roadmap.md`** (this doc is the "what happened + why + what's banked" companion).
+**Status:** The mechanical combat **SYSTEM is COMPLETE.** The effect-move/status layer, the momentum spine (Spine-1 phased-unlock + Spine-2 behind-penalty — Spine-3's hard ceiling was DROPPED, folded into HP-tuning), the two-pool move model (Part A), and Updraft are all shipped and sim-gated; tempo (UPHEAVAL/TREMOR) is CUT. Everything remaining is **content, UI, and tuning**: the 640×360 battle UI, the stat-foundation (which now also carries one-shot prevention), and the holistic balance pass. This doc is the running checkpoint; **the ordered plan lives in `docs/combat-roadmap.md`** (this doc is the "what happened + why + what's banked" companion).
 
 **Source-of-truth reminder:** `docs/combat-design-canonical.md` = the canonical spec; live knobs in `src/engine/config.ts`; `combat-focus-AS-BUILT.md` = the two-step code-truth. Docs win over code; flag conflicts, never silently change design numbers.
 
@@ -15,20 +15,23 @@
 - **`0178cfa`** — Wave B: 6 control/resource effects (Frozen, Inception, Taunt, Drained, Sap, Corrode). Control is ESCAPABLE (stance-locks bind only moves, DR resists chain-locking; freezes land ~20% of rounds yet freezer wins 0%).
 - **`2dfd363`** — Wave C: 11 buffs/heals/cleanse (TIDE MEND, UNDERTOW, SIPHON, ENTANGLE, WANE, STEADY, REFORGE, VEIL, SET STANCE, FOCUS UP, GLASS EDGE). Heal-turtle found + magnitude-fixed once (tideMend 0.30→0.10 etc.) — but see #5: the phased-unlock economy re-broke these.
 
-~31 of the 34-technique roster built (TERRA tempo UPHEAVAL/TREMOR, GALE UPDRAFT/WING FLARE, DRAKE DREAD GAZE/PRIMAL ROAR still unbuilt).
+~32 of the roster built. GALE UPDRAFT is now built (see the Updraft sign-off below); TERRA tempo (UPHEAVAL/TREMOR) is CUT (not unbuilt — see the tempo-cut decision); GALE WING FLARE (STATIC HAZE stands in) + DRAKE DREAD GAZE/PRIMAL ROAR remain unbuilt.
 
 ### The momentum-economy spine
 - **Spine-1 — `f53fdf3`** — phased-unlock: ★ gates attack tiers via a legality FILTER (unaffordable tier = locked/not-offered, not backfire — backfire would also make the AI fumble). `MOMENTUM_REQ_BY_TIER` (light:0/mid:1/heavy:2/nuke:3) on the existing `Move.tier`, alongside the stamina/winded gates. Attacks-only (techniques ★-exempt). Falkner adapted to the ★-economy (banked 2★ opening, hold-vs-spend Catch Breath, breakBar 2→4, tuned reads) → a fair gentle Gym-1 boss. **Independently audited GREEN by Terminal B** (reproduced to the decimal; 0 draws / 30k).
 - **Spine-2 — `f99bf40`** — the behind-penalty (anti-snowball): `damage × max(FLOOR, 1 − perStar × momentum-behind)`, `behind = max(0, foe.momentum − self.momentum) ∈ {0..3}`. Composed LAST in the attacker-outgoing block of BOTH `rawHit` + `resolveStrike` (every path inherits it). **`behindPenaltyPerStar` = 0.04, `behindPenaltyFloor` = 0.65** — sim-tuned DOWN from the brief's 0.10 (at 0.10, Falkner's banked 2★ opening dropped his fair cells below band). Spine-1's tier-gate is the PRIMARY anti-snowball; the behind-penalty is a SECONDARY nudge. Two intentional composition calls: the **Guard counter-reflect IS scaled** (being behind weakens everything); **status application is NOT penalized** (only chip damage scales — the comeback lane).
-- **Spine-3 — the damage ceiling — NOT YET BUILT** (roadmap #1; playtest-independent; ~70% no-one-shot cap; finishes the spine).
+- **Spine-3 — the damage ceiling — DROPPED (reframed).** The hard ~70% cap is cut; one-shots are prevented via HP-tuning instead (see the Spine-3 reframe under Session design decisions). The momentum spine is COMPLETE at Spine-1 + Spine-2.
 
 ### The two-pool move model — Part A — `c7e2c67`
-4 ATTACKS (no `effect`, ★-gated by tier) + 2 TECHNIQUES (with `effect`, cast-in-stance, ★-exempt), partitioned from the flat `species.moves`. Accessors `attackPool`/`techniquePool`/`affordableAttacks`/`affordableTechniques`; `movePoolIssues()` enforces ≥1 light Basic / ≤4 attacks / ≤2 techniques (`twoPool.test.ts`, 6/6). Techniques equipped on all 15 CH1 mons (FLAME SEAR+KINDLE, NATURE SIPHON+ENTANGLE, AQUA TIDE MEND+UNDERTOW; **GALE STATIC HAZE+SECOND WIND and TERRA BULWARK+TOXIC SAP are STAND-INS** — their real roster is unbuilt). GALEHAWK+MARSHMASH trimmed of the redundant neutral HEADBUTT → uniform 4+2. AI: `trainerPolicy` gains a technique-cast branch (0.25 rate); `wildFoeAI` already random-picks the full pool; **Falkner kept bit-identical** (his pickers filter to attacks; his techniques sit in-pool, his bespoke gust-AI plays his kit). **Part B = the 640×360 visual UI** (roadmap #3).
+4 ATTACKS (no `effect`, ★-gated by tier) + 2 TECHNIQUES (with `effect`, cast-in-stance, ★-exempt), partitioned from the flat `species.moves`. Accessors `attackPool`/`techniquePool`/`affordableAttacks`/`affordableTechniques`; `movePoolIssues()` enforces ≥1 light Basic / ≤4 attacks / ≤2 techniques (`twoPool.test.ts`, 6/6). Techniques equipped on all 15 CH1 mons (FLAME SEAR+KINDLE, NATURE SIPHON+ENTANGLE, AQUA TIDE MEND+UNDERTOW; **GALE is now STATIC HAZE+UPDRAFT** — UPDRAFT is the real GALE technique, the SECOND WIND stand-in removed, STATIC HAZE still stands in for WING FLARE; **TERRA BULWARK+TOXIC SAP remains a STAND-IN** — tempo is cut, so TERRA keeps these). GALEHAWK+MARSHMASH trimmed of the redundant neutral HEADBUTT → uniform 4+2. AI: `trainerPolicy` gains a technique-cast branch (0.25 rate); `wildFoeAI` already random-picks the full pool; **Falkner kept bit-identical** (his pickers filter to attacks; his techniques sit in-pool, his bespoke gust-AI plays his kit). **Part B = the 640×360 visual UI** (roadmap #1).
+
+### Updraft (GALE) — `f5094df`
+The GALE identity technique — a self-buff granting "act as if +1★ for tier-ACCESS" (**capped to mid**; heavy/nuke still need the real ★). Surgical: touches ONLY the phased-unlock gate — no actual ★ granted, no behind-penalty effect. GALE loadout is now STATIC HAZE + UPDRAFT. See the Updraft sign-off (the mid-cap is an APPROVED deviation — do not revert it).
 
 ### The dev combat-log — `1bb2302` (+ `7338829` layout fix)
 Toggleable event log (`?log=1` / backtick) so the invisible depth (status ticks, read-wins, ★ swings) is legible **at dev time**. NOT the shipping status readout (see the invisible-status gap).
 
-**Current suite: 884 pass / 6 skip.** The 6 skips = deferred balance (all → #5, below).
+**Current suite: 891 pass / 6 skip.** The 6 skips = deferred balance (all → #5, below).
 
 **The full depth (spine + techniques + statuses) is LIVE and playable now** (rough dev-UI, log via `?log=1`); the depth playtest — is the read-war fun + legible? — is the GATE on all further combat work (Spine-3 onward). Note: the 6 quarantined balance issues will feel off in play (heals / SECOND WIND / KAMON) — that's known-deferred, not new bugs.
 
@@ -47,9 +50,29 @@ A "validated" sim result was a **measuring-instrument artifact.** Under phased-u
 
 ---
 
+## Session design decisions (2026-07-02)
+
+### Spine-3 (damage ceiling) — REFRAMED: no hard cap; prevent one-shots via HP-tuning
+The original Spine-3 (a hard ~70% single-hit cap) is **DROPPED** as a mechanic. The no-one-shot rule was a GUIDELINE about FEEL ("battles take several turns"), not the mechanism — and a hard cap PUNISHES earned success (under phased-unlock + the behind-penalty, engineering a one-shot is HARD and, if pulled off, EARNED; capping it away betrays the skill-rewarded thesis). The RIGHT prevention is HP POOLS: if stronger mons have large enough HP that a single hit realistically can't reach 100%, one-shots don't happen BECAUSE OF THE MATH (not a rule), and the rare genuinely-earned huge hit is ALLOWED to land + feel spectacular.
+- NO hard clamp is built — an earned massive hit lands.
+- One-shot prevention becomes a TUNING outcome — folds into the **stat-foundation** increment (per-mon HP + evolution-stage scaling) and the **holistic pass #5** (hpScale/dmgScale balanced so no-one-shots holds in normal play).
+- OPTIONAL soft backstop (a very-high ~95–100% single-hit clamp) is available but NOT chosen — revisit only if a degenerate trivial turn-1 one-shot ever surfaces.
+=> The momentum SPINE is **COMPLETE at Spine-1 + Spine-2**; the "third vertebra" dissolves into HP-tuning (one fewer core-math mechanic to build/sim-gate).
+
+### Tempo (UPHEAVAL/TREMOR) — CUT. No design hole.
+Tempo is **CUT**, not built. High-risk (must not corrupt the triangle — the read-war IS the triangle) for narrow payoff (a KO-race strike-order effect that rarely fires, since HP-tuning makes both-would-KO situations rare). Confirmed NO hole: TERRA's identity (earth/tank — defense, attrition, endurance) is intact via its already-built non-tempo techniques (BULWARK/DR, TOXIC SAP/attrition); the core loop (triangle + momentum + techniques) is validated fun WITHOUT tempo (the Falkner playtest had none); tempo wasn't a counter to anything, so cutting leaves nothing unanswerable. "Cutting" = UPHEAVAL/TREMOR simply never get built (TERRA draws from the non-tempo roster) — nothing removed from code, zero risk. If the speed-in-a-kill-race dilemma ever feels missing in play → find a more elegant solution THEN, don't pre-solve it. => The remaining "specials" work was JUST Updraft (now done).
+
+### Balance philosophy — metas are a FEATURE; target GAME-BREAKING, not inequality
+Standing principle for all tuning (esp. #5): perfect balance is a mirage AND undesirable — in a system this deep (34 techniques, 6-move loadouts, stances, momentum) some moves/combos WILL be stronger, and that's GOOD (the joy is the player DISCOVERING strong lines; flattening to equal kills discovery). The line that matters is **FUN-STRONG vs. GAME-BREAKING**: a move being better = fine (rewards knowledge); a move being DOMINANT (no-counter auto-win, e.g. SECOND WIND) = the problem. That distinction is DEGENERACY, not inequality — exactly the line the sim-gate already draws (it checks for domination / 100%-no-counterplay, NOT parity). The cycle: Mathias PLAYS → finds strong/broken lines (and "feels cheap" / "boring-strong" — a human signal the sim can't) → reports → we patch. => #5's job is NOT "make all 34 effects equal." It is "**eliminate the GAME-BREAKING degeneracies** (the 6 quarantined gates + whatever sim/playtest surfaces) and otherwise **let the meta breathe**."
+
+### Updraft — SHIPPED (`f5094df`) + THE MILESTONE
+Updraft (GALE — "act as if +1★ for tier-access") is DONE. The GALE loadout is now **STATIC HAZE + UPDRAFT** (the SECOND WIND stand-in removed). ⚠️ The **mid-cap is an INTENTIONAL, APPROVED deviation** from the literal "+1★" spec: uncapped, early HEAVY access was DEGENERATE (a 0%-win aggressive strategy → 74% off early DIVE BOMBs in the fragile glass-mirror); capping the boost to MID access kills it (74% → 0%) while keeping the identity (throw your typed mid a beat early; pure use ~29%). **Do NOT "fix" it back to uncapped.** Surgical scope holds (no actual ★ granted, no behind-penalty effect). — With Updraft in and tempo cut, **the mechanical combat SYSTEM is now COMPLETE: everything remaining is content, UI, and tuning.**
+
+---
+
 ## Banked decisions & future work (not yet built)
 
-### Stat-foundation increment (roadmap #4; separable)
+### Stat-foundation increment (roadmap #2; separable; now also carries one-shot prevention)
 - **(a) Per-mon stamina** — today stamina is a GLOBAL 100 and Catch Breath is a flat +50 (`catchBreathRestorePct` 0.5 of the global cap). Add `Species.stamina` + a per-mon `maxSt`; make Catch Breath restore % of the mon's OWN max. (HP/ATK/DEF/SPD are already per-mon; stamina is the lone uniform axis.)
 - **(b) Evolution-stage scaling** — phase-3 > phase-1 across stats; single-phase legendaries EXEMPT.
 - **(c) Profile-matched stat sets** — each mon's stats deliberately match its archetype (tank / speedy-attacker / etc.), extended to stamina.
@@ -60,7 +83,7 @@ Spine-2 recon flagged a compounding risk: the trailing side is BOTH tier-gated (
 ### The Blissey no-repeat lever (candidate #5 fix)
 A single mechanism may collapse two of the #5 problem classes: **restrict repeated same-buff/heal casts** — hard no-repeat / cooldown / diminishing-returns (the DR machinery may already exist via refresh-not-stack + control-status fade) / escalating cost. This plausibly fixes BOTH the buff-turtle magnitudes (i) AND the SECOND WIND ★-farm (ii) — a reliable *repeatable* no-read generator/heal is the shared root. Decide the flavor in #5.
 
-### The 640×360 battle-UI direction (roadmap #3)
+### The 640×360 battle-UI direction (roadmap #1)
 The battle UI rebuilt at **640×360** (the overworld + rest of the game STAYS GBA 320×180) — the read-war (6 moves, stances, momentum, 34 statuses) is too dense for 320×180. Carries: the two-row ATTACKS/TECHNIQUES layout, **locked-attack greying** (★-locked attacks visibly dimmed — a playtest legibility need), and **player-facing status indicators on the mons** (the shipping fix for the invisible-status gap). Mathias's visual domain (likely functional structure CC + look Mathias/Claude Design). Scope its requirements FROM the depth playtest.
 
 ### The invisible-status gap
@@ -94,5 +117,5 @@ Runs LAST, once the economy stops changing (spine + two-pool + stats settled —
 ## Note for the next session / a fresh CC
 - The mechanism is in `2fbf82b`; the spine in `f53fdf3` (Spine-1) + `f99bf40` (Spine-2); two-pool in `c7e2c67`. Read before extending. Techniques resolve via the existing triangle (cast-in-stance) — don't build parallel resolution.
 - ALL combat changes are sim-gated against the canonical `reader`. Post-spine the ladders are NOT bit-identical (core math changed — expected). Validate "no degeneracy + read-war central + no one-shots."
-- **The ordered plan is `docs/combat-roadmap.md`.** Next up: the depth playtest (the gate on everything after), then Spine-3.
+- **The ordered plan is `docs/combat-roadmap.md`.** Next up: the depth playtest (the gate on everything after), then the 640×360 UI / stat-foundation (the mechanical system is complete — Spine-3 dropped, tempo cut, Updraft done).
 - One Terminal A (builder, master) task at a time. Explicit `git add` paths, never `-A`. Terminal B = read-only auditor on the `Argent-termB` worktree.
