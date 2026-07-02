@@ -882,6 +882,40 @@ describe('battle move list — cursor wrap + rejection paths + B-back', () => {
     scene.draw(ctx);
     expect(hasFocus(ctx)).toBe(true);
   });
+
+  test('the release picker labels rows "HEAVY ATTACK" and shows the charged attack (2b-3 / Q2)', () => {
+    // A mon mid-Focus (focus set) → beginTurn routes to the release phase. The
+    // charged attack (focus.move) carries through the release, so the picker names
+    // WHICH attack is releasing + labels the rows "<release> ATTACK" (not a bare
+    // "HEAVY" that misreads as a damage tier). GRUBLEAF's LEAF LASH = mid/T1/NATURE.
+    let state = createBattleState(
+      createTeam([createSide(CH1.GRUBLEAF!)]),
+      createTeam([createSide(CH1.FLITPECK!)]),
+    );
+    const patched: SideState = { ...activeMon(state.player), focus: { stance: 'A', move: 'LEAF LASH' } };
+    state = { ...state, player: setActiveMember(state.player, patched) };
+    const scene = createBattleScene({
+      state,
+      rng: mulberry32(1),
+      chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'A' }),
+      intro: [],
+      catchBreathUnlocked: false,
+      canRun: true,
+      onResolve: () => {},
+    });
+    scene.update?.(0.01); // beginTurn → phase 'release'
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    // Rows read "<RELEASE> ATTACK", not bare "HEAVY".
+    expect(ctx.texts.some((t) => t.includes('HEAVY ATTACK'))).toBe(true);
+    expect(ctx.texts.some((t) => t.includes('FEINT ATTACK'))).toBe(true);
+    expect(ctx.texts.some((t) => t.includes('HIDE ATTACK'))).toBe(true);
+    // The charged attack is shown by name + its ATTACK detail line (badge/type/ST).
+    expect(screen).toContain('RELEASING');
+    expect(ctx.texts.some((t) => t.includes('LEAF LASH'))).toBe(true);
+    expect(ctx.texts.some((t) => t.includes('T1 ATTACK'))).toBe(true);
+  });
 });
 
 describe('battle resolve + end-text', () => {

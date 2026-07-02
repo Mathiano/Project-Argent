@@ -2655,13 +2655,34 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const y = BOTTOM.y + 34 + i * 20; // rows below the header
       const marker = releaseCursor === i ? '>' : ' ';
       const color = releaseCursor === i ? PALETTE.frameInk : PALETTE.frameInkSoft;
-      drawText(ctx, `${marker}${r.name}`, BOTTOM.x + 18, y, color);
+      // "HEAVY ATTACK" (not bare "HEAVY") — it's YOUR charged attack delivered
+      // that way, NOT a damage tier. Heavy/Feint/Hide is the read-multiplier on top.
+      drawText(ctx, `${marker}${r.name} ATTACK`, BOTTOM.x + 18, y, color);
     });
-    // The selected release's rotation hint — right column, aligned with the
-    // first row (clear of the left-column move names).
+
+    // Right column — the CHARGED ATTACK that carries through this release. Its
+    // type/tier/damage/initiative all carry (via focus.move → rawHit); Heavy/Feint/
+    // Hide only sets the read-outcome multiplier. Showing it here (mirroring the
+    // move view's SELECTED detail) makes concrete WHICH attack is being released,
+    // so "HEAVY" can't misread as a generic heavy-tier hit. Display-only.
+    const rx = BOTTOM.x + 300;
+    const chargedName = activeMon(state.player).focus?.move;
+    if (chargedName) {
+      const info = moveCellInfo(activeMon(state.player), chargedName);
+      drawText(ctx, 'RELEASING:', rx, BOTTOM.y + 8, PALETTE.frameInkSoft);
+      drawText(ctx, info.name, rx, BOTTOM.y + 22, PALETTE.frameInk);
+      drawText(
+        ctx,
+        `${info.badge} ${info.isTech ? 'TECHNIQUE' : 'ATTACK'} · ${info.type ?? 'NEUTRAL'} · ST${info.cost}`,
+        rx,
+        BOTTOM.y + 40,
+        PALETTE.frameInkSoft,
+      );
+    }
+    // The selected release's rotation hint + the confirm prompt.
     const sel = RELEASES[releaseCursor]!;
-    drawText(ctx, `${sel.name} ${sel.beats}`, BOTTOM.x + 300, BOTTOM.y + 34, PALETTE.frameInkSoft);
-    drawText(ctx, 'A=release', BOTTOM.x + 300, BOTTOM.y + BOTTOM.h - 20, PALETTE.frameInkDim);
+    drawText(ctx, `${sel.name}: ${sel.beats}`, rx, BOTTOM.y + 64, PALETTE.frameInkSoft);
+    drawText(ctx, 'A=release', rx, BOTTOM.y + BOTTOM.h - 20, PALETTE.frameInkDim);
   }
 
   function drawBottomCall(ctx: CanvasRenderingContext2D): void {
