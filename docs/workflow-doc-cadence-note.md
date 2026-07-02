@@ -19,3 +19,14 @@ Claude kept appending decisions to its workspace copy of combat-build-status.md 
 - docs/combat-build-status.md — the what/why/banked companion (canonical: committed version).
 - docs/combat-roadmap.md — the ordered plan (committed 4014dc1).
 - docs/combat-design-canonical.md — the design spec / canon.
+
+## The two-way sync rule (adopted 2026-07-03, doc-audit Card 6)
+Docs drift when the project plane and the repo plane diverge (the doc-audit found 6 such collisions). Standing practice — **keep the two planes in sync, both directions, same session:**
+- **Project → repo:** every project-plane `*-decision` / `*-spec` / `*-verdict` doc gets a **same-session CC commit** into `docs/` (so the repo is canon, not a stale mirror).
+- **Repo → project:** every repo *canon* doc that changes gets **mirrored back to project knowledge** (so the project plane isn't stale).
+- The two-way file-list reconciliation itself can be a follow-up (CC generates the lists); the RULE is the standing discipline. Repo canon wins on any conflict.
+
+## Standing post-increment reporting items (doc-audit Cards 3 + 6)
+Add to every increment's close-out report:
+- **Refresh the CLAUDE.md combat lines** — CLAUDE.md's combat summary (Calls toolkit, canon constants, cap/Catch-Breath) goes stale as systems ship. Re-check + refresh it whenever an increment changes the combat surface (e.g. Card 3: line 58's Calls list was stale after Lane B shipped Recover/Dodge/Full Power).
+- **Two-way doc sync** — list any project↔repo docs this increment touched that need mirroring (per the rule above).

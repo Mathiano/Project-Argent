@@ -16,15 +16,19 @@ A mon's learnset has base entries (level-gated, as today) PLUS **bond-gated entr
 - 1-2 coverage moves per significant line sit behind bond tiers, giving the player a reason to invest in a specific mon and a sense of it "growing into itself."
 
 ### Track B — Call economy (the partnership)
-The ★ Momentum / Trainer Call system deepens with bond — pure read-economy, the most anime-bond mechanic in the game:
+The ★ Momentum / Trainer Call system deepens with bond — pure read-economy, the most anime-bond mechanic in the game.
 
-| Bond tier | Earned by (quality) | Unlock |
-|---|---|---|
-| **I — Familiar** | first few read-wins / first boss fought with | first read-win each battle grants ★ free (jumpstart) |
-| **II — Trusted** | sustained read-wins, a gym cleared | Catch Breath also clears one Winded step |
-| **III — Attuned** | multiple bosses, many Calls landed | ★ cap 2 → 3 for this mon (more Call banking) |
-| **IV — In Step** | deep investment | this mon's signature Call costs 1 less ★ |
-| **V — Bonded** | endgame-level investment | **second Call slot** — two charges, two Calls per battle (the veteran partner) |
+> **⚠️ EFFECTS-LADDER STATUS (doc-audit reconcile, 2026-07-03).** This original 5-tier table was authored against the display stages + a cap-of-2 economy; it is reconciled to the AS-BUILT below and to the code's 7 named stages (see the display table). **A dedicated STAGE-7 bond design is forthcoming (Mathias)** — the effects ladder is deliberately NOT re-placed onto stages now; it leaves room for that plan. Per-item:
+>
+> | Original tier reward | Status now |
+> |---|---|
+> | **jumpstart** (first read-win each battle grants a free ★) | **BUILT — now gated at STAGE 5, "Partners in Kind"** (`bond.ts` `JUMPSTART_STAGE = 5`; was stage 2 — a genuinely-bonded mid-game reward). DECOUPLED from the Calls-unlock below. |
+> | **Calls unlock** (the toolkit becomes usable) | **BUILT — at STAGE 2, "Warming"** (`bond.ts` `bondUnlocksCalls`, or the run flag). The built Calls: GET AWAY / HANG IN THERE / Catch Breath + Lane B's RECOVER / DODGE / FULL POWER. |
+> | **★ cap 2 → 3 for this mon** | **RETIRED — obsolete.** The ★ cap is GLOBALLY 3 now (`COMBAT.momentumCap`), so a "raise the cap" reward is meaningless. |
+> | **signature Call costs −1 ★** | **SUPERSEDED / ON-HOLD** pending the stage-7 plan. Not placed on a stage. |
+> | **second Call slot** (two charges/battle) | **SUPERSEDED / ON-HOLD** pending the stage-7 plan. Not placed on a stage. |
+>
+> Track A (bond-gated moves) and the Catch-Breath / status-defense ideas below stand; only Track B's effects placement is deferred to the stage-7 design.
 
 ## The display model — named stages, never a number (ruling)
 
@@ -40,7 +44,7 @@ Bond is a **HIDDEN 1–100 value**. The player **never sees the number**; it is 
 | 6 | 79–92 | Kindred |
 | 7 | 93–100 | Inseparable |
 
-- **Each stage gates the bond benefits above** — the bond-gated moves (Track A) and the Call-economy unlocks (Track B). Crossing into a new stage is a felt step in the partnership that also unlocks capability. (The five Call-economy tiers map onto these seven stages; the exact stage→unlock placement is a tuning/wordsmith detail for Mathias — e.g. the second-Call-slot payoff sits at the top stage, the jumpstart at the first.)
+- **Each stage gates the bond benefits above** — the bond-gated moves (Track A) and the Call-economy unlocks (Track B). Crossing into a new stage is a felt step in the partnership that also unlocks capability. AS-BUILT: the Calls unlock at **stage 2** ("Warming") and the ★-jumpstart at **stage 5** ("Partners in Kind"); the remaining Track-B rewards are on-hold for the forthcoming stage-7 design (see the Track B status note).
 - **Where it shows:** the **party-menu summary screen's BOND line** — the forward-hook placeholder already rendered there (Phase 4). It shows the **stage name**, never the number.
 - **Rationale:**
   - **Hidden number → no grind-bar feel.** A visible 0–100 bar invites grinding to fill it; a named stage invites *living with* the mon. The number still exists under the hood for the sim/tuning — it's just never shown.

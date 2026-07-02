@@ -2,9 +2,18 @@
 
 **Status:** vision doc, NOT a build. Captured now so the target is concrete; built in the Phase 7+ art/polish pass, against a frozen, working game. Everything here is a *data swap* on the existing data-driven engine (tilesets, prefabs, sprites, animations are all data) — so none of it requires engine changes, and the architecture is already built to receive it.
 
-## The thesis
+## The thesis — FEEL is canon (2026 reimagining of Silver/Ruby)
 
-Argent is Silver *revamped* — so the visual bar is "**Silver's soul at a fidelity Silver's hardware never allowed.**" Not photoreal, not a different art style — recognizably GBC-descended pixel art, but with the resolution (320×180, 6× the GBC working area), color depth (64-color master palette), and animation budget that 1999 couldn't afford. The reference points are modern pixel-art games that kept retro *language* while adding modern *craft*: Stardew Valley's warmth, Eastward's lighting, the newer fan-Pokémon and HD-2D looks.
+Argent is a **2026 REIMAGINING of Silver/Ruby**: the **FEEL** of that era at a fidelity the hardware never allowed — **retro soul, modern craft**. The FEEL is the canon, **not a hardware-resolution law**: Argent is NOT "strict GBC" nor "strict GBA" as a technical ceiling. The reference points are modern pixel-art games that kept retro *language* while adding modern *craft*: Stardew Valley's warmth, Eastward's lighting, the newer fan-Pokémon and HD-2D looks.
+
+**Resolution — a choice serving the feel, not an inviolable law:**
+- The **overworld stays 320×180** — that IS the overworld identity (and where we are — it looks great). A deliberate choice, held because it serves the feel, not because the hardware demands it. (See `battle-ui-spec-decisions.md` — the "320×180 identity" language and this are both true under feel-is-canon.)
+- The **battle scene already exceeds it (640×360)** — the battle is the place to raise visual fidelity.
+- **Animations later MAY break the GBA wall** — flashier than 2003 hardware allowed — *because flashiness serving the feel* (impactful, readable combat) wins over hardware-authenticity. Forward permission for the animation lane.
+
+**Palette (post-reseed, doc-audit 2026-07-03):** the terrain master is **~41 colours** (the Pocket Creature Tamer reseed — `assets/palettes/argent-master.palette.json`; was mis-stated as 64). The **battle-UI palette is DECOUPLED (~20 colours)** — its own warm-artifact skin (`src/game/palette.ts`), distinct from the terrain master.
+
+**Canonical shorthand:** *"Silver/Ruby's soul at 2026 fidelity — FEEL over hardware-authenticity. 320×180 overworld is the identity; battle + animations may exceed it where flashiness serves the feel."*
 
 **The rule that makes it affordable:** we beautify *last*, against frozen systems, as data. A static sprite → animated sprite is a data swap. A flat tile → animated tile is a data swap. We never re-architect for visuals; we *fill in* the visual layer the engine already consumes.
 

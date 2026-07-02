@@ -55,7 +55,7 @@ When code and docs conflict: **docs win**. Flag conflicts; never silently change
 - Bond growth — challenge-scaled XP; gates the JUMPSTART ★ (`docs/bond-track-v2.md`)
 - PC box + Pokédex — `src/game/scenes/{boxMenu,dexMenu}.ts`
 - Black-out + instant boss retry — `src/game/main.ts`
-- **DESIGNED, NOT BUILT — do not canonize:** RESOLVE (the bond ceiling-breaker / desperate comeback) is design-only (`docs/bond-track-v2.md`, `docs/the-concord.md`); the engine has no Resolve mechanic (only a deferred-unlock note in `bond.ts`). The Calls toolkit today is GET AWAY / HANG IN THERE / Catch Breath only.
+- **DESIGNED, NOT BUILT — do not canonize:** RESOLVE (the bond ceiling-breaker / desperate comeback) is design-only (`docs/bond-track-v2.md`, `docs/the-concord.md`); the engine has no Resolve mechanic (only a deferred-unlock note in `bond.ts`). The BUILT Calls toolkit is GET AWAY / HANG IN THERE / Catch Breath PLUS Lane B's RECOVER / DODGE / FULL POWER (each gated by its bond tier). RESOLVE is the only Call still design-only.
 
 ## The sim gate (non-negotiable)
 

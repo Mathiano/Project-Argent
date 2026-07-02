@@ -60,16 +60,15 @@ FLAME→Burn(DoT) · AQUA→Recover(heal) · NATURE→Drain(lifesteal) · SPARK�
 
 ---
 
-## 5. TEMPO — narrow, KO-race only, CUT-ABLE
+## 5. TEMPO — **CUT** (no design hole; 2026-07-02, `9b7c83d`)
 
-Per B's brace investigation: in the simultaneous triangle, action ORDER only affects the KO-RACE (who strikes first when both could be lethal), NOT the triangle outcome (the Brace counter is a resolution rule, fires regardless of order). So tempo is NARROW:
-- Tempo = a finisher/denial tool, KO-race only. Tier 1 (not game-warping). TERRA owns the axis (UPHEAVAL = foe can't win the kill-race; TREMOR = you win it).
-- BUILD AS strike-order/KO-race modifiers ONLY — must NOT alter triangle resolution.
-- **If CC can't make the narrow version work without touching the triangle → CUT tempo entirely** (Mathias's standing caveat).
+Per B's brace investigation: in the simultaneous triangle, action ORDER only affects the KO-RACE (who strikes first when both could be lethal), NOT the triangle outcome (the Brace counter is a resolution rule, fires regardless of order). So tempo was NARROW — a KO-race-only finisher/denial tool. Per Mathias's standing caveat ("if the narrow version can't work without touching the triangle → CUT tempo entirely"), **it was CUT**: the tempo techniques are gone, TERRA no longer owns a tempo axis, and there is no design hole (the read-war carries the depth). Recorded here for history; there is nothing to build.
 
 ---
 
-## 6. THE 34-MOVE ROSTER (2 techniques/type)
+## 6. THE MOVE ROSTER (2 techniques/type planned; **29 built** in data.ts)
+
+> Count note (doc-audit 2026-07-03): this is the DESIGN roster (up to 2 techniques × 17 types). The BUILD ships **29 moves-with-effect** (`src/engine/data.ts`) — TERRA's tempo pair was CUT (§5) and a few remain unbuilt. "29" is the canonical built count (was mis-stated as 34).
 
 | Type | Technique 1 | Technique 2 |
 |---|---|---|
@@ -80,7 +79,7 @@ Per B's brace investigation: in the simultaneous triangle, action ORDER only aff
 | FROST | FROST BIND — Frozen (stance-lock 1-2rds), T2, read-win | GLASS EDGE — self-buff: next attack harder but more exposed, T1, Buff |
 | BRAWN | CHALLENGE — Taunt (force Aggressive 1rd) + Daze, T1 | WARCRY — Call Lock (foe can't spend ★ 1-2rds), T2, read-win |
 | VENOM | TOXIC SAP — Drained (stamina-bleed 2-3rds), T1 | CORRODE — foe's next technique costs more/fizzles, T1-2 |
-| TERRA | UPHEAVAL — Stunned (foe can't win kill-race), T1, read-win | TREMOR — Quicken (you win the kill-race), T1, Buff |
+| TERRA | — (tempo CUT §5; TERRA techniques TBD) | — (tempo CUT §5; TERRA techniques TBD) |
 | GALE | UPDRAFT — act as if +1★ for tier-access this turn, T1, Buff | WING FLARE — Daze (buffet), T1 |
 | PSI | MIND SNARE — Inception (force-repeat-stance), T1 | FALSE ECHO — Echo (force-repeat-Call), T1-2 |
 | INSECT | LEECH BITE — Sap (burst stamina-drain), T1 | SWARM — Amplify (double-★-next-read), T2, Buff, ⚠️snowball |
@@ -104,7 +103,7 @@ Trainers get 2-3 strategies each (NOT know-it-alls). Consolidate with `trainer-c
 
 ## 8. BUILD SEQUENCE (all sim-gated except #0)
 0. ✅ Status-engine scaffolding (dadaa24 — inert plumbing, bit-identical). DONE.
-1. Wire statuses + effect moves into the scaffolding (the 34 moves, the read-win application, cast-in-a-stance, effect-move damage). FIRST sim-gated combat increment — Monte Carlo validation, no degenerate line dominates, read-war + hold-vs-spend stay central.
+1. Wire statuses + effect moves into the scaffolding (the 29 built moves-with-effect, the read-win application, cast-in-a-stance, effect-move damage). FIRST sim-gated combat increment — Monte Carlo validation, no degenerate line dominates, read-war + hold-vs-spend stay central.
 2. Two-pool move model (learnsets + battle UI).
 3. Momentum-economy reshape (phased-unlock gate, behind-penalty, hold-vs-spend, damage ceiling).
 (Order of 1-3 TBD at build — some interleaving likely. Each its own sim-gated increment.)

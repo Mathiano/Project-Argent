@@ -8,11 +8,13 @@ import {
 } from '../engine';
 import { BOND_MAX, BOND_STAGES, bondStage } from './catching';
 import {
+  CALLS_UNLOCK_STAGE,
   CHALLENGE_CAP,
   JUMPSTART_STAGE,
   applyBondXp,
   bondAfterFight,
   bondStageCrossing,
+  bondUnlocksCalls,
   bondXp,
   challengeFactor,
   hasJumpstart,
@@ -175,11 +177,18 @@ describe('scenarios — the gate (growth feel, firewall, renewable)', () => {
 });
 
 describe('hasJumpstart — the one effect’s unlock (B5)', () => {
-  test('locked at the freshly-met first stage, unlocked from stage 2', () => {
+  test('locked below Partners in Kind, unlocked from stage 5 (doc-audit Card 1)', () => {
     expect(hasJumpstart(5)).toBe(false); // Wary (stage 1)
-    expect(hasJumpstart(BOND_STAGES[0]!.max)).toBe(false); // top of stage 1
-    expect(hasJumpstart(BOND_STAGES[0]!.max + 1)).toBe(true); // into stage 2
-    expect(bondStage(BOND_STAGES[0]!.max + 1)).toBe(JUMPSTART_STAGE);
+    expect(hasJumpstart(BOND_STAGES[3]!.max)).toBe(false); // top of stage 4 (In Sync)
+    expect(hasJumpstart(BOND_STAGES[3]!.max + 1)).toBe(true); // into stage 5 (Partners in Kind)
+    expect(bondStage(BOND_STAGES[3]!.max + 1)).toBe(JUMPSTART_STAGE);
+    expect(JUMPSTART_STAGE).toBe(5);
+  });
+
+  test('the Call-unlock bond moment stays at stage 2 (decoupled from jumpstart)', () => {
+    expect(bondUnlocksCalls(BOND_STAGES[0]!.max)).toBe(false); // still stage 1
+    expect(bondUnlocksCalls(BOND_STAGES[0]!.max + 1)).toBe(true); // into stage 2 (Warming)
+    expect(CALLS_UNLOCK_STAGE).toBe(2);
   });
 });
 

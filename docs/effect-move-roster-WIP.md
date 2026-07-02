@@ -1,4 +1,4 @@
-# Effect-Move Roster (WIP) — the ~34 technique moves (2/type)
+# Effect-Move Roster (WIP) — the 29 built technique moves (2/type planned; tempo cut)
 
 **Status:** DESIGN IN PROGRESS. The TECHNIQUE-pool moves delivering the locked statuses (`combat-depth-types-status.md`) under the framework (`effect-move-framework-additions.md`). Naming law: 1-2 words ALL CAPS, status-readable, distinct from the 43 damage names. Potency→tier. All carry chip damage unless pure self-buff. Drop in `docs/` when the roster's complete.
 
@@ -13,14 +13,11 @@
 - **FROST:** FROST BIND (Frozen — stance-lock 1-2rds, T2, read-win) · GLASS EDGE (self-buff: next attack hits harder but more exposed — the FROST best-offense/worst-defense identity, T1, Buff)
 - **BRAWN:** CHALLENGE (Taunt — force foe Aggressive 1rd + Daze, T1) · WARCRY (Call Lock — foe can't spend ★ on Calls 1-2rds, T2, read-win)
 - **VENOM:** TOXIC SAP (Drained — stamina-bleed 2-3rds, T1) · CORRODE (foe's next technique costs more/fizzles — anti-utility, T1-2)
-- **TERRA:** UPHEAVAL (Stunned, reframed: foe can't win the kill-race this round = KO-race denial, T1, read-win) · TREMOR (Quicken: you win the kill-race this round = finisher enable, T1, Buff)
+- **TERRA:** tempo pair (UPHEAVAL/TREMOR) **CUT** — TERRA's techniques are TBD (see below).
 
-## TEMPO — HARD BUILD CONDITION (banked)
-The TERRA tempo effects (UPHEAVAL/TREMOR) are NARROW per B's brace-investigation: in the simultaneous triangle, order only affects the KO-RACE (who strikes first when both could be lethal), NOT the triangle outcome. So:
-- Tempo = a finisher/denial tool, KO-race only. Tier 1 (narrow, not game-warping). TERRA owns the whole tempo axis (deny their kill / enable yours).
-- BUILD AS strike-order/KO-race modifiers ONLY — must NOT alter triangle resolution.
-- **If CC can't make the narrow version work without touching the triangle → CUT tempo entirely** (Mathias's standing caveat). Tempo is the cut-able mechanic; flag explicitly in the wiring brief.
-- FROST's original weak tempo move (Cold Snap) was CUT for this reason (too thin) → replaced with GLASS EDGE.
+## TEMPO — **CUT** (2026-07-02, `9b7c83d`)
+Tempo was NARROW (KO-race only — in the simultaneous triangle, order only affects who strikes first when both could be lethal, not the triangle outcome). Per Mathias's standing caveat ("if the narrow version can't work without touching the triangle → CUT tempo entirely"), it was **CUT** — the TERRA tempo pair (UPHEAVAL/TREMOR) is gone, no design hole (the read-war carries the depth). Recorded for history; nothing to build.
+(Historical: FROST's original weak tempo move Cold Snap was cut earlier for the same thinness → replaced with GLASS EDGE.)
 
 ## Momentum/Call-economy effects — placement so far
 Sap Focus→SPARK, Silence→UMBRA, Echo→PSI, Second Wind→STONE, Attunement→FLAME, Call Lock→BRAWN, Amplify→INSECT (batch 2), tempo→TERRA. The core economy is touched by many types (good spread).

@@ -32,7 +32,7 @@ The battle UI rebuilt at 640×360 (overworld + rest of game STAYS GBA 320×180).
 - Includes: the two-row ATTACKS/TECHNIQUES layout, **locked-attack greying** (the playtest bug — ★-locked attacks visibly dimmed), and **player-facing status indicators/icons on the mons** (the shipping solution to the invisible-status gap — the dev-log is only the dev-time version).
 - Mathias's VISUAL domain (CC can't see) — maybe Claude Design. Likely splits: functional structure (CC) + the look (Mathias/CD).
 - Scope its REQUIREMENTS from the playtest (how much status info must show, how the read-war must read). **Button placement doesn't matter until this** — don't invest in the 320×180 battle UI.
-- Sub-item (open question): an attack/technique EXPLAINER (the 34 effects need to be legible) — location TBD (menu/overworld/battle-UI).
+- Sub-item (open question): an attack/technique EXPLAINER (the 29 effects need to be legible) — location TBD (menu/overworld/battle-UI).
 
 ### 2. Stat-foundation increment  [separable; now ALSO carries one-shot prevention]
 Per-mon stat depth (the behind-penalty doesn't depend on it, so it's flexible in order):
@@ -43,7 +43,7 @@ Per-mon stat depth (the behind-penalty doesn't depend on it, so it's flexible in
 Connects to the Call-rebalance (Catch Breath scaling to a bigger pool helps equalize Calls).
 
 ### 3. THE HOLISTIC POTENCY/FEEL TUNING PASS ("**#5**" — the stable name used across the docs + code)  [LAST — needs the settled economy]
-Re-tune + re-validate ALL ~34 effects in the FINAL settled economy (after the spine + two-pool + stats stop changing — tuning earlier = whack-a-mole). **The GOAL is NOT "make all 34 effects equal"** — metas are a feature (see the balance philosophy). It's: **eliminate the GAME-BREAKING degeneracies and otherwise let the meta breathe.** Also **validates no-one-shots-in-normal-play** (hpScale/dmgScale balanced — the Spine-3 reframe's tuning gate). The deferred balance lives here. THREE known problem classes:
+Re-tune + re-validate ALL 29 effects in the FINAL settled economy (after the spine + two-pool + stats stop changing — tuning earlier = whack-a-mole). **The GOAL is NOT "make all 29 effects equal"** — metas are a feature (see the balance philosophy). It's: **eliminate the GAME-BREAKING degeneracies and otherwise let the meta breathe.** Also **validates no-one-shots-in-normal-play** (hpScale/dmgScale balanced — the Spine-3 reframe's tuning gate). The deferred balance lives here. THREE known problem classes:
 - **(i) Buff-turtle magnitudes** (heal-turtle/bulwark-turtle/set-stance) — MAGNITUDE tuning.
 - **(ii) SECOND WIND→FULL POWER = 100%** — a STRUCTURAL degeneracy (reliable no-read ★-farm → burst), likely a DESIGN fix not a number. **Candidate lever: the "Blissey" no-repeat rule** (restrict repeated same-buff/heal casts — hard no-repeat / cooldown / diminishing-returns [DR machinery may already exist via refresh-not-stack + control-status fade] / escalating cost). This ONE lever may also fix (i) — collapses two classes into one mechanism. Decide the flavor here.
 - **(iii) rivalCard trainer-tech bleed** — the buff-turtle quarantine via KAMON's AI; re-settles when (i)/(ii) are tuned.

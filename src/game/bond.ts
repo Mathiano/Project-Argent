@@ -163,15 +163,26 @@ export function bondAfterFight(currentValue: number, input: BondFightInput): num
 
 // ---- The one combat effect's unlock (B5) --------------------------------
 
-// The Tier-I "Familiar" jumpstart (first read-win each battle banks a free
-// ★) unlocks once a mon crosses out of the freshly-met first stage into the
-// second — i.e. it has actually bonded a little, not at the moment of
-// catching. (Call-tier→display-stage placement is a tuning detail per
-// bond-track-v2; stage 2 is the first FELT step. Mathias can retune.)
-export const JUMPSTART_STAGE = 2;
+// The JUMPSTART (first read-win each battle banks a free ★) unlocks at bond
+// stage 5, "Partners in Kind" (doc-audit Card 1, 2026-07-03: moved up from stage
+// 2 — a genuinely-bonded mid-game reward, not an early freebie). DECOUPLED from
+// the Calls-unlock below, which stays at stage 2 (they used to share a threshold).
+// Call-tier→display-stage placement is a tuning detail per bond-track-v2 (stage-7
+// rewards forthcoming). Fixtures/sim never bond → bit-identical.
+export const JUMPSTART_STAGE = 5;
 
 export function hasJumpstart(bondValue: number): boolean {
   return bondStage(bondValue) >= JUMPSTART_STAGE;
+}
+
+// The Call economy unlocks as the FIRST felt bond moment — stage 2, "Warming"
+// (the established design; memory: Calls unlock at bond stage 2 OR the run flag).
+// Kept SEPARATE from JUMPSTART_STAGE so moving jumpstart to 5 (Card 1) did not
+// silently lock Calls until stage 5.
+export const CALLS_UNLOCK_STAGE = 2;
+
+export function bondUnlocksCalls(bondValue: number): boolean {
+  return bondStage(bondValue) >= CALLS_UNLOCK_STAGE;
 }
 
 // Did applying bond XP cross into a new named stage? Returns the from/to

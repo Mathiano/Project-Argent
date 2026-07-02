@@ -92,6 +92,7 @@ import { createBondStageScene } from './scenes/bondStage';
 import {
   applyBondXp,
   bondStageCrossing,
+  bondUnlocksCalls,
   bondXp,
   hasJumpstart,
   powerIndex,
@@ -350,8 +351,8 @@ function buildPlayerTeam(): ReturnType<typeof createTeam> {
   // run.party between battles. HP carries through (the persistent resource
   // — healed at Centers/potions); STAMINA resets to full at battle start
   // (firstroad-fixes S1). freshBattleSide owns that contract (tested).
-  // Arm the bond jumpstart (B5) per mon: a Familiar-tier mon's first read-
-  // win this battle banks a free ★. Read-economy only — the engine applies
+  // Arm the bond jumpstart (B5) per mon: a stage-5 ("Partners in Kind") mon's
+  // first read-win this battle banks a free ★. Read-economy only — the engine applies
   // it; bond never touches stats. Each mon's own bond decides (index-
   // aligned with run.partyBond), so a bonded mon keeps the perk after a
   // switch. freshBattleSide already cleared round-local flags.
@@ -473,15 +474,16 @@ function promptNickname(speciesName: string, done: (nickname?: string) => void):
 // IT ended (finalState.members — the fight-strain signal). `participants` are
 // player party indices, aligned with run.party/run.partyBond. Bond is
 // horizontal — this only moves the bond value, never a stat.
-// Calls unlock as a BOND moment — the Tier-I "Familiar" step (bond stage ≥ 2,
-// Warming; the same threshold as the ★-jumpstart) — OR via the legacy run
-// flag (kept so existing unlock paths still fire). This fixes "Calls never
-// usable": the flag was set only by specific fight wins, so a path that
-// missed them left Calls locked forever even with ★ banked. Bond now unlocks
-// them robustly (bond-track-v2: the Call economy is a bond reward). Read off
-// the lead's bond (the active mon in the common 1-mon case).
+// Calls unlock as a BOND moment — bond stage ≥ 2, "Warming" (the first felt step)
+// — OR via the legacy run flag (kept so existing unlock paths still fire). This
+// fixes "Calls never usable": the flag was set only by specific fight wins, so a
+// path that missed them left Calls locked forever even with ★ banked. Bond now
+// unlocks them robustly (bond-track-v2: the Call economy is a bond reward). Read
+// off the lead's bond (the active mon in the common 1-mon case). NOTE: this stays
+// at stage 2 even though the ★-JUMPSTART moved to stage 5 (Card 1) — the two were
+// decoupled (bondUnlocksCalls vs hasJumpstart).
 function callsUnlocked(): boolean {
-  return run.catchBreathUnlocked || hasJumpstart(run.partyBond[0] ?? 0);
+  return run.catchBreathUnlocked || bondUnlocksCalls(run.partyBond[0] ?? 0);
 }
 
 // A bond stage-crossing to announce after the battle (Issue 1).
@@ -524,8 +526,8 @@ function awardBondForFight(
     const cross = bondStageCrossing(before, after);
     if (cross) {
       // Calls newly unlock when this crossing reaches the Warming bond moment
-      // (hasJumpstart threshold) and the run flag hadn't already unlocked them.
-      const unlocksCalls = !hasJumpstart(before) && hasJumpstart(after) && !run.catchBreathUnlocked;
+      // (stage 2, bondUnlocksCalls) and the run flag hadn't already unlocked them.
+      const unlocksCalls = !bondUnlocksCalls(before) && bondUnlocksCalls(after) && !run.catchBreathUnlocked;
       crossings.push({
         species: mon.species.name,
         fromName: bondStageName(before),
