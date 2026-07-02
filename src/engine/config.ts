@@ -198,6 +198,25 @@ export const STATUS = {
   // Re-applying the SAME buff REFRESHES (diminishing-returns, applyPendingEffect)
   // rather than stacking a 2nd multiplier; DISTINCT buffs still stack.
   bulwarkDamageTaken: 0.85,
+  // ── SELF-ESCALATION diminishing returns (tuning pass #5) ─────────────────────
+  // Repeated self-buffs / heals / ★-gain (bulwark / setStance / tideMend /
+  // secondWind) lose marginal value on repeat — the SAME applied-counter DR the
+  // control debuffs already use, extended to self-escalation. `Step` = the linear
+  // shrink per repeat past the first; `Floor` = the minimum retained fraction for
+  // the CONTINUOUS buffs/heals (so a turtle stays a real ~55-60% strategy, not
+  // neutered). SECOND WIND's ★-gain floors at 0 instead (it can fully RESIST past
+  // a couple casts → ★-farming is tempo-negative). Sim-tuned this pass.
+  selfEscalationStep: 0.4,
+  selfEscalationFloor: 0.15,
+  // Heals (undertow regen / tideMend) sit on a knife-edge (heal-per-turn vs
+  // safe-damage-per-turn), so they get their OWN, gentler floor — enough to cap
+  // the unkillable-healer stall while keeping healing a real ~55-60% strategy.
+  selfEscalationHealFloor: 0.20,
+  // SECOND WIND's ★-gain is a step function (one early FULL POWER nuke snowballs
+  // to a runaway), so cap the number of PRODUCTIVE casts per battle: the first
+  // grants ★, the rest RESIST (→ 0). ★-farming becomes tempo-negative — the bot
+  // must earn further ★ by reading, not by free repeated casts.
+  secondWindMaxCasts: 1,
   // ── Momentum / Call-economy effect magnitudes (Wave A — PLACEHOLDER,
   // sim-tuned). These manipulate ★ + Calls, the hold-vs-spend core. ───────────
   // Sap Focus (THUNDERCLAP debuff): the foe loses this many ★ instantly on a

@@ -173,11 +173,14 @@ describe('effect-move degeneracy gate — technique play is viable, not dominant
   // question (gating techniques by tier — partially helps but cascades 19 tests +
   // the heal magnitude itself needs re-tuning regardless). (The MECHANISM tests in
   // engine/effectMoves.test.ts stay green — only this win-rate BALANCE gate defers.)
-  test.skip('BULWARK-turtle gets a modest edge but does NOT dominate (DR sim-tuned to 0.85) [QUARANTINED — holistic pass]', () => {
+  test('BULWARK-turtle gets a modest edge but does NOT dominate (self-escalation DR)', () => {
     const r = vsReader(bulwarkTurtle);
     // eslint-disable-next-line no-console
     console.log(`bulwark-turtle vs reader→ win ${r.win.toFixed(1)}%  draw ${r.draw.toFixed(1)}%`);
-    expect(r.win).toBeLessThan(62); // measured ~56% — a real buff, not free invulnerability
+    // Tuning pass #5: the tick-counted self-escalation DR caps a held BULWARK's
+    // mitigation as it's maintained → ~55.6% (measured). A REAL buff at the ~56%
+    // ceiling (a modifier, not a spam-threshold), never free invulnerability.
+    expect(r.win).toBeLessThan(62);
   });
 
   test('occasional technique use is a real tempo cost, not a free win (reads gate the payoff)', () => {

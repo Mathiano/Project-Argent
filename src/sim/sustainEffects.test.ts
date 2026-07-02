@@ -181,10 +181,15 @@ describe('sustain/buff degeneracy gate — no free value, no turtle, no stall', 
   // but cascades 19 tests + the heal magnitude itself needs re-tuning regardless).
   // (The MECHANISM tests in engine/sustainEffects.test.ts stay green — heals heal,
   // buffs apply, the DR is real; only these win-rate BALANCE gates defer.)
-  test.skip('HEAL-TURTLE does NOT out-sustain the reader (no unkillable healer, no stall) [QUARANTINED — holistic pass]', () => {
+  test('HEAL-TURTLE does NOT out-sustain the reader (no unkillable healer, no stall)', () => {
     const r = vs(healTurtle);
     log('heal-turtle', r);
-    expect(r.win).toBeLessThan(60); // heal-per-turn < safe-damage-per-turn
+    // Tuning pass #5: the tick-counted self-escalation DR shrinks a maintained
+    // UNDERTOW/TIDE-MEND regen so heal-per-turn falls BELOW safe-damage-per-turn →
+    // the pure heal-STALLER now LOSES to the reader (~13% measured). On-thesis: a
+    // spam-staller should lose to reads. (Bimodal — sustain is a threshold, not a
+    // ~56% dial; accepted per Decision 1. The moves stay usable situationally.)
+    expect(r.win).toBeLessThan(60);
     expect(r.draw).toBeLessThan(10); // a sustain stalemate would show as timeouts
   });
 
@@ -210,7 +215,7 @@ describe('sustain/buff degeneracy gate — no free value, no turtle, no stall', 
 
   // QUARANTINED (Spine-1) — see the buff/heal BALANCE-gate deferral note above
   // (DEFERRED to the holistic potency/feel tuning pass, checkpoint #5).
-  test.skip('SET-STANCE poker DR (worst-case: tell unseen) does not dominate [QUARANTINED — holistic pass]', () => {
+  test('SET-STANCE poker DR (worst-case: tell unseen) does not dominate', () => {
     const r = vs(setStanceTurtle);
     log('set-stance', r);
     expect(r.win).toBeLessThan(62); // a conditional DR turtle, BULWARK-class edge ceiling

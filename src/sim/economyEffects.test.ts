@@ -155,7 +155,7 @@ describe('economy-effect degeneracy gate — no ★-snowball runs away from the 
   // mons is a STAND-IN loadout (real GALE techniques WING FLARE/UPDRAFT unbuilt) —
   // its live-ladder presence will change when the real GALE roster is built, which
   // may itself alter this.
-  test.skip('Second-Wind→Full-Power does NOT dominate (★-farming is tempo-negative) [QUARANTINED — holistic pass #5]', () => {
+  test('Second-Wind→Full-Power does NOT dominate (★-farming is tempo-negative)', () => {
     const r = vs(secondWindNuke);
     log('second-wind-nuke', r);
     expect(r.win).toBeLessThan(60);

@@ -13,6 +13,40 @@ const INSTANT_STATUSES: ReadonlySet<string> = new Set(['sapFocus', 'secondWind',
 // RESISTS, so a controller can't chain-lock to death).
 const CONTROL_STATUSES: ReadonlySet<string> = new Set(['frozen', 'inception', 'taunt']);
 
+// SELF-ESCALATION statuses (tuning pass #5): repeatable self-buffs / heals /
+// ★-gain that a turtle could otherwise spam every turn to invulnerability or
+// ★-farm to dominance. They carry the SAME applied-counter DR the control debuffs
+// use — the count lives in `side.escalations[status]` and shrinks the effect's
+// value on repeat (see escalationFactor + the apply/consume sites below).
+// CAST-counted self-escalation (count bumps on each APPLICATION) — the INSTANT
+// self-effects: repeated casts diminish (tideMend heal shrinks; secondWind ★-gain
+// resists). A long-duration buff would barely move here (cast once, held for many
+// rounds), so those are TICK-counted instead (below).
+const SELF_ESCALATION_STATUSES: ReadonlySet<string> = new Set(['tideMend', 'secondWind']);
+
+// TICK-counted self-escalation — the LINGERING mitigation/regen buffs. Held
+// round-after-round they'd be full-strength forever, so the count bumps once per
+// end-of-round TICK (in tickStatuses) and the effect weakens the LONGER the buff
+// is maintained: BULWARK/SET STANCE mitigation decays toward neutral, UNDERTOW
+// regen shrinks — so a turtle can't hold one buff up to invulnerability. Read by
+// buffDamageTakenMult / guardBuffMult / the undertow tick.
+const LINGERING_ESCALATION_STATUSES: ReadonlySet<string> = new Set(['bulwark', 'setStance', 'undertow']);
+
+// Diminishing-returns factor for a self-escalation status applied `count` times
+// this battle (1 = first cast → 1.0/full). Each repeat shrinks it linearly by
+// STATUS.selfEscalationStep, floored at `floor`. The continuous buffs/heals pass
+// the config floor (they stay a real edge); SECOND WIND passes 0 so it can fully
+// resist (tempo-negative ★-farming). count 0 (never applied / legacy absent) → 1.
+function escalationFactor(count: number, floor: number): number {
+  if (count <= 1) return 1;
+  return Math.max(floor, 1 - STATUS.selfEscalationStep * (count - 1));
+}
+
+// The count of prior+this applications of a self-escalation status on a side.
+function escalationCount(side: SideState, status: string): number {
+  return side.escalations?.[status] ?? 0;
+}
+
 // Remove a side's single active debuff (used to CONSUME Corrode when it fizzles
 // the bearer's next technique). No-op if there is no debuff.
 export function clearDebuff(side: SideState): SideState {
@@ -59,8 +93,14 @@ export function buffDamageTakenMult(side: SideState): number {
   if (buffs === undefined || buffs.length === 0) return 1;
   let m = 1;
   for (const b of buffs) {
-    if (b.kind === 'bulwark') m *= STATUS.bulwarkDamageTaken;
-    else if (b.kind === 'entangle') m *= STATUS.entangleDamageTaken;
+    // BULWARK's mitigation weakens with the self-escalation count (tuning pass #5):
+    // a re-cast-every-turn turtle's damage reduction decays toward neutral, so it
+    // can't compound to invulnerability. First cast = full 0.85; count 0 (legacy /
+    // never re-applied) → factor 1 → full → bit-identical.
+    if (b.kind === 'bulwark') {
+      const f = escalationFactor(escalationCount(side, 'bulwark'), STATUS.selfEscalationFloor);
+      m *= 1 - (1 - STATUS.bulwarkDamageTaken) * f;
+    } else if (b.kind === 'entangle') m *= STATUS.entangleDamageTaken;
     else if (b.kind === 'glassEdge') m *= STATUS.glassEdgeDamageTaken;
   }
   return m;
@@ -88,7 +128,11 @@ export function buffDamageDealtMult(side: SideState): number {
 export function guardBuffMult(side: SideState): number {
   const buffs = side.buffs;
   if (buffs === undefined || buffs.length === 0) return 1;
-  return buffs.some((b) => b.kind === 'setStance') ? STATUS.setStanceGuardTaken : 1;
+  if (!buffs.some((b) => b.kind === 'setStance')) return 1;
+  // SET STANCE's Guard mitigation weakens with the self-escalation count (tuning
+  // pass #5) — the conditional-DR turtle's edge is capped like BULWARK's.
+  const f = escalationFactor(escalationCount(side, 'setStance'), STATUS.selfEscalationFloor);
+  return 1 - (1 - STATUS.setStanceGuardTaken) * f;
 }
 
 // Base duration for a freshly-applied status — per-kind via STATUS.statusDurations
@@ -128,15 +172,28 @@ export function applyPendingEffect(
       debuff: { kind: pe.status, duration: dur, applied, ...(pe.stance ? { stance: pe.stance } : {}) },
     };
   }
+  // SELF-ESCALATION DR bookkeeping (tuning pass #5): count THIS application of a
+  // repeatable self-escalation status (bulwark/setStance/tideMend/secondWind), and
+  // stamp the bumped counter onto whatever side each path returns (withEsc). The
+  // effect paths below read escCount to shrink their value. Non-escalation statuses
+  // → escCount 0, withEsc a no-op → bit-identical.
+  const escCount = SELF_ESCALATION_STATUSES.has(pe.status) ? escalationCount(side, pe.status) + 1 : 0;
+  const withEsc = (s: SideState): SideState =>
+    escCount > 0 ? { ...s, escalations: { ...(s.escalations ?? {}), [pe.status]: escCount } } : s;
   // ── Wave C instant SELF-effects (heal / lifesteal / cleanse) ────────────────
   // Resolve the swing NOW and leave NO lingering buff (so no buff entry, no
   // statusApply). Reached via the buff path; SIPHON's 'drain' is read-win-gated
   // at the CALL site (resolveStrike), so by here it has already earned its heal.
   if (pe.status === 'tideMend' || pe.status === 'drain') {
-    const pct = pe.status === 'tideMend' ? STATUS.tideMendHealPct : STATUS.siphonHealPct;
+    // tideMend is a REPEATABLE self-heal → DR its heal % (a heal-turtle can't
+    // out-sustain safe-damage indefinitely). SIPHON's 'drain' is read-win-gated
+    // (it earned the heal), so it keeps full potency.
+    const basePct = pe.status === 'tideMend' ? STATUS.tideMendHealPct : STATUS.siphonHealPct;
+    const pct =
+      pe.status === 'tideMend' ? basePct * escalationFactor(escCount, STATUS.selfEscalationHealFloor) : basePct;
     const hp = Math.min(side.maxHp, side.hp + Math.round(side.maxHp * pct));
     if (hp !== side.hp) events.push({ kind: 'recover', side: sideKey, healed: hp - side.hp });
-    return { ...side, hp };
+    return withEsc({ ...side, hp });
   }
   // WANE / STEADY (cleanse) + REFORGE (cleanse + minor heal): clear the bearer's
   // single active debuff (the non-Resolve counterplay valve), and REFORGE also
@@ -164,12 +221,16 @@ export function applyPendingEffect(
   }
   // SAP FOCUS −1★ (Wave A) / SECOND WIND +1★ (Wave A).
   if (INSTANT_STATUSES.has(pe.status)) {
+    // SECOND WIND is a REPEATABLE self-★-gain → only the first `secondWindMaxCasts`
+    // casts grant ★; the rest RESIST (→ 0). One early FULL POWER nuke otherwise
+    // snowballs, so capping the productive casts makes ★-farming tempo-negative.
+    const secondWindGain = escCount <= STATUS.secondWindMaxCasts ? STATUS.secondWindAmount : 0;
     const total =
       pe.status === 'secondWind'
-        ? Math.min(COMBAT.momentumCap, side.momentum + STATUS.secondWindAmount)
+        ? Math.min(COMBAT.momentumCap, side.momentum + secondWindGain)
         : Math.max(0, side.momentum - STATUS.sapFocusAmount); // sapFocus
     events.push({ kind: 'momentum', side: sideKey, total });
-    return { ...side, momentum: total };
+    return withEsc({ ...side, momentum: total });
   }
   if (pe.polarity === 'debuff') {
     // Fresh debuff (incl. a first-time control lock → applied:1 + forced stance).
@@ -189,7 +250,9 @@ export function applyPendingEffect(
   const next = hasSame
     ? buffs.map((b) => (b.kind === pe.status ? fresh : b)) // refresh in place
     : [...buffs, fresh]; // a new, distinct buff → stack
-  return { ...side, buffs: next };
+  // Lingering self-escalation buffs (bulwark/setStance) carry the bumped counter;
+  // buffDamageTakenMult / guardBuffMult read it to DR the mitigation on repeat.
+  return withEsc({ ...side, buffs: next });
 }
 
 // End-of-round tick for the statuses CARRIED INTO this round: DoT damage (Burn)
@@ -244,10 +307,19 @@ export function tickStatuses(
     const kept: { kind: StatusKind; duration: number }[] = [];
     for (const b of buffs) {
       const remaining = b.duration - 1;
-      // UNDERTOW (AQUA HoT): heal a slice of maxHp each tick (regenerating tank).
-      // Bounded by duration + refresh-not-stack DR; clamped to maxHp.
+      // TICK-counted self-escalation DR (tuning pass #5): a lingering mitigation /
+      // regen buff bumps its escalation count once per tick, so holding it longer
+      // weakens it (the count is read at the mitigation/regen sites). count 0
+      // (legacy, never ticked) → factor 1 → full → bit-identical.
+      if (LINGERING_ESCALATION_STATUSES.has(b.kind)) {
+        s = { ...s, escalations: { ...(s.escalations ?? {}), [b.kind]: escalationCount(s, b.kind) + 1 } };
+      }
+      // UNDERTOW (AQUA HoT): heal a slice of maxHp each tick (regenerating tank),
+      // scaled by its now-bumped escalation factor — a heal-turtle can't out-heal
+      // safe-damage indefinitely (no unkillable healer / stall).
       if (b.kind === 'undertow' && s.hp > 0) {
-        const hp = Math.min(s.maxHp, s.hp + Math.round(s.maxHp * STATUS.undertowHealPct));
+        const f = escalationFactor(escalationCount(s, 'undertow'), STATUS.selfEscalationHealFloor);
+        const hp = Math.min(s.maxHp, s.hp + Math.round(s.maxHp * STATUS.undertowHealPct * f));
         if (hp !== s.hp) {
           events.push({ kind: 'recover', side: sideKey, healed: hp - s.hp });
           s = { ...s, hp };

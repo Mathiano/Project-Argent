@@ -180,6 +180,14 @@ export interface SideState {
   // The stacking BUFFS (multiple, per "buffs stack"), or ABSENT when none.
   // Read as `side.buffs ?? []` by the wiring increment. Unread today.
   readonly buffs?: readonly StatusInstance[];
+  // SELF-ESCALATION diminishing-returns counter (tuning pass #5): per-battle count
+  // of how many times each REPEATABLE self-escalation status (bulwark / setStance /
+  // tideMend / secondWind) has been applied. The effect's value shrinks with the
+  // count — extending the debuff applied-counter DR to self-buffs/heals/★-gain, so
+  // a turtle can't compound to invulnerability and ★-farming is tempo-negative.
+  // ABSENT by default → count 0 → full effect → bit-identical for every side that
+  // never self-escalates (fixtures, legacy). Per-battle (createSide omits it).
+  readonly escalations?: { readonly [status: string]: number };
   // The last Call this mon successfully made (Wave A — for ECHO, the "false
   // echo" that re-maps the foe's next Call to this one). Absent until the mon
   // Calls; absent on every legacy/sim side that never Calls → bit-identical.
