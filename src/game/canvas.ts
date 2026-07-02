@@ -59,14 +59,25 @@ export function mountCanvas(host: HTMLElement): CanvasHost {
   let scale = 1;
   const handlers: Array<(s: number) => void> = [];
 
-  // Fit the CURRENT logical size to the viewport at an integer scale, updating the
-  // CSS display size. Returns the computed scale (does NOT notify handlers).
+  // Size the canvas ELEMENT (CSS display size) to the on-screen footprint, updating
+  // `scale`. The footprint is defined by the BASE logical resolution at an integer
+  // scale — it is the physical space the game fills, and it is the SAME for every
+  // scene regardless of that scene's backing resolution. A scene that declares a
+  // higher logical size (battle → 640×360) keeps this footprint and simply packs
+  // more (crisper) pixels into it. It must NOT recompute the scale against its own
+  // larger size: that yields `640 × floor(winW/640)`, which for most real window
+  // sizes is well under winW, so the battle canvas would display smaller than the
+  // window and cluster in the top-left corner — the Part 1 real-render bug. All
+  // logical sizes share the 16:9 base aspect, so stretching a 640×360 backing store
+  // into the 320-based footprint is a clean uniform 0.5×-per-pixel scale (no
+  // distortion; on displays whose base scale is even, e.g. 1080p→6×, it is exactly
+  // an integer 3× so it also stays pixel-crisp).
   function applyScale(): void {
     const sw = window.innerWidth;
     const sh = window.innerHeight;
-    scale = Math.max(1, Math.floor(Math.min(sw / logicalW, sh / logicalH)));
-    canvas.style.width = `${logicalW * scale}px`;
-    canvas.style.height = `${logicalH * scale}px`;
+    scale = Math.max(1, Math.floor(Math.min(sw / LOGICAL_W, sh / LOGICAL_H)));
+    canvas.style.width = `${LOGICAL_W * scale}px`;
+    canvas.style.height = `${LOGICAL_H * scale}px`;
   }
 
   function rescale(): void {
