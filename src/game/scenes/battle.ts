@@ -1,13 +1,18 @@
 import {
   COMBAT,
+  MOMENTUM_REQ_BY_TIER,
   TIERS,
   activeMon,
+  attackPool,
   forcedAction,
   hasBenchSurvivor,
   isTeamWiped,
   lookupMove,
+  moveLegal,
   mulberry32,
   resolveRound,
+  techniquePool,
+  tierMomentumLocked,
 } from '../../engine';
 import type {
   Action,
@@ -20,7 +25,9 @@ import type {
   SideState,
   Species,
   Stance,
+  StatusInstance,
   Team,
+  TierName,
 } from '../../engine';
 import { BATTLE_LOGICAL_H, BATTLE_LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
@@ -124,6 +131,144 @@ const BOTTOM = { x: 4, y: 238, w: 632, h: 118 } as const; // full-width bottom
 // bar height (was BAR_HEIGHT_TALL 6) grow for the bigger canvas.
 const BATTLE_SLOT = 96;
 const BATTLE_BAR_H = 12;
+
+// ── CD-format move grid + status chips (battle-UI rebuild Part 2b-1) ──────────
+// Tier → the compact grid badge (Combat 2.0 tiers light/mid/heavy/nuke) and a
+// one-word descriptor for the detail panel. Plain colors here; the 2b-2 skin
+// (warm/silver/gold) recolours these later.
+const TIER_BADGE: { readonly [k in TierName]: string } = {
+  light: 'T0',
+  mid: 'T1',
+  heavy: 'T2',
+  nuke: 'T3',
+};
+const TIER_WORD: { readonly [k in TierName]: string } = {
+  light: 'quick',
+  mid: 'solid',
+  heavy: 'heavy',
+  nuke: 'devastating',
+};
+// Short chip labels for the effect-layer statuses (the debuff/buff `kind` strings
+// from engine data.ts). Display-only abbreviations — the exact wording is a 2b-2
+// tuning detail; unknown kinds fall back to an uppercase truncation.
+const STATUS_CHIP_LABEL: { readonly [k: string]: string } = {
+  burn: 'BURN', daze: 'DAZE', drain: 'DRAIN', entangle: 'ROOT', updraft: 'GALE',
+  attunement: 'ATTN', bulwark: 'GUARD', frozen: 'FROZE', inception: 'INCP',
+  taunt: 'TAUNT', drained: 'DRND', sap: 'SAP', corrode: 'CORR', silence: 'SLNC',
+  echo: 'ECHO', callLock: 'CLOCK', doubt: 'DOUBT', secondWind: 'WIND',
+  amplify: 'AMP', sapFocus: 'SAPF', tideMend: 'MEND',
+};
+function statusChipLabel(kind: string): string {
+  return STATUS_CHIP_LABEL[kind] ?? kind.slice(0, 5).toUpperCase();
+}
+
+interface MoveCellInfo {
+  readonly name: string;
+  readonly badge: string;
+  readonly tier: TierName;
+  readonly cost: number;
+  readonly isTech: boolean;
+  readonly effectTag: string | null; // technique status label (e.g. BURN)
+  readonly type: string | null;
+  readonly legal: boolean;
+  readonly lockLabel: string | null; // e.g. 'NEEDS ★★' / 'WINDED' / 'LOW ST'
+}
+
+// Everything the move grid + detail panel needs for one move, read from engine
+// truth (moveLegal / tierMomentumLocked / TIERS / MOMENTUM_REQ_BY_TIER) so the
+// locked-state shown matches what the engine will actually allow.
+function moveCellInfo(side: SideState, name: string): MoveCellInfo {
+  const move = lookupMove(name);
+  const tier = move.tier;
+  const isTech = move.effect !== undefined;
+  const legal = moveLegal(side, name);
+  let lockLabel: string | null = null;
+  if (!legal) {
+    if (side.st <= COMBAT.winded && (tier === 'heavy' || tier === 'nuke')) lockLabel = 'WINDED';
+    else if (tierMomentumLocked(side, move)) lockLabel = `NEEDS ${'★'.repeat(MOMENTUM_REQ_BY_TIER[tier])}`;
+    else lockLabel = 'LOW ST';
+  }
+  return {
+    name,
+    badge: TIER_BADGE[tier],
+    tier,
+    cost: TIERS[tier].cost,
+    isTech,
+    effectTag: isTech && move.effect ? statusChipLabel(move.effect.status) : null,
+    type: move.type,
+    legal,
+    lockLabel,
+  };
+}
+
+// A move cell in the 2×3 grid: tier badge + name + (ST cost / effect tag), or the
+// lock reason for an unavailable move. Plain colors (2b-2 skins it).
+function drawMoveCell(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  info: MoveCellInfo,
+  selected: boolean,
+): void {
+  ctx.fillStyle = selected ? 'rgba(90,74,42,0.34)' : 'rgba(246,239,218,0.6)';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = PALETTE.ink;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  const ty = y + Math.round(h / 2) - 6;
+  const nameColor = info.legal ? PALETTE.ink : PALETTE.paperDim;
+  const badgeColor = info.legal ? (info.isTech ? PALETTE.stanceG : PALETTE.paperShadow) : PALETTE.paperDim;
+  drawText(ctx, info.badge, x + 8, ty, badgeColor);
+  // Cursor + name as one string so the selected move reads ">NAME".
+  drawText(ctx, `${selected ? '>' : ' '}${info.name}`, x + 30, ty, nameColor);
+  if (info.lockLabel) {
+    drawTextRight(ctx, info.lockLabel, x + w - 5, ty, PALETTE.hpCrit);
+  } else {
+    const right = info.effectTag ? `${info.effectTag}·ST${info.cost}` : `ST${info.cost}`;
+    drawTextRight(ctx, right, x + w - 5, ty, info.isTech ? PALETTE.stanceG : PALETTE.paperShadow);
+  }
+}
+
+// Active effect-layer statuses on a side, as chips (the previously-invisible
+// combat depth: the debuff + stacking buffs from the effect moves). Read from
+// live engine state — the debuff/buff instances.
+function sideChips(side: SideState): ReadonlyArray<{ readonly label: string; readonly buff: boolean }> {
+  const out: { label: string; buff: boolean }[] = [];
+  const debuff: StatusInstance | undefined = side.debuff;
+  if (debuff) out.push({ label: statusChipLabel(debuff.kind), buff: false });
+  for (const b of side.buffs ?? []) out.push({ label: statusChipLabel(b.kind), buff: true });
+  return out;
+}
+
+// Draw the status chips near a mon. Debuffs read red, buffs read blue (plain
+// palette — 2b-2 restyles). `vertical` stacks them; otherwise a left-to-right row.
+function drawStatusChips(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  chips: ReadonlyArray<{ readonly label: string; readonly buff: boolean }>,
+  vertical: boolean,
+): void {
+  let cx = x;
+  let cy = y;
+  // A horizontal row (foe, under the sprite) fits fewer before the canvas edge
+  // than a vertical stack (player, in the side gap) — cap accordingly.
+  for (const chip of chips.slice(0, vertical ? 4 : 3)) {
+    ctx.font = UI_FONT;
+    const w = Math.ceil(ctx.measureText(chip.label).width) + 10;
+    const h = 14;
+    ctx.fillStyle = chip.buff ? PALETTE.stanceG : PALETTE.hpCrit;
+    ctx.fillRect(cx, cy, w, h);
+    ctx.strokeStyle = PALETTE.ink;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cx + 0.5, cy + 0.5, w - 1, h - 1);
+    drawText(ctx, chip.label, cx + 5, cy + 1, PALETTE.paper);
+    if (vertical) cy += h + 2;
+    else cx += w + 3;
+  }
+}
 
 
 export interface BattleSceneOpts {
@@ -675,11 +820,17 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   let menuCursor = 0;
   let moveCursor = 0;
-  // Move list scroll window — evolved mons carry up to 8 moves, more than
-  // fit the panel; show MOVES_VISIBLE at a time and scroll to keep the
-  // cursor in view (with ▲▼ indicators).
+  // Move list scroll window — kept for the FOCUS release menu / legacy paths;
+  // the 2×3 move grid (2b-1) shows all ≤6 moves at once, so it doesn't scroll.
   const MOVES_VISIBLE = 5;
   let moveScroll = 0;
+  // The move grid's fixed order: the ATTACK pool (≤4) then the TECHNIQUE pool
+  // (≤2), a reordering of species.moves. moveCursor indexes THIS list, and both
+  // the input handler and the grid draw read it, so selection stays in sync.
+  function gridMoves(): string[] {
+    const sp = activeMon(state.player).species;
+    return [...attackPool(sp), ...techniquePool(sp)];
+  }
   let stanceIdx = 0;
   // FOCUS R2 — the release-selection cursor over [HEAVY, FEINT, HIDE].
   let releaseCursor = 0;
@@ -1518,16 +1669,17 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // collapsing it) preserves a stable visual layout as state changes.
   type MenuKind = 'fight' | 'pkmn' | 'catch' | 'call' | 'run';
   function menuItems(): ReadonlyArray<{ readonly kind: MenuKind; readonly enabled: boolean }> {
+    // Order: FIGHT / CALLS / MONS / BALLS / RUN (the CD menu order — 2b-1).
+    // The menu dispatches by `kind`, so the order is display-only.
     return [
       { kind: 'fight', enabled: true },
-      // PKMN enabled only when the bench has a non-fainted non-active
-      // mon (so voluntary switching is meaningful). Single-mon teams
-      // see this row greyed; the cursor skips it.
-      { kind: 'pkmn', enabled: hasBenchSurvivor(state.player) },
-      // BALL (Phase 6a) — wild encounters only, when the player has
-      // balls. Throws at the active foe (Path 1).
-      { kind: 'catch', enabled: !!opts.canCatch && (opts.ballCount?.() ?? 0) > 0 },
       { kind: 'call', enabled: opts.catchBreathUnlocked },
+      // MONS enabled only when the bench has a non-fainted non-active mon (so
+      // voluntary switching is meaningful). Single-mon teams see it greyed;
+      // the cursor skips it.
+      { kind: 'pkmn', enabled: hasBenchSurvivor(state.player) },
+      // BALLS (Phase 6a) — wild encounters only, when the player has balls.
+      { kind: 'catch', enabled: !!opts.canCatch && (opts.ballCount?.() ?? 0) > 0 },
       // RUN row stays enabled even when canRun is false — confirming it
       // surfaces the "No running from a rival!" dialog (intentional UX).
       { kind: 'run', enabled: true },
@@ -1736,7 +1888,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   }
 
   function handleMoveInput(key: InputKey): void {
-    const moves = activeMon(state.player).species.moves;
+    const moves = gridMoves();
     if (key === 'up') {
       moveCursor = (moveCursor + moves.length - 1) % moves.length;
       clampMoveScroll();
@@ -2046,6 +2198,29 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         ctx.strokeRect(bx + i * 10 + 0.5, y + 7 + 0.5, 5, 5);
       }
     }
+    // Gust cue — INTEGRATED into the boss strip (2b-1): a pill between the BREAK
+    // pips and the bench, so the gust telegraph no longer overlaps the arena /
+    // sprite (the 2a-flagged floating banner is gone). Only bosses have an arena
+    // schedule, so this is the single home for the gust cue.
+    const arena = state.bossCard?.arenaSchedule;
+    if (arena && arena.rhythmEveryN > 0) {
+      const anchor = state.rhythmAnchor ?? 0;
+      const activeRound = phase === 'resolve' ? state.round - 1 : state.round;
+      const currentIsGust = (activeRound - anchor) % arena.rhythmEveryN === 0;
+      const nextIsGust = (state.round + 1 - anchor) % arena.rhythmEveryN === 0;
+      const gustX = pipX + breakThreshold * 16 + 8;
+      const gustW = 96;
+      const benchStart = foe.members.length > 1 ? x + w - foe.members.length * 10 - 8 : x + w - 4;
+      if ((currentIsGust || nextIsGust) && gustX + gustW <= benchStart) {
+        const pulse = currentIsGust ? 0.55 + 0.4 * Math.sin(tick * 6) : 0.5;
+        ctx.fillStyle = currentIsGust ? `rgba(70,150,230,${pulse})` : 'rgba(80,140,210,0.5)';
+        ctx.fillRect(gustX, y + 4, gustW, 14);
+        ctx.strokeStyle = PALETTE.ink;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(gustX + 0.5, y + 4.5, gustW - 1, 13);
+        drawText(ctx, currentIsGust ? 'GUST NOW' : 'GUST NEXT', gustX + 6, y + 5, PALETTE.paper);
+      }
+    }
   }
 
   function drawPlayerPanel(ctx: CanvasRenderingContext2D): void {
@@ -2184,15 +2359,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     ctx.font = UI_FONT;
     const intentValueX = Math.round(intentLabelX + ctx.measureText('FOE INTENT:').width + 6);
     drawText(ctx, shownIntent.line ?? '———', intentValueX, INTENT.y + 4, PALETTE.paper);
-    // Base-SPEED relationship: the dodge lever + the initiative NUMERATOR.
-    // It is NOT the turn-order verdict — order = speed ÷ move weight, with
-    // the Fluid override, shown move-by-move as "NEXT:" in the move menu.
-    // (turn-order-fix: the old label implied it decided turn order, so a
-    // raw-slower mon acting first via a lighter move / Fluid read as a bug.)
-    const sl = speedLabel(activeMon(state.player).species.spd, activeMon(state.foe).species.spd);
-    const slColor =
-      sl === 'YOU FASTER' ? PALETTE.hpOk : sl === 'YOU SLOWER' ? PALETTE.hpCrit : PALETTE.paperShadow;
-    drawTextRight(ctx, `BASE SPD: ${sl}`, INTENT.x + INTENT.w - 8, INTENT.y + 4, slColor);
+    // (2b-1) The BASE SPD readout was removed — speed is settled; the honest
+    // per-move "NEXT:" turn-order preview in the move view carries what matters.
     // TUTORIAL live prompt — surface the read while the player is deciding.
     // An opening exists -> "NOW — throw!"; otherwise the read tell ("Brace to
     // force an opening"). Scripted guided catch only (opts.tutorial); a single
@@ -2244,27 +2412,29 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function drawBottomMenu(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     const me = activeMon(state.player);
+    // CD menu labels (2b-1): FIGHT / CALLS / MONS / BALLS / RUN, with the
+    // informative suffixes kept (ball count, Call ★/lock reason).
     const labels: { readonly [K in 'fight' | 'pkmn' | 'catch' | 'call' | 'run']: string } = {
       fight: 'FIGHT',
-      pkmn: 'PKMN',
-      catch: opts.canCatch ? `BALL x${opts.ballCount?.() ?? 0}` : 'BALL -',
-      // Legibility #3 — the CALL row states WHY it's unavailable inline:
+      pkmn: 'MONS',
+      catch: opts.canCatch ? `BALLS x${opts.ballCount?.() ?? 0}` : 'BALLS -',
+      // Legibility #3 — the CALLS row states WHY it's unavailable inline:
       // not unlocked yet, or unlocked but not enough ★ to spend.
       call: !opts.catchBreathUnlocked
-        ? 'CALL — locked'
+        ? 'CALLS — locked'
         : me.momentum < 1
-          ? 'CALL — needs ★'
-          : `CALL ★${me.momentum}`,
-      run: opts.canRun ? 'RUN' : 'STAY',
+          ? 'CALLS — needs ★'
+          : `CALLS ★${me.momentum}`,
+      run: 'RUN',
     };
     const items = menuItems();
     items.forEach((it, i) => {
-      // PKMN is dimmed when no bench survivor; CALL when locked or 0 ★;
+      // MONS is dimmed when no bench survivor; CALLS when locked or 0 ★;
       // RUN never dimmed (its row dispatches the "no running" text when
       // canRun is false). FIGHT always lit.
       let dim = !it.enabled;
       if (it.kind === 'call' && (!opts.catchBreathUnlocked || me.momentum < 1)) dim = true;
-      // 5 rows (FIGHT/PKMN/BALL/CALL/RUN) at 20px pitch in the left column of
+      // 5 rows (FIGHT/CALLS/MONS/BALLS/RUN) at 20px pitch in the left column of
       // the full-width bottom panel.
       const rowY = BOTTOM.y + 14 + i * 20;
       if (menuCursor === i) drawRowHighlight(ctx, BOTTOM.x + 12, rowY - 2, 240, 19);
@@ -2316,68 +2486,119 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawText(ctx, help, BOTTOM.x + 16, BOTTOM.y + BOTTOM.h - 20, PALETTE.paperDim);
   }
 
+  // The CD-format move view (2b-1): a 2×3 grid — 4 ATTACKS (2 columns) + 2
+  // TECHNIQUES (a row), the two purposeful pools visually separated — with a
+  // move-detail panel + the A/G/F stance selector in the right column. Plain
+  // colors (2b-2 skins it). Reads the two-pool + tier-gate engine truth.
   function drawBottomMoves(ctx: CanvasRenderingContext2D): void {
     drawPanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
-    const moves = activeMon(state.player).species.moves;
-    // Window the move list (evolved mons carry up to 8 moves). Show
-    // MOVES_VISIBLE rows starting at moveScroll, with ▲▼ when there's
-    // more above/below — nothing spills past the panel edge.
-    const end = Math.min(moves.length, moveScroll + MOVES_VISIBLE);
-    for (let i = moveScroll; i < end; i += 1) {
-      const m = moves[i]!;
-      const move = lookupMove(m);
-      const tier = TIERS[move.tier];
-      const locked =
-        (activeMon(state.player).st <= COMBAT.winded && (move.tier === 'heavy' || move.tier === 'nuke')) ||
-        activeMon(state.player).st < tier.cost;
-      const color = locked ? PALETTE.paperDim : PALETTE.ink;
-      const y = BOTTOM.y + 14 + (i - moveScroll) * 20;
-      if (moveCursor === i) drawRowHighlight(ctx, BOTTOM.x + 12, y - 2, 300, 19);
-      drawText(ctx, `${moveCursor === i ? '>' : ' '}${m}`, BOTTOM.x + 18, y, color);
-      drawTextRight(ctx, `ST${tier.cost}`, BOTTOM.x + 300, y, color);
-    }
-    // Scroll indicators (only when there's more off-window).
-    if (moveScroll > 0) drawText(ctx, '▲', BOTTOM.x + 316, BOTTOM.y + 10, PALETTE.paperDim);
-    if (end < moves.length) drawText(ctx, '▼', BOTTOM.x + 316, BOTTOM.y + BOTTOM.h - 20, PALETTE.paperDim);
+    const side = activeMon(state.player);
+    const attacks = attackPool(side.species);
+    const techs = techniquePool(side.species);
+    const moves = [...attacks, ...techs]; // == gridMoves(); moveCursor indexes this
 
+    // ── LEFT column: the 2×3 grid ────────────────────────────────────────────
+    const gx = BOTTOM.x + 12;
+    const cellW = 158;
+    const cellGX = 164;
+    drawText(ctx, 'ATTACKS', gx, BOTTOM.y + 6, PALETTE.paperShadow);
+    for (let i = 0; i < attacks.length; i += 1) {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      drawMoveCell(
+        ctx,
+        gx + col * cellGX,
+        BOTTOM.y + 22 + row * 28,
+        cellW,
+        24,
+        moveCellInfo(side, attacks[i]!),
+        moveCursor === i,
+      );
+    }
+    drawText(ctx, 'TECHNIQUES', gx, BOTTOM.y + 78, PALETTE.paperShadow);
+    for (let j = 0; j < techs.length; j += 1) {
+      drawMoveCell(
+        ctx,
+        gx + j * cellGX,
+        BOTTOM.y + 92,
+        cellW,
+        22,
+        moveCellInfo(side, techs[j]!),
+        moveCursor === attacks.length + j,
+      );
+    }
+
+    // Divider between the grid and the detail/stance column.
+    ctx.fillStyle = PALETTE.paperShadow;
+    ctx.fillRect(BOTTOM.x + 344, BOTTOM.y + 8, 1, BOTTOM.h - 16);
+
+    // ── RIGHT column: SELECTED detail + stance selector ──────────────────────
+    const rx = BOTTOM.x + 356;
+    const sel = moves[moveCursor] ? moveCellInfo(side, moves[moveCursor]!) : null;
+    drawText(ctx, 'SELECTED', rx, BOTTOM.y + 6, PALETTE.paperShadow);
+    if (sel) {
+      drawText(ctx, sel.name, rx, BOTTOM.y + 20, sel.legal ? PALETTE.ink : PALETTE.paperDim);
+      drawText(
+        ctx,
+        `${sel.badge} ${sel.isTech ? 'TECHNIQUE' : 'ATTACK'} · ${sel.type ?? 'NEUTRAL'} · ST${sel.cost}`,
+        rx,
+        BOTTOM.y + 38,
+        PALETTE.paperShadow,
+      );
+      const move = lookupMove(sel.name);
+      let desc: string;
+      if (sel.isTech && move.effect) {
+        desc =
+          move.effect.polarity === 'buff'
+            ? `Self-buff — grants ${sel.effectTag}. Chip damage.`
+            : `On a read-win, inflicts ${sel.effectTag}.`;
+      } else {
+        desc = `A ${TIER_WORD[sel.tier]} ${(sel.type ?? 'neutral').toLowerCase()} strike.`;
+      }
+      if (sel.lockLabel) desc += ` Locked: ${sel.lockLabel}.`;
+      // Wrap to two lines at ~40 chars.
+      const words = desc.split(' ');
+      let l1 = '';
+      let l2 = '';
+      for (const w of words) {
+        if ((l1 + ' ' + w).trim().length <= 40 || !l1) l1 = (l1 + ' ' + w).trim();
+        else l2 = (l2 + ' ' + w).trim();
+      }
+      drawText(ctx, l1, rx, BOTTOM.y + 54, sel.legal ? PALETTE.ink : PALETTE.hpCrit);
+      if (l2) drawText(ctx, l2, rx, BOTTOM.y + 68, sel.legal ? PALETTE.ink : PALETTE.hpCrit);
+    }
+
+    // Stance selector — the three stance badges, current one boxed + named.
     const stance = STANCES[stanceIdx]!;
-    drawStanceBadge(ctx, BOTTOM.x + 356, BOTTOM.y + 14, stance);
-    // FULL POWER armed (Lane B) takes the indicator slot — the next attack is
-    // buffed +50%. Else FOCUS (commit-modifier) / plain stance name.
-    if (pendingFullPower) {
-      drawText(ctx, '▶FULL+50%', BOTTOM.x + 372, BOTTOM.y + 14, PALETTE.star);
-    } else if (committing) {
-      drawText(ctx, '▶FOCUS', BOTTOM.x + 372, BOTTOM.y + 14, PALETTE.hpCrit);
-    } else {
-      drawText(ctx, STANCE_NAME[stance], BOTTOM.x + 372, BOTTOM.y + 14);
+    const sy = BOTTOM.y + 84;
+    for (let i = 0; i < STANCES.length; i += 1) {
+      const bx = rx + i * 18;
+      if (STANCES[i] === stance) {
+        ctx.fillStyle = 'rgba(201,162,39,0.5)'; // highlight the active badge (plain)
+        ctx.fillRect(bx - 2, sy - 2, 13, 13);
+      }
+      drawStanceBadge(ctx, bx, sy, STANCES[i]!);
     }
+    // Current stance name, and the commit indicator (FULL POWER / FOCUS).
+    drawText(ctx, STANCE_NAME[stance], rx + 60, sy + 1, PALETTE.ink);
+    if (pendingFullPower) drawText(ctx, '▶FULL+50%', rx + 116, sy + 1, PALETTE.star);
+    else if (committing) drawText(ctx, '▶FOCUS', rx + 116, sy + 1, PALETTE.hpCrit);
 
-    // Turn-order preview — the HONEST "who acts first" for THIS move
-    // (initiative = speed ÷ move weight, with the Fluid-vs-Guard override).
-    // This is the truth the persistent SPD readout can't show (it's raw
-    // speed); a raw-slower mon legitimately acts first with a lighter move
-    // or via Fluid, and the player sees it HERE.
-    const previewMove = moves[moveCursor]!;
+    // Turn-order preview — the HONEST "who acts first" for THIS move (initiative
+    // = speed ÷ move weight, with the Fluid-vs-Guard override), and the controls.
     const foeSt = actionStance(foeAction);
-    const order = orderHint(
-      activeMon(state.player),
-      activeMon(state.foe),
-      previewMove,
-      stance,
-      actionMove(foeAction),
-      foeSt,
-    );
-    // Surface the Fluid exception explicitly — "I'm slower but I go first
-    // because FLUID" must be visible, not a mystery.
+    const order = orderHint(side, activeMon(state.foe), moves[moveCursor]!, stance, actionMove(foeAction), foeSt);
     const fluidFirst = (stance === 'F' && foeSt === 'G') || (foeSt === 'F' && stance === 'G');
     drawText(
       ctx,
       `NEXT: ${order}${fluidFirst ? ' ·FLUID' : ''}`,
-      BOTTOM.x + 356,
-      BOTTOM.y + 44,
+      rx,
+      BOTTOM.y + 102,
       fluidFirst ? PALETTE.stanceF : PALETTE.paperShadow,
     );
-    drawText(ctx, 'SEL=stance ←→=commit B=back', BOTTOM.x + 356, BOTTOM.y + BOTTOM.h - 20, PALETTE.paperDim);
+    // Controls hint — right-aligned so it can't overflow the panel; ASCII only
+    // (m3x6 lacks the ←→ arrows). SEL cycles stance, L/R toggles the FOCUS commit.
+    drawTextRight(ctx, 'SEL stance · L/R commit · B back', BOTTOM.x + BOTTOM.w - 8, BOTTOM.y + 102, PALETTE.paperDim);
   }
 
   // FOCUS R2 — the release picker (the hidden release is chosen NOW).
@@ -2629,40 +2850,19 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       if (breakThreshold > 0) drawBossStrip(ctx);
       drawPlayerPanel(ctx);
       drawPlayerUnderPanel(ctx); // bond meter + bench dots (Lane A)
+      // Status chips (2b-1) — the previously-invisible effect-layer statuses
+      // (debuff + stacking buffs) as chips near each mon, from live engine state.
+      // Foe: a row under the foe sprite; player: a stack right of the player sprite.
+      drawStatusChips(ctx, FOE_SLOT.x, FOE_SLOT.y + BATTLE_SLOT + 2, sideChips(activeMon(state.foe)), false);
+      drawStatusChips(ctx, PL_SLOT.x + BATTLE_SLOT + 6, PL_SLOT.y + 8, sideChips(activeMon(state.player)), true);
 
       if (phase === 'menu' || phase === 'move' || phase === 'call' || phase === 'release') drawIntent(ctx);
       // S1 — the read-war callout occupies the intent slot during resolve. Drawn
       // whenever it's visible (situationAlpha > 0) so its fade-out completes even
       // a beat or two after resolve ends; drawCallout no-ops when faded out.
       drawCallout(ctx);
-
-      // BUG 3 — gust legibility. Two distinct states:
-      //  • ACTIVE: the round in play IS a gust round (this is what the
-      //    "wind is rising" was only ever warning about) — say what it
-      //    DOES. During resolve the round counter has already advanced,
-      //    so the round being resolved is state.round - 1.
-      //  • TELEGRAPH: the NEXT round will be a gust round.
-      const arena = state.bossCard?.arenaSchedule;
-      if (arena && arena.rhythmEveryN > 0) {
-        const anchor = state.rhythmAnchor ?? 0;
-        const activeRound = phase === 'resolve' ? state.round - 1 : state.round;
-        const currentIsGust = (activeRound - anchor) % arena.rhythmEveryN === 0;
-        const nextIsGust = (state.round + 1 - anchor) % arena.rhythmEveryN === 0;
-        // Transient full-width gust banner, in the band between the foe panel and
-        // the INTENT strip. (2a: it can overlap the boss strip on a Falkner gust
-        // round — a transient pulse over a thin strip; integrating the gust cue
-        // into the boss strip is a 2b refinement.)
-        if (currentIsGust && (phase === 'menu' || phase === 'move' || phase === 'resolve')) {
-          const pulse = 0.7 + 0.3 * Math.sin(tick * 6);
-          ctx.fillStyle = `rgba(70,150,230,${pulse})`;
-          ctx.fillRect(0, 88, BATTLE_LOGICAL_W, 20);
-          drawText(ctx, '~~ GUST ROUND — heavies cost +ST, gale bites harder ~~', 32, 90, PALETTE.paper);
-        } else if (nextIsGust && (phase === 'menu' || phase === 'move')) {
-          ctx.fillStyle = 'rgba(80,140,210,0.7)';
-          ctx.fillRect(0, 88, BATTLE_LOGICAL_W, 20);
-          drawText(ctx, '~~ the wind is rising... GUST next round ~~', 80, 90, PALETTE.paper);
-        }
-      }
+      // Gust legibility now lives in the boss BREAK strip (drawBossStrip) — the
+      // 2a floating full-width banner was removed so it can't overlap the arena.
 
       if (breakFlashT > 0) {
         const a = breakFlashT / 0.6;

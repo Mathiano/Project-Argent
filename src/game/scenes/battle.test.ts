@@ -325,20 +325,24 @@ describe('battle move menu — fits a FULL moveset (no spill off the panel)', ()
     for (const m of moves) expect(screen).toContain(m);
   });
 
-  test('a 6-move mon windows the list + scrolls to reveal the rest (no spill)', () => {
-    const moves = ['TACKLE', 'GUST RAKE', 'WING CUT', 'HEADBUTT', 'DIVE BOMB', 'SCRATCH'];
-    const scene = sceneWithMoves(moves);
-    scene.input?.('a'); // FIGHT → move list
-    let ctx = stubCtx();
+  test('the 2×3 move grid shows both pools at once (no windowing / no scroll)', () => {
+    // Battle-UI 2b-1: the flat windowed list became a 2×3 grid — 4 ATTACKS +
+    // 2 TECHNIQUES, all shown at once, so there is NO scroll indicator. GRUBLEAF
+    // is a real 4+2 mon: TACKLE/THORN FLICK/LEAF LASH/HEADBUTT + SIPHON/ENTANGLE.
+    const { scene } = buildScene();
+    scene.input?.('a'); // FIGHT → the grid
+    const ctx = stubCtx();
     scene.draw(ctx);
-    // The 6th is off-window initially (window of 5) + a ▼ indicator shows.
-    expect(ctx.texts.join('|')).not.toContain('SCRATCH');
-    expect(ctx.texts.join('|')).toContain('▼');
-    // Scroll down past the window to reveal the 6th.
-    for (let i = 0; i < 5; i += 1) scene.input?.('down');
-    ctx = stubCtx();
-    scene.draw(ctx);
-    expect(ctx.texts.join('|')).toContain('SCRATCH');
+    const screen = ctx.texts.join('|');
+    expect(screen).toContain('ATTACKS');
+    expect(screen).toContain('TECHNIQUES');
+    // Every move in both pools renders (no windowing hides any).
+    for (const name of ['TACKLE', 'THORN FLICK', 'LEAF LASH', 'HEADBUTT', 'SIPHON', 'ENTANGLE']) {
+      expect(ctx.texts.some((t) => t.includes(name))).toBe(true);
+    }
+    // No scroll indicators — the grid never windows.
+    expect(screen).not.toContain('▼');
+    expect(screen).not.toContain('▲');
   });
 });
 
@@ -1154,14 +1158,17 @@ describe('combat legibility (S1/S2) — pure callout + speed helpers', () => {
     expect(speedLabel(100, 100)).toBe('SPEED EVEN');
   });
 
-  test('the speed indicator is drawn on the intent bar while choosing', () => {
-    // GRUBLEAF vs FLITPECK — buildScene starts at the FIGHT menu, where
-    // the intent bar (and the speed readout) render.
+  test('the BASE SPD speed readout is NO LONGER on the intent bar (removed in 2b-1)', () => {
+    // Battle-UI 2b-1 removed the persistent BASE SPD line (speed is settled; the
+    // honest per-move "NEXT:" order preview in the move view carries what matters).
+    // The FOE INTENT readout still renders; the speed label does not.
     const { scene } = buildScene();
     const ctx = stubCtx();
     scene.draw(ctx);
     const screen = ctx.texts.join('|');
-    expect(/YOU FASTER|YOU SLOWER|SPEED EVEN/.test(screen)).toBe(true);
+    expect(screen).toContain('FOE INTENT');
+    expect(screen).not.toContain('BASE SPD');
+    expect(/YOU FASTER|YOU SLOWER|SPEED EVEN/.test(screen)).toBe(false);
   });
 });
 

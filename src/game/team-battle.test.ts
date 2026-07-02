@@ -114,21 +114,21 @@ describe('Phase 1 GATE — 2v2 player battle, voluntary + forced switching', () 
       foeParty: [createSide(CH1.FLITPECK!)],
     });
     // Menu open after the no-intro scene init. Menu order is now
-    // FIGHT / PKMN / CALL / RUN (4 rows). drawText prefixes a cursor
+    // FIGHT / CALLS / MONS / BALLS / RUN (2b-1). drawText prefixes a cursor
     // indicator ('> ' or '  ') so we match by substring.
     const ctx = stubCtx();
     scene.draw(ctx);
     expect(ctx.texts.some((t) => t.includes('FIGHT'))).toBe(true);
-    expect(ctx.texts.some((t) => t.includes('PKMN'))).toBe(true);
+    expect(ctx.texts.some((t) => t.includes('MONS'))).toBe(true);
 
-    // DOWN from FIGHT (enabled) — with CALL locked (catchBreathUnlocked=false)
-    // the cursor steps cursor 0 → 1 (PKMN, enabled here because the bench
-    // has SILTSKIP).
+    // DOWN from FIGHT (enabled) — with CALLS locked (catchBreathUnlocked=false)
+    // the cursor skips it and lands on MONS (enabled because the bench has
+    // SILTSKIP).
     scene.input?.('down');
     ctx.reset();
     scene.draw(ctx);
-    // The cursor prefix '>' must be next to PKMN now.
-    expect(ctx.texts.some((t) => t.includes('> PKMN'))).toBe(true);
+    // The cursor prefix '>' must be next to MONS now.
+    expect(ctx.texts.some((t) => t.includes('> MONS'))).toBe(true);
   });
 
   test('PKMN row is disabled (cursor skips) when the player has a single-mon "team"', () => {
@@ -418,7 +418,7 @@ describe('legibility — ★/Call economy reads (bond-feel-polish #1-3)', () => 
     const screen = ctx.texts.join('|');
     // ★ is drawn small + separate by the symbol pass, so assert the words (the
     // trailing ★ glyph is a distinct run now).
-    expect(screen).toContain('CALL — needs'); // why it's unavailable, inline
+    expect(screen).toContain('CALLS — needs'); // why it's unavailable, inline
     expect(screen).toContain('win a read to charge'); // the 0-★ micro-hint
     expect(screen.includes('MOMENTUM')).toBe(true); // the ★ pips are labelled
   });
@@ -431,6 +431,6 @@ describe('legibility — ★/Call economy reads (bond-feel-polish #1-3)', () => 
     });
     const ctx = stubCtx();
     scene.draw(ctx);
-    expect(ctx.texts.join('|')).toContain('CALL — locked');
+    expect(ctx.texts.join('|')).toContain('CALLS — locked');
   });
 });

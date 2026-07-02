@@ -1,7 +1,7 @@
 export * from './types';
 export { isRhythmRound, traitMods } from './types';
 export * from './events';
-export { COMBAT, STATUS, TIERS } from './config';
+export { COMBAT, STATUS, TIERS, MOMENTUM_REQ_BY_TIER } from './config';
 export { effectDamageFactor, buffDamageTakenMult, tickStatuses } from './status';
 export type { PendingEffect } from './status';
 export { LEGACY_TRAIT_TABLE, LEGACY_TYPE_CHART, MOVES, SPECIES, COUNTER_MAP, typeMult } from './data';
@@ -22,6 +22,7 @@ export {
   canAfford,
   isWinded,
   moveLegal,
+  tierMomentumLocked,
   affordableMoves,
   affordableAttacks,
   affordableTechniques,
