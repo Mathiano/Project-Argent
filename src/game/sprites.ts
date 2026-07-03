@@ -208,7 +208,7 @@ export function drawPlaceholder(
   type: ElementType | null,
   slotX: number,
   slotY: number,
-  options: { slotSize?: number; name?: string } = {},
+  options: { slotSize?: number; name?: string; bottomAnchor?: boolean } = {},
 ): void {
   const slotSize = options.slotSize ?? 56;
   const fill = type !== null && TYPE_COLOR[type] ? TYPE_COLOR[type]! : PLACEHOLDER_NEUTRAL;
@@ -228,6 +228,21 @@ export function drawPlaceholder(
   const inside = shape.inside;
   const test = (nx: number, ny: number): boolean => inside(0.5 + (nx - 0.5) / scale, 0.5 + (ny - 0.5) / scale);
 
+  // BOTTOM-ANCHOR (beat 3.2, battle-only via the option): find the silhouette's
+  // lowest filled row and shift it down so its feet reach the slot floor (so the
+  // sprite stands ON its platform instead of floating centred). Absent → dy 0,
+  // byte-identical for every existing caller.
+  let dy = 0;
+  if (options.bottomAnchor) {
+    let maxPy = -1;
+    for (let py = slotSize - 1; py >= 0 && maxPy < 0; py -= 1) {
+      for (let px = 0; px < slotSize; px += 1) {
+        if (test((px + 0.5) / slotSize, (py + 0.5) / slotSize)) { maxPy = py; break; }
+      }
+    }
+    if (maxPy >= 0) dy = slotSize - 1 - maxPy;
+  }
+
   for (let py = 0; py < slotSize; py += 1) {
     for (let px = 0; px < slotSize; px += 1) {
       const nx = (px + 0.5) / slotSize;
@@ -237,7 +252,7 @@ export function drawPlaceholder(
       const onEdge =
         !test(nx - e, ny) || !test(nx + e, ny) || !test(nx, ny - e) || !test(nx, ny + e);
       ctx.fillStyle = onEdge ? PLACEHOLDER_OUTLINE : fill;
-      ctx.fillRect(slotX + px, slotY + py, 1, 1);
+      ctx.fillRect(slotX + px, slotY + py + dy, 1, 1);
     }
   }
 
@@ -248,7 +263,7 @@ export function drawPlaceholder(
     const sy = 0.5 + (ey - 0.5) * scale;
     const dot = Math.max(1, Math.round(slotSize / 20));
     ctx.fillStyle = PLACEHOLDER_EYE;
-    ctx.fillRect(slotX + Math.round(sx * slotSize) - 1, slotY + Math.round(sy * slotSize) - 1, dot, dot);
+    ctx.fillRect(slotX + Math.round(sx * slotSize) - 1, slotY + Math.round(sy * slotSize) - 1 + dy, dot, dot);
   }
 }
 
@@ -306,14 +321,14 @@ export function drawSpeciesInSlot(
   species: SpeciesRef,
   slotX: number,
   slotY: number,
-  options: { slotSize?: number; flip?: boolean; facing?: Facing; fillSlot?: boolean } = {},
+  options: { slotSize?: number; flip?: boolean; facing?: Facing; fillSlot?: boolean; bottomAnchor?: boolean } = {},
 ): void {
   const sprite = getSprite(species.name);
   if (sprite) {
     const flip = resolveFlip(sprite, options);
     // `fillSlot` (beat 3) upscales real pixel art by the largest INTEGER factor
-    // that fits (56px art in the 112px battle slot → 2×). The placeholder branch
-    // below already scales to slotSize (normalized sampling), so both fill the slot.
+    // that fits (56px art in the 112px battle slot → 2×). drawSpriteInSlot already
+    // bottom-anchors, so real sprites ignore bottomAnchor (no-op).
     const drawOpts: { slotSize?: number; flip: boolean; fillSlot?: boolean } =
       options.slotSize !== undefined
         ? { slotSize: options.slotSize, flip, ...(options.fillSlot ? { fillSlot: true } : {}) }
@@ -323,8 +338,11 @@ export function drawSpeciesInSlot(
   }
   // Pass the species name so the placeholder picks the manifest archetype
   // (distinct shape) — falls back to the neutral "?" blob for unknown names.
-  const placeholderOpts: { slotSize?: number; name: string } =
-    options.slotSize !== undefined ? { slotSize: options.slotSize, name: species.name } : { name: species.name };
+  // `bottomAnchor` (beat 3.2) makes the placeholder stand on its platform.
+  const placeholderOpts: { slotSize?: number; name: string; bottomAnchor?: boolean } =
+    options.slotSize !== undefined
+      ? { slotSize: options.slotSize, name: species.name, ...(options.bottomAnchor ? { bottomAnchor: true } : {}) }
+      : { name: species.name, ...(options.bottomAnchor ? { bottomAnchor: true } : {}) };
   drawPlaceholder(ctx, species.type, slotX, slotY, placeholderOpts);
 }
 

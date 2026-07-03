@@ -26,27 +26,36 @@ import { bondStageName, BOND_STAGES } from './catching';
 import { clearGameEventListeners, onGameEvent } from './gameEvents';
 import type { GameEvent } from './gameEvents';
 
-// Recording ctx — captures fillText so we can assert what's on screen.
+// Recording ctx — captures fillText + the fill COLOUR of each fillRect (the bond
+// bar draws no text now, so its presence reads via its bond-coloured fill).
 interface RecordingCtx extends CanvasRenderingContext2D {
   readonly texts: string[];
+  readonly rectFills: string[];
   reset(): void;
 }
 function stubCtx(): RecordingCtx {
   const noop = () => {};
   const texts: string[] = [];
+  const rectFills: string[] = [];
+  let fillStyle = '#000000';
   return new Proxy(
-    { texts, reset: () => texts.splice(0) },
+    { texts, rectFills, reset: () => { texts.splice(0); rectFills.splice(0); } },
     {
       get(target, prop) {
         if (prop === 'texts') return (target as { texts: string[] }).texts;
+        if (prop === 'rectFills') return (target as { rectFills: string[] }).rectFills;
         if (prop === 'reset') return (target as { reset: () => void }).reset;
         if (prop === 'fillText') return (text: string) => texts.push(String(text));
+        if (prop === 'fillRect') return () => rectFills.push(fillStyle);
         if (prop === 'beginPath') return () => ({ fill: noop, stroke: noop, ellipse: noop });
         if (prop === 'measureText') return () => ({ width: 10 });
         if (prop === 'canvas') return { width: 320, height: 180 };
         return noop;
       },
-      set: () => true,
+      set: (_t, p, v) => {
+        if (p === 'fillStyle') fillStyle = String(v);
+        return true;
+      },
     },
   ) as unknown as RecordingCtx;
 }
@@ -92,7 +101,11 @@ describe('bond bar — surfaces the existing stage + progress (no recompute)', (
     scene.update?.(0.01); // past intro → menu
     const ctx = stubCtx();
     scene.draw(ctx);
-    expect(ctx.texts.some((t) => t.includes('Companions'))).toBe(true);
+    // Beat 3.2 — the stage WORD moved off the panel (it lives in the mon summary
+    // now). The threaded ACTIVE-mon bond bar still draws: a bond-coloured fill
+    // (value 40 > 0) proves the bar rendered.
+    expect(ctx.texts.some((t) => t.includes('BOND'))).toBe(true); // the panel BOND label
+    expect(ctx.rectFills).toContain('#c0608a'); // PALETTE.bond — the bond bar fill
   });
 
   test('no bond bar drawn when bond is not threaded (sim / isolated callers)', () => {
@@ -110,9 +123,11 @@ describe('bond bar — surfaces the existing stage + progress (no recompute)', (
     scene.update?.(0.01);
     const ctx = stubCtx();
     scene.draw(ctx);
-    // No stage name leaks onto the HUD when there's no bond to show.
+    // No stage name leaks onto the HUD, and — without a threaded bond — the bond
+    // bar itself does not draw (no bond-coloured fill).
     const names = BOND_STAGES.map((s) => s.name);
     expect(ctx.texts.some((t) => names.some((n) => t.includes(n)))).toBe(false);
+    expect(ctx.rectFills).not.toContain('#c0608a'); // no bond bar fill when unthreaded
   });
 });
 

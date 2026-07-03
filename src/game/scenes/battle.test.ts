@@ -31,6 +31,7 @@ import ch1BatchData from '../../../docs/ch1-batch.json';
 import movesData from '../../../docs/moves.json';
 import { createBattleScene, degradeIntent, focusIntentTell, infoLevelToReliability, speedLabel, stanceCallout } from './battle';
 import type { FocusIntentInfo } from './battle';
+import { bondStageName } from '../catching';
 
 // Stub CanvasRenderingContext2D — records every fillText so tests can
 // assert what's on screen. Everything else is a no-op; we don't render
@@ -1697,7 +1698,7 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
   // A ctx that records every fillRect/strokeRect + fillText WITH the active font
   // px, and a proportional measureText (≈ m3x6's 0.5em advance) so right-aligned
   // + width-derived placements resolve realistically for the bounds check.
-  interface TextRec { x: number; y: number; text: string; px: number; align: string }
+  interface TextRec { x: number; y: number; text: string; px: number; align: string; color: string }
   function recordingCtx(): CanvasRenderingContext2D & {
     rects: { x: number; y: number; w: number; h: number }[];
     texts: TextRec[];
@@ -1711,6 +1712,7 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
     let font = '16px m3x6, monospace';
     let align = 'start';
     let strokeStyle = '#000000';
+    let fillStyle = '#000000';
     const px = (f: string): number => {
       const m = /(\d+)px/.exec(f);
       return m ? parseInt(m[1]!, 10) : 16;
@@ -1731,7 +1733,7 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
               strokes.push({ x, y, w, h, style: strokeStyle });
             };
           }
-          if (p === 'fillText') return (text: string, x: number, y: number) => texts.push({ x, y, text: String(text), px: px(font), align });
+          if (p === 'fillText') return (text: string, x: number, y: number) => texts.push({ x, y, text: String(text), px: px(font), align, color: fillStyle });
           // m3x6's real average advance is ~0.25em (UI_CHAR_W 4.0 @ 16px). Use a
           // CONSERVATIVE 0.3em: if a bound passes here it passes with margin live.
           if (p === 'measureText') return (s: string) => ({ width: String(s).length * px(font) * 0.3 });
@@ -1743,6 +1745,7 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
         },
         set(_t, p, v) {
           if (p === 'strokeStyle') strokeStyle = String(v);
+          if (p === 'fillStyle') fillStyle = String(v);
           if (p === 'font') {
             font = String(v);
             fonts.push(font);
@@ -1874,7 +1877,8 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
   function assertStageBand(ctx: ReturnType<typeof recordingCtx>, label: string): void {
     const panels = panelRects(ctx);
     const bad: string[] = [];
-    for (let sy = 80; sy <= 190; sy += 10) {
+    // sy starts at 90 (beat 3.2: the taller boss BREAK strip now reaches y82).
+    for (let sy = 90; sy <= 190; sy += 10) {
       for (let sx = 210; sx <= 430; sx += 20) {
         if (hits(panels, sx, sy)) bad.push(`(${sx},${sy})`);
       }
@@ -2100,5 +2104,99 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
     expect(ctx.rects.some((r) => r.x === 0 && r.y === 150 && r.w === 640)).toBe(true); // ground band
     const scatter = ctx.rects.filter((r) => r.w <= 3 && r.h <= 3 && r.y >= 150 && r.y <= 256);
     expect(scatter.length).toBeGreaterThan(20); // deterministic grass/pebble scatter
+  });
+
+  // ── Beat 3.2 — the three micro-fixes + two additions ────────────────────────
+  const contains = (r: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) =>
+    r.x <= b.x + 0.01 && r.y <= b.y + 0.01 && r.x + r.w >= b.x + b.w - 0.01 && r.y + r.h >= b.y + b.h - 0.01;
+
+  test('3.2 fix 1: the boss BREAK strip elements sit fully INSIDE the panel inner rect', () => {
+    const scene = richScene(BOSS_CARD);
+    scene.update?.(0.01);
+    const ctx = recordingCtx();
+    scene.draw(ctx);
+    const FOE = { x: 8, y: 8, w: 340, h: 52 + 22 }; // boss panel = base + FOE_BREAK_EXTRA
+    const innerTop = FOE.y + 3;
+    const innerBottom = FOE.y + FOE.h - 3; // 79
+    for (const label of ['BREAK', 'GYM LEADER']) {
+      const t = ctx.texts.find((x) => x.text === label)!;
+      expect(t, label).toBeTruthy();
+      expect(t.y, `${label} top`).toBeGreaterThanOrEqual(innerTop - 1);
+      expect(t.y + t.px, `${label} bottom`).toBeLessThanOrEqual(innerBottom + 1);
+    }
+    // The GYM LEADER tag box (h===15) in the strip, + the thin BREAK line (h===3,
+    // wide) — both within the inner rect (not clipping the frame).
+    const tagRects = ctx.rects.filter((r) => r.h === 15 && r.y > 55 && r.x < FOE.x + FOE.w);
+    expect(tagRects.length, 'the GYM LEADER tag box in the strip').toBeGreaterThan(0);
+    for (const r of tagRects) expect(r.y + r.h, 'tag box bottom').toBeLessThanOrEqual(innerBottom);
+    const line = ctx.rects.filter((r) => r.h === 3 && r.w > 300 && r.y > 55 && r.x < 200);
+    expect(line.length, 'the thin BREAK line').toBeGreaterThan(0);
+    for (const r of line) expect(r.y + r.h, 'break line bottom').toBeLessThanOrEqual(innerBottom);
+  });
+
+  test('3.2 fix 2: the SELECTED move name reads in every state (never the vanishing dim-ink)', () => {
+    const player = { ...createSide(CH1.GRUBLEAF!), momentum: 0 }; // ★-gates → locked cells
+    const state = createBattleState(createTeam([player]), createTeam([createSide(CH1.FLITPECK!)]));
+    const scene = createBattleScene({
+      state, rng: mulberry32(1), chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'A' }),
+      intro: [], catchBreathUnlocked: false, canRun: true, onResolve: () => {},
+    });
+    scene.update?.(0.01);
+    scene.input?.('a'); // move grid
+    let sawLocked = false;
+    for (let i = 0; i < 6; i += 1) {
+      const ctx = recordingCtx();
+      scene.draw(ctx);
+      const sel = ctx.texts.find((t) => t.text.startsWith('>')); // the selected move name
+      expect(sel, 'a selected move name').toBeTruthy();
+      // frameInkDim (#b09068) is the color that VANISHES over the velvet wash.
+      expect(sel!.color, `selected name "${sel!.text}"`).not.toBe('#b09068');
+      if (ctx.texts.some((t) => /NEEDS|WINDED|LOW ST/.test(t.text))) sawLocked = true;
+      scene.input?.('down');
+    }
+    expect(sawLocked, 'the test must land the cursor on a locked cell').toBe(true);
+  });
+
+  test('3.2 fix 3: both sprites are ANCHORED to their platform (not floating)', () => {
+    const scene = richScene();
+    scene.update?.(0.01);
+    const ctx = recordingCtx();
+    scene.draw(ctx);
+    const SLOT = 112;
+    const foePlat = 12 + SLOT; // FOE_SLOT.y + BATTLE_SLOT (platform centre)
+    const plPlat = 140 + SLOT;
+    const spriteBottom = (x0: number, y0: number, platY: number): number => {
+      const px = ctx.rects.filter((r) => r.w <= 2 && r.x >= x0 && r.x <= x0 + SLOT && r.y >= y0 && r.y <= platY + 14);
+      return Math.max(...px.map((r) => r.y + r.h));
+    };
+    // Feet land on the platform disc (within the platform half-height + a px).
+    expect(Math.abs(spriteBottom(472, 12, foePlat) - foePlat), 'foe sprite bottom vs platform').toBeLessThanOrEqual(14);
+    expect(Math.abs(spriteBottom(96, 140, plPlat) - plPlat), 'player sprite bottom vs platform').toBeLessThanOrEqual(16);
+  });
+
+  test('3.2 add 1: the rail selection highlight ⊇ the keyword text (menu + breadcrumb)', () => {
+    const scene = richScene();
+    scene.update?.(0.01);
+    let ctx = recordingCtx();
+    scene.draw(ctx); // MENU: cursor on FIGHT
+    const menuKw = ctx.texts.find((t) => t.text === '> FIGHT')!;
+    expect(menuKw, 'the cursor keyword "> FIGHT"').toBeTruthy();
+    expect(ctx.rects.some((r) => contains(r, tbounds(menuKw))), 'menu highlight ⊇ FIGHT').toBe(true);
+    scene.input?.('a'); // MOVE: the FIGHT breadcrumb is boxed
+    ctx = recordingCtx();
+    scene.draw(ctx);
+    const bcKw = ctx.texts.find((t) => t.text === '  FIGHT')!; // breadcrumb marker is a space
+    expect(bcKw, 'the boxed breadcrumb keyword').toBeTruthy();
+    expect(ctx.rects.some((r) => contains(r, tbounds(bcKw))), 'breadcrumb highlight ⊇ FIGHT').toBe(true);
+  });
+
+  test('3.2 add 2: the bond STAGE WORD is removed from the panel (label + bar kept)', () => {
+    const scene = richScene(); // playerBond [55, 10] → active mon at 55 = "In Sync"
+    scene.update?.(0.01);
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    const screen = ctx.texts.join('|');
+    expect(screen).toContain('BOND'); // the panel BOND label stays
+    expect(screen).not.toContain(bondStageName(55)); // the always-on stage word is gone
   });
 });

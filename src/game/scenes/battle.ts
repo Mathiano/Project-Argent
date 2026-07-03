@@ -130,9 +130,11 @@ function devLogUrlFlag(): boolean {
 // `h` on FOE_PANEL is the NON-boss base; a boss adds FOE_BREAK_EXTRA (the thin
 // BREAK line + GYM LEADER/gust strip), so drawFoePanel computes its total.
 const FOE_PANEL = { x: 8, y: 8, w: 340, h: 52 } as const; // upper-left (was h74; boss = +FOE_BREAK_EXTRA)
-const FOE_BREAK_EXTRA = 13; // a boss adds the compact GYM-LEADER/gust strip + the thin BREAK line
+// Beat 3.2 — the boss BREAK strip grown so the GYM LEADER tag (h15) + the thin
+// line + the labels ALL sit inside the panel's inner rect (correctness > a few px).
+const FOE_BREAK_EXTRA = 22; // boss adds the GYM-LEADER/gust strip + the thin BREAK line
 const FOE_SLOT = { x: 472, y: 12 } as const; // upper-right sprite slot
-const INTENT = { x: 8, y: 76, w: 340, h: 18 } as const; // mid strip — re-derived UP under the compacted foe panel (ends y60 / y65 boss), clear of the player sprite (y140)
+const INTENT = { x: 8, y: 88, w: 340, h: 18 } as const; // mid strip — under the taller boss panel (ends y82) + the compact non-boss panel (y60), clear of the player sprite (y140)
 const PL_SLOT = { x: 96, y: 140 } as const; // mid-left sprite slot
 // Beat 3 — PL_PANEL NUDGES DOWN to hug the console (y150→196; ends y256, a ~4px
 // gap above BOTTOM y260), opening the mock's wide middle STAGE band. The housed
@@ -555,9 +557,13 @@ function drawMoveCell(
     rightLeft = x + w - 5 - Math.ceil(measureUiText(ctx, `ST${info.cost}`));
   }
   // NAME — truncated so it never reaches the right-side note (padlock/chip/ST).
+  // The name must READ in ALL FOUR states: over the velvet SELECTION wash a locked
+  // name uses the readable SOFT ink (not the dim-ink, which vanishes on the wash);
+  // unselected states keep frameInk (legal) / frameInkDim (locked, disabled look).
   const nameStr = `${selected ? '>' : ' '}${info.name}`;
   const nameX = x + 32;
-  drawText(ctx, fitText(ctx, nameStr, rightLeft - 5 - nameX), nameX, ty, legal ? PALETTE.frameInk : PALETTE.frameInkDim);
+  const nameColor = legal ? PALETTE.frameInk : selected ? PALETTE.frameInkSoft : PALETTE.frameInkDim;
+  drawText(ctx, fitText(ctx, nameStr, rightLeft - 5 - nameX), nameX, ty, nameColor);
 }
 
 // Active effect-layer statuses on a side, as chips (the previously-invisible
@@ -2611,8 +2617,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         drawText(ctx, currentIsGust ? 'GUST NOW' : 'GUST NEXT', gustX + 5, stripY, PALETTE.paper);
       }
     }
-    // The thin BREAK progress line along the panel's bottom inner edge.
-    const lineY = py + h - 5;
+    // The thin BREAK progress line along the panel's bottom inner edge (inside the
+    // frame body: py+h-6..-3, clear of the tag above).
+    const lineY = py + h - 6;
     const lineX = x + 5;
     const lineW = w - 10;
     ctx.fillStyle = PALETTE.momentumOff; // dim track
@@ -2656,7 +2663,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         const eased = 1 - (1 - t) * (1 - t); // ease-out — the bar settles in
         value = bondAdvanceFrom + (bondAdvanceTo - bondAdvanceFrom) * eased;
       }
-      drawBondBar(ctx, bondX, bondY + 2, px + pw - 10 - bondX - benchW, value);
+      // Beat 3.2 — the always-on STAGE WORD ("Wary"/"In Sync"…) is removed from the
+      // persistent panel (hideLabel); the panel BOND row keeps label + bar + bench.
+      // Stage changes still announce in the bond-advance LOG; names live in the
+      // mon summary.
+      drawBondBar(ctx, bondX, bondY + 2, px + pw - 10 - bondX - benchW, value, { hideLabel: true });
     }
     // Team bench dots — right end of the BOND row (no-op for ≤1 mon / resolve).
     drawBenchIndicators(ctx, px + pw - 10 - state.player.members.length * 10, bondY + 1, state.player);
@@ -2805,16 +2816,21 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const boxedHere = mode === 'breadcrumb' && it.kind === boxedKind;
       // In breadcrumb mode the drilled item is bright; the rest are dim context.
       const color = boxedHere ? PALETTE.frameInk : mode === 'breadcrumb' ? PALETTE.frameInkDim : dim ? PALETTE.frameInkDim : PALETTE.frameInk;
-      if (cursorHere) drawRowHighlight(ctx, x + 6, rowY - 1, mode === 'full' ? 76 : 72, 15);
-      // The breadcrumb "you drilled in here" cue is ONE treatment — a FILL
-      // highlight + the ◄ marker (beat 3.1: the gold hollow box is gone).
-      if (boxedHere) {
-        const bw = Math.ceil(measureUiText(ctx, RAIL_KEYWORD[it.kind])) + 7;
-        drawRowHighlight(ctx, kwX - 4, rowY - 1, bw + 2, 15);
-        drawText(ctx, '◄', kwX + bw, rowY, PALETTE.momentumGold);
-      }
       const marker = cursorHere ? '>' : ' ';
       const kwLabel = `${marker} ${RAIL_KEYWORD[it.kind]}`;
+      // Beat 3.2 — the selection highlight is SIZED to the keyword (measured width
+      // + padding) and covers the full text em box (drawText's -4 nudge → the em
+      // spans rowY-4..rowY+12), so it wraps the keyword (+ the ◄) fully. (Was a
+      // stale fixed 76/72 that rendered offset/short after the compaction.)
+      const kwW = Math.ceil(measureUiText(ctx, kwLabel));
+      if (cursorHere) drawRowHighlight(ctx, kwX - 4, rowY - 4, kwW + 8, 16);
+      // The breadcrumb "you drilled in here" cue is ONE treatment — a FILL
+      // highlight (keyword + ◄) + the ◄ marker (beat 3.1: the gold hollow box gone).
+      if (boxedHere) {
+        const arrowW = Math.ceil(measureUiText(ctx, '◄'));
+        drawRowHighlight(ctx, kwX - 4, rowY - 4, kwW + 12 + arrowW, 16);
+        drawText(ctx, '◄', kwX + kwW + 6, rowY, PALETTE.momentumGold);
+      }
       drawText(ctx, kwLabel, kwX, rowY, color);
       // The note + description columns render in 'full' (menu) mode only — the
       // breadcrumb stays compact/narrow so the active list has room beside it.
@@ -3238,14 +3254,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         { name: display.foe.species.name, type: display.foe.species.types[0] ?? null },
         FOE_SLOT.x + spriteOffset('foe'),
         FOE_SLOT.y,
-        { facing: 'left', slotSize: BATTLE_SLOT, fillSlot: true },
+        { facing: 'left', slotSize: BATTLE_SLOT, fillSlot: true, bottomAnchor: true },
       );
       drawSpeciesInSlot(
         ctx,
         { name: monDisplayName(display.player), type: display.player.species.types[0] ?? null },
         PL_SLOT.x + spriteOffset('player'),
         PL_SLOT.y,
-        { facing: 'right', slotSize: BATTLE_SLOT, fillSlot: true },
+        { facing: 'right', slotSize: BATTLE_SLOT, fillSlot: true, bottomAnchor: true },
       );
 
       drawReadReaction(ctx); // surface ③ — over the mon, under the HUD panels
