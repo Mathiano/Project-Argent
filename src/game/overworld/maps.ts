@@ -8,7 +8,6 @@ import labData from '../maps/lab.json';
 import houseData from '../maps/house.json';
 import kamonHouseData from '../maps/kamon_house.json';
 import bedroomData from '../maps/bedroom.json';
-import hearthwickData from '../maps/hearthwick.json';
 import violetData from '../maps/violet.json';
 import violetAcademyData from '../maps/violet_academy.json';
 import gymData from '../maps/gym.json';
@@ -35,10 +34,13 @@ import pctWatersheetTileset from '../../../assets/tilesets/pct_watersheet.tilese
 import pctFencesTileset from '../../../assets/tilesets/pct_fences.tileset.json';
 import pctBuildingsTileset from '../../../assets/tilesets/pct_buildings.tileset.json';
 import pctDecorTileset from '../../../assets/tilesets/pct_decor.tileset.json';
+import pctFlowersTileset from '../../../assets/tilesets/pct_flowers.tileset.json';
 import pctVerifyData from '../maps/pct_verify.json';
 import testMapTmj from '../maps/tiled/test-map.tmj.json';
 import kitchenSinkTmj from '../maps/tiled/test-map-kitchen-sink.tmj.json';
 import route31BigTmj from '../maps/tiled/test-map-kitchen-sink-big.tmj.json';
+// HEARTHWICK is now Mathias's authored Tiled town (replaces the graybox hearthwick.json).
+import hearthwickTmj from '../maps/tiled/hearthwick.tmj.json';
 import houseVioletPrefab from '../../../assets/prefabs/house_violet.prefab.json';
 import gymVioletPrefab from '../../../assets/prefabs/gym_violet.prefab.json';
 import treeBigPrefab from '../../../assets/prefabs/tree_big.prefab.json';
@@ -50,7 +52,7 @@ import { wireImportedMap } from './tiledWiring';
 import { makeCenter, makeMart } from './interiorGen';
 import { getTileset, hasTileset, registerPrefab, registerTileset } from './tilesetCatalog';
 import type { PrefabJson, TilesetJson } from './tileset';
-import type { MapData, MapObject } from './types';
+import type { MapData, MapObject, Spawn } from './types';
 
 // Register tilesets + prefabs first so map loaders can resolve refs.
 registerTileset(outdoorVioletTileset as TilesetJson);
@@ -67,6 +69,7 @@ registerTileset(pctWatersheetTileset as TilesetJson);
 registerTileset(pctFencesTileset as TilesetJson);
 registerTileset(pctBuildingsTileset as TilesetJson);
 registerTileset(pctDecorTileset as TilesetJson);
+registerTileset(pctFlowersTileset as TilesetJson);
 registerPrefab(houseVioletPrefab as PrefabJson);
 registerPrefab(gymVioletPrefab as PrefabJson);
 registerPrefab(treeBigPrefab as PrefabJson);
@@ -92,7 +95,9 @@ const REGISTRY: { [name: string]: () => MapData } = {
   BEDROOM: () => loadMap(bedroomData as GrayboxMapJson),
   HOUSE: () => loadMap(houseData as GrayboxMapJson),
   KAMON_HOUSE: () => loadMap(kamonHouseData as GrayboxMapJson),
-  HEARTHWICK: () => loadMap(hearthwickData as GrayboxMapJson),
+  // HEARTHWICK is Mathias's authored Tiled town (buildHearthwick), replacing the
+  // retired graybox hearthwick.json.
+  HEARTHWICK: buildHearthwick,
   // Interiors are GENERATED from data (interiorGen.ts), not hand-authored JSON.
   // Hearthwick uses the defaults (its text IS the default); a new town's pair is two
   // lines: makeCenter('NEWTOWN') + makeMart('NEWTOWN', [...stock]).
@@ -177,6 +182,29 @@ function buildRoute31(): MapData {
     },
   ];
   return { ...map, objects: [...map.objects, ...scripts] };
+}
+
+// THE LIVE Hearthwick (Mathias's authored 40×36 Tiled town): import+wire the .tmj
+// (terrain/collision/props/overhead + 5 building doors + 2 signs + 4 NPCs + the
+// Route 31 edge exit), then inject the CODE-AUTHORED return-landing spawns — one per
+// warp INTO town — so the round-trips close (same hybrid as buildRoute31: Tiled =
+// where, code = the glue). Each spawn sits one tile off its door (walkable; the
+// building sits above the door), keyed to the tmj's warp markers. The interiors
+// (HOUSE/KAMON_HOUSE/LAB + the generated CENTER/MART) all return to HEARTHWICK:from<X>;
+// ROUTE 31 returns to :fromRoute. (warp_to_north is future content — intentionally
+// unwired; the forest-ranger NPC is the "north is overgrown" stub.)
+function buildHearthwick(): MapData {
+  const map = importAndWire(hearthwickTmj, 'HEARTHWICK');
+  const spawns: { [id: string]: Spawn } = {
+    ...map.spawns,
+    fromHouse: { x: 7, y: 14, facing: 'down' }, // warp_player_home @7,13
+    fromKamonHouse: { x: 16, y: 14, facing: 'down' }, // warp_kamon_house @16,13
+    fromLab: { x: 27, y: 17, facing: 'down' }, // warp_professor_laboratory @27,16
+    fromCenter: { x: 8, y: 26, facing: 'down' }, // warp_pokecenter @8,25
+    fromMart: { x: 28, y: 26, facing: 'down' }, // warp_pokemart @28,25
+    fromRoute: { x: 18, y: 34, facing: 'up' }, // warp_to_route31 @18,35 (return from Route 31)
+  };
+  return { ...map, spawns };
 }
 
 // Each call rebuilds from the JSON so any in-place editing during dev

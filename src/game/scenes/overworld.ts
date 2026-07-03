@@ -677,9 +677,16 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
   // A door tile — building doors (gym_door / academy_door / wall_door / *_door) read
   // by id (data-driven) or label (graybox). Route-EDGE warps sit on path/grass, so
   // this keeps the door sound on building entrances/exits, not seamless map edges.
+  // IMPORTED (Tiled) maps carry no door-tile LABELS — their tiles live in
+  // importedLayers as opaque pct_* refs. There, read the warp's explicit `door` flag
+  // (set on BUILDING-entrance warps by the wiring; route/edge warps omit it), so the
+  // blip fires on building doors but not on seamless route↔town edges. Graybox maps
+  // never carry the flag → they keep the label path → bit-identical.
   function isDoorAt(x: number, y: number): boolean {
     const id = map.cells ? map.cells[y]?.[x] : map.tileset[rows[y]?.[x] ?? '']?.label;
-    return id !== undefined && id.includes('door');
+    if (id !== undefined && id.includes('door')) return true;
+    const w = map.objects.find((o) => o.type === 'warp' && o.x === x && o.y === y);
+    return w?.type === 'warp' && w.door === true;
   }
 
   function stepOnScriptAt(x: number, y: number): Extract<MapObject, { type: 'script' }> | null {

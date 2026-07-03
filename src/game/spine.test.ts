@@ -550,9 +550,9 @@ describe('DEMO-COMPLETE GATE — cold spine intro → Violet → gym → Falkner
     // fair-path starter per the boss card.
     const h = createHarness({
       map: 'HEARTHWICK',
-      // Drop just north of the south exit (the gatekeeper steps aside
-      // once player_has_starter is set — which it is).
-      spawnAt: { x: 9, y: 11, facing: 'down' },
+      // Authored Tiled town: drop just north of the elder@(18,34) (the gatekeeper
+      // steps aside once player_has_starter is set) — the south exit is (18,35).
+      spawnAt: { x: 18, y: 33, facing: 'down' },
     });
     h.run.party = [createSide(CH1.KINDRAKE!)];
     h.flags.set('player_has_starter');
@@ -570,8 +570,8 @@ describe('DEMO-COMPLETE GATE — cold spine intro → Violet → gym → Falkner
     expect(h.top()).toBe('overworld');
     expect(h.overworld().currentPosition().map).toBe('HEARTHWICK');
 
-    // Hearthwick → Route 31 (south exit at (9,13)).
-    walkTo(h, 9, 13);
+    // Hearthwick → Route 31 (south exit at (18,35)).
+    walkTo(h, 18, 35);
     h.tick(30); // fade + warp + new-scene fade-in
     expect(h.overworld().currentPosition().map).toBe('ROUTE31');
 

@@ -97,8 +97,9 @@ const FLIP_MASK = 0x1fffffff; // strip Tiled's 3 high flip bits (H/V/D)
 // Collision convention: a tile layer with one of these names (case-insensitive) is
 // the COLLISION layer — metadata, not art. Any non-empty cell = solid; it is NOT
 // added to the visual importedLayers. The tiles used to paint it don't matter
-// (presence = solid). `collision` is canonical. See docs/tiled-importer.md.
-const COLLISION_LAYER_NAMES = new Set(['collision', 'meta_collision']);
+// (presence = solid). `collision` is canonical; `collide` (Mathias's Hearthwick
+// layer name) + `meta_collision` are accepted aliases. See docs/tiled-importer.md.
+const COLLISION_LAYER_NAMES = new Set(['collision', 'collide', 'meta_collision']);
 export function isCollisionLayerName(name: string): boolean {
   return COLLISION_LAYER_NAMES.has(name.trim().toLowerCase());
 }
@@ -329,6 +330,7 @@ export const DEFAULT_SHEET_TABLE: { readonly [tsx: string]: ResolvedSheet } = {
   'Fences.tsx': { pct: 'pct_fences', cols: 4 }, // Fences.png (64 wide)
   'premade_builds.tsx': { pct: 'pct_buildings', cols: 40 }, // premade_builds.png (640 wide)
   'decor.tsx': { pct: 'pct_decor', cols: 7 }, // decor.png (112 wide)
+  'flowers.tsx': { pct: 'pct_flowers', cols: 5 }, // flowers.png (80 wide) — Hearthwick
 };
 
 export function defaultResolveSheet(source: string): ResolvedSheet | null {

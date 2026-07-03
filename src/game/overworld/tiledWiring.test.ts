@@ -38,6 +38,19 @@ describe('wireImportedMap — marker → definition', () => {
     expect(map.objects).toEqual([{ type: 'warp', x: 6, y: 0, target: 'ROUTE31:fromHearthwick' }]);
   });
 
+  test('the kind PREFIX is matched case-insensitively (Uppercase prefixes dispatch to their kind, not "unknown")', () => {
+    // The accommodation lowercases the prefix for KIND dispatch: a mis-cased NPC_/
+    // WARP_ resolves to its kind (then the exact-name def lookup applies) instead of
+    // falling through to the "unknown prefix" warning.
+    const { warnings } = wireImportedMap(
+      baseMap([{ name: 'NPC_ghost', x: 1, y: 1, w: 1, h: 1 }, { name: 'Warp_ghost', x: 2, y: 2, w: 1, h: 1 }]),
+      DEFS,
+    );
+    expect(warnings.some((w) => w.includes('NPC_ghost') && w.includes('no NPC definition'))).toBe(true);
+    expect(warnings.some((w) => w.includes('Warp_ghost') && w.includes('no WARP definition'))).toBe(true);
+    expect(warnings.some((w) => w.includes('unknown prefix'))).toBe(false); // NOT mis-classified
+  });
+
   test('spawn_<name> marker becomes a named spawn point (no def needed)', () => {
     const { map, warnings } = wireImportedMap(baseMap([{ name: 'spawn_fromCave', x: 2, y: 9, w: 1, h: 1 }]), DEFS);
     expect(warnings).toEqual([]);

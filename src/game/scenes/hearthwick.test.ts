@@ -133,9 +133,10 @@ describe('Hearthwick depth — KAMON house (the one new enterable interior)', ()
 
   test('ENTER: walking into the KAMON door fires the warp to the interior', () => {
     let warp: string | null = null;
-    // stand just below the door (8,3); spawn fromKamonHouse is (8,4) facing down
-    const { scene, input } = makeScene('HEARTHWICK', { x: 8, y: 4, facing: 'up' }, mockFlags(), (t) => (warp = t));
-    walkOne(scene, input, 'up'); // step onto the door (8,3)
+    // Authored-map door: warp_kamon_house @(16,13); the return spawn fromKamonHouse
+    // is (16,14), one tile below the door (walkable; the house sits above it).
+    const { scene, input } = makeScene('HEARTHWICK', { x: 16, y: 14, facing: 'up' }, mockFlags(), (t) => (warp = t));
+    walkOne(scene, input, 'up'); // step onto the door (16,13)
     tick(scene); // let the warp fade resolve
     expect(warp).toBe('KAMON_HOUSE:fromHearthwick');
   });
@@ -159,12 +160,16 @@ describe('Hearthwick depth — the TOWN ELDER departure trigger', () => {
     expect(JSON.stringify(elder!.interactAfterFlag)).toContain('Off already'); // departure word
   });
 
-  test('PRE-starter: the elder blocks the south exit and gives the bench line', () => {
+  test('PRE-starter: the elder blocks their tile and gives the bench line', () => {
+    // Authored-map elder: npc_town_elder @(18,34), one tile above the Route 31 exit
+    // (18,35); approach from (18,33) facing down. NOTE (flagged in the round-trip
+    // report): the south-exit corridor is >1 tile wide, so the elder blocks the
+    // DIRECT path but the player can currently walk around him — a map-geometry fix
+    // for Mathias, not a wiring bug. The gate mechanism (blockedUntilFlag) is intact.
     const flags = mockFlags(); // no player_has_starter
-    const { scene, input } = makeScene('HEARTHWICK', { x: 9, y: 11, facing: 'down' }, flags, () => {});
-    // try to walk south through the elder's tile (9,12) — blocked (the gate)
-    walkOne(scene, input, 'down');
-    expect(scene.currentPosition()).toMatchObject({ x: 9, y: 11 });
+    const { scene, input } = makeScene('HEARTHWICK', { x: 18, y: 33, facing: 'down' }, flags, () => {});
+    walkOne(scene, input, 'down'); // into the elder's tile (18,34) — blocked
+    expect(scene.currentPosition()).toMatchObject({ x: 18, y: 33 });
     // facing the elder, A reads the bench line (thesis whisper), not the goodbye
     const text = readFacing(scene);
     expect(text).toContain('Forty winters');
@@ -174,35 +179,98 @@ describe('Hearthwick depth — the TOWN ELDER departure trigger', () => {
   test('POST-starter: the gate opens AND the elder gives the departure word', () => {
     const flags = mockFlags();
     flags.set('player_has_starter');
-    const { scene, input } = makeScene('HEARTHWICK', { x: 9, y: 11, facing: 'down' }, flags, () => {});
-    const text = readFacing(scene); // facing the elder (9,12)
+    const { scene, input } = makeScene('HEARTHWICK', { x: 18, y: 33, facing: 'down' }, flags, () => {});
+    const text = readFacing(scene); // facing the elder (18,34)
     expect(text).toContain('Off already'); // the departure word fires once developed
-    // and the elder no longer blocks — the player can step onto (9,12)
+    // and the elder no longer blocks — the player can step onto (18,34)
     walkOne(scene, input, 'down');
-    expect(scene.currentPosition()).toMatchObject({ x: 9, y: 12 });
+    expect(scene.currentPosition()).toMatchObject({ x: 18, y: 34 });
   });
 
-  test('the elder sits with their lifelong companion mon (the thesis whisper)', () => {
-    const companion = npcs('HEARTHWICK').find((n) => n.sprite && JSON.stringify(n.interact).includes('Forty winters'));
-    expect(companion).toBeTruthy(); // a visible mon beside the elder, "grey at the muzzle"
-  });
+  // NOTE — DROPPED CONTENT (flagged in the round-trip report): the graybox town's
+  // FOUR ambient mon-NPCs (the elder's grey-muzzled companion GALEHAWK, two
+  // MARSHMASH, a GRITHOAX) have no marker in the authored map. If Mathias wants them
+  // back he adds mon_* markers + we add MON_DEFS. Their examine text ("Forty winters"
+  // companion, etc.) is not asserted here because the map no longer places them.
 });
 
 describe('Hearthwick depth — the departure threshold', () => {
-  test('the Route 31 sign carries the canonical hand-added note', () => {
+  // The authored town ships TWO signs (sign_pokecenter + sign_pokemart, STUB text
+  // flagged for Mathias's voice pass). The graybox's ~15 flavor signs — incl. the
+  // "ROUTE 31 · Come home for the winters" threshold note — are DROPPED (no markers
+  // in the authored map); flagged in the round-trip report as content to re-place.
+  test('the town signs wire from Tiled markers (pokecenter + pokemart)', () => {
     const text = signs('HEARTHWICK').map((s) => s.lines.join(' ')).join(' || ');
-    expect(text).toContain('ROUTE 31');
-    expect(text).toContain('Come home for the winters.');
+    expect(signs('HEARTHWICK').length).toBe(2);
+    expect(text).toContain('POKÉCENTER');
+    expect(text).toContain('POKÉMART');
   });
 
-  test('the south exit still warps to Route 31 (threshold intact, Route 31 untouched)', () => {
+  test('the south exit warps to Route 31 (threshold intact, Route 31 untouched)', () => {
     let warp: string | null = null;
     const flags = mockFlags();
-    flags.set('player_has_starter'); // gate open
-    const { scene, input } = makeScene('HEARTHWICK', { x: 9, y: 11, facing: 'down' }, flags, (t) => (warp = t));
-    walkOne(scene, input, 'down'); // (9,11) -> (9,12)
-    walkOne(scene, input, 'down'); // (9,12) -> (9,13) exit
+    flags.set('player_has_starter'); // gate open — elder @(18,34) is passable
+    const { scene, input } = makeScene('HEARTHWICK', { x: 18, y: 33, facing: 'down' }, flags, (t) => (warp = t));
+    walkOne(scene, input, 'down'); // (18,33) -> (18,34), past the now-open elder gate
+    walkOne(scene, input, 'down'); // (18,34) -> (18,35) exit (warp_to_route31)
     tick(scene);
     expect(warp).toBe('ROUTE31:fromHearthwick');
+  });
+});
+
+// The authored Tiled town's WIRING is complete: every door round-trips, every NPC/
+// sign resolves, the collision border holds, and the dev landing is sane. This is
+// the round-trip gate that retires the graybox (hearthwick.json).
+describe('Hearthwick — the authored Tiled town (round-trip completeness)', () => {
+  // [town→interior warp target, interior map id, the return spawn HEARTHWICK provides]
+  const BUILDINGS: ReadonlyArray<readonly [string, string, string]> = [
+    ['HOUSE:fromHearthwick', 'HOUSE', 'fromHouse'],
+    ['KAMON_HOUSE:fromHearthwick', 'KAMON_HOUSE', 'fromKamonHouse'],
+    ['LAB:fromHearthwick', 'LAB', 'fromLab'],
+    ['HEARTHWICK_CENTER:fromHearthwick', 'HEARTHWICK_CENTER', 'fromCenter'],
+    ['HEARTHWICK_MART:fromHearthwick', 'HEARTHWICK_MART', 'fromMart'],
+  ];
+  const warps = (map: string) => getMap(map).objects.filter((o): o is Extract<MapObject, { type: 'warp' }> => o.type === 'warp');
+
+  test('every building door → a real interior entry spawn, and the interior returns to a real town spawn', () => {
+    const town = getMap('HEARTHWICK');
+    const targets = new Set(warps('HEARTHWICK').map((w) => w.target));
+    for (const [target, interior, ret] of BUILDINGS) {
+      expect(targets.has(target), target).toBe(true); // town → interior
+      const [mapId, spawn] = target.split(':');
+      expect(getMap(mapId!).spawns[spawn!], `${interior} entry spawn ${spawn}`).toBeTruthy();
+      expect(town.spawns[ret], `HEARTHWICK:${ret} (return from ${interior})`).toBeTruthy(); // interior → town
+    }
+  });
+
+  test('Route 31 round-trip: town → ROUTE31:fromHearthwick, ROUTE31 → HEARTHWICK:fromRoute (both spawns real)', () => {
+    const town = getMap('HEARTHWICK');
+    expect(warps('HEARTHWICK').some((w) => w.target === 'ROUTE31:fromHearthwick')).toBe(true);
+    expect(getMap('ROUTE31').spawns.fromHearthwick).toBeTruthy();
+    expect(town.spawns.fromRoute).toBeTruthy(); // ROUTE 31 returns here (injected by buildHearthwick)
+  });
+
+  test('the four authored NPCs wire (boy, farmer, elder-with-gate, forest ranger)', () => {
+    const ns = npcs('HEARTHWICK');
+    const blob = JSON.stringify(ns);
+    expect(blob).toContain('Larch is in the lab'); // npc_boy
+    expect(blob).toContain('Trainers used to come'); // npc_farmer
+    expect(blob).toContain('north track'); // npc_forest_ranger (stub)
+    expect(ns.some((n) => n.blockedUntilFlag === 'player_has_starter')).toBe(true); // npc_town_elder gate
+    expect(ns.length).toBe(4);
+  });
+
+  test('go: hearthwick (devNav → fromHouse) lands on a real, walkable spawn', () => {
+    const town = getMap('HEARTHWICK');
+    const s = town.spawns.fromHouse;
+    expect(s).toBeTruthy();
+    expect(town.solidOverrides?.[s!.y]?.[s!.x] ?? false).toBe(false); // not a solid cell
+  });
+
+  test('the collision border holds (the authored Collide layer imported as solid cells)', () => {
+    const town = getMap('HEARTHWICK');
+    let solidCount = 0;
+    for (const row of town.solidOverrides ?? []) for (const c of row) if (c) solidCount += 1;
+    expect(solidCount).toBeGreaterThan(100); // 405 solid cells in the authored map (masses + borders)
   });
 });

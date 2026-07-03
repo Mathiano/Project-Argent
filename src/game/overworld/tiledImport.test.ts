@@ -210,4 +210,21 @@ describe('importTiledMap — collision layer (unit)', () => {
     expect(isWalkable(map, 0, 0)).toBe(true);
     expect(isWalkable(map, 1, 0)).toBe(true);
   });
+
+  test('"Collide" is accepted as a collision-layer name (Hearthwick\'s layer)', () => {
+    expect(isCollisionLayerName('Collide')).toBe(true);
+    expect(isCollisionLayerName('collide')).toBe(true);
+    const withCollide: TiledMapJson = {
+      width: 3, height: 1, tilewidth: 16, tileheight: 16,
+      tilesets: [{ firstgid: 1, source: 'x/g.tsx' }],
+      layers: [
+        { type: 'tilelayer', name: 'ground', width: 3, height: 1, data: [1, 1, 1] },
+        { type: 'tilelayer', name: 'Collide', width: 3, height: 1, data: [5, 0, 0] },
+      ],
+    };
+    const { map, stats } = importTiledMap(withCollide, { name: 'M', resolveSheet: grassResolver });
+    expect(stats.collisionLayers).toBe(1); // "Collide" consumed as collision, not rendered
+    expect(map.importedLayers!.map((l) => l.name)).toEqual(['ground']);
+    expect(isWalkable(map, 0, 0)).toBe(false); // painted cell → solid
+  });
 });

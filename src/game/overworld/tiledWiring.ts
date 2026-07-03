@@ -25,7 +25,7 @@ import type { MapData, MapObject, Spawn } from './types';
 // A definition is the inline MapObject MINUS its placement (type/x/y) — the marker
 // supplies x/y, the registry supplies the behaviour.
 export type NpcDef = Omit<Extract<MapObject, { type: 'npc' }>, 'type' | 'x' | 'y'>;
-export type WarpDef = { readonly target: string };
+export type WarpDef = { readonly target: string; readonly door?: boolean };
 export type SignDef = Omit<Extract<MapObject, { type: 'sign' }>, 'type' | 'x' | 'y'>;
 // An encounter-zone def: the marker rectangle supplies x/y/w/h (where + how big),
 // the def supplies the wild table (what mons) + the per-step roll rate.
@@ -252,6 +252,53 @@ export const DEFAULT_DEFS: WiringDefs = {
         { kind: 'start-rival-gate' },
       ],
     },
+
+    // ── HEARTHWICK — the authored town's four NPCs (Mathias's Tiled markers).
+    // Boy / Farmer / Elder carry their graybox lines forward (authored content, not
+    // lost in the swap); Forest Ranger is a stub. All flagged for Mathias's voice
+    // pass. The ELDER is the OPENING GATE — blockedUntilFlag 'player_has_starter'
+    // holds the south exit until a starter is chosen (the tmj note: "stops you
+    // exiting the town before you've chosen a mon"). See the round-trip report re:
+    // the exit-corridor width (the gate leaks around the elder — a map-geometry fix).
+    npc_boy: {
+      color: '#caa148',
+      interact: [{ kind: 'dialog', lines: [
+        'BOY: Larch is in the lab.',
+        "BOY: He's been waiting all morning.",
+        'BOY: I hope you pick the AQUA-type one. It looks soft.'] }],
+    },
+    npc_farmer: {
+      color: '#7c4fa8',
+      interact: [{ kind: 'dialog', lines: [
+        'FARMER: Trainers used to come',
+        'through every week.',
+        'Bought eggs, told stories.',
+        'Not many left who walk the routes.'] }],
+    },
+    npc_town_elder: {
+      color: '#caa148',
+      blockedUntilFlag: 'player_has_starter', // OPENING GATE — no south exit until a partner is chosen
+      interact: [{ kind: 'dialog', lines: [
+        'TOWN ELDER: Forty winters, this one and I.',
+        "You don't learn a creature in a hurry —",
+        'you learn it the way you learn a song.',
+        'A little at a time.'] }],
+      interactAfterFlag: [{ kind: 'dialog', lines: [
+        'TOWN ELDER: Off already? Good.',
+        "Just — don't go so fast you miss it.",
+        "The road's best taken slow."] }],
+    },
+    // Forest Ranger — stub. The tmj note wants him to gate the NORTH path (future
+    // content); for now he's a solid dialogue NPC. Flagged for voice + a real
+    // LOS-gate behaviour when north is designed.
+    npc_forest_ranger: {
+      color: '#5a7a4a',
+      interact: [{ kind: 'dialog', lines: [
+        'RANGER: The north track? Grown over.',
+        'Roots and bramble past the treeline —',
+        'no way through this season.',
+        'RANGER: South’s your road. Route 31.'] }],
+    },
   },
 
   // mon_* markers → overworld creatures (sprite NPCs).
@@ -283,6 +330,9 @@ export const DEFAULT_DEFS: WiringDefs = {
     sign_wayside: { lines: ['THE WAYSIDE', 'Where the road pauses.', 'Old stone, a long view,', 'a place to rest.'] },
     sign_stillwater: { lines: ['STILLWATER POND', 'Too deep to wade.', 'Follow the bank around.'] },
     sign_violet_distance: { lines: ['The land opens, and you see it', 'for the first time — a town in the', 'distance, a tower rising over it.', "Violet City. Where you're going."] },
+    // ── HEARTHWICK — the town's two signs (STUB text; flagged for Mathias's voice pass) ──
+    sign_pokecenter: { lines: ['HEARTHWICK POKÉCENTER', 'Rest your partners —', 'free for trainers.'] },
+    sign_pokemart: { lines: ['HEARTHWICK POKÉMART', 'Potions and supplies', 'for the road ahead.'] },
   },
   warp: {
     // Trivial-but-real destination: HEARTHWICK has a "fromRoute" spawn. Stepping on
@@ -294,6 +344,16 @@ export const DEFAULT_DEFS: WiringDefs = {
     // Route 31 Phase 1: the two route boundary warps (Hearthwick ↔ Violet).
     warp_north: { target: 'HEARTHWICK:fromRoute' },
     warp_south: { target: 'VIOLET:fromRoute' },
+    // ── HEARTHWICK — the five building doors + the Route 31 edge exit. Each interior
+    // returns to a HEARTHWICK:from<X> spawn injected by buildHearthwick (maps.ts).
+    // (warp_to_north is intentionally UNWIRED — north is future content; the importer
+    // warns-and-skips it, which the round-trip report accounts for.)
+    warp_player_home: { target: 'HOUSE:fromHearthwick', door: true },
+    warp_kamon_house: { target: 'KAMON_HOUSE:fromHearthwick', door: true },
+    warp_professor_laboratory: { target: 'LAB:fromHearthwick', door: true },
+    warp_pokecenter: { target: 'HEARTHWICK_CENTER:fromHearthwick', door: true },
+    warp_pokemart: { target: 'HEARTHWICK_MART:fromHearthwick', door: true },
+    warp_to_route31: { target: 'ROUTE31:fromHearthwick' }, // route EDGE — seamless, no door blip
   },
   encounter: {
     // A small test wild zone (the marker rectangle decides where/how big).
@@ -322,7 +382,7 @@ export function wireImportedMap(map: MapData, defs: WiringDefs = DEFAULT_DEFS): 
   const spawns: { [id: string]: Spawn } = { ...map.spawns };
 
   for (const m of map.importedObjects ?? []) {
-    const prefix = m.name.split('_')[0];
+    const prefix = (m.name.split('_')[0] ?? '').toLowerCase(); // case-insensitive kind (Npc_/WARP_ all resolve)
     if (prefix === 'npc') {
       const def = defs.npc[m.name];
       if (!def) {
@@ -343,7 +403,7 @@ export function wireImportedMap(map: MapData, defs: WiringDefs = DEFAULT_DEFS): 
         warnings.push(`marker "${m.name}" at (${m.x},${m.y}) has no WARP definition (add it to WARP_DEFS) — skipped.`);
         continue;
       }
-      objects.push({ type: 'warp', x: m.x, y: m.y, target: def.target });
+      objects.push({ type: 'warp', x: m.x, y: m.y, target: def.target, ...(def.door ? { door: true } : {}) });
     } else if (prefix === 'sign') {
       const def = defs.sign?.[m.name];
       if (!def) {

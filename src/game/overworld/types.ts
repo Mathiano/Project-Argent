@@ -142,7 +142,9 @@ export type ScriptCommand =
   | { readonly kind: 'start-rival-gate' };
 
 export type MapObject =
-  | { readonly type: 'warp'; readonly x: number; readonly y: number; readonly target: string }
+  // `door: true` marks a BUILDING-entrance warp (door-enter blip). Route/edge warps
+  // omit it. Graybox maps detect doors by tile label; imported maps use this flag.
+  | { readonly type: 'warp'; readonly x: number; readonly y: number; readonly target: string; readonly door?: boolean }
   | { readonly type: 'sign'; readonly x: number; readonly y: number; readonly lines: readonly string[] }
   | {
       readonly type: 'encounter_zone';

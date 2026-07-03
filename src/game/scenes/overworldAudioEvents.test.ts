@@ -6,6 +6,7 @@
 import { afterEach, describe, expect, test } from 'vitest';
 import { createOverworldScene } from './overworld';
 import { getMap } from '../overworld/maps';
+import type { MapObject } from '../overworld/types';
 import { clearGameEventListeners, onGameEvent } from '../gameEvents';
 import type { GameEvent, GameEventKind } from '../gameEvents';
 import type { InputKey } from '../scene';
@@ -55,8 +56,8 @@ describe('overworld audio emit sites (slice 2)', () => {
   afterEach(() => clearGameEventListeners());
 
   test('talking to a sign emits dialogue-open, then paging emits dialogue-advance', () => {
-    // The HEARTHWICK sign sits at (1,5); stand at (2,5) facing it.
-    const h = harness({ x: 2, y: 5, facing: 'left' });
+    // Authored town: sign_pokecenter sits at (10,26); stand just below (10,27) facing up.
+    const h = harness({ x: 10, y: 27, facing: 'up' });
     h.press('a'); // face the sign → openDialog
     expect(h.kinds).toContain('dialogue-open');
     expect(h.kinds).not.toContain('dialogue-advance');
@@ -65,28 +66,31 @@ describe('overworld audio emit sites (slice 2)', () => {
   });
 
   test('stepping through a BUILDING DOOR emits door-enter', () => {
-    // Player house door is the wall_door at (3,3); spawn just below (3,4), walk up onto it.
-    const h = harness({ x: 3, y: 4, facing: 'up' });
+    // Player-home door is warp_player_home @(7,13) → HOUSE (interior); spawn just below
+    // (7,14) and walk up onto it. (Imported map: door-enter keys off the non-ROUTE warp.)
+    const h = harness({ x: 7, y: 14, facing: 'up' });
     h.walk('up');
     expect(h.kinds).toContain('door-enter');
   });
 
-  test('a route-EDGE warp (path tile, not a door) does NOT emit door-enter', () => {
-    // The south exit to Route 31 is the path_exit tile at (9,13); walk onto it from (9,12).
-    const h = harness({ x: 9, y: 12, facing: 'down' });
-    h.walk('down');
+  test('a route-EDGE warp (ROUTE target, not a building) does NOT emit door-enter', () => {
+    // The south exit warp_to_route31 @(18,35) → ROUTE31; approach from (19,35) facing left.
+    const h = harness({ x: 19, y: 35, facing: 'left' });
+    h.walk('left');
     expect(h.kinds).not.toContain('door-enter');
   });
 });
 
-describe('overworld audio emit sites — the door tiles are real, the edge is not', () => {
-  test('Hearthwick: the house-door warp sits on a door tile; the south exit does not', () => {
+describe('overworld audio emit sites — building doors vs the route edge', () => {
+  test('Hearthwick: building-door warps carry door:true; the route-edge exit does not', () => {
+    // The authored (Tiled) town has no door-tile LABELS — door-enter keys off the
+    // warp's explicit `door` flag (set on building-entrance warps by the wiring).
     const m = getMap('HEARTHWICK');
-    const labelAt = (x: number, y: number) => {
-      const ch = m.tiles.split('\n')[y]?.[x];
-      return ch ? m.tileset[ch]?.label : undefined;
-    };
-    expect(labelAt(3, 3)).toContain('door'); // building door
-    expect(labelAt(9, 13)).not.toContain('door'); // route edge (path_exit)
+    const warpAt = (x: number, y: number) =>
+      m.objects.find((o): o is Extract<MapObject, { type: 'warp' }> => o.type === 'warp' && o.x === x && o.y === y);
+    expect(warpAt(7, 13)).toMatchObject({ target: 'HOUSE:fromHearthwick', door: true }); // building door → blip
+    const south = warpAt(18, 35);
+    expect(south?.target).toBe('ROUTE31:fromHearthwick'); // route edge → no blip
+    expect(south?.door).toBeUndefined();
   });
 });
