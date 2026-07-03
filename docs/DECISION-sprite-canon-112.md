@@ -20,9 +20,9 @@ the game Silver never was."
   112 from their source PNGs through Sprite Studio as convenient — not a blocker.
 
 ### 2 · Palette law: per-mon extracted ramps (Sprite Studio Mode 2)
-- The global MASTER_PAL is retired as a creature-art constraint (it was never
-  an engine constraint — each sprite JSON carries its own palette). Authentic
-  Gen-2 discipline is a small palette PER SPRITE.
+- Extract-from-source is the default; master/manual remap is allowed at the
+  director's preference. The binding rule is front/back palette coherence per
+  mon — two views of one creature share a palette family.
 - Default: extract-from-source, ~8 colors (range 4–16), near-duplicates merged.
 - Shared value discipline remains the cohesion rule across 200 mons:
   dark outline, mid body, light accent (tool hints, human enforces).
