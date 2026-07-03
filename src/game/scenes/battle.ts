@@ -923,7 +923,9 @@ export function focusIntentTell(
 // case + its own narrow-hint set — no rewrite of degradeIntent or the renderer.
 // See docs/intent-tells-design-note.md ("Call-intent" seam).
 function foeActionLine(action: Action, name: string): { stance: Stance | null; line: string } {
-  if (action.kind === 'rest') return { stance: null, line: `${name} is resting` };
+  // A resting mon holds a defensive posture — the line telegraphs the Guard-default
+  // (it hunkers, it does not attack) so the read stays honest.
+  if (action.kind === 'rest') return { stance: null, line: `${name} hunkers down to catch its breath` };
   if (action.kind === 'catchBreath') return { stance: null, line: `${name} is recovering` };
   if (action.kind === 'switch') return { stance: null, line: `${name} is switching` };
   if (action.kind === 'throwBall') return { stance: null, line: `${name} readies a ball` };

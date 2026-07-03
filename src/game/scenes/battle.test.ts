@@ -368,9 +368,9 @@ describe('intent reliability ramp — degradeIntent (honest-partial model)', () 
 
   test('a non-stance action (resting) reads plainly at every tier except opaque', () => {
     const rest: Action = { kind: 'rest' };
-    expect(degradeIntent(rest, 'FLITPECK', 'honest', mulberry32(1)).line).toBe('FLITPECK is resting');
+    expect(degradeIntent(rest, 'FLITPECK', 'honest', mulberry32(1)).line).toBe('FLITPECK hunkers down to catch its breath');
     expect(degradeIntent(rest, 'FLITPECK', 'ambiguous', mulberry32(1)).line).toBe(
-      'FLITPECK is resting',
+      'FLITPECK hunkers down to catch its breath',
     );
     expect(degradeIntent(rest, 'FLITPECK', 'opaque', mulberry32(1)).line).toBeNull();
   });
