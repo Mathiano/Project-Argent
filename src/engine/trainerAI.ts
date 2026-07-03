@@ -60,6 +60,12 @@ export interface InfoOverride {
 // their tree behavior lands in Stage 2/3 / Layer 3.
 export type BondLevel = 'none' | 'mid' | 'high'; // → the Call toolkit (Stage 2)
 export type CallUse = 'never' | 'clutch' | 'liberal' | 'defensive'; // (Stage 2)
+// ADAPTIVITY level (catalog part B, now LIVE): a Reactive trainer reads the
+// player's stance history and counter-weights its pick. 'lite' = a MILD lean
+// (the mid tier — Trickster/Ambusher-ish); 'full' = a STRONG lean (elites —
+// Drifter/Duelist). Absent → non-reactive (the gate returns the base tree
+// untouched, no history read, no rng perturbation → bit-identical).
+export type ReactiveLevel = 'lite' | 'full';
 
 export interface TrainerProfile {
   readonly name: string;
@@ -80,8 +86,9 @@ export interface TrainerProfile {
   readonly callUse?: CallUse;
   // 7. TERRAIN — home-turf stance bias. [DATA; behavior Layer 3]
   readonly terrain?: string;
-  // 8. ADAPTIVITY — reads the player back. [DATA; behavior Stage 2/3]
-  readonly adaptive?: boolean;
+  // 8. ADAPTIVITY — reads the player back + counter-weights its stance. [LIVE]
+  //    'lite' (mild) / 'full' (strong). Omitted → non-reactive. See adaptiveStanceMix.
+  readonly adaptive?: ReactiveLevel;
   // FUTURE-ADOPT Calls (Part C) — DATA ONLY, UNREAD by the tree this increment.
   // The trainer casts only the CLASSIC toolkit now (trainerCall below). The
   // info-war pair (readThem/throwOff) enters trainer policy at part-B/Reactive
@@ -191,6 +198,67 @@ function avoidSelfDaze(want: Stance, state: BattleState, side: Side): Stance {
   return want;
 }
 
+// ── STAGE 3 — REACTIVE adaptivity (catalog part B) ──────────────────────────
+// A Reactive profile READS the player's recent single-step stance history — the
+// SAME `state.history` array the reader bot + KAMON's modal-read consult, and the
+// one THROW THEM OFF poisons (the counterplay shipped before the threat, by
+// design) — computes the player's MODAL stance over a window, and counter-weights
+// its own base stance mix toward the stance that BEATS it.
+// Recent single-step stances the modal is read over. 3 matches the reader-bot +
+// KAMON convention — short enough that ONE planted lie (THROW THEM OFF) meaningfully
+// tips the modal, so the espionage counter lands as designed against a heavy reader.
+const REACTIVE_WINDOW = 3;
+// Counter-weight ADDED to the beating-stance's slot of the base [A,G,F] mix (the
+// mix slots sum to ~1.0, so 'full' ≈ a 2/3 lean, 'lite' ≈ a mild 55% lean).
+// SIM-TUNED so 'full' punishes a repeater hard but does NOT wall the reader.
+const REACTIVE_WEIGHT: { readonly [k in ReactiveLevel]: number } = { lite: 0.4, full: 1.0 };
+
+// The triangle counter (AGGRESSIVE > FLUID > GUARD > AGGRESSIVE): the stance that
+// BEATS `s`. A←(beats F), G←(beats A), F←(beats G).
+function triangleCounter(s: Stance): Stance {
+  return s === 'A' ? 'G' : s === 'G' ? 'F' : 'A';
+}
+
+// The OPPONENT's modal single-step stance over the recent window (nulls — focus/
+// release/call rounds — skipped, matching the daze-history convention). Ties break
+// A > G > F (deterministic). Null when there's no single-step history yet.
+function opponentModalStance(state: BattleState, side: Side, window: number): Stance | null {
+  const oppKey: Side = side === 'player' ? 'foe' : 'player';
+  const recent = state.history
+    .map((h) => h[oppKey])
+    .filter((s): s is Stance => s !== null)
+    .slice(-window);
+  if (recent.length === 0) return null;
+  const cnt: Record<Stance, number> = { A: 0, G: 0, F: 0 };
+  for (const s of recent) cnt[s] += 1;
+  let modal: Stance = 'A';
+  for (const s of ['G', 'F'] as const) if (cnt[s] > cnt[modal]) modal = s;
+  return modal;
+}
+
+// The base stance mix a profile draws from THIS round. GATE-FIRST: a non-reactive
+// profile (adaptive undefined) returns the base mix UNTOUCHED — no history read,
+// no extra rng — so every shipped (non-reactive) trainer is bit-identical. A
+// Reactive profile counter-weights the base toward the beat of the player's modal
+// (deterministic given the seed + history; drawStance still draws exactly one rng,
+// so the reactive lean changes the RESULT, never the rng draw COUNT).
+function adaptiveStanceMix(
+  profile: TrainerProfile,
+  base: readonly [number, number, number],
+  state: BattleState,
+  side: Side,
+): readonly [number, number, number] {
+  const level = profile.adaptive;
+  if (level === undefined) return base; // ← the gate (before any read / rng)
+  const modal = opponentModalStance(state, side, REACTIVE_WINDOW);
+  if (modal === null) return base; // no pattern yet → base
+  const counter = triangleCounter(modal);
+  const idx = counter === 'A' ? 0 : counter === 'G' ? 1 : 2;
+  const m: [number, number, number] = [base[0], base[1], base[2]];
+  m[idx] += REACTIVE_WEIGHT[level];
+  return m;
+}
+
 // HP fraction at/below which a clutch/defensive trainer reaches for RECOVER.
 const TRAINER_RECOVER_HP_PCT = 0.4;
 
@@ -284,8 +352,9 @@ export function trainerPolicy(profile: TrainerProfile): TrainerPolicy {
     //    profile.bond + profile.callUse. No-bond → null (bit-identical, no rng).
     const call = trainerCall(profile, state, side);
     if (call) return call;
-    // 3. READ THE PLAYER — STAGE 2/3 hook: a profile.adaptive trainer biases
-    //    toward the counter of the player's recent pattern here.
+    // 3. READ THE PLAYER (Stage 3, LIVE) — a Reactive profile counter-weights its
+    //    single-step stance toward the player's modal's beat, at the base-stance
+    //    pick below (adaptiveStanceMix; gate-first → non-reactive is bit-identical).
 
     const focusRate = FOCUS_RATE[profile.twoStep];
     const twoSteps = focusRate > 0;
@@ -340,9 +409,11 @@ export function trainerPolicy(profile: TrainerProfile): TrainerPolicy {
       return { kind: 'move', move: tech, stance: isBuff ? 'G' : 'A' };
     }
 
-    // 5. BASE STANCE — weighted by tendency (+ terrain bias later), avoiding
-    //    the thrice-repeat self-daze. Single-step damage is an ATTACK.
-    const stance = avoidSelfDaze(drawStance(STANCE_MIX[profile.stance], rng), state, side);
+    // 5. BASE STANCE — weighted by tendency, REACTIVE counter-weighting (Stage 3;
+    //    base mix untouched for non-reactive → bit-identical), avoiding the
+    //    thrice-repeat self-daze. Single-step damage is an ATTACK.
+    const mix = adaptiveStanceMix(profile, STANCE_MIX[profile.stance], state, side);
+    const stance = avoidSelfDaze(drawStance(mix, rng), state, side);
     return { kind: 'move', move: pickSustainableMove(atk), stance };
   };
 }
@@ -393,25 +464,29 @@ export const TRAINER_PROFILES: { readonly [id: string]: TrainerProfile } = {
     release: { feintRate: 0.35, signature: 'heavy' }, infoLevel: 'veiled',
     bond: 'mid', callUse: 'clutch',
   },
+  // TRICKSTER — Reactive-LITE (mid tier): a mild counter-weight (per the catalog).
   trickster: {
     name: 'TRICKSTER', stance: 'evader', twoStep: 'signature',
     release: { feintRate: 0.35, signature: 'feint' }, infoLevel: 'veiled',
-    bond: 'mid', callUse: 'liberal', adaptive: true, futureCalls: ['readThem', 'throwOff'],
+    bond: 'mid', callUse: 'liberal', adaptive: 'lite', futureCalls: ['readThem', 'throwOff'],
   },
   stonewall: {
     name: 'STONEWALL', stance: 'bulwark', twoStep: 'occasional',
     release: { feintRate: 0.3, signature: 'heavy' }, infoLevel: 'veiled',
     bond: 'high', callUse: 'defensive',
   },
+  // DRIFTER — the first FULL Reactive generalist (mid→elite bridge; the catalog's
+  // "Reactive" no-tell fight); strong counter-weight.
   drifter: {
     name: 'DRIFTER', stance: 'balanced', twoStep: 'occasional',
     release: { feintRate: 0.3, signature: 'heavy' }, infoLevel: 'veiled',
-    bond: 'mid', callUse: 'clutch', adaptive: true, futureCalls: ['readThem', 'throwOff', 'comeBack'],
+    bond: 'mid', callUse: 'clutch', adaptive: 'full', futureCalls: ['readThem', 'throwOff', 'comeBack'],
   },
+  // DUELIST — the elite gym-leader base: FULL Reactive.
   duelist: {
     name: 'DUELIST', stance: 'evader', twoStep: 'frequent',
     release: { feintRate: 0.3, signature: 'heavy' }, infoLevel: 'veiled',
-    bond: 'high', callUse: 'clutch', adaptive: true, futureCalls: ['readThem', 'throwOff', 'comeBack'],
+    bond: 'high', callUse: 'clutch', adaptive: 'full', futureCalls: ['readThem', 'throwOff', 'comeBack'],
   },
 };
 
