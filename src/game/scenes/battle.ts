@@ -1274,7 +1274,12 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let starPopScale = 1; // the earned ★ pops (rests at 1)
   let starPopFlash = 0;
   let wipeAlpha = 0; // battle-enter wipe overlay
+  let wipeOffX = 0; // the wipe overlay's x (slides off during the entrance)
+  const spriteOffX: Record<Side, number> = { player: 0, foe: 0 }; // entrance/impact sprite x-slide (side-addressable)
+  const panelOffY: Record<Side, number> = { player: 0, foe: 0 }; // panel drop-in y-offset (per side)
+  const panelAlpha: Record<Side, number> = { player: 1, foe: 1 }; // panel fade-in (per side; rests at 1)
   anim.register('sprite.flashAlpha', { set: (v, s) => { spriteFlash[s ?? 'foe'] = v; } });
+  anim.register('sprite.offsetX', { set: (v, s) => { spriteOffX[s ?? 'foe'] = v; } });
   anim.register('stage.shakeX', { set: (v) => { stageShakeX = v; } });
   anim.register('bar.hpProgress', {
     onStart: (s) => { const side = s ?? 'foe'; drainFrom[side] = barHp[side]; drainTo[side] = display[side].hp; },
@@ -1282,7 +1287,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   });
   anim.register('star.scale', { set: (v) => { starPopScale = v; } });
   anim.register('star.flashAlpha', { set: (v) => { starPopFlash = v; } });
+  anim.register('panel.offsetY', { set: (v, s) => { panelOffY[s ?? 'foe'] = v; } });
+  anim.register('panel.alpha', { set: (v, s) => { panelAlpha[s ?? 'foe'] = v; } });
   anim.register('wipe.alpha', { set: (v) => { wipeAlpha = v; } });
+  anim.register('wipe.offsetX', { set: (v) => { wipeOffX = v; } });
   // React to the scene's OWN emitted events (mapped to ids as data). Disposed in exit().
   const disposeAnim = onGameEvent((ev) => anim.trigger(ev.kind, 'side' in ev ? ev.side : null));
 
@@ -2640,11 +2648,15 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // ---------- draw ----------
 
   function drawFoePanel(ctx: CanvasRenderingContext2D): void {
+    // Entrance drop-in (anim): offsetY slides the whole panel, alpha fades it. At
+    // rest (0 / 1) these are no-ops → byte-identical.
+    const fadeA = panelAlpha.foe;
+    if (fadeA < 0.999) ctx.globalAlpha = fadeA;
     const boss = breakThreshold > 0;
     const h = FOE_PANEL.h + (boss ? FOE_BREAK_EXTRA : 0); // a boss adds the thin BREAK strip
     const px = FOE_PANEL.x;
     const pw = FOE_PANEL.w;
-    const py = FOE_PANEL.y;
+    const py = FOE_PANEL.y + panelOffY.foe;
     drawBattlePanel(ctx, px, py, pw, h);
     // Header — mon name (16px), type badge chip(s), combat-state / effect TAGS.
     const name = display.foe.species.name;
@@ -2661,6 +2673,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // BOSS: the thin BREAK line + GYM LEADER / gust strip. Regular foes lack it.
     if (boss) drawBossBreak(ctx, px, pw, py, h);
     else drawBenchIndicators(ctx, px + 12, py + h + 3, state.foe);
+    if (fadeA < 0.999) ctx.globalAlpha = 1; // restore the entrance fade
   }
 
   // BOSS BREAK — a slim progress LINE along the foe panel's bottom inner edge (gold
@@ -2709,9 +2722,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   }
 
   function drawPlayerPanel(ctx: CanvasRenderingContext2D): void {
+    const fadeA = panelAlpha.player; // entrance fade (no-op at rest)
+    if (fadeA < 0.999) ctx.globalAlpha = fadeA;
     const px = PL_PANEL.x;
     const pw = PL_PANEL.w;
-    const py = PL_PANEL.y;
+    const py = PL_PANEL.y + panelOffY.player;
     drawBattlePanel(ctx, px, py, pw, PL_PANEL.h);
     // Header — name (16px), type badges, top-right tags.
     const name = monDisplayName(display.player);
@@ -2763,6 +2778,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
     // Team bench dots — right end of the BOND row (no-op for ≤1 mon / resolve).
     drawBenchIndicators(ctx, px + pw - 10 - state.player.members.length * 10, bondY + 1, state.player);
+    if (fadeA < 0.999) ctx.globalAlpha = 1; // restore
   }
 
   // Surface ③ — the read-win mon reaction. A soft, brief bond-tinted spark
@@ -3350,8 +3366,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
       // Sprites — fillSlot upscales real 56px art by the largest INTEGER factor
       // that fits (2× → 112, pixel-crisp); placeholders already scale to the slot.
-      const foeX = FOE_SLOT.x + spriteOffset('foe') + stageShakeX;
-      const plX = PL_SLOT.x + spriteOffset('player') + stageShakeX;
+      const foeX = FOE_SLOT.x + spriteOffset('foe') + stageShakeX + spriteOffX.foe;
+      const plX = PL_SLOT.x + spriteOffset('player') + stageShakeX + spriteOffX.player;
       drawSpeciesInSlot(
         ctx,
         { name: display.foe.species.name, type: display.foe.species.types[0] ?? null },
@@ -3404,7 +3420,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       if (wipeAlpha > 0.001) {
         ctx.globalAlpha = Math.min(1, wipeAlpha);
         ctx.fillStyle = PALETTE.shellBlack;
-        ctx.fillRect(0, 0, BATTLE_LOGICAL_W, BATTLE_LOGICAL_H);
+        ctx.fillRect(wipeOffX, 0, BATTLE_LOGICAL_W, BATTLE_LOGICAL_H); // offsetX slides the wipe off on entry
         ctx.globalAlpha = 1;
       }
 

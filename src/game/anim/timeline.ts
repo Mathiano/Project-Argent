@@ -1,7 +1,10 @@
 // The animation RUNTIME — a timeline-JSON interpreter (docs/animation-pipeline-
 // plan.md). PURE + headless: it knows nothing about canvas, the battle, or the
 // engine. It plays DATA (tracks of {target, property, from→to, durationFrames,
-// easing, delayFrames}) against a registry of named BINDINGS the host provides.
+// easing, delayFrames, side?}) against a registry of named BINDINGS the host
+// provides. `side` ('player' | 'foe', OPTIONAL) picks which side a track drives —
+// absent → the triggering event's subject (so subject-less events, e.g. the
+// battle-start entrance, can still choreograph both sides explicitly).
 // Frame-based timing (60fps units), never ms. Deterministic (zero RNG).
 //
 // The same JSON the game plays is the JSON the preview harness plays — that
@@ -32,6 +35,10 @@ export interface Track {
   readonly durationFrames: number;
   readonly easing: EasingName;
   readonly delayFrames: number;
+  // Which side this track addresses ('player' | 'foe'). ABSENT → the triggering
+  // event's subject (today's behavior). Set it to drive a specific side from a
+  // SUBJECT-LESS event (e.g. battle-start's entrance choreographs both panels).
+  readonly side?: 'player' | 'foe';
 }
 export interface AnimationDef {
   readonly id: string; // dot-namespaced ("battle.hitFlash")
@@ -67,6 +74,7 @@ export function parseAnimationDef(raw: unknown): AnimationDef {
     req(Number.isInteger(durationFrames) && durationFrames > 0, `${o.id}: track ${i} durationFrames must be a positive integer`);
     const delayFrames = t.delayFrames === undefined ? 0 : num(t.delayFrames, `${o.id}: track ${i} delayFrames`);
     req(Number.isInteger(delayFrames) && delayFrames >= 0, `${o.id}: track ${i} delayFrames must be a non-negative integer`);
+    req(t.side === undefined || t.side === 'player' || t.side === 'foe', `${o.id}: track ${i} side "${String(t.side)}" must be 'player' | 'foe' (or absent)`);
     totalFrames = Math.max(totalFrames, delayFrames + durationFrames);
     return {
       target: t.target as string,
@@ -77,6 +85,7 @@ export function parseAnimationDef(raw: unknown): AnimationDef {
       durationFrames,
       easing: t.easing as EasingName,
       delayFrames,
+      ...(t.side !== undefined ? { side: t.side as 'player' | 'foe' } : {}),
     };
   });
   return { id: o.id as string, tracks, totalFrames };
@@ -126,11 +135,13 @@ export class AnimRuntime {
     const def = this.defs.get(id);
     if (!def) return;
     this.instances = this.instances.filter((i) => !(i.def.id === id && i.subject === subject));
-    const capturedChannels = new Set<string>();
+    const captured = new Set<string>();
     for (const t of def.tracks) {
-      if (capturedChannels.has(t.channel)) continue;
-      capturedChannels.add(t.channel);
-      this.bindings.get(t.channel)?.onStart?.(subject);
+      const sub = t.side ?? subject; // a track's explicit side overrides the event subject
+      const key = `${t.channel}|${sub ?? ''}`;
+      if (captured.has(key)) continue;
+      captured.add(key);
+      this.bindings.get(t.channel)?.onStart?.(sub);
     }
     const inst: Instance = { def, subject, frame: 0 };
     this.apply(inst); // frame-0 value immediately (no 1-frame gap)
@@ -152,7 +163,7 @@ export class AnimRuntime {
       if (local < 0) continue; // this track hasn't started
       const p = t.durationFrames > 0 ? Math.min(1, local / t.durationFrames) : 1;
       const v = t.from + (t.to - t.from) * EASINGS[t.easing](p);
-      this.bindings.get(t.channel)?.set(v, inst.subject);
+      this.bindings.get(t.channel)?.set(v, t.side ?? inst.subject); // per-track side overrides the subject
     }
   }
 

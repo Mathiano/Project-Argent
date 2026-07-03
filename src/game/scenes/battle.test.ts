@@ -2208,16 +2208,37 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
   // ── Animation runtime — bounds hold DURING active animation frames ──────────
   test('anim: every primitive stays within 640×360 mid-animation (wipe · flash · shake · star pop · hp drain)', () => {
     const scene = richScene(); // player momentum 2 → the star pop has a lit ★ to grow
-    scene.update?.(0.01); // → menu; the enter-wipe is live from battle-start
+    scene.update?.(0.01); // → menu; the enter-wipe entrance is live from battle-start
+    // Drain the ENTRANCE first — its sprites/panels intentionally start OFF-canvas
+    // (the bounds contract exempts off-stage starts by sampling POST-entry). ~40
+    // frames finishes the 36-frame choreography.
+    for (let k = 0; k < 45; k += 1) scene.update?.(1 / 60);
     // Fire the stage animations the way the scene does (its runtime subscribed).
     emitGameEvent({ kind: 'hit-landed', side: 'foe', effectiveness: 1 }); // hitFlash + hpDrain
     emitGameEvent({ kind: 'read-win', side: 'player' }); // starPop
-    // Sample several points across the animations' spans (frames ~1..24).
+    // Sample several points across the animations' spans.
     for (let step = 0; step < 8; step += 1) {
       scene.update?.(3 / 60); // +3 frames
       const ctx = recordingCtx();
       scene.draw(ctx);
       assertInBounds(ctx, `mid-animation frame ~${(step + 1) * 3}`);
     }
+  });
+
+  test('anim: the entrance starts OFF-stage then SETTLES in-bounds at rest (post-entry sample)', () => {
+    const scene = richScene();
+    scene.update?.(0.01); // battle-start fired the enterWipe entrance
+    // Mid-entrance (~frame 18): the sprites are intentionally off-canvas (the
+    // choreography slid them in from the wings) — this is the exempt off-stage start.
+    for (let k = 0; k < 18; k += 1) scene.update?.(1 / 60);
+    const mid = recordingCtx();
+    scene.draw(mid);
+    const offStage = mid.rects.some((r) => r.x < -1 || r.x + r.w > W + 1); // wipe/sprite slid off
+    expect(offStage, 'the entrance should have primitives intentionally off-stage mid-flight').toBe(true);
+    // POST-entry: everything has settled back to rest → fully in bounds.
+    for (let k = 0; k < 40; k += 1) scene.update?.(1 / 60);
+    const done = recordingCtx();
+    scene.draw(done);
+    assertInBounds(done, 'post-entry rest');
   });
 });
