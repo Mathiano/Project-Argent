@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sprite Studio — mon sprite ingest/convert/touch-up</title>
+<style>
+  :root { --bg:#15171d; --panel:#1d2029; --line:#2c313d; --ink:#d8dce6; --dim:#838b9c; --accent:#82b969; --warn:#e25a6a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.45 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:8px 14px; border-bottom:1px solid var(--line); display:flex; gap:14px; align-items:baseline; flex-wrap:wrap; }
+  header h1 { font-size:15px; margin:0; letter-spacing:.5px; }
+  header .src { color:var(--dim); font-size:12px; }
+  header .src b { color:var(--accent); }
+  main { display:grid; grid-template-columns:270px 1fr 300px; gap:14px; padding:14px; align-items:start; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:14px; }
+  .panel h2 { font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--dim); margin:0 0 10px; }
+  .swatches { display:grid; grid-template-columns:repeat(8,1fr); gap:4px; }
+  .sw { aspect-ratio:1; border:2px solid transparent; border-radius:4px; cursor:pointer; position:relative; }
+  .sw.sel { border-color:#fff; }
+  .sw .k { position:absolute; bottom:-1px; right:1px; font-size:9px; color:#000; text-shadow:0 0 2px #fff,0 0 2px #fff; }
+  .sw .m { position:absolute; top:-1px; left:1px; font-size:8px; color:#fff; text-shadow:0 0 2px #000,0 0 2px #000; }
+  .sw.trans { background:repeating-conic-gradient(#444 0 25%,#2a2a2a 0 50%) 0/10px 10px; }
+  .row { display:flex; gap:8px; align-items:center; margin:7px 0; flex-wrap:wrap; }
+  .row label { color:var(--dim); min-width:96px; }
+  label.tog { display:flex; gap:6px; align-items:center; cursor:pointer; color:var(--dim); min-width:0; }
+  button { background:#2a2f3b; color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:6px 10px; cursor:pointer; font:inherit; }
+  button:hover { border-color:var(--accent); }
+  button.primary { background:#2f5a34; border-color:var(--accent); }
+  input[type=text],input[type=number],select { background:#11131a; color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:5px 8px; font:inherit; }
+  input[type=text]{ width:110px; }
+  input[type=number]{ width:52px; }
+  input[type=range]{ accent-color:var(--accent); flex:1; }
+  .val { color:var(--accent); min-width:26px; text-align:right; }
+  #drop { border:2px dashed var(--line); border-radius:8px; padding:20px; text-align:center; color:var(--dim); cursor:pointer; }
+  #drop.over { border-color:var(--accent); color:var(--ink); }
+  canvas { image-rendering:pixelated; display:block; background:#0e1015; border:1px solid var(--line); border-radius:6px; }
+  .canvwrap { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; }
+  .cap { color:var(--dim); font-size:11px; margin:4px 0; }
+  .err { color:var(--warn); white-space:pre-wrap; min-height:16px; margin-top:6px; }
+  .ok { color:var(--accent); }
+  .hint { color:var(--dim); font-size:11px; margin-top:8px; line-height:1.5; }
+  .brushbar { display:flex; gap:3px; flex-wrap:wrap; margin:6px 0; }
+  .brush { width:22px; height:22px; border:2px solid transparent; border-radius:4px; cursor:pointer; position:relative; }
+  .brush.sel { border-color:#fff; }
+  .brush .k { position:absolute; bottom:-2px; right:1px; font-size:9px; color:#000; text-shadow:0 0 2px #fff; }
+  .brush.eraser { background:repeating-conic-gradient(#444 0 25%,#2a2a2a 0 50%) 0/8px 8px; }
+  .rampentry { display:flex; gap:5px; align-items:center; margin:3px 0; }
+  .rampentry .chip { width:18px; height:18px; border-radius:3px; border:1px solid var(--line); }
+</style>
+</head>
+<body>
+<header>
+  <h1>SPRITE STUDIO <span style="color:var(--dim);font-weight:normal">v1</span></h1>
+  <span class="src">drop a generated creature PNG → <b>grid-true 56px Argent sprite</b> → touch up → export engine JSON. Replaces <b>sprite_ingest.py</b> for daily use.</span>
+</header>
+<main>
+  <!-- LEFT: import + controls + source colours + export -->
+  <div>
+    <div class="panel">
+      <h2>1 · Import</h2>
+      <div id="drop">Drag a PNG here<br>or click to pick</div>
+      <input type="file" id="file" accept="image/png,image/*" style="display:none" />
+      <div class="row"><label>bg tolerance</label><input type="range" id="tol" min="0" max="48" value="24"><span class="val" id="tolV">24</span></div>
+      <div class="hint">Flood-fills the background from the corners: near-white (all &gt;235) or within tolerance of the corner colour. Interior whites (teeth/shine) survive.</div>
+    </div>
+
+    <div class="panel">
+      <h2>2 · Grid + pooling</h2>
+      <div class="row"><label>size (slot)</label><input type="range" id="size" min="40" max="64" step="1" value="56"><span class="val" id="sizeV">56</span></div>
+      <div class="row"><label>empty if bg &gt;</label><input type="range" id="bgt" min="30" max="80" value="55"><span class="val" id="bgtV">55%</span></div>
+      <div class="hint">Content is pooled by majority vote (outline pixels excluded from the vote unless a cell is ≥70% outline — the GALEHAWK fix), then bottom-anchored + centred into a square <b>size×size</b> grid (matches <code>fit()</code>). Non-56 sizes validate but render non-standard.</div>
+    </div>
+
+    <div class="panel">
+      <h2>4 · Cleanup</h2>
+      <div class="row"><label>despeckle &lt;</label><input type="range" id="spk" min="0" max="6" value="3"><span class="val" id="spkV">3</span></div>
+      <div class="row"><label class="tog"><input type="checkbox" id="outline" checked> outline pass (soft-edge chars exempt)</label></div>
+    </div>
+
+    <div class="panel">
+      <h2>Source colours</h2>
+      <div class="swatches" id="srcSw"></div>
+      <div class="hint">Click a source colour, then a ramp entry (right) to reassign. <b>T</b> = transparent, <b>K</b> = outline.</div>
+    </div>
+
+    <div class="panel">
+      <h2>7 · Export</h2>
+      <div class="row"><label>name</label><input type="text" id="name" value="NEWMON" placeholder="UPPERCASE"></div>
+      <div class="row"><label>facing</label>
+        <label class="tog"><input type="radio" name="facing" value="left" checked> left (front)</label>
+        <label class="tog"><input type="radio" name="facing" value="right"> right (back)</label>
+      </div>
+      <div class="row">
+        <button class="primary" id="expJson">⬇ sprite.json</button>
+        <button id="expPng">⬇ preview.png</button>
+      </div>
+      <div class="err" id="err"></div>
+      <div class="hint">Export is <b>download-only</b> — registering into <code>src/game/sprites.ts</code> stays a separate, human step. Validates chars ∈ palette ∪ '.', rows == size, row length == size before it will download.</div>
+    </div>
+  </div>
+
+  <!-- CENTRE: work canvas + brush -->
+  <div>
+    <div class="panel">
+      <h2>5 · Touch-up (work view)</h2>
+      <div class="row">
+        <label class="tog">zoom</label>
+        <button id="z4">4×</button><button id="z8">8×</button>
+        <span class="cap" style="margin-left:auto">click/drag to paint · Ctrl-Z undo</span>
+      </div>
+      <div class="brushbar" id="brushbar"></div>
+      <canvas id="work" width="448" height="448"></canvas>
+    </div>
+
+    <div class="panel">
+      <h2>6 · Preview</h2>
+      <div class="row"><label class="tog"><input type="checkbox" id="mock"> battle mock (bottom-anchored on parchment)</label></div>
+      <div class="canvwrap">
+        <div><div class="cap">1× actual</div><canvas id="p1" width="56" height="56"></canvas></div>
+        <div><div class="cap">2× battle (56→112)</div><canvas id="p2" width="112" height="112"></canvas></div>
+        <div><div class="cap">4× work</div><canvas id="p4" width="224" height="224"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: target ramp + mapping targets -->
+  <div>
+    <div class="panel">
+      <h2>3 · Target ramp</h2>
+      <div class="row">
+        <button id="loadMaster">reset to master</button>
+        <button id="impRamp">import</button>
+        <button id="expRamp">export</button>
+      </div>
+      <div class="swatches" id="rampSw" style="grid-template-columns:repeat(6,1fr)"></div>
+      <div class="row" style="margin-top:8px">
+        <span class="chip" id="targTrans" title="transparent" style="width:22px;height:22px;border-radius:4px;background:repeating-conic-gradient(#444 0 25%,#2a2a2a 0 50%) 0/10px 10px;border:2px solid transparent;cursor:pointer"></span>
+        <span class="cap">transparent</span>
+        <span class="chip" id="targOut" title="outline" style="width:22px;height:22px;border-radius:4px;border:2px solid transparent;cursor:pointer"></span>
+        <span class="cap">outline (<span id="outChar">k</span>)</span>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <input type="text" id="rk" placeholder="char" maxlength="1" style="width:44px">
+        <input type="text" id="rh" placeholder="#hex" style="width:90px">
+        <button id="rampAdd">add</button>
+      </div>
+      <div class="row"><label>outline char</label><select id="outSel"></select></div>
+      <div id="rampList"></div>
+      <div class="hint">Ships with <code>MASTER_PAL</code>. Ramps aren't saved to localStorage (project rule) — use import/export JSON.</div>
+    </div>
+  </div>
+</main>
+<input type="file" id="rampFile" accept="application/json,.json" style="display:none" />
+
+<script>
+'use strict';
+// ── sprite_ingest.py ground truth (MASTER_PAL + SOFT_EDGE + fit) ─────────────
+const MASTER_PAL = {
+  k:'#2a1c20', o:'#e8772a', O:'#c2491a', c:'#f6dcae', C:'#cdbf92', g:'#3e8f4e', G:'#246b38',
+  l:'#8fd06a', b:'#3f7fd2', B:'#27579c', L:'#7db4ea', r:'#e23a1e', y:'#f7b32b', w:'#ffffff',
+  s:'#a8a296', S:'#6e6860', D:'#46423e',
+};
+const SOFT_EDGE = new Set(['r','y']); // fire keeps soft edges, no forced outline
+
+const $ = id => document.getElementById(id);
+function hexToRgb(h){ h=h.replace('#',''); if(h.length===3) h=[...h].map(c=>c+c).join(''); const n=parseInt(h,16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+function rgbToHex(r,g,b){ return '#'+[r,g,b].map(v=>Math.max(0,Math.min(255,v|0)).toString(16).padStart(2,'0')).join(''); }
+function dist2(a,b){ const dr=a[0]-b[0],dg=a[1]-b[1],db=a[2]-b[2]; return dr*dr+dg*dg+db*db; }
+
+// ── State ────────────────────────────────────────────────────────────────────
+const S = {
+  W:0, H:0, data:null,            // source ImageData (RGBA)
+  fg:null,                         // Uint8 foreground mask (1=creature)
+  bbox:null,                       // {x0,y0,x1,y1} of foreground
+  bucket:null,                     // Int16 per-pixel nearest-source-colour index
+  srcColors:[],                    // [{rgb:[r,g,b], count}] ≤16
+  map:[],                          // srcIndex → ramp char | '#T' (transparent) | '#K' (outline)
+  ramp:{...MASTER_PAL},            // target palette {char:hex}
+  outlineChar:'k',
+  size:56, tol:24, bgt:0.55, despeckle:3, outline:true,
+  selSrc:-1, brush:'k', zoom:8, mock:false,
+  base:null,                       // pipeline output grid (array of char[])
+  overrides:new Map(),             // "x,y" → char (manual touch-ups)
+  grid:null,                       // base + overrides
+  undo:[],
+};
+const TRANS='#T', OUT='#K';
+
+// ── Import + background flood-fill ───────────────────────────────────────────
+function loadImage(file){
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    // Cap very large sources for responsiveness (keeps aspect).
+    const scale = Math.min(1, 512/Math.max(img.width,img.height));
+    c.width = Math.round(img.width*scale); c.height = Math.round(img.height*scale);
+    const g = c.getContext('2d'); g.imageSmoothingEnabled=false; g.drawImage(img,0,0,c.width,c.height);
+    S.data = g.getImageData(0,0,c.width,c.height); S.W=c.width; S.H=c.height;
+    URL.revokeObjectURL(url);
+    recomputeAll();
+  };
+  img.onerror = () => setErr('could not read image');
+  img.src = url;
+}
+
+function nearWhite(r,g,b){ return r>235 && g>235 && b>235; }
+function floodBg(){
+  const {W,H,data}=S, px=data.data, tol=S.tol*S.tol;
+  const bg = new Uint8Array(W*H); // 1 = background
+  const stack=[];
+  const corners = [[0,0],[W-1,0],[0,H-1],[W-1,H-1]];
+  for(const [cx,cy] of corners){
+    const ci=(cy*W+cx)*4, cc=[px[ci],px[ci+1],px[ci+2]];
+    const seed = cy*W+cx;
+    if(bg[seed]) continue;
+    // Flood cells matching this corner's colour (or near-white / low alpha).
+    stack.push(seed);
+    while(stack.length){
+      const p=stack.pop(); if(bg[p]) continue;
+      const o=p*4, r=px[o],gc=px[o+1],b=px[o+2],a=px[o+3];
+      const match = a<16 || nearWhite(r,gc,b) || dist2([r,gc,b],cc)<=tol;
+      if(!match) continue;
+      bg[p]=1;
+      const x=p%W, y=(p/W)|0;
+      if(x>0) stack.push(p-1); if(x<W-1) stack.push(p+1);
+      if(y>0) stack.push(p-W); if(y<H-1) stack.push(p+W);
+    }
+  }
+  // Foreground = not background. Compute tight bbox.
+  const fg=new Uint8Array(W*H); let x0=W,y0=H,x1=-1,y1=-1;
+  for(let p=0;p<W*H;p++){ if(!bg[p]){ fg[p]=1; const x=p%W,y=(p/W)|0; if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; } }
+  S.fg=fg; S.bbox = x1<0? null : {x0,y0,x1,y1};
+}
+
+// ── Dominant source colours (frequency buckets) + per-pixel nearest ──────────
+function extractColors(){
+  const {W,H,data,fg}=S, px=data.data;
+  const buckets=new Map(); // 12-bit key → {r,g,b,count}
+  for(let p=0;p<W*H;p++){ if(!fg[p]) continue; const o=p*4;
+    const key=((px[o]>>4)<<8)|((px[o+1]>>4)<<4)|(px[o+2]>>4);
+    let e=buckets.get(key); if(!e){ e={r:0,g:0,b:0,n:0}; buckets.set(key,e); }
+    e.r+=px[o]; e.g+=px[o+1]; e.b+=px[o+2]; e.n++;
+  }
+  const cols=[...buckets.values()].sort((a,b)=>b.n-a.n).slice(0,16)
+    .map(e=>({rgb:[Math.round(e.r/e.n),Math.round(e.g/e.n),Math.round(e.b/e.n)], count:e.n}));
+  S.srcColors=cols;
+  // per-pixel nearest source colour
+  const bucket=new Int16Array(W*H).fill(-1);
+  for(let p=0;p<W*H;p++){ if(!fg[p]) continue; const o=p*4, c=[px[o],px[o+1],px[o+2]];
+    let bi=0,bd=1e18; for(let i=0;i<cols.length;i++){ const d=dist2(c,cols[i].rgb); if(d<bd){bd=d;bi=i;} } bucket[p]=bi; }
+  S.bucket=bucket;
+}
+
+function autoMap(){
+  const chars=Object.keys(S.ramp);
+  S.map = S.srcColors.map(sc=>{
+    let bc=chars[0], bd=1e18; for(const ch of chars){ const d=dist2(sc.rgb,hexToRgb(S.ramp[ch])); if(d<bd){bd=d;bc=ch;} }
+    return bc;
+  });
+}
+function mappedChar(i){ return i>=0 ? S.map[i] : TRANS; }
+
+// ── Pooling (mode vote, outline-aware) — mirrors ingest() ────────────────────
+function pool(ih){
+  const {W,H,fg,bucket,bbox}=S; if(!bbox) return [['.']];
+  const cw=bbox.x1-bbox.x0+1, ch=bbox.y1-bbox.y0+1;
+  const cell=ch/ih, ow=Math.max(1,Math.round(cw/cell));
+  const grid=[];
+  for(let gy=0;gy<ih;gy++){ const row=[];
+    for(let gx=0;gx<ow;gx++){
+      const cx0=bbox.x0+gx*cell, cy0=bbox.y0+gy*cell;
+      let total=0,bg=0,outline=0; const cnt={};
+      for(let sy=Math.floor(cy0); sy<Math.min(Math.floor(cy0+cell)+1,H); sy++)
+        for(let sx=Math.floor(cx0); sx<Math.min(Math.floor(cx0+cell)+1,W); sx++){
+          total++; const p=sy*W+sx;
+          if(!fg[p]){ bg++; continue; }
+          const m=mappedChar(bucket[p]);
+          if(m===TRANS){ bg++; continue; }
+          if(m===OUT){ outline++; continue; }
+          cnt[m]=(cnt[m]||0)+1;
+        }
+      const nonBg=total-bg;
+      if(total===0 || bg/total>S.bgt || nonBg===0){ row.push('.'); continue; }
+      if(outline/nonBg>=0.70){ row.push(S.outlineChar); continue; }
+      let best=null,bn=-1; for(const c in cnt){ if(cnt[c]>bn){bn=cnt[c];best=c;} }
+      row.push(best ?? S.outlineChar);
+    }
+    grid.push(row);
+  }
+  return grid;
+}
+
+// ── Cleanup: despeckle (connected non-outline islands < N) + outline pass ────
+function cleanup(g){
+  const H=g.length, W=g[0].length;
+  if(S.despeckle>0){
+    const seen=Array.from({length:H},()=>new Uint8Array(W));
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      if(g[y][x]==='.'||seen[y][x]) continue;
+      // flood a connected non-'.' component; track cells + whether all non-outline
+      const comp=[], st=[[x,y]]; let allNonOutline=true;
+      while(st.length){ const [cx,cy]=st.pop(); if(cx<0||cy<0||cx>=W||cy>=H||seen[cy][cx]||g[cy][cx]==='.') continue;
+        seen[cy][cx]=1; comp.push([cx,cy]); if(g[cy][cx]===S.outlineChar) allNonOutline=false;
+        st.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]);
+      }
+      if(comp.length<S.despeckle && allNonOutline) for(const [cx,cy] of comp) g[cy][cx]='.';
+    }
+  }
+  if(S.outline){
+    const orig=g.map(r=>r.slice());
+    const isBg=(x,y)=> x<0||y<0||x>=W||y>=H || orig[y][x]==='.';
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      const ch=orig[y][x]; if(ch==='.'||SOFT_EDGE.has(ch)) continue;
+      if(isBg(x+1,y)||isBg(x-1,y)||isBg(x,y+1)||isBg(x,y-1)) g[y][x]=S.outlineChar;
+    }
+  }
+  return g;
+}
+
+// ── fit(): crop bbox, centre-x, bottom-anchor into slot×slot ─────────────────
+function fit(g, slot){
+  const H=g.length, W=g[0].length;
+  let x0=W,y0=H,x1=-1,y1=-1;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(g[y][x]!=='.'){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+  if(x1<0) return null;
+  const cw=x1-x0+1, ch=y1-y0+1;
+  if(cw>slot||ch>slot) return null;
+  const final=Array.from({length:slot},()=>Array.from({length:slot},()=>'.'));
+  // Bottom-anchored (a 1px floor gap when there's room), horizontally centred.
+  // Clamp offy≥0 so a full-height crop (ch===slot) fills the slot instead of
+  // underflowing — sprite_ingest.py's slot-ch-1 relied on Python's negative-index wrap.
+  const offx=(slot-cw)>>1, offy=Math.max(0, slot-ch-1);
+  for(let y=0;y<ch;y++) for(let x=0;x<cw;x++) final[y+offy][x+offx]=g[y0+y][x0+x];
+  return final;
+}
+
+function buildBase(){
+  if(!S.bbox){ S.base=null; return; }
+  let ih=S.size;
+  while(ih>=8){ const f=fit(cleanup(pool(ih)), S.size); if(f){ S.base=f; return; } ih-=2; }
+  S.base=Array.from({length:S.size},()=>Array.from({length:S.size},()=>'.'));
+}
+function applyOverrides(){
+  if(!S.base){ S.grid=null; return; }
+  const g=S.base.map(r=>r.slice());
+  for(const [k,ch] of S.overrides){ const [x,y]=k.split(',').map(Number); if(y>=0&&y<g.length&&x>=0&&x<g[0].length) g[y][x]=ch; }
+  S.grid=g;
+}
+
+// ── Recompute chain ──────────────────────────────────────────────────────────
+function recomputePipeline(){ buildBase(); applyOverrides(); render(); }
+function recomputeAll(){
+  if(!S.data){ render(); return; }
+  floodBg(); extractColors(); autoMap(); S.overrides.clear(); S.undo.length=0; recomputePipeline();
+}
+
+// ── Rendering ────────────────────────────────────────────────────────────────
+function colorOf(ch){ return ch==='.'? null : (S.ramp[ch] || '#ff00ff'); }
+function paintGrid(ctx, grid, z, ox=0, oy=0){
+  for(let y=0;y<grid.length;y++) for(let x=0;x<grid[0].length;x++){ const c=colorOf(grid[y][x]); if(!c) continue; ctx.fillStyle=c; ctx.fillRect(ox+x*z, oy+y*z, z, z); }
+}
+function render(){
+  renderSourceSwatches(); renderRamp(); renderBrushbar();
+  const wc=$('work'), wctx=wc.getContext('2d'); const z=S.zoom, sz=S.size;
+  wc.width=sz*z; wc.height=sz*z; wctx.imageSmoothingEnabled=false;
+  wctx.fillStyle='#0e1015'; wctx.fillRect(0,0,wc.width,wc.height);
+  // grid lines
+  wctx.strokeStyle='rgba(255,255,255,0.05)'; for(let i=0;i<=sz;i++){ wctx.beginPath(); wctx.moveTo(i*z,0); wctx.lineTo(i*z,sz*z); wctx.moveTo(0,i*z); wctx.lineTo(sz*z,i*z); wctx.stroke(); }
+  if(S.grid) paintGrid(wctx, S.grid, z);
+  // previews
+  drawPreview($('p1'),1); drawPreview($('p2'),2); drawPreview($('p4'),4);
+}
+function drawPreview(cv, z){
+  const sz=S.size; cv.width=sz*z; cv.height=sz*z; const ctx=cv.getContext('2d'); ctx.imageSmoothingEnabled=false;
+  if(S.mock){ ctx.fillStyle='#e8e4d8'; ctx.fillRect(0,0,cv.width,cv.height); } else { ctx.clearRect(0,0,cv.width,cv.height); }
+  if(S.grid) paintGrid(ctx, S.grid, z);
+}
+
+function renderSourceSwatches(){
+  const el=$('srcSw'); el.innerHTML='';
+  S.srcColors.forEach((sc,i)=>{
+    const d=document.createElement('div'); d.className='sw'+(S.selSrc===i?' sel':''); d.style.background=rgbToHex(...sc.rgb);
+    const m=S.map[i]; let label = m===TRANS?'T' : m===OUT?'K' : m;
+    d.innerHTML=`<span class="m">${label}</span>`;
+    d.title=`source ${rgbToHex(...sc.rgb)} → ${label} (${sc.count}px)`;
+    d.onclick=()=>{ S.selSrc=i; render(); };
+    el.appendChild(d);
+  });
+}
+function renderRamp(){
+  $('outChar').textContent=S.outlineChar;
+  const targOut=$('targOut'); targOut.style.background = S.ramp[S.outlineChar]||'#000';
+  const el=$('rampSw'); el.innerHTML='';
+  for(const ch of Object.keys(S.ramp)){
+    const d=document.createElement('div'); d.className='sw'; d.style.background=S.ramp[ch];
+    d.innerHTML=`<span class="k">${ch}</span>`; d.title=`${ch} ${S.ramp[ch]} — click to assign selected source`;
+    d.onclick=()=>assignSelected(ch); el.appendChild(d);
+  }
+  // outline-char selector
+  const sel=$('outSel'); sel.innerHTML=''; for(const ch of Object.keys(S.ramp)){ const o=document.createElement('option'); o.value=ch; o.textContent=ch; if(ch===S.outlineChar)o.selected=true; sel.appendChild(o); }
+  // ramp list (remove buttons)
+  const list=$('rampList'); list.innerHTML='';
+  for(const ch of Object.keys(S.ramp)){
+    const r=document.createElement('div'); r.className='rampentry';
+    r.innerHTML=`<span class="chip" style="background:${S.ramp[ch]}"></span><b>${ch}</b><span class="cap">${S.ramp[ch]}</span>`;
+    const rm=document.createElement('button'); rm.textContent='×'; rm.style.marginLeft='auto'; rm.style.padding='2px 7px';
+    rm.onclick=()=>{ if(Object.keys(S.ramp).length<=1) return; delete S.ramp[ch]; if(S.outlineChar===ch) S.outlineChar=Object.keys(S.ramp)[0]; autoMap(); recomputePipeline(); };
+    r.appendChild(rm); list.appendChild(r);
+  }
+}
+function assignSelected(target){ if(S.selSrc<0) return; S.map[S.selSrc]=target; recomputePipeline(); }
+
+function renderBrushbar(){
+  const bar=$('brushbar'); bar.innerHTML='';
+  const er=document.createElement('div'); er.className='brush eraser'+(S.brush==='.'?' sel':''); er.title='eraser'; er.onclick=()=>{S.brush='.';render();}; bar.appendChild(er);
+  for(const ch of Object.keys(S.ramp)){ const b=document.createElement('div'); b.className='brush'+(S.brush===ch?' sel':''); b.style.background=S.ramp[ch]; b.innerHTML=`<span class="k">${ch}</span>`; b.title=ch; b.onclick=()=>{S.brush=ch;render();}; bar.appendChild(b); }
+}
+
+// ── Brush (palette-clamped) + undo ───────────────────────────────────────────
+let painting=false;
+function paintAt(e){
+  if(!S.grid) return; const wc=$('work'); const rect=wc.getBoundingClientRect();
+  const x=Math.floor((e.clientX-rect.left)/rect.width*S.size), y=Math.floor((e.clientY-rect.top)/rect.height*S.size);
+  if(x<0||y<0||x>=S.size||y>=S.size) return;
+  const ch = S.brush; // '.' eraser or a ramp char (palette-clamped by construction)
+  S.overrides.set(`${x},${y}`, ch); applyOverrides(); render();
+}
+function pushUndo(){ S.undo.push(new Map(S.overrides)); if(S.undo.length>50) S.undo.shift(); }
+
+// ── Export ───────────────────────────────────────────────────────────────────
+function usedPalette(rows){ const used=new Set(); for(const r of rows) for(const c of r) if(c!=='.') used.add(c); const p={}; for(const c of used) if(S.ramp[c]) p[c]=S.ramp[c]; return {used,palette:p}; }
+function validateExport(rows){
+  const errs=[];
+  if(rows.length!==S.size) errs.push(`rows count ${rows.length} ≠ size ${S.size}`);
+  for(let i=0;i<rows.length;i++) if(rows[i].length!==S.size) errs.push(`row ${i} length ${rows[i].length} ≠ size ${S.size}`);
+  const {used}=usedPalette(rows);
+  for(const c of used) if(!(c in S.ramp)) errs.push(`char '${c}' not in ramp`);
+  if(S.size>56) errs.push(`size ${S.size} > 56 — engine convention is 56 (width must be ≤ 56)`);
+  return errs;
+}
+function download(name, text, type='application/json'){ const b=new Blob([text],{type}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+
+function exportJson(){
+  setErr('');
+  if(!S.grid){ setErr('nothing to export — drop a PNG first'); return; }
+  const rows=S.grid.map(r=>r.join(''));
+  const errs=validateExport(rows);
+  if(errs.length){ setErr('EXPORT REFUSED:\n· '+errs.join('\n· ')); return; }
+  const name=($('name').value||'NEWMON').trim().toUpperCase().replace(/[^A-Z0-9_]/g,'');
+  const facing=document.querySelector('input[name=facing]:checked').value;
+  const {palette}=usedPalette(rows);
+  const obj={ name, size:S.size, palette, rows, facing };
+  download(`${name}.sprite.json`, JSON.stringify(obj,null,1));
+  setErr(`✓ ${name}.sprite.json — ${Object.keys(palette).length} colours, ${S.size}×${S.size}`, true);
+}
+function exportPng(){
+  if(!S.grid){ setErr('nothing to export'); return; }
+  const z=4, sz=S.size, cv=document.createElement('canvas'); cv.width=sz*z; cv.height=sz*z; const ctx=cv.getContext('2d');
+  ctx.fillStyle='#1a1d24'; ctx.fillRect(0,0,cv.width,cv.height); paintGrid(ctx,S.grid,z);
+  const name=($('name').value||'NEWMON').trim().toUpperCase().replace(/[^A-Z0-9_]/g,'');
+  cv.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=`${name}.preview.png`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); });
+}
+function setErr(msg, ok=false){ const e=$('err'); e.textContent=msg||''; e.className='err'+(ok?' ok':''); }
+
+// ── Wiring ───────────────────────────────────────────────────────────────────
+const drop=$('drop');
+drop.onclick=()=>$('file').click();
+$('file').onchange=e=>{ if(e.target.files[0]) loadImage(e.target.files[0]); };
+['dragover','dragenter'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) loadImage(f); });
+window.addEventListener('dragover',e=>e.preventDefault()); window.addEventListener('drop',e=>e.preventDefault());
+
+function slider(id, vid, fn, fmt=v=>v){ const s=$(id); const upd=()=>{ $(vid).textContent=fmt(+s.value); fn(+s.value); }; s.oninput=upd; }
+slider('tol','tolV', v=>{ S.tol=v; if(S.data){ floodBg(); extractColors(); autoMap(); S.overrides.clear(); recomputePipeline(); } });
+slider('size','sizeV', v=>{ S.size=v; recomputePipeline(); });
+slider('bgt','bgtV', v=>{ S.bgt=v/100; recomputePipeline(); }, v=>v+'%');
+slider('spk','spkV', v=>{ S.despeckle=v; recomputePipeline(); });
+$('outline').onchange=e=>{ S.outline=e.target.checked; recomputePipeline(); };
+$('z4').onclick=()=>{S.zoom=4;render();}; $('z8').onclick=()=>{S.zoom=8;render();};
+$('mock').onchange=e=>{S.mock=e.target.checked;render();};
+
+$('targTrans').onclick=()=>assignSelected(TRANS);
+$('targOut').onclick=()=>assignSelected(OUT);
+$('outSel').onchange=e=>{ S.outlineChar=e.target.value; recomputePipeline(); };
+$('loadMaster').onclick=()=>{ S.ramp={...MASTER_PAL}; S.outlineChar='k'; autoMap(); recomputePipeline(); };
+$('rampAdd').onclick=()=>{ const k=$('rk').value.trim(), h=$('rh').value.trim(); if(k.length!==1){setErr('ramp key must be 1 char');return;} if(!/^#?[0-9a-fA-F]{3,6}$/.test(h)){setErr('bad hex');return;} S.ramp[k]=h.startsWith('#')?h:'#'+h; $('rk').value='';$('rh').value=''; autoMap(); recomputePipeline(); };
+$('expRamp').onclick=()=>download('ramp.json', JSON.stringify(S.ramp,null,1));
+$('impRamp').onclick=()=>$('rampFile').click();
+$('rampFile').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ const o=JSON.parse(r.result); if(typeof o!=='object')throw 0; S.ramp=o; if(!(S.outlineChar in S.ramp)) S.outlineChar=Object.keys(S.ramp)[0]; autoMap(); recomputePipeline(); setErr('ramp imported',true); }catch{ setErr('bad ramp JSON'); } }; r.readAsText(f); };
+$('expJson').onclick=exportJson; $('expPng').onclick=exportPng;
+
+const wc=$('work');
+wc.addEventListener('mousedown',e=>{ pushUndo(); painting=true; paintAt(e); });
+window.addEventListener('mousemove',e=>{ if(painting) paintAt(e); });
+window.addEventListener('mouseup',()=>painting=false);
+window.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); if(S.undo.length){ S.overrides=S.undo.pop(); applyOverrides(); render(); } } });
+
+if(location.protocol==='file:') setErr('Tip: serve via `npx serve tools/sprite_studio` or vite — file:// works for local drops but the served path matches the Argent Studio convention.');
+render();
+</script>
+</body>
+</html>
