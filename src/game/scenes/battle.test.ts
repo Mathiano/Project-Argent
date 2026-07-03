@@ -1273,24 +1273,23 @@ describe('resolve cadence + stance labels — legibility pass', () => {
     expect(advanceUntilLog(scene, 'COUNTER', 12)).toBe(true);
   });
 
-  test('Bug 1: a read-win increments USABLE ★ — the Call submenu reflects it (not just the callout)', () => {
+  test('Bug 1: a read-win increments USABLE ★ — the CALLS row reflects it (not just the callout)', () => {
     // GRUBLEAF Guard vs FLITPECK Aggressive → COUNTER → the player charges ★.
     const { scene } = buildScene({
       foeAction: { kind: 'move', move: 'TACKLE', stance: 'A' },
       catchBreathUnlocked: true,
     });
     pickStance(scene, 'G');
-    drainResolve(scene);
-    // FIGHT → CALL (PKMN + BALL are disabled on a solo, no-catch team).
-    scene.input?.('down');
-    scene.input?.('a'); // open the Call submenu
+    drainResolve(scene); // → menu; the player now holds 1★
     const ctx = stubCtx();
     scene.draw(ctx);
-    // The submenu reads the LIVE engine ★ (the resource Calls spend), so this
-    // proves the read-win actually banked usable ★, not just fired a callout.
-    // ★1 ≥ Catch Breath's cost (1) → the Call is now usable.
-    expect(ctx.texts.join('|')).toContain('Your'); // "Your ★1" — ★ drawn separately now
-    expect(ctx.texts).toContain('★');
+    // Beat 3.1 moved the ★ readout to the mon CARD (the "Your ★N" line is gone).
+    // The MENU's CALLS row note reads the LIVE engine ★, flipping from "needs ★"
+    // (0★, ★-starved) to the ★-count when usable — so this proves the read-win
+    // actually banked usable ★, not just fired a callout (★1 ≥ Catch Breath's cost).
+    const screen = ctx.texts.join('|');
+    expect(screen).not.toContain('needs'); // no longer ★-starved on the CALLS row
+    expect(ctx.texts).toContain('★'); // the ★ glyph (the note count + the card star row)
   });
 
   test('stance label on opening: "FLUID slips past GUARD" when F attacks G', () => {
@@ -1703,26 +1702,34 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
     rects: { x: number; y: number; w: number; h: number }[];
     texts: TextRec[];
     fonts: string[];
+    strokes: { x: number; y: number; w: number; h: number; style: string }[];
   } {
     const rects: { x: number; y: number; w: number; h: number }[] = [];
+    const strokes: { x: number; y: number; w: number; h: number; style: string }[] = [];
     const texts: TextRec[] = [];
     const fonts: string[] = [];
     let font = '16px m3x6, monospace';
     let align = 'start';
+    let strokeStyle = '#000000';
     const px = (f: string): number => {
       const m = /(\d+)px/.exec(f);
       return m ? parseInt(m[1]!, 10) : 16;
     };
     const noop = () => {};
     return new Proxy(
-      { rects, texts, fonts },
+      { rects, texts, fonts, strokes },
       {
         get(t, p) {
           if (p === 'rects') return (t as { rects: unknown }).rects;
           if (p === 'texts') return (t as { texts: unknown }).texts;
           if (p === 'fonts') return (t as { fonts: unknown }).fonts;
-          if (p === 'fillRect' || p === 'strokeRect') {
-            return (x: number, y: number, w: number, h: number) => rects.push({ x, y, w, h });
+          if (p === 'strokes') return (t as { strokes: unknown }).strokes;
+          if (p === 'fillRect') return (x: number, y: number, w: number, h: number) => rects.push({ x, y, w, h });
+          if (p === 'strokeRect') {
+            return (x: number, y: number, w: number, h: number) => {
+              rects.push({ x, y, w, h });
+              strokes.push({ x, y, w, h, style: strokeStyle });
+            };
           }
           if (p === 'fillText') return (text: string, x: number, y: number) => texts.push({ x, y, text: String(text), px: px(font), align });
           // m3x6's real average advance is ~0.25em (UI_CHAR_W 4.0 @ 16px). Use a
@@ -1735,6 +1742,7 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
           return noop;
         },
         set(_t, p, v) {
+          if (p === 'strokeStyle') strokeStyle = String(v);
           if (p === 'font') {
             font = String(v);
             fonts.push(font);
@@ -1746,6 +1754,7 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
       rects: { x: number; y: number; w: number; h: number }[];
       texts: TextRec[];
       fonts: string[];
+      strokes: { x: number; y: number; w: number; h: number; style: string }[];
     };
   }
 
@@ -1976,5 +1985,120 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
     // The compact star row draws a ★ glyph per slot; player + foe = 3 + 3 min.
     const stars = ctx.texts.filter((t) => t === '★').length;
     expect(stars).toBeGreaterThanOrEqual(6);
+  });
+
+  // ── Beat 3.1 — declutter + collision fixes (no-overlap assertions) ──────────
+  const PL_PANEL_R = { x: 300, y: 196, w: 332, h: 60 };
+  const tbounds = (t: TextRec) => {
+    const w = t.text.length * t.px * 0.3;
+    const x = t.align === 'right' ? t.x - w : t.align === 'center' ? t.x - w / 2 : t.x;
+    return { x, y: t.y, w, h: t.px };
+  };
+  const overlaps = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) =>
+    a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+  test('A1 no-overlap: GYM LEADER tag ∩ BREAK label = ∅ (boss strip)', () => {
+    const scene = richScene(BOSS_CARD);
+    scene.update?.(0.01);
+    const ctx = recordingCtx();
+    scene.draw(ctx);
+    const brk = ctx.texts.find((t) => t.text === 'BREAK');
+    const gym = ctx.texts.find((t) => t.text === 'GYM LEADER');
+    expect(brk && gym).toBeTruthy();
+    expect(overlaps(tbounds(brk!), tbounds(gym!))).toBe(false);
+  });
+
+  test('A2 no-overlap: the BOND row (bar) sits fully inside the player-panel frame', () => {
+    const scene = richScene();
+    scene.update?.(0.01);
+    const ctx = recordingCtx();
+    scene.draw(ctx);
+    expect(ctx.texts.some((t) => t.text === 'BOND')).toBe(true);
+    // The bond BAR is the h===5 fillRect in the player-panel x-band; its bottom
+    // must sit above the frame body (panel bottom − 3), not clip the border.
+    const bodyBottom = PL_PANEL_R.y + PL_PANEL_R.h - 3;
+    const bars = ctx.rects.filter((r) => r.h === 5 && r.x >= PL_PANEL_R.x && r.x < PL_PANEL_R.x + PL_PANEL_R.w);
+    expect(bars.length).toBeGreaterThan(0);
+    for (const r of bars) expect(r.y + r.h, `bond bar bottom ${r.y + r.h}`).toBeLessThan(bodyBottom);
+  });
+
+  test('A3 no-overlap: the ▶FOCUS commit indicator ∩ the A/B chips = ∅', () => {
+    const scene = richScene();
+    scene.update?.(0.01);
+    scene.input?.('a'); // move grid
+    scene.input?.('right'); // toggle the FOCUS commit → ▶FOCUS shows on the stance row
+    const ctx = recordingCtx();
+    scene.draw(ctx);
+    const focus = ctx.texts.find((t) => t.text.includes('FOCUS'));
+    expect(focus, '▶FOCUS should render while committing').toBeTruthy();
+    const chips = ctx.texts.filter((t) => t.text === 'A CONFIRM' || t.text === 'B BACK');
+    expect(chips.length).toBe(2);
+    for (const c of chips) expect(overlaps(tbounds(focus!), tbounds(c))).toBe(false);
+  });
+
+  test('A4 no-overlap: a locked cell name ∩ its lock note = ∅ (name truncates clear)', () => {
+    // Momentum 0 → the mid/heavy attacks are ★-gated → locked cells with NEEDS ★.
+    const player = { ...createSide(CH1.GRUBLEAF!), momentum: 0 };
+    const state = createBattleState(createTeam([player]), createTeam([createSide(CH1.FLITPECK!)]));
+    const scene = createBattleScene({
+      state, rng: mulberry32(1), chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'A' }),
+      intro: [], catchBreathUnlocked: false, canRun: true, onResolve: () => {},
+    });
+    scene.update?.(0.01);
+    scene.input?.('a'); // move grid
+    const ctx = recordingCtx();
+    scene.draw(ctx);
+    const isLock = (s: string) => /NEEDS|WINDED|LOW ST/.test(s);
+    const locks = ctx.texts.filter((t) => isLock(t.text));
+    expect(locks.length, 'the scene must actually have a locked cell to test').toBeGreaterThan(0);
+    for (const lock of locks) {
+      for (const t of ctx.texts) {
+        if (t === lock || isLock(t.text)) continue;
+        expect(overlaps(tbounds(lock), tbounds(t)), `"${t.text}" overlaps lock "${lock.text}"`).toBe(false);
+      }
+    }
+  });
+
+  test('B declutter: the five removed strings are GONE from the render', () => {
+    const scene = richScene();
+    scene.update?.(0.01);
+    const menu = recordingCtx();
+    scene.draw(menu);
+    scene.input?.('a'); // move phase
+    const move = recordingCtx();
+    scene.draw(move);
+    const scene2 = richScene();
+    scene2.update?.(0.01);
+    scene2.input?.('down'); // CALLS row
+    scene2.input?.('a'); // Call submenu
+    const call = recordingCtx();
+    scene2.draw(call);
+    const all = [...menu.texts, ...move.texts, ...call.texts].map((t) => t.text).join('|');
+    expect(all).not.toMatch(/SELECTED/); // header removed
+    expect(all).not.toMatch(/NEXT:/); // initiative readout removed
+    expect(all).not.toMatch(/FOE > YOU|YOU > FOE/);
+    expect(all).not.toMatch(/Your ★/); // Calls-menu star line removed
+    expect(all).not.toMatch(/SEL stance/); // control hint removed
+  });
+
+  test('B declutter: NO gold hollow selection square (fill-only selection)', () => {
+    const scene = richScene();
+    scene.update?.(0.01);
+    scene.input?.('a'); // move grid — a cell is selected + FIGHT breadcrumb boxed
+    const ctx = recordingCtx();
+    scene.draw(ctx);
+    // The selection/breadcrumb is a FILL now — no strokeRect uses the momentum gold.
+    expect(ctx.strokes.some((s) => s.style === '#f6c92e')).toBe(false); // PALETTE.momentumGold
+  });
+
+  test('C seam: the "clearing" background renders the arena (sky · ground · scatter)', () => {
+    const scene = richScene();
+    scene.update?.(0.01);
+    const ctx = recordingCtx();
+    scene.draw(ctx);
+    expect(ctx.rects.some((r) => r.x === 0 && r.y === 0 && r.w === 640)).toBe(true); // sky band
+    expect(ctx.rects.some((r) => r.x === 0 && r.y === 150 && r.w === 640)).toBe(true); // ground band
+    const scatter = ctx.rects.filter((r) => r.w <= 3 && r.h <= 3 && r.y >= 150 && r.y <= 256);
+    expect(scatter.length).toBeGreaterThan(20); // deterministic grass/pebble scatter
   });
 });

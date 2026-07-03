@@ -288,7 +288,20 @@ const ARENA_SCATTER = ((): { tufts: readonly (readonly [number, number])[]; pebb
   return { tufts, pebbles };
 })();
 
-function drawArena(ctx: CanvasRenderingContext2D): void {
+// ── Background SEAM (beat 3.1) — the 2b-3 slot graduates, MINIMALLY ──────────
+// The arena paint is a function keyed by a background id, behind a small registry.
+// DEFAULT 'clearing' = the current painted arena (byte-identical). This is ONLY
+// the opening in the code: a future environment (cave/snow/water) slots in as one
+// entry here + one draw function — NO biome wiring, no other backgrounds authored.
+type ArenaBackgroundId = 'clearing';
+const ARENA_BACKGROUNDS: { readonly [id in ArenaBackgroundId]: (ctx: CanvasRenderingContext2D) => void } = {
+  clearing: drawClearingArena,
+};
+function drawArenaBackground(id: ArenaBackgroundId, ctx: CanvasRenderingContext2D): void {
+  (ARENA_BACKGROUNDS[id] ?? ARENA_BACKGROUNDS.clearing)(ctx);
+}
+
+function drawClearingArena(ctx: CanvasRenderingContext2D): void {
   // Sky + ground base.
   ctx.fillStyle = PALETTE.arenaSky;
   ctx.fillRect(0, 0, BATTLE_LOGICAL_W, ARENA_HORIZON);
@@ -484,10 +497,20 @@ function drawChip(ctx: CanvasRenderingContext2D, x: number, y: number, label: st
   return x + w;
 }
 
-// A move cell in the 2×3 grid (beat-2 richer): a BOXED tier chip (T0/T1…), the
-// name, and on the right either an EFFECT chip (BURN/…) + ST for a technique, or
-// the ST cost, or a PADLOCK + the lock reason ("NEEDS ★★") for an illegal move.
-// Selected cells get the stronger (double gold) border. Velvet stripe marks TEC.
+// Truncate a UI string with an ellipsis so it fits within maxW px (beat 3.1 —
+// so a compact-cell name never intersects its right-side note).
+function fitText(ctx: CanvasRenderingContext2D, text: string, maxW: number): string {
+  if (maxW <= 0) return '';
+  if (measureUiText(ctx, text) <= maxW) return text;
+  let t = text;
+  while (t.length > 1 && measureUiText(ctx, `${t}…`) > maxW) t = t.slice(0, -1);
+  return `${t}…`;
+}
+
+// A move cell in the 2×3 grid: a BOXED tier chip (T0/T1…), the name, and on the
+// right either an EFFECT chip (BURN/…) + ST, the ST cost, or a PADLOCK + lock
+// reason. SELECTION is ONE treatment — the velvet fill wash (beat 3.1: the gold
+// hollow outline is gone). Velvet stripe marks TEC.
 function drawMoveCell(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -500,36 +523,41 @@ function drawMoveCell(
   ctx.fillStyle = PALETTE.frameParchmentDim; // inset parchment cell
   ctx.fillRect(x, y, w, h);
   if (selected) {
-    ctx.fillStyle = 'rgba(158,74,58,0.5)'; // velvet selection wash
+    ctx.fillStyle = 'rgba(158,74,58,0.5)'; // velvet selection wash — the ONE selection cue
     ctx.fillRect(x, y, w, h);
   }
   if (info.isTech) {
     ctx.fillStyle = PALETTE.velvet; // TEC accent stripe (the two pools read apart)
     ctx.fillRect(x, y, 3, h);
   }
-  ctx.strokeStyle = selected ? PALETTE.momentumGold : PALETTE.frameWoodDark;
+  ctx.strokeStyle = PALETTE.frameWoodDark; // neutral border — no gold hollow square
   ctx.lineWidth = 1;
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-  if (selected) ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3); // stronger (double) border
   const ty = y + Math.round(h / 2) - 6;
   const legal = info.legal;
-  // Boxed tier chip.
   drawChip(ctx, x + 6, ty - 1, info.badge, legal ? TIER_BADGE_COLOR[info.tier] : PALETTE.frameInkDim);
-  // Name (with the > cursor).
-  drawText(ctx, `${selected ? '>' : ' '}${info.name}`, x + 32, ty, legal ? PALETTE.frameInk : PALETTE.frameInkDim);
-  // Right side.
+  // RIGHT side first — so the name can truncate to stop clear of it.
+  let rightLeft: number;
   if (info.lockLabel) {
     const lw = Math.ceil(measureUiText(ctx, info.lockLabel));
+    const padX = x + w - 5 - lw - 9;
     drawText(ctx, info.lockLabel, x + w - 5 - lw, ty, PALETTE.hpCrit);
-    drawPadlock(ctx, x + w - 5 - lw - 9, ty + 1, PALETTE.hpCrit);
+    drawPadlock(ctx, padX, ty + 1, PALETTE.hpCrit);
+    rightLeft = padX;
   } else if (info.effectTag) {
-    // Effect chip + ST for a technique.
     drawTextRight(ctx, `ST${info.cost}`, x + w - 5, ty, PALETTE.frameInkSoft);
     const ew = Math.ceil(measureUiText(ctx, `ST${info.cost}`));
-    drawChip(ctx, x + w - 5 - ew - 4 - (Math.ceil(ctx.measureText(info.effectTag).width) + 7), ty - 1, info.effectTag, PALETTE.brass);
+    const chipX = x + w - 5 - ew - 4 - (Math.ceil(ctx.measureText(info.effectTag).width) + 7);
+    drawChip(ctx, chipX, ty - 1, info.effectTag, PALETTE.brass);
+    rightLeft = chipX;
   } else {
     drawTextRight(ctx, `ST${info.cost}`, x + w - 5, ty, PALETTE.frameInkSoft);
+    rightLeft = x + w - 5 - Math.ceil(measureUiText(ctx, `ST${info.cost}`));
   }
+  // NAME — truncated so it never reaches the right-side note (padlock/chip/ST).
+  const nameStr = `${selected ? '>' : ' '}${info.name}`;
+  const nameX = x + 32;
+  drawText(ctx, fitText(ctx, nameStr, rightLeft - 5 - nameX), nameX, ty, legal ? PALETTE.frameInk : PALETTE.frameInkDim);
 }
 
 // Active effect-layer statuses on a side, as chips (the previously-invisible
@@ -772,13 +800,6 @@ export function orderHint(
   return 'TIE';
 }
 
-function actionStance(action: Action): Stance {
-  return action.kind === 'move' ? action.stance : 'G';
-}
-
-function actionMove(action: Action): string | null {
-  return action.kind === 'move' ? action.move : null;
-}
 
 // ---- Intent reliability ramp (Phase 6.7-A; honest-partial model 6.7-A') ------
 // The foe ALWAYS commits a real stance (foeAction → resolveRound, untouched).
@@ -2562,22 +2583,25 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // just above it. Replaces the old pip row.
   function drawBossBreak(ctx: CanvasRenderingContext2D, x: number, w: number, py: number, h: number): void {
     const stripY = py + FOE_PANEL.h; // the +FOE_BREAK_EXTRA strip
-    // GYM LEADER role tag — RIGHT-ALIGNED to the panel's right inner edge (the
-    // mock's position; beat-3 eye-gate fix). CH1 bosses are gym leaders (a static
-    // default; reversible to a bossCard title field). Fine-print framed tag.
-    drawPanelTags(ctx, x + w - 6, stripY, [{ label: 'GYM LEADER', color: PALETTE.velvet }]);
+    // Beat 3.1 — the strip is spaced so nothing overlaps AT ANY tag width: BREAK
+    // label LEFT · gust cue clamped in the middle · GYM LEADER tag right-anchored.
     drawText(ctx, 'BREAK', x + 8, stripY + 1, breakPipFlashT > 0 ? PALETTE.momentumGoldHi : PALETTE.frameInkSoft);
-    // Gust cue (Falkner) — to the LEFT (beside BREAK), keeping clear of the
-    // right-anchored role tag.
+    const breakEnd = x + 8 + Math.ceil(measureUiText(ctx, 'BREAK'));
+    // GYM LEADER role tag — right-anchored to the panel inner edge. CH1 bosses are
+    // gym leaders (a static default; reversible to a bossCard title field).
+    const tagLeft = x + w - 6 - (Math.ceil(measureUiText(ctx, 'GYM LEADER')) + 8);
+    drawPanelTags(ctx, x + w - 6, stripY, [{ label: 'GYM LEADER', color: PALETTE.velvet }]);
+    // Gust cue (Falkner) — clamped BETWEEN the BREAK label and the tag; drawn only
+    // if a real gap exists, so it can never touch either.
     const arena = state.bossCard?.arenaSchedule;
     if (arena && arena.rhythmEveryN > 0) {
       const anchor = state.rhythmAnchor ?? 0;
       const activeRound = phase === 'resolve' ? state.round - 1 : state.round;
       const currentIsGust = (activeRound - anchor) % arena.rhythmEveryN === 0;
       const nextIsGust = (state.round + 1 - anchor) % arena.rhythmEveryN === 0;
-      if (currentIsGust || nextIsGust) {
-        const gustW = 72;
-        const gustX = x + 58; // beside the BREAK label, clear of the right tag
+      const gustX = breakEnd + 8;
+      const gustW = Math.min(72, tagLeft - 8 - gustX);
+      if ((currentIsGust || nextIsGust) && gustW >= 40) {
         const pulse = currentIsGust ? 0.55 + 0.4 * Math.sin(tick * 6) : 0.5;
         ctx.fillStyle = currentIsGust ? `rgba(70,150,230,${pulse})` : 'rgba(80,140,210,0.5)';
         ctx.fillRect(gustX, stripY, gustW, 11);
@@ -2605,20 +2629,20 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawBattlePanel(ctx, px, py, pw, PL_PANEL.h);
     // Header — name (16px), type badges, top-right tags.
     const name = monDisplayName(display.player);
-    drawText(ctx, name, px + 10, py + 3, PALETTE.stanceG);
-    drawTypeBadges(ctx, px + 10 + measureUiText(ctx, name) + 6, py + 2, display.player.species.types);
-    drawPanelTags(ctx, px + pw - 10, py + 2, buildTags(display.player, activeMon(state.player)));
-    // HP / ST rows + numerics (thin bars).
-    drawStatRow(ctx, px, pw, py + 15, 'HP', PALETTE.hpOk, display.player.hp, display.player.maxHp, hpColor(display.player.hp, display.player.maxHp), null);
-    drawStatRow(ctx, px, pw, py + 27, 'ST', PALETTE.stamina, display.player.st, display.player.maxSt, PALETTE.stamina, COMBAT.winded / display.player.maxSt);
-    // MOMENTUM — a compact ★★☆ star row + the single teaching hint (fine-print),
-    // beside the stars. Replaces the old "win a read to charge ★" hint (one hint).
-    drawText(ctx, 'MOMENTUM', px + 10, py + 38, PALETTE.stanceG);
-    const sockEnd = drawStars(ctx, px + 10 + measureUiText(ctx, 'MOMENTUM') + 8, py + 38, display.player.momentum);
-    drawText(ctx, 'STARS POWER CALLS + UNLOCK MOVES', sockEnd + 8, py + 38, PALETTE.frameInkDim);
+    drawText(ctx, name, px + 10, py + 2, PALETTE.stanceG);
+    drawTypeBadges(ctx, px + 10 + measureUiText(ctx, name) + 6, py + 1, display.player.species.types);
+    drawPanelTags(ctx, px + pw - 10, py + 1, buildTags(display.player, activeMon(state.player)));
+    // HP / ST rows + numerics (thin bars). Beat 3.1 — rows pulled UP so the BOND
+    // row (label + bar + bench dots) sits FULLY inside the frame body (was clipped).
+    drawStatRow(ctx, px, pw, py + 14, 'HP', PALETTE.hpOk, display.player.hp, display.player.maxHp, hpColor(display.player.hp, display.player.maxHp), null);
+    drawStatRow(ctx, px, pw, py + 26, 'ST', PALETTE.stamina, display.player.st, display.player.maxSt, PALETTE.stamina, COMBAT.winded / display.player.maxSt);
+    // MOMENTUM — a compact ★★☆ star row + the single teaching hint (fine-print).
+    drawText(ctx, 'MOMENTUM', px + 10, py + 37, PALETTE.stanceG);
+    const sockEnd = drawStars(ctx, px + 10 + measureUiText(ctx, 'MOMENTUM') + 8, py + 37, display.player.momentum);
+    drawText(ctx, 'STARS POWER CALLS + UNLOCK MOVES', sockEnd + 8, py + 37, PALETTE.frameInkDim);
     // BOND — LABELED + HOUSED inside the panel frame (it used to float below).
     // Static during the fight; animates on the post-win advance (bondAdvanceFrom/To).
-    const bondY = py + 49;
+    const bondY = py + 47;
     drawText(ctx, 'BOND', px + 10, bondY, PALETTE.bond);
     const bondX = px + 10 + measureUiText(ctx, 'BOND') + 6;
     const benchShown =
@@ -2782,11 +2806,11 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // In breadcrumb mode the drilled item is bright; the rest are dim context.
       const color = boxedHere ? PALETTE.frameInk : mode === 'breadcrumb' ? PALETTE.frameInkDim : dim ? PALETTE.frameInkDim : PALETTE.frameInk;
       if (cursorHere) drawRowHighlight(ctx, x + 6, rowY - 1, mode === 'full' ? 76 : 72, 15);
+      // The breadcrumb "you drilled in here" cue is ONE treatment — a FILL
+      // highlight + the ◄ marker (beat 3.1: the gold hollow box is gone).
       if (boxedHere) {
         const bw = Math.ceil(measureUiText(ctx, RAIL_KEYWORD[it.kind])) + 7;
-        ctx.strokeStyle = PALETTE.momentumGold;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(kwX - 3.5, rowY - 0.5, bw, 15);
+        drawRowHighlight(ctx, kwX - 4, rowY - 1, bw + 2, 15);
         drawText(ctx, '◄', kwX + bw, rowY, PALETTE.momentumGold);
       }
       const marker = cursorHere ? '>' : ' ';
@@ -2901,17 +2925,20 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     ctx.fillStyle = PALETTE.frameInkSoft;
     ctx.fillRect(BOTTOM.x + 398, BOTTOM.y + 16, 1, BOTTOM.h - 24);
 
-    // ── RIGHT: SELECTED detail + stance selector ─────────────────────────────
+    // ── RIGHT: the move detail + stance selector. Beat 3.1 — no "SELECTED"
+    //    header (the block opens with the move NAME), no "NEXT:" line (initiative
+    //    is academy material), no "SEL stance" hint (the A/B chips are the only
+    //    control hints). More room → the rows breathe.
     const rx = BOTTOM.x + 406;
     const sel = moves[moveCursor] ? moveCellInfo(side, moves[moveCursor]!) : null;
-    drawText(ctx, 'SELECTED', rx, BOTTOM.y + 14, PALETTE.frameInkSoft);
+    const stance = STANCES[stanceIdx]!;
     if (sel) {
-      drawText(ctx, sel.name, rx, BOTTOM.y + 25, sel.legal ? PALETTE.frameInk : PALETTE.frameInkDim);
+      drawText(ctx, sel.name, rx, BOTTOM.y + 16, sel.legal ? PALETTE.frameInk : PALETTE.frameInkDim);
       drawText(
         ctx,
         `${sel.badge} ${sel.isTech ? 'TECHNIQUE' : 'ATTACK'} · ${sel.type ?? 'NEUTRAL'} · ST${sel.cost}`,
         rx,
-        BOTTOM.y + 37,
+        BOTTOM.y + 30,
         PALETTE.frameInkSoft,
       );
       const move = lookupMove(sel.name);
@@ -2920,18 +2947,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       else if (sel.isTech && move.effect) {
         eff = move.effect.polarity === 'buff' ? `Self-buff — grants ${sel.effectTag}.` : `Read-win → inflicts ${sel.effectTag}.`;
       } else eff = `A ${TIER_WORD[sel.tier]} ${(sel.type ?? 'neutral').toLowerCase()} strike.`;
-      drawText(ctx, eff, rx, BOTTOM.y + 47, sel.legal ? PALETTE.frameInk : PALETTE.hpCrit);
+      drawText(ctx, eff, rx, BOTTOM.y + 44, sel.legal ? PALETTE.frameInk : PALETTE.hpCrit);
     }
 
-    // NEXT — the honest turn-order preview for THIS move.
-    const stance = STANCES[stanceIdx]!;
-    const foeSt = actionStance(foeAction);
-    const order = orderHint(side, activeMon(state.foe), moves[moveCursor]!, stance, actionMove(foeAction), foeSt);
-    const fluidFirst = (stance === 'F' && foeSt === 'G') || (foeSt === 'F' && stance === 'G');
-    drawText(ctx, `NEXT: ${order}${fluidFirst ? ' ·FLUID' : ''}`, rx, BOTTOM.y + 58, fluidFirst ? PALETTE.stanceF : PALETTE.frameInkSoft);
-
     // Stance selector — boxed A/G/F badges, active highlighted + NAMED (e.g. GUARD).
-    const sy = BOTTOM.y + 69;
+    // The COMMIT indicator (▶FOCUS / ▶FULL+50%) lives HERE, beside the stance name —
+    // it marks the commit state (not a button), clear of the A/B chips below.
+    const sy = BOTTOM.y + 60;
     for (let i = 0; i < STANCES.length; i += 1) {
       const bx = rx + i * 18;
       if (STANCES[i] === stance) {
@@ -2941,12 +2963,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       drawStanceBadge(ctx, bx, sy, STANCES[i]!);
     }
     drawText(ctx, STANCE_NAME[stance], rx + 60, sy, PALETTE.frameInk);
-    if (pendingFullPower) drawText(ctx, '▶FULL+50%', rx + 118, sy, PALETTE.momentumGold);
-    // ▶FOCUS only shows for a chargeable move — a technique can't Focus.
-    else if (committing && sel && !sel.isTech) drawText(ctx, '▶FOCUS', rx + 118, sy, PALETTE.hpCrit);
+    const commitX = rx + 60 + Math.ceil(measureUiText(ctx, STANCE_NAME[stance])) + 8;
+    if (pendingFullPower) drawText(ctx, '▶FULL+50%', commitX, sy, PALETTE.momentumGold);
+    else if (committing && sel && !sel.isTech) drawText(ctx, '▶FOCUS', commitX, sy, PALETTE.hpCrit); // no technique Focus
 
-    // Move-specific controls (fine-print, left of the chips) + the A/B button chips.
-    drawText(ctx, 'SEL stance · L/R commit', gx, BOTTOM.y + BOTTOM.h - 14, PALETTE.frameInkDim);
     drawButtonChips(ctx, ['A CONFIRM', 'B BACK']);
   }
 
@@ -3012,7 +3032,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       drawText(ctx, `${marker}${call.name}${tag}`, x, y, color);
       drawTextRight(ctx, `★${call.starCost}`, x + colW - 16, y, color);
     });
-    drawText(ctx, `Your ★${activeMon(state.player).momentum}`, listX, BOTTOM.y + BOTTOM.h - 16, PALETTE.frameInkDim);
+    // (Beat 3.1 — the "Your ★N" line is gone; momentum lives on the mon card.)
     drawButtonChips(ctx, ['A USE', 'B BACK']);
   }
 
@@ -3203,8 +3223,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
     draw(ctx) {
       // Beat 3 — the PAINTED STAGE (sky · horizon band · ground · clearing ellipse
-      // · deterministic grass/pebbles). Replaces the flat sky + ground strip.
-      drawArena(ctx);
+      // · deterministic grass/pebbles), via the background registry (beat 3.1 seam).
+      drawArenaBackground('clearing', ctx);
 
       // Restyled platforms IN the clearing under each fighter (grown to the 112
       // slot). Lit top + shaded rim, so the mons stand on the field, not float.
