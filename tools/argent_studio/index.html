@@ -152,8 +152,10 @@
     <h2 style="margin-top:16px">Export</h2>
     <div class="row">
       <button id="dlPng">PNG sheet</button>
+      <button id="savePng" class="saveRepo" style="display:none" title="Write the PNG sheet into assets/tilesets/ (needs npm run dev)">💾</button>
       <button id="dlTileset">tileset.json</button>
       <button id="dlPrefab">prefab.json</button>
+      <button id="savePrefab" class="saveRepo" style="display:none" title="Write the prefab into assets/prefabs/ (needs npm run dev)">💾</button>
       <button id="selfTest" title="Export a known canvas, decode the exported file, assert the pixels match exactly">self-test ⤺</button>
     </div>
     <div class="row">
@@ -515,6 +517,30 @@ $('saveProject').onclick = async ()=>{
     toast('Save needs the dev server (npm run dev). ' + (e && e.message ? e.message : e));
   }
 };
+
+// Save-to-repo for the PNG sheet + prefab (the exports that otherwise only download),
+// via the GENERAL /api/save-asset contract (allowlisted dirs; no manifest/registration).
+// Feature-detected — the buttons stay hidden until the dev endpoint answers its ping.
+async function saveGeneral(dir, filename, content, encoding){
+  try {
+    const r = await fetch('/api/save-asset', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ dir, filename, content, encoding }) });
+    const j = await r.json().catch(()=>({}));
+    if (r.ok && j.ok) toast('saved → ' + j.path + (j.overwrote ? ' (overwritten)' : ''));
+    else toast('save failed: ' + (j.error || ('HTTP '+r.status)));
+  } catch (e) {
+    toast('Save needs the dev server (npm run dev). ' + (e && e.message ? e.message : e));
+  }
+}
+$('savePng').onclick = ()=>{ if(!requireName()) return;
+  const c=document.createElement('canvas'); c.width=W; c.height=H; const x=c.getContext('2d');
+  for (let y=0;y<H;y++) for (let xx=0;xx<W;xx++){ const v=grid[y*W+xx]; if(v>=0&&palette[v]){ x.fillStyle=palette[v].hex; x.fillRect(xx,y,1,1); } }
+  c.toBlob(b=>{ const rd=new FileReader(); rd.onload=()=>{ const b64=String(rd.result).split(',')[1]||''; saveGeneral('assets/tilesets', baseId()+'.png', b64, 'base64'); }; rd.readAsDataURL(b); }); };
+$('savePrefab').onclick = ()=>{ if(TW*TH===1){ toast('prefab is for multi-tile props'); return; } if(!requireName()) return;
+  saveGeneral('assets/prefabs', baseId()+'.prefab.json', JSON.stringify(prefabObj(),null,1), 'utf8'); };
+fetch('/api/save-asset/ping', { cache:'no-store' })
+  .then(r=>{ if(r.ok) document.querySelectorAll('.saveRepo').forEach(el=>{ el.style.display=''; }); })
+  .catch(()=>{});
 
 // import a single tile's rows into a 1×1 workspace
 function loadRows(rows) {

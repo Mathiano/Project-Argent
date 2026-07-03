@@ -99,6 +99,7 @@
       <div class="row">
         <button class="primary" id="expJson">⬇ sprite.json</button>
         <button id="expPng">⬇ preview.png</button>
+        <button id="saveJson" class="saveRepo" style="display:none" title="Write into assets/sprites/ (needs npm run dev). Does NOT register — that stays a CC commit step.">💾 → sprites/</button>
       </div>
       <div class="err" id="err"></div>
       <div class="hint">Export is <b>download-only</b> — registering into <code>src/game/sprites.ts</code> stays a separate, human step. Validates chars ∈ palette ∪ '.', rows == size, row length == size before it will download.</div>
@@ -153,6 +154,7 @@
         <button id="loadMaster">reset to master</button>
         <button id="impRamp">import</button>
         <button id="expRamp">export</button>
+        <button id="saveRamp" class="saveRepo" style="display:none" title="Write into assets/palettes/ (needs npm run dev)">💾 → palettes/</button>
       </div>
       <div class="swatches" id="rampSw" style="grid-template-columns:repeat(6,1fr)"></div>
       <div class="row" style="margin-top:8px">
@@ -677,19 +679,47 @@ function collapseRaw(grid){
 }
 function download(name, text, type='application/json'){ const b=new Blob([text],{type}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
 
-function exportJson(){
+// Build + validate the export object (shared by download AND save-to-repo). Returns
+// {name, json, palette, note} or null (having set the error).
+function buildSpriteJson(){
   setErr('');
-  if(!S.grid){ setErr('nothing to export — drop a PNG first'); return; }
+  if(!S.grid){ setErr('nothing to export — drop a PNG first'); return null; }
   let rows, palette, note='';
   if(S.mode==='raw'){ const c=collapseRaw(S.grid); rows=c.rows; palette=c.palette; note=c.note; }
   else { rows=S.grid.map(r=>r.join('')); palette=usedPalette(rows).palette; }
   const errs=validateExport(rows, palette);
-  if(errs.length){ setErr('EXPORT REFUSED:\n· '+errs.join('\n· ')); return; }
+  if(errs.length){ setErr('EXPORT REFUSED:\n· '+errs.join('\n· ')); return null; }
   const name=($('name').value||'NEWMON').trim().toUpperCase().replace(/[^A-Z0-9_]/g,'');
   const facing=document.querySelector('input[name=facing]:checked').value;
   const obj={ name, size:S.size, palette, rows, facing };
-  download(`${name}.sprite.json`, JSON.stringify(obj,null,1));
-  setErr(`✓ ${name}.sprite.json — ${Object.keys(palette).length} colours, ${S.size}×${S.size}${note}${sizeNote()}`, true);
+  return { name, palette, note, json: JSON.stringify(obj,null,1) };
+}
+function exportJson(){
+  const b=buildSpriteJson(); if(!b) return;
+  download(`${b.name}.sprite.json`, b.json);
+  setErr(`✓ ${b.name}.sprite.json — ${Object.keys(b.palette).length} colours, ${S.size}×${S.size}${b.note}${sizeNote()}`, true);
+}
+// ── Save-to-repo (dev server only; POST /api/save-asset, allowlisted dirs) ─────
+// Feature-detected via GET /api/save-asset/ping — when absent (static open), the
+// save buttons stay hidden and behaviour is exactly the download-only path.
+async function saveToRepo(dir, filename, content){
+  try{
+    const r=await fetch('/api/save-asset', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ dir, filename, content, encoding:'utf8' }) });
+    const j=await r.json().catch(()=>({}));
+    if(r.ok && j.ok) setErr(`✓ saved ${j.path}${j.overwrote?' (overwrote)':''} — register in sprites.ts is a separate step`, true);
+    else setErr(`save failed: ${j.error || ('HTTP '+r.status)}`);
+  }catch(e){ setErr(`save failed: ${e && e.message || e}`); }
+}
+function saveSpriteToRepo(){ const b=buildSpriteJson(); if(!b) return; saveToRepo('assets/sprites', `${b.name}.sprite.json`, b.json); }
+function saveRampToRepo(){
+  const name=($('name').value||'NEWMON').trim().toUpperCase().replace(/[^A-Z0-9_]/g,'')||'NEWMON';
+  saveToRepo('assets/palettes', `${name}.ramp.json`, JSON.stringify(S.ramp,null,1));
+}
+function detectSaveEndpoint(){
+  fetch('/api/save-asset/ping', { cache:'no-store' })
+    .then(r=>{ if(r.ok) document.querySelectorAll('.saveRepo').forEach(el=>{ el.style.display=''; }); })
+    .catch(()=>{});
 }
 function exportPng(){
   if(!S.grid){ setErr('nothing to export'); return; }
@@ -755,6 +785,8 @@ $('expRamp').onclick=()=>download('ramp.json', JSON.stringify(S.ramp,null,1));
 $('impRamp').onclick=()=>$('rampFile').click();
 $('rampFile').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ const o=JSON.parse(r.result); if(typeof o!=='object')throw 0; S.ramp=o; if(!(S.outlineChar in S.ramp)) S.outlineChar=Object.keys(S.ramp)[0]; autoMap(); recomputePipeline(); setErr('ramp imported',true); }catch{ setErr('bad ramp JSON'); } }; r.readAsText(f); };
 $('expJson').onclick=exportJson; $('expPng').onclick=exportPng;
+$('saveJson').onclick=saveSpriteToRepo; $('saveRamp').onclick=saveRampToRepo;
+detectSaveEndpoint(); // reveals the .saveRepo buttons only when the dev endpoint answers
 
 // v1.1 — palette modes + A/B strip
 qsa('input[name=pmode]').forEach(el=>{ el.onchange=e=>{ if(e.target.checked) setMode(e.target.value); }; });

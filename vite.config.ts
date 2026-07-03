@@ -10,7 +10,7 @@ export default defineConfig({
     port: 5173,
   },
   test: {
-    include: ['src/**/*.{test,spec}.ts'],
+    include: ['src/**/*.{test,spec}.ts', 'tools/**/*.{test,spec}.ts'],
     environment: 'node',
   },
 });

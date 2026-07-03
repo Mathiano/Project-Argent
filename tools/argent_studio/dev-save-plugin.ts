@@ -1,22 +1,87 @@
-// Dev-only Vite middleware for Argent Studio: persists authored tile sheets into the
-// repo's assets/tilesets/ dir and maintains a manifest CC resolves asset names against.
+// Dev-only Vite middleware — the studios' SAVE-TO-REPO endpoint. Persists authored
+// assets into the repo in dev. Two contracts on POST /api/save-asset, discriminated
+// by body shape:
+//
+//   GENERAL (Phase-7 Build A) { dir, filename, content, encoding }
+//        → writes <dir>/<filename> for dir in an ALLOWLIST (sprites/tilesets/prefabs/
+//          anim/palettes), filename ^[A-Za-z0-9._-]+$, ext .json|.png, encoding utf8|
+//          base64. Overwrite is allowed (iteration is the point) — the response says
+//          { overwrote }. Used by Sprite Studio (sprite.json, ramp) + Argent Studio's
+//          PNG/prefab exports + future tools (Sound Board, anim). Does NOT register.
+//
+//   LEGACY (Argent Studio tilesets) { name, tileset, description?, cols?, rows?, count?, overwrite? }
+//        → writes assets/tilesets/<name>.tileset.json AND upserts the manifest CC
+//          resolves asset names against. 409 if the name exists and overwrite isn't set.
 //
 // Active ONLY under `npm run dev` (apply: 'serve' + configureServer) — zero effect on
-// build / test / prod. Scoped tightly: it writes ONLY inside assets/tilesets/, rejects
-// any name that isn't filesystem-safe, and refuses to clobber an existing file unless
-// the request opts in with { overwrite: true }. No new dependency — Node fs + Vite only.
+// build / test / prod. No new dependency — Node fs + Vite only.
 //
-// Endpoints:
-//   POST /api/save-asset  { name, tileset, description?, cols?, rows?, count?, overwrite? }
-//        → writes assets/tilesets/<name>.tileset.json (round-trip format unchanged) and
-//          upserts the manifest entry. 409 if the name exists and overwrite isn't set.
-//   GET  /api/assets      → the current manifest (so the Studio can show what exists).
+// Other endpoints:
+//   GET  /api/save-asset/ping → 200 {ok} — feature-detect (tools hide save buttons when absent).
+//   GET  /api/assets          → the current tileset manifest.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join, resolve, sep } from 'node:path';
 import type { Plugin } from 'vite';
 
 const NAME_RE = /^[a-z0-9][a-z0-9_]*$/; // filesystem-safe: lower alnum + underscore, leading alnum/digit
+
+// ── General save-asset contract (Phase-7 Build A) — PURE + unit-tested ────────
+// The write allowlist: repo-relative dirs the endpoint may write into. Anything
+// else is rejected. (Trailing slash normalised away before the check.)
+export const SAVE_ALLOWLIST_DIRS: ReadonlySet<string> = new Set([
+  'assets/sprites',
+  'assets/tilesets',
+  'assets/prefabs',
+  'assets/anim',
+  'assets/palettes',
+]);
+const FILENAME_RE = /^[A-Za-z0-9._-]+$/; // single path component — no separators, no absolute paths
+
+export type SaveValidation =
+  | { readonly ok: true; readonly dir: string; readonly filename: string; readonly buf: Buffer; readonly rel: string }
+  | { readonly ok: false; readonly code: number; readonly error: string };
+
+// Validate + decode a general save request. Rejects: non-allowlisted dir, path
+// traversal (`..`) / absolute paths / separators (blocked by FILENAME_RE), a filename
+// whose extension isn't .json/.png, a bad encoding, and — defence-in-depth — any
+// resolved path that escapes the allowlisted dir. No filesystem writes here (pure).
+export function validateSaveRequest(body: unknown, repoRoot: string): SaveValidation {
+  const b = (body ?? {}) as { dir?: unknown; filename?: unknown; content?: unknown; encoding?: unknown };
+  const dir = typeof b.dir === 'string' ? b.dir.replace(/\\/g, '/').replace(/\/+$/, '') : '';
+  if (!SAVE_ALLOWLIST_DIRS.has(dir)) {
+    return { ok: false, code: 400, error: `dir "${dir}" not in the allowlist (${[...SAVE_ALLOWLIST_DIRS].join(', ')})` };
+  }
+  const filename = typeof b.filename === 'string' ? b.filename : '';
+  if (!FILENAME_RE.test(filename)) {
+    return { ok: false, code: 400, error: 'invalid filename — must match ^[A-Za-z0-9._-]+$ (no path separators, no "..")' };
+  }
+  const dot = filename.lastIndexOf('.');
+  const ext = dot >= 0 ? filename.slice(dot).toLowerCase() : '';
+  if (ext !== '.json' && ext !== '.png') {
+    return { ok: false, code: 400, error: 'extension must be .json or .png' };
+  }
+  const encoding = b.encoding === 'base64' ? 'base64' : b.encoding === 'utf8' ? 'utf8' : null;
+  if (encoding === null) {
+    return { ok: false, code: 400, error: 'encoding must be "utf8" or "base64"' };
+  }
+  if (typeof b.content !== 'string') {
+    return { ok: false, code: 400, error: 'content must be a string' };
+  }
+  let buf: Buffer;
+  try {
+    buf = Buffer.from(b.content, encoding);
+  } catch {
+    return { ok: false, code: 400, error: 'content failed to decode' };
+  }
+  // defence-in-depth: the resolved target must sit directly inside the allowlisted dir.
+  const dirAbs = resolve(repoRoot, dir);
+  const fileAbs = resolve(dirAbs, filename);
+  if (!fileAbs.startsWith(dirAbs + sep)) {
+    return { ok: false, code: 400, error: 'resolved path escapes the target directory' };
+  }
+  return { ok: true, dir, filename, buf, rel: `${dir}/${filename}` };
+}
 
 interface ManifestEntry {
   name: string;
@@ -73,6 +138,11 @@ export function argentStudioSavePlugin(repoRoot: string): Plugin {
     configureServer(server) {
       server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
         const url = req.url ?? '';
+        // Feature-detect: tools GET this on load; a 200 means save-to-repo is available.
+        if (url === '/api/save-asset/ping' && req.method === 'GET') {
+          sendJSON(res, 200, { ok: true, dirs: [...SAVE_ALLOWLIST_DIRS] });
+          return;
+        }
         if (url === '/api/assets' && req.method === 'GET') {
           sendJSON(res, 200, readManifest());
           return;
@@ -83,7 +153,25 @@ export function argentStudioSavePlugin(repoRoot: string): Plugin {
         }
         void (async () => {
           try {
-            const body = JSON.parse((await readBody(req)) || '{}') as {
+            const raw = JSON.parse((await readBody(req)) || '{}') as Record<string, unknown>;
+            // GENERAL contract (Build A): { dir, filename, content, encoding }. Any of
+            // these fields present → route to the allowlisted file write (not the legacy
+            // tileset+manifest path). Overwrite is allowed; the response reports it.
+            if ('dir' in raw || 'filename' in raw || 'content' in raw) {
+              const v = validateSaveRequest(raw, repoRoot);
+              if (!v.ok) {
+                sendJSON(res, v.code, { ok: false, error: v.error });
+                return;
+              }
+              const dirAbs = resolve(repoRoot, v.dir);
+              const fileAbs = join(dirAbs, v.filename);
+              const overwrote = existsSync(fileAbs);
+              mkdirSync(dirAbs, { recursive: true });
+              writeFileSync(fileAbs, v.buf);
+              sendJSON(res, 200, { ok: true, path: v.rel, overwrote });
+              return;
+            }
+            const body = raw as {
               name?: unknown;
               tileset?: ({ tilesize?: number; tiles?: Record<string, unknown> } & Record<string, unknown>) | null;
               description?: unknown;
