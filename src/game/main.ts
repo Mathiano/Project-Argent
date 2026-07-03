@@ -1291,6 +1291,119 @@ function pushRivalGateFight(): void {
   );
 }
 
+// ── The KAMON GATE (content era, Phase 1) — the built rivalCard fight placed as
+// the Route 32 gate via the wiring contract (npc_kamon_gate → start-rival-gate →
+// here). The 2v2 ruling is enforced diegetically. Dialogue v1 — flagged for
+// Mathias's voice pass. NO change to the card's numbers or KAMON's AI: the 0.85
+// already lives in buildKamonTeam; the tell (below) is the STORY of that number.
+const KAMON_GATE_REFUSAL_LINES: readonly string[] = [
+  'KAMON: One mon? I don’t beat people',
+  'at half strength.',
+  'KAMON: Catch yourself a friend first.',
+];
+const KAMON_GATE_INTRO_LINES: readonly string[] = [
+  'KAMON blocks the road south.',
+  'KAMON: You, your partner, one friend.',
+  'Same as me. Fair. Now — come on.',
+];
+const KAMON_GATE_WIN_LINES: readonly string[] = [
+  'KAMON: …Why. Why does yours fight',
+  'harder? I took the strong one.',
+  'KAMON: Move, then. The road’s yours.',
+];
+const KAMON_GATE_LOSS_LINES: readonly string[] = [
+  'KAMON: That’s the difference between',
+  'taking strength and begging for it.',
+  'KAMON: Come back stronger.',
+];
+
+// The player fields their FIRST `count` party mons (the 2v2 ruling). A CLONE per
+// mon (freshBattleSide) + the per-mon bond perks — the same contract as
+// buildPlayerTeam, sliced. run.party is untouched until the writeback.
+function buildPlayerTeamPrefix(count: number): ReturnType<typeof createTeam> {
+  const fresh = run.party.slice(0, count).map((mon, i) => {
+    const side = freshBattleSide(mon);
+    const bond = run.partyBond[i] ?? 0;
+    return {
+      ...side,
+      ...(hasJumpstart(bond) ? { jumpstartArmed: true } : {}),
+      ...(hasBondMoment(bond) ? { bondMomentArmed: true } : {}),
+    };
+  });
+  return createTeam(fresh);
+}
+
+// Write the mons that FOUGHT (the 2v2 prefix) back to the front of run.party,
+// PRESERVING any bench mons beyond them (a full writebackParty would drop them).
+function writebackGatePrefix(finalState: BattleState): void {
+  const fought = finalState.player.members.map((m) => ({
+    ...fromSavedSide(toSavedSide(m), resolveSpecies),
+    st: m.maxSt,
+    momentum: 0,
+  }));
+  run.party = [...fought, ...run.party.slice(fought.length)];
+}
+
+function showKamonGate(): void {
+  // 2v2 enforcement — the party-of-one refusal (diegetic; doubles as a catch nudge).
+  if (run.party.length < 2) {
+    pushMessage(KAMON_GATE_REFUSAL_LINES);
+    return; // no fight; the gate flag stays unset → KAMON keeps the road
+  }
+  const player = partyLead();
+  const stolen = kamonStolenSpecies(player);
+  const chaff = kamonChaffFor(player); // CH1 → a leading chaff; the ACE finishes
+  const foeTeam = buildKamonTeam(stolen, chaff); // the built v2 card (0.85 ace) — UNCHANGED
+  const aceIndex = chaff ? 1 : 0; // the stolen-starter ace's index in KAMON's team
+  const isCh1 = CH1_DEX[player.name] !== undefined;
+  const playerTeam = buildPlayerTeamPrefix(2); // the FIRST TWO party mons
+  scenes.push(
+    createPrepScene({
+      playerSpecies: player,
+      foeSpecies: stolen,
+      foeTrainerName: 'KAMON',
+      onContinue: () => {
+        const state = createBattleState(playerTeam, foeTeam, isCh1 ? { typeChart: TYPECHART_CH1 } : {});
+        scenes.replace(
+          createBattleScene({
+            state,
+            rng: run.rng,
+            ...bondSceneProps(foeTeam, 'trainer'),
+            chooseFoeAction: (s, r) => trainerPolicy(TRAINER_PROFILES.kamon!)(s, 'foe', r),
+            ...profileIntentInfo(TRAINER_PROFILES.kamon!),
+            intro: KAMON_GATE_INTRO_LINES,
+            catchBreathUnlocked: callsUnlocked(),
+            canRun: false,
+            // ── THE HESITATION TELL (presentation-only; the 0.85 made visible) ──
+            // Beat (a) — the ace's send-in: it glances back at the player, hesitating.
+            onFoeSwitchIn: (toIndex, species) =>
+              toIndex === aceIndex
+                ? [`${species} glances back at you… it hesitates.`, 'KAMON: Eyes HERE. You’re mine now — act like it.']
+                : null,
+            // Beat (b) — ONCE, at the ace's first low-HP moment.
+            onFoeActiveLowHp: (species) => (species === stolen.name ? `${species} falters — its heart isn’t in this.` : null),
+            onResolve: (winner, finalState, participants) => {
+              if (winner === 'player') {
+                writebackGatePrefix(finalState);
+                flagStore.set('kamon_gate_beaten'); // the gate opens — KAMON steps aside
+                const crossings = awardBondForFight(foeTeam, 'trainer', finalState, participants);
+                recomputeSignpostFlags();
+                scenes.pop(); // back to the overworld
+                autosaveNow();
+                showBondBeats(crossings, () => pushMessage(KAMON_GATE_WIN_LINES));
+              } else {
+                // Loss = standard whiteout/retry; the gate stays shut (flag unset).
+                // The taunt shows over the battle, then blackout pops it + warps.
+                pushMessage(KAMON_GATE_LOSS_LINES, blackout);
+              }
+            },
+          }),
+        );
+      },
+    }),
+  );
+}
+
 function buildFalknerTeam(): { team: ReturnType<typeof createTeam>; card: BossCard } {
   const flitpeck: Species = FALKNER_LEAD_DEX.FLITPECK!;
   const galehawk: Species = { ...FALKNER_ACE_DEX.GALEHAWK!, trait: 'GUSTBORNE' };
@@ -1707,6 +1820,20 @@ function openDevMenu(): void {
     },
   });
   items.push({
+    label: 'fight: KAMON gate',
+    run: () => {
+      devSession = true;
+      // The gate needs a 2-mon CH1 party (else the party-of-one refusal fires + the
+      // solo path skips the ace-send-in tell). Only seed one if the current party
+      // can't run the full scene — a tester's own 2-mon CH1 party is preserved.
+      if (run.party.length < 2 || CH1_DEX[run.party[0]!.species.name] === undefined) {
+        applyDevParty([{ name: 'GRUBLEAF', level: null }, { name: 'SILTSKIP', level: null }]);
+      }
+      closeDevMenu();
+      showKamonGate();
+    },
+  });
+  items.push({
     label: `sfx: ${sfx.isMuted() ? 'unmute' : 'mute'}`,
     run: () => {
       sfx.toggleMuted();
@@ -1964,6 +2091,9 @@ function showOverworld(
     },
     onRivalBattle() {
       pushRivalGateFight();
+    },
+    onRivalGate() {
+      showKamonGate();
     },
     onTrainerBattle(foeSpecies: string | readonly string[], winFlag: string, reward?: number) {
       pushTrainerFight(foeSpecies, winFlag, reward);

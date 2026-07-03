@@ -77,6 +77,7 @@ export interface OverworldSceneOpts {
   // Phase 7 — opt-in. The start-rival-battle verb fires this so main.ts can
   // launch the KAMON v2 fight (the Violet→Route 32 gate). No callback = no-op.
   readonly onRivalBattle?: () => void;
+  readonly onRivalGate?: () => void;
   // Encounter RNG source (risks/gaps #2). Returns [0,1) like Math.random.
   // REQUIRED — main.ts passes the run's SEEDED rng so encounter sequences
   // are deterministic + testable, consistent with the combat engine. No
@@ -408,6 +409,12 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         // rival fight (the Violet→Route 32 gate). Same delegation as
         // start-trainer-battle. Maps without onRivalBattle no-op silently.
         opts.onRivalBattle?.();
+        return;
+      }
+      if (cmd.kind === 'start-rival-gate') {
+        // Content era — the KAMON GATE (map-placeable). Terminal; main.ts runs
+        // the 2v2 gate flow. Maps without onRivalGate no-op silently.
+        opts.onRivalGate?.();
         return;
       }
     }

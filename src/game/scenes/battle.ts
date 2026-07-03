@@ -685,6 +685,17 @@ export interface BattleSceneOpts {
   // the foe gone). Returns the player to the overworld, no catch, no
   // black-out (same shape as onFlee).
   readonly onFoeGone?: (finalState: BattleState) => void;
+
+  // ── Foe hesitation TELL (presentation-only) — the KAMON gate's 0.85 made
+  // visible. ZERO sim-path involvement: the number already lives in the card;
+  // these surface its STORY through the existing beat/log. Undefined for every
+  // other fight → no-op (bit-identical). ──
+  // Called when the foe SWITCHES A MON IN (toIndex = its team index): return beat
+  // line(s) to surface as a callout + log, or null to stay quiet.
+  readonly onFoeSwitchIn?: (toIndex: number, species: string) => readonly string[] | null;
+  // Called ONCE when the foe's ACTIVE mon first drops to low HP: return a beat
+  // line, or null.
+  readonly onFoeActiveLowHp?: (species: string) => string | null;
 }
 
 // Display carries everything the panel needs about the CURRENTLY-SHOWN
@@ -1293,6 +1304,25 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function pushLog(line: string): void {
     log.push(line);
     if (log.length > 3) log.shift();
+  }
+
+  // ── Foe hesitation TELL (presentation-only) — surfaced as a callout + log. ──
+  let foeFalterTold = false; // beat (b) fires at most once
+  function foeSwitchTell(toIndex: number, species: string): void {
+    if (!opts.onFoeSwitchIn) return;
+    const beat = opts.onFoeSwitchIn(toIndex, species);
+    if (beat && beat.length > 0) {
+      for (const l of beat) pushLog(l);
+      calloutLine = beat[0]!;
+    }
+  }
+  function maybeFoeFalter(): void {
+    if (foeFalterTold || !opts.onFoeActiveLowHp) return;
+    const f = display.foe;
+    if (f.hp > 0 && f.hp <= f.maxHp * 0.35) {
+      const line = opts.onFoeActiveLowHp(f.species.name);
+      if (line) { foeFalterTold = true; pushLog(line); calloutLine = line; }
+    }
   }
 
   function setText(
@@ -1926,6 +1956,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // bars reflect the new active's values immediately.
       const fresh = activeMon(state[ev.side]);
       display[ev.side] = snapshot(fresh);
+      if (ev.side === 'foe') foeSwitchTell(ev.toIndex, ev.species); // hesitation tell (a)
       return;
     }
     if (ev.kind === 'faint') {
@@ -1946,6 +1977,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       pushLog(`${who}!`);
       const fresh = activeMon(state[ev.side]);
       display[ev.side] = snapshot(fresh);
+      if (ev.side === 'foe') foeSwitchTell(ev.toIndex, ev.species); // hesitation tell (a) — the ace send-in
       // PLAYER side: open the party picker so the player CHOOSES the
       // next mon. The engine's auto-pick (ev.toIndex) becomes the
       // default highlight; the player can confirm or override. This is
@@ -3243,6 +3275,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       for (const s of ['player', 'foe'] as const) {
         if (!anim.isActive('battle.hpDrain', s)) barHp[s] = display[s].hp;
       }
+      maybeFoeFalter(); // hesitation tell (b) — the foe ace falters at low HP (no-op elsewhere)
       if (breakFlashT > 0) breakFlashT = Math.max(0, breakFlashT - dt);
       if (breakPipFlashT > 0) breakPipFlashT = Math.max(0, breakPipFlashT - dt);
       if (readReactT > 0) readReactT = Math.max(0, readReactT - dt);

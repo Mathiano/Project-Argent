@@ -27,34 +27,28 @@ describe('KAMON rival card — the two-mon stage-1 gate', () => {
     expect(rows.length).toBe(3);
   });
 
-  // Spine-1 re-baseline (2026-06-30, phased-unlock): the ★-ramp shifted the
-  // stage-1 picks up a touch (70.5 / 70.8 / 76.3) — the player's read-driven ★
-  // snowball vs the weak fixed-aggressor rival. Still winnable-but-tense and
-  // TIGHT (spread 5.8pp < 8, below); upper band 73 → 78 for the shift.
-  // ── INTENTIONAL RE-BASELINE (2026-07-03, tuning pass #5 + per-mon stamina) —
-  // PROVISIONAL, pending KAMON's full multi-mon card ─────────────────────────
-  // Un-quarantined at pass #5. Two shifts settled the rival fight: (1) tuning-pass
-  // #5's self-escalation DR neutralised the TIDE-MEND heal-turtle that KAMON's AQUA
-  // mons had been abusing through the trainer AI (the original quarantine root),
-  // and (2) per-mon stamina equalised the three STARTER lines to 108 while KAMON's
-  // stolen counter-starters kept their own values. Net: the three picks now land
-  // KINDRAKE 71.6 / GRUBLEAF 82.0 / SILTSKIP 88.1 — every pick a comfortable win
-  // (no starter is a TRAP; the >62 floor holds), but the CEILING is high (2 picks
-  // > 78) and the SPREAD is ~16.5pp. Per the ruling (Decision 2): starters needn't
-  // win identically vs the rival, and KAMON's card is a STUB (he gains mons in
-  // later chapters), so we do NOT over-engineer a tightening tune now. The bands
-  // are LOOSENED to accept the current shape (floor held; ceiling + spread widened),
-  // flagged PROVISIONAL — they re-tighten when KAMON's real multi-mon card lands.
-  test('every pick is WINNABLE (>62 floor; loosened ceiling — provisional, KAMON is a stub)', () => {
+  // ── RE-PINNED 2026-07-03 (content era — the gate SHIPPED as npc_kamon_gate,
+  // main.ts's showKamonGate, the map-placeable Route 32 gate). The card's combat
+  // numbers + KAMON's AI are UNCHANGED — this is a BAND tightening now that the
+  // fight is real content, not the earlier PROVISIONAL loosening. Observed (n=2000,
+  // seed 1): KINDRAKE 71.6 / GRUBLEAF 82.0 / SILTSKIP 88.1 — spread 16.5pp. Every
+  // pick a comfortable-but-real win (the >62 fairness FLOOR HOLDS — no starter is a
+  // trap), the ceiling + spread now pinned TIGHT to observed ± a sane margin:
+  //   floor  >62   (HELD — the fairness floor / Decision 2: no trap pick)
+  //   ceiling <90  (was <92 provisional → observed max 88.1 + ~2pp margin)
+  //   spread  <18  (was <20 provisional → observed 16.5 + ~1.5pp margin)
+  // Still PROVISIONAL only in that KAMON's card gains mons in later chapters (a
+  // future re-baseline); for the CH1 shipped gate these bands are the pin.
+  test('every pick is WINNABLE (>62 floor HELD; ceiling re-pinned tight <90)', () => {
     for (const r of rows) {
       expect(r.playerWinPct).toBeGreaterThan(62); // no starter is a trap (the fairness floor)
-      expect(r.playerWinPct).toBeLessThan(92); // provisional ceiling — re-tightens with KAMON's full card
+      expect(r.playerWinPct).toBeLessThan(90); // re-pinned tight (observed max 88.1 + margin)
     }
   });
 
-  test('the three picks are within a provisional spread (~16pp — re-tightens with KAMON’s full card)', () => {
+  test('the three picks are within a TIGHT spread (<18pp — observed 16.5 + margin)', () => {
     const w = rows.map((r) => r.playerWinPct);
-    expect(Math.max(...w) - Math.min(...w)).toBeLessThan(20);
+    expect(Math.max(...w) - Math.min(...w)).toBeLessThan(18);
   });
 });
 

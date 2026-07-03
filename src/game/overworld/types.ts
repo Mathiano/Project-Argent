@@ -134,7 +134,12 @@ export type ScriptCommand =
   // the bespoke RIVAL v2 card (counter-type stolen starter, kamon profile).
   // main.ts wires onRivalBattle -> the fight; both win and loss set
   // kamon_beaten (no soft-lock) so the gate opens either way.
-  | { readonly kind: 'start-rival-battle' };
+  | { readonly kind: 'start-rival-battle' }
+  // The KAMON GATE (content era — the Route 32 gate as a map-placeable NPC). TERMINAL
+  // — fires the same bespoke RIVAL v2 card, but through the gate flow: 2v2 enforced
+  // (first two party mons; a party-of-one is refused), the hesitation tell, and the
+  // gate winFlag on a win. main.ts wires onRivalGate; maps without it no-op silently.
+  | { readonly kind: 'start-rival-gate' };
 
 export type MapObject =
   | { readonly type: 'warp'; readonly x: number; readonly y: number; readonly target: string }

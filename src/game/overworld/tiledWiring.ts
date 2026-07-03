@@ -227,6 +227,31 @@ export const DEFAULT_DEFS: WiringDefs = {
         'spilling out wrong and not caring.)',
         'KID: Wait — here. For helping. Go on, take it.'] }],
     },
+
+    // ── Content era — the KAMON GATE (the Violet→Route 32 gate, now MAP-PLACEABLE
+    // via the wiring contract). Mathias drops one `npc_kamon_gate` marker on the
+    // future Route 32 chokepoint and this activates — no code change. He approaches
+    // on entry (approachOnEnter, like JAY) and BLOCKS the road; blockedUntilFlag
+    // 'kamon_gate_beaten' steps him aside once beaten. The bespoke rivalCard fight +
+    // the 2v2 enforcement + the hesitation tell live in main.ts's onRivalGate (the
+    // `start-rival-gate` step); this def is only the placement + the pre-fight
+    // dialogue. DORMANT until a map names the marker. Dialogue v1 — flagged for
+    // Mathias's voice/tone pass (his ruling stands over every line).
+    npc_kamon_gate: {
+      color: '#7c3328',
+      facing: 'down',
+      approachOnEnter: true,
+      blockedUntilFlag: 'kamon_gate_beaten',
+      interact: [
+        { kind: 'dialog', lines: [
+          'KAMON: Heading south? Funny.',
+          'So is the HIVE badge — into MY pocket.',
+          'KAMON: You want the road, you go',
+          'through me. You, your partner, one',
+          'friend. Same as me. Fair.'] },
+        { kind: 'start-rival-gate' },
+      ],
+    },
   },
 
   // mon_* markers → overworld creatures (sprite NPCs).
