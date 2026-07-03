@@ -122,29 +122,33 @@ function devLogUrlFlag(): boolean {
 //   [ PL_SLOT ]              ┌ PL_PANEL (mid-right) ┐
 //   (mid-left sprite)        [ bond + bench under-strip ]
 //   ┌───────────── BOTTOM (full-width command / narration) ─────────────┐
-// Battle-UI v2 (beat 1) — panels GROW for the 32px primary type tier + the new
-// rows (numerics, star sockets, integrated BREAK, housed BOND). `h` on FOE_PANEL
-// is the NON-boss base; a boss adds FOE_BREAK_ROW_H (the integrated BREAK row),
-// so drawFoePanel computes its own total height. All kept clear of the sprite
-// slots (foe x472+, player x96–192) and of BOTTOM (y238).
-const FOE_PANEL = { x: 8, y: 8, w: 372, h: 88 } as const; // upper-left (boss = +FOE_BREAK_ROW_H)
-const FOE_BREAK_ROW_H = 20; // the integrated BREAK row a boss adds (regular foes lack it)
+// Battle-UI v2 (beat 1 TUNE) — panels back to ≈PRE-beat-1 COMPACT footprints so
+// they clear the ATTACK CORRIDOR (the diagonal band between the two sprite slots
+// that strike animations travel). All panel text is the 16px fine-print tier
+// (drawBig came OFF the panels → onto the menu rail); the beat-1 CONTENT is kept,
+// rows re-compressed. `h` on FOE_PANEL is the NON-boss base; a boss adds
+// FOE_BREAK_ROW_H (the integrated BREAK row), so drawFoePanel computes its total.
+const FOE_PANEL = { x: 8, y: 8, w: 340, h: 74 } as const; // upper-left (boss = +FOE_BREAK_ROW_H)
+const FOE_BREAK_ROW_H = 18; // the integrated BREAK row a boss adds (regular foes lack it)
 const FOE_SLOT = { x: 472, y: 12 } as const; // upper-right sprite slot
-const INTENT = { x: 8, y: 120, w: 288, h: 18 } as const; // mid strip — moved down + narrowed to clear the taller foe panel (boss → y116) and the player panel (x300)
+const INTENT = { x: 8, y: 112, w: 340, h: 22 } as const; // mid strip — restored up under the compact foe panel (y82 non-boss / y92 boss), clear of the player sprite (y140)
 const PL_SLOT = { x: 96, y: 140 } as const; // mid-left sprite slot
-const PL_PANEL = { x: 300, y: 120, w: 332, h: 110 } as const; // mid-right (grown for the 32px tier + housed BOND)
+const PL_PANEL = { x: 300, y: 150, w: 332, h: 84 } as const; // mid-right (restored y150; the housed BOND row is the only growth over the old h72)
 const BOTTOM = { x: 4, y: 238, w: 632, h: 118 } as const; // full-width bottom
 // Battle-scaled draw sizes: the sprite slot (was the 56px default) and the HP/ST
 // bar height (was BAR_HEIGHT_TALL 6) grow for the bigger canvas.
 const BATTLE_SLOT = 96;
 const BATTLE_BAR_H = 12;
 
-// ── Battle-UI v2 (beat 1) — the two-tier TYPE scale, battle-SCOPED ────────────
+// ── Battle-UI v2 — the two-tier TYPE scale, battle-SCOPED ─────────────────────
 // m3x6 is crisp only at INTEGER scales of its 16px design size. The PRIMARY tier
-// is 32px (2× — crisp) for mon names, HP/ST/MOMENTUM/BOND labels + panel
-// headings; the fine-print tier stays the global 16px drawText (numerics, hints,
-// tags, chip labels). NO 24px (1.5× = fuzzy). The global UI_FONT_PX / drawText
-// are UNTOUCHED (every other scene byte-identical) — these are battle-local.
+// is 32px (2× — crisp), used for the MENU RAIL items only (FIGHT/CALLS/MONS/
+// BALLS/RUN — the console has the room). Everything else — ALL panel text (mon
+// names, HP/ST/MOMENTUM/BOND/BREAK labels, numerics, tags, hints) + move names +
+// lock notes — stays the global 16px drawText fine-print. NO 24px (1.5× = fuzzy).
+// (Beat-1 put 32px on the panels; the eye-gate moved it OFF — the grown panels
+// blocked the attack corridor.) The global UI_FONT_PX / drawText are UNTOUCHED
+// (every other scene byte-identical) — these are battle-local.
 const BATTLE_BIG_PX = 32;
 const BATTLE_BIG_FONT = `${BATTLE_BIG_PX}px m3x6, monospace`;
 // Vertical-align nudge, RE-DERIVED for 32px (NOT copied): m3x6's caps sit ~2×
@@ -247,10 +251,10 @@ function drawStatRow(
   barColor: string,
   notchFrac: number | null,
 ): void {
-  drawBig(ctx, label, panelX + 12, rowY - 3, labelColor); // 32px primary label
-  const barX = panelX + 46;
-  const barW = panelW - 46 - 64; // leave the right margin for the numeric
-  const barY = rowY + 4;
+  drawText(ctx, label, panelX + 10, rowY, labelColor); // 16px fine-print label
+  const barX = panelX + 32;
+  const barW = panelW - 32 - 60; // leave the right margin for the numeric
+  const barY = rowY + 2;
   drawBar(ctx, barX, barY, barW, cur, max, barColor, BATTLE_BAR_H);
   if (notchFrac !== null) drawWindedNotch(ctx, barX, barY, barW, BATTLE_BAR_H, notchFrac);
   // Fine-print cur/max (rounded — cur ceils so a living mon never shows 0).
@@ -258,7 +262,7 @@ function drawStatRow(
     ctx,
     `${Math.max(0, Math.ceil(cur))}/${Math.round(max)}`,
     panelX + panelW - 10,
-    barY - 2,
+    barY - 1,
     PALETTE.frameInkSoft,
   );
 }
@@ -2416,20 +2420,20 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     const pw = FOE_PANEL.w;
     const py = FOE_PANEL.y;
     drawBattlePanel(ctx, px, py, pw, h);
-    // Header — mon name (32px primary), type badge chip(s) beside it, and the
-    // combat-state / effect TAGS top-right.
+    // Header — mon name (16px), type badge chip(s) beside it, combat-state /
+    // effect TAGS top-right.
     const name = display.foe.species.name;
-    drawBig(ctx, name, px + 12, py + 6, PALETTE.stanceG);
-    drawTypeBadges(ctx, px + 12 + measureBig(ctx, name) + 8, py + 8, display.foe.species.types);
-    drawPanelTags(ctx, px + pw - 10, py + 5, buildTags(display.foe, activeMon(state.foe)));
-    // HP / ST rows — 32px labels + bars + fine-print cur/max numerics.
-    drawStatRow(ctx, px, pw, py + 26, 'HP', PALETTE.hpOk, display.foe.hp, display.foe.maxHp, hpColor(display.foe.hp, display.foe.maxHp), null);
-    drawStatRow(ctx, px, pw, py + 44, 'ST', PALETTE.stamina, display.foe.st, display.foe.maxSt, PALETTE.stamina, COMBAT.winded / display.foe.maxSt);
+    drawText(ctx, name, px + 10, py + 4, PALETTE.stanceG);
+    drawTypeBadges(ctx, px + 10 + measureUiText(ctx, name) + 6, py + 3, display.foe.species.types);
+    drawPanelTags(ctx, px + pw - 10, py + 3, buildTags(display.foe, activeMon(state.foe)));
+    // HP / ST rows — 16px labels + bars + fine-print cur/max numerics.
+    drawStatRow(ctx, px, pw, py + 20, 'HP', PALETTE.hpOk, display.foe.hp, display.foe.maxHp, hpColor(display.foe.hp, display.foe.maxHp), null);
+    drawStatRow(ctx, px, pw, py + 37, 'ST', PALETTE.stamina, display.foe.st, display.foe.maxSt, PALETTE.stamina, COMBAT.winded / display.foe.maxSt);
     // MOMENTUM — the framed star-socket meter (the load-bearing ★ differential:
     // behind-penalty + the foe's phased-unlock tier access are unreadable without
     // it; display-only — reads the foe's existing momentum, no logic change).
-    drawBig(ctx, 'MOMENTUM', px + 12, py + 62, PALETTE.stanceG);
-    drawMomentumSockets(ctx, px + 12 + measureBig(ctx, 'MOMENTUM') + 10, py + 64, display.foe.momentum);
+    drawText(ctx, 'MOMENTUM', px + 10, py + 56, PALETTE.stanceG);
+    drawMomentumSockets(ctx, px + 10 + measureUiText(ctx, 'MOMENTUM') + 8, py + 54, display.foe.momentum);
     // BREAK row (boss only) INTEGRATED into the panel — the separate PHASE/BREAK
     // strip is gone. Regular foes simply lack this row (+ show bench dots below).
     if (boss) drawFoeBreakRow(ctx, px, pw, py + FOE_PANEL.h);
@@ -2481,24 +2485,24 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     const pw = PL_PANEL.w;
     const py = PL_PANEL.y;
     drawBattlePanel(ctx, px, py, pw, PL_PANEL.h);
-    // Header — name (32px), type badges, top-right tags.
+    // Header — name (16px), type badges, top-right tags.
     const name = monDisplayName(display.player);
-    drawBig(ctx, name, px + 12, py + 6, PALETTE.stanceG);
-    drawTypeBadges(ctx, px + 12 + measureBig(ctx, name) + 8, py + 8, display.player.species.types);
-    drawPanelTags(ctx, px + pw - 10, py + 5, buildTags(display.player, activeMon(state.player)));
+    drawText(ctx, name, px + 10, py + 3, PALETTE.stanceG);
+    drawTypeBadges(ctx, px + 10 + measureUiText(ctx, name) + 6, py + 2, display.player.species.types);
+    drawPanelTags(ctx, px + pw - 10, py + 2, buildTags(display.player, activeMon(state.player)));
     // HP / ST rows + numerics.
-    drawStatRow(ctx, px, pw, py + 26, 'HP', PALETTE.hpOk, display.player.hp, display.player.maxHp, hpColor(display.player.hp, display.player.maxHp), null);
-    drawStatRow(ctx, px, pw, py + 44, 'ST', PALETTE.stamina, display.player.st, display.player.maxSt, PALETTE.stamina, COMBAT.winded / display.player.maxSt);
+    drawStatRow(ctx, px, pw, py + 19, 'HP', PALETTE.hpOk, display.player.hp, display.player.maxHp, hpColor(display.player.hp, display.player.maxHp), null);
+    drawStatRow(ctx, px, pw, py + 35, 'ST', PALETTE.stamina, display.player.st, display.player.maxSt, PALETTE.stamina, COMBAT.winded / display.player.maxSt);
     // MOMENTUM — star sockets + the single teaching hint (fine-print), by the
     // sockets. This REPLACES the old "win a read to charge ★" hint (one hint).
-    drawBig(ctx, 'MOMENTUM', px + 12, py + 62, PALETTE.stanceG);
-    const sockEnd = drawMomentumSockets(ctx, px + 12 + measureBig(ctx, 'MOMENTUM') + 10, py + 64, display.player.momentum);
-    drawText(ctx, 'STARS POWER CALLS + UNLOCK MOVES', sockEnd + 8, py + 66, PALETTE.frameInkDim);
+    drawText(ctx, 'MOMENTUM', px + 10, py + 53, PALETTE.stanceG);
+    const sockEnd = drawMomentumSockets(ctx, px + 10 + measureUiText(ctx, 'MOMENTUM') + 8, py + 51, display.player.momentum);
+    drawText(ctx, 'STARS POWER CALLS + UNLOCK MOVES', sockEnd + 8, py + 53, PALETTE.frameInkDim);
     // BOND — LABELED + HOUSED inside the panel frame (it used to float below).
     // Static during the fight; animates on the post-win advance (bondAdvanceFrom/To).
-    const bondY = py + 84;
-    drawBig(ctx, 'BOND', px + 12, bondY - 3, PALETTE.bond);
-    const bondX = px + 12 + measureBig(ctx, 'BOND') + 8;
+    const bondY = py + 69;
+    drawText(ctx, 'BOND', px + 10, bondY, PALETTE.bond);
+    const bondX = px + 10 + measureUiText(ctx, 'BOND') + 6;
     const benchShown =
       state.player.members.length > 1 && phase !== 'resolve' && phase !== 'end' && phase !== 'text';
     const benchW = benchShown ? state.player.members.length * 10 + 6 : 0;
@@ -2510,10 +2514,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         const eased = 1 - (1 - t) * (1 - t); // ease-out — the bar settles in
         value = bondAdvanceFrom + (bondAdvanceTo - bondAdvanceFrom) * eased;
       }
-      drawBondBar(ctx, bondX, bondY + 3, px + pw - 10 - bondX - benchW, value);
+      drawBondBar(ctx, bondX, bondY + 2, px + pw - 10 - bondX - benchW, value);
     }
     // Team bench dots — right end of the BOND row (no-op for ≤1 mon / resolve).
-    drawBenchIndicators(ctx, px + pw - 10 - state.player.members.length * 10, bondY + 2, state.player);
+    drawBenchIndicators(ctx, px + pw - 10 - state.player.members.length * 10, bondY + 1, state.player);
   }
 
   // Surface ③ — the read-win mon reaction. A soft, brief bond-tinted spark
@@ -2633,20 +2637,20 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function drawBottomMenu(ctx: CanvasRenderingContext2D): void {
     drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     const me = activeMon(state.player);
-    // CD menu labels (2b-1): FIGHT / CALLS / MONS / BALLS / RUN, with the
-    // informative suffixes kept (ball count, Call ★/lock reason).
-    const labels: { readonly [K in 'fight' | 'pkmn' | 'catch' | 'call' | 'run']: string } = {
-      fight: 'FIGHT',
-      pkmn: 'MONS',
-      catch: opts.canCatch ? `BALLS x${opts.ballCount?.() ?? 0}` : 'BALLS -',
-      // Legibility #3 — the CALLS row states WHY it's unavailable inline:
-      // not unlocked yet, or unlocked but not enough ★ to spend.
-      call: !opts.catchBreathUnlocked
-        ? 'CALLS — locked'
-        : me.momentum < 1
-          ? 'CALLS — needs ★'
-          : `CALLS ★${me.momentum}`,
-      run: 'RUN',
+    // The MENU RAIL — the 32px PRIMARY tier lives here (the console has the room):
+    // FIGHT / CALLS / MONS / BALLS / RUN keywords in drawBig, with the informative
+    // NOTES (ball count, Call ★/lock reason) kept as 16px FINE-PRINT beside them.
+    const keyword: { readonly [K in 'fight' | 'pkmn' | 'catch' | 'call' | 'run']: string } = {
+      fight: 'FIGHT', pkmn: 'MONS', catch: 'BALLS', call: 'CALLS', run: 'RUN',
+    };
+    const note: { readonly [K in 'fight' | 'pkmn' | 'catch' | 'call' | 'run']: string } = {
+      fight: '',
+      pkmn: '',
+      catch: opts.canCatch ? `x${opts.ballCount?.() ?? 0}` : '-',
+      // Legibility #3 — the CALLS note states WHY it's unavailable: not unlocked, or
+      // unlocked but no ★ to spend.
+      call: !opts.catchBreathUnlocked ? 'locked' : me.momentum < 1 ? 'needs ★' : `★${me.momentum}`,
+      run: '',
     };
     const items = menuItems();
     items.forEach((it, i) => {
@@ -2655,17 +2659,15 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // canRun is false). FIGHT always lit.
       let dim = !it.enabled;
       if (it.kind === 'call' && (!opts.catchBreathUnlocked || me.momentum < 1)) dim = true;
-      // 5 rows (FIGHT/CALLS/MONS/BALLS/RUN) at 20px pitch in the left column of
-      // the full-width bottom panel.
-      const rowY = BOTTOM.y + 14 + i * 20;
-      if (menuCursor === i) drawRowHighlight(ctx, BOTTOM.x + 12, rowY - 2, 240, 19);
-      drawText(
-        ctx,
-        `${menuCursor === i ? '>' : ' '} ${labels[it.kind]}`,
-        BOTTOM.x + 18,
-        rowY,
-        dim ? PALETTE.frameInkDim : PALETTE.frameInk,
-      );
+      const color = dim ? PALETTE.frameInkDim : PALETTE.frameInk;
+      // 5 rows at the 32px rail pitch, left column of the full-width bottom panel.
+      const rowY = BOTTOM.y + 8 + i * 21;
+      if (menuCursor === i) drawRowHighlight(ctx, BOTTOM.x + 10, rowY + 2, 250, 20);
+      const kw = `${menuCursor === i ? '>' : ' '} ${keyword[it.kind]}`;
+      drawBig(ctx, kw, BOTTOM.x + 14, rowY, color);
+      if (note[it.kind]) {
+        drawText(ctx, note[it.kind], BOTTOM.x + 14 + measureBig(ctx, kw) + 10, rowY + 8, dim ? PALETTE.frameInkDim : PALETTE.frameInkSoft);
+      }
     });
     // (Removed the dim "R{round}" debug round-counter — not player-facing.)
     // Legibility #2 — when the player has no ★, teach what charges it (the

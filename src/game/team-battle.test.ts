@@ -416,9 +416,10 @@ describe('legibility — ★/Call economy reads (bond-feel-polish #1-3)', () => 
     const ctx = stubCtx();
     scene.draw(ctx);
     const screen = ctx.texts.join('|');
-    // ★ is drawn small + separate by the symbol pass, so assert the words (the
-    // trailing ★ glyph is a distinct run now).
-    expect(screen).toContain('CALLS — needs'); // why it's unavailable, inline
+    // Battle-UI tune: the rail keyword (CALLS, 32px) + its fine-print NOTE
+    // ("needs ★") are now SEPARATE draws (32px tier ≠ fine-print tier).
+    expect(screen).toContain('CALLS'); // the rail keyword
+    expect(screen).toContain('needs'); // the inline reason (note)
     expect(screen).toContain('win a read to charge'); // the 0-★ micro-hint
     expect(screen.includes('MOMENTUM')).toBe(true); // the ★ pips are labelled
   });
@@ -431,6 +432,8 @@ describe('legibility — ★/Call economy reads (bond-feel-polish #1-3)', () => 
     });
     const ctx = stubCtx();
     scene.draw(ctx);
-    expect(ctx.texts.join('|')).toContain('CALLS — locked');
+    const screen = ctx.texts.join('|');
+    expect(screen).toContain('CALLS'); // the rail keyword
+    expect(screen).toContain('locked'); // the inline reason (note)
   });
 });

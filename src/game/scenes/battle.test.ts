@@ -1830,6 +1830,51 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
     assertInBounds(ctx, 'throwoff');
   });
 
+  // The ATTACK CORRIDOR: the diagonal band between the two sprite-slot centres,
+  // where strike animations travel. Beat-1's grown panels intruded it; the tune
+  // restores compact footprints so it is panel-FREE. Sample the centreline and
+  // assert no point falls inside a panel rect (backgrounds excluded).
+  function assertCorridorClear(ctx: ReturnType<typeof recordingCtx>, label: string): void {
+    const A = { x: 96 + 48, y: 140 + 48 }; // PL_SLOT centre (BATTLE_SLOT 96)
+    const B = { x: 472 + 48, y: 12 + 48 }; // FOE_SLOT centre
+    const isBg = (r: { w: number; h: number }) => r.w >= 600 && r.h >= 300; // sky / flash
+    const panels = ctx.rects.filter((r) => !isBg(r));
+    const N = 24;
+    for (let i = 0; i <= N; i += 1) {
+      // Sample the MID-BAND (t∈[0.2,0.8]) — the endpoints sit inside the sprite
+      // placeholders themselves; the intrusion risk is a PANEL in the middle.
+      const t = 0.2 + 0.6 * (i / N);
+      const cx = A.x + (B.x - A.x) * t;
+      const cy = A.y + (B.y - A.y) * t;
+      for (const r of panels) {
+        const inside = cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h;
+        expect(inside, `${label}: corridor point (${cx.toFixed(0)},${cy.toFixed(0)}) inside a panel`).toBe(false);
+      }
+    }
+  }
+
+  // Check at RESOLVE — the phase where strikes actually animate. The INTENT tell
+  // strip (a transient mid-strip, present pre-beat-1 too) is NOT drawn then, so
+  // this isolates the STAT PANELS: they must leave the corridor clear.
+  function toResolve(scene: ReturnType<typeof richScene>): void {
+    scene.update?.(0.01); // → menu
+    scene.input?.('a'); // FIGHT → move grid
+    scene.input?.('a'); // commit → resolve (first frame: no callout yet)
+  }
+
+  test('the attack corridor between the sprite slots is panel-free (regular + boss)', () => {
+    const s1 = richScene();
+    toResolve(s1);
+    const c1 = recordingCtx();
+    s1.draw(c1);
+    assertCorridorClear(c1, 'regular');
+    const s2 = richScene(BOSS_CARD);
+    toResolve(s2);
+    const c2 = recordingCtx();
+    s2.draw(c2);
+    assertCorridorClear(c2, 'boss'); // the taller (boss) foe panel must still clear it
+  });
+
   test('the integrated BREAK row + role tag stays within bounds (boss foe)', () => {
     const scene = richScene(BOSS_CARD);
     scene.update?.(0.01);
