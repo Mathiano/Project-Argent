@@ -4,7 +4,7 @@
 // can tell the mons apart at a glance (not an identical "?").
 
 import { describe, expect, test } from 'vitest';
-import { drawPlaceholder, drawSprite, drawSpriteInSlot, drawSpeciesInSlot } from './sprites';
+import { drawPlaceholder, drawSprite, drawSpriteInSlot, drawSpeciesInSlot, getSprite } from './sprites';
 import { validateSprite } from './sprite';
 import type { Sprite } from './sprite';
 import flitpeck from '../../assets/sprites/FLITPECK.sprite.json';
@@ -197,7 +197,8 @@ describe('commissioned CH1 art — front + back sprites', () => {
       ) as unknown as CanvasRenderingContext2D & { rects: { x: number; y: number; w: number; h: number }[] },
     };
   }
-  // The battle-slot draw contract: 56px art, 112 slot, fillSlot 2× integer, bottom-anchored.
+  // The battle-slot draw contract: 56px art → 2× integer, 112px → 1× native (the
+  // integer rule floor(112/size)), fillSlot, bottom-anchored.
   function renderInSlot(name: string, view?: 'front' | 'back') {
     const { ctx, rects } = rectCtx();
     drawSpeciesInSlot(ctx, { name, type: null }, 0, 0, {
@@ -212,25 +213,33 @@ describe('commissioned CH1 art — front + back sprites', () => {
     { name: 'MARSHMASH', front: marshmash, back: marshmashBack },
     { name: 'SILTSKIP', front: siltskip, back: siltskipBack },
   ] as const;
+  // The integer in-slot scale for a sprite's own size (112 slot): 112 → 1×, 56 → 2×.
+  const slotScaleFor = (size: number) => Math.max(1, Math.floor(112 / size));
+  const rawFor = (name: string, view?: 'front' | 'back') => {
+    const e = NEW.find((n) => n.name === name)!;
+    return (view === 'back' ? e.back : e.front) as unknown as Sprite;
+  };
 
-  test('per-sprite pins — all eight validate, are 56px, and carry a palette', () => {
+  test('per-sprite pins — all eight validate, are a BLESSED size (56 or 112), and carry a palette', () => {
     for (const { front, back } of NEW) {
       for (const raw of [front, back]) {
         const s = raw as unknown as Sprite;
         expect(() => validateSprite(s)).not.toThrow();
-        expect(s.size).toBe(56);
-        expect(s.rows.length).toBe(56);
+        expect(s.size === 56 || s.size === 112, `${s.name} size ${s.size}`).toBe(true); // 56 legacy / 112 native
+        expect(s.rows.length).toBe(s.size);
         expect(Object.keys(s.palette).length).toBeGreaterThan(0);
       }
     }
   });
 
-  test('fronts route through getSprite → real art (not the placeholder) in the slot', () => {
+  test('fronts route through getSprite → real REGISTERED art (not the placeholder) at the right scale', () => {
     for (const { name } of NEW) {
+      expect(getSprite(name), name).toBeTruthy(); // registered → real art path (not a generated silhouette)
       const rects = renderInSlot(name); // default front
       expect(rects.length, name).toBeGreaterThan(0);
-      // Real fillSlot art draws 2×2 blocks; the placeholder path draws 1×1 pixels.
-      expect(rects.every((r) => r.w === 2 && r.h === 2), name).toBe(true);
+      // Clean integer blocks at the size's in-slot scale (112 → 1×, 56 → 2×).
+      const sc = slotScaleFor(getSprite(name)!.size);
+      expect(rects.every((r) => r.w === sc && r.h === sc), name).toBe(true);
     }
   });
 
@@ -250,17 +259,18 @@ describe('commissioned CH1 art — front + back sprites', () => {
     expect(back).toEqual(front);
   });
 
-  test('bounds harness — every new front + a back satisfies the fillSlot 2× / floor bounds', () => {
+  test('bounds harness — every new front + a back satisfies the fillSlot integer-scale / floor bounds', () => {
     const cases: Array<[string, 'front' | 'back']> = [
       ['FLITPECK', 'front'], ['GALEHAWK', 'front'], ['MARSHMASH', 'front'], ['SILTSKIP', 'front'], ['FLITPECK', 'back'],
     ];
     for (const [name, view] of cases) {
       const rects = renderInSlot(name, view);
+      const sc = slotScaleFor(rawFor(name, view).size); // 112 → 1×, 56 → 2×
       expect(rects.length, `${name}/${view}`).toBeGreaterThan(0);
       for (const r of rects) {
-        // Clean integer 2× blocks.
-        expect(r.w, `${name}/${view}`).toBe(2);
-        expect(r.h, `${name}/${view}`).toBe(2);
+        // Clean integer blocks at the sprite's own in-slot scale.
+        expect(r.w, `${name}/${view}`).toBe(sc);
+        expect(r.h, `${name}/${view}`).toBe(sc);
         expect(Number.isInteger(r.x) && Number.isInteger(r.y), `${name}/${view}`).toBe(true);
         // Fully inside the 112 slot (floor bounds — nothing escapes the stage tile).
         expect(r.x, `${name}/${view}`).toBeGreaterThanOrEqual(0);
