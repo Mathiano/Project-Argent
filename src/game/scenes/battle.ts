@@ -50,7 +50,6 @@ import {
   STANCE_NAME,
   UI_FONT,
   drawBar,
-  drawMomentum,
   drawBattlePanel,
   drawRowHighlight,
   drawStanceBadge,
@@ -60,6 +59,7 @@ import {
   drawWindedNotch,
   hpColor,
   measureUiText,
+  normalizeUiText,
 } from '../ui';
 
 // Battle-text stream speed (chars/sec). Tuned readable, ~modern-Pokémon feel
@@ -122,16 +122,172 @@ function devLogUrlFlag(): boolean {
 //   [ PL_SLOT ]              ┌ PL_PANEL (mid-right) ┐
 //   (mid-left sprite)        [ bond + bench under-strip ]
 //   ┌───────────── BOTTOM (full-width command / narration) ─────────────┐
-const FOE_PANEL = { x: 8, y: 8, w: 340, h: 74 } as const; // upper-left
+// Battle-UI v2 (beat 1) — panels GROW for the 32px primary type tier + the new
+// rows (numerics, star sockets, integrated BREAK, housed BOND). `h` on FOE_PANEL
+// is the NON-boss base; a boss adds FOE_BREAK_ROW_H (the integrated BREAK row),
+// so drawFoePanel computes its own total height. All kept clear of the sprite
+// slots (foe x472+, player x96–192) and of BOTTOM (y238).
+const FOE_PANEL = { x: 8, y: 8, w: 372, h: 88 } as const; // upper-left (boss = +FOE_BREAK_ROW_H)
+const FOE_BREAK_ROW_H = 20; // the integrated BREAK row a boss adds (regular foes lack it)
 const FOE_SLOT = { x: 472, y: 12 } as const; // upper-right sprite slot
-const INTENT = { x: 8, y: 112, w: 340, h: 22 } as const; // mid strip — left-anchored, sized to sit under the foe panel, clear of the upper-right sprite (472)
+const INTENT = { x: 8, y: 120, w: 288, h: 18 } as const; // mid strip — moved down + narrowed to clear the taller foe panel (boss → y116) and the player panel (x300)
 const PL_SLOT = { x: 96, y: 140 } as const; // mid-left sprite slot
-const PL_PANEL = { x: 300, y: 150, w: 332, h: 72 } as const; // mid-right
+const PL_PANEL = { x: 300, y: 120, w: 332, h: 110 } as const; // mid-right (grown for the 32px tier + housed BOND)
 const BOTTOM = { x: 4, y: 238, w: 632, h: 118 } as const; // full-width bottom
 // Battle-scaled draw sizes: the sprite slot (was the 56px default) and the HP/ST
 // bar height (was BAR_HEIGHT_TALL 6) grow for the bigger canvas.
 const BATTLE_SLOT = 96;
 const BATTLE_BAR_H = 12;
+
+// ── Battle-UI v2 (beat 1) — the two-tier TYPE scale, battle-SCOPED ────────────
+// m3x6 is crisp only at INTEGER scales of its 16px design size. The PRIMARY tier
+// is 32px (2× — crisp) for mon names, HP/ST/MOMENTUM/BOND labels + panel
+// headings; the fine-print tier stays the global 16px drawText (numerics, hints,
+// tags, chip labels). NO 24px (1.5× = fuzzy). The global UI_FONT_PX / drawText
+// are UNTOUCHED (every other scene byte-identical) — these are battle-local.
+const BATTLE_BIG_PX = 32;
+const BATTLE_BIG_FONT = `${BATTLE_BIG_PX}px m3x6, monospace`;
+// Vertical-align nudge, RE-DERIVED for 32px (NOT copied): m3x6's caps sit ~2×
+// lower in the 2× em, so the 16px UI_TEXT_DY (−4) doubles to −8 to land the caps
+// where the fine-print tier lands them. ⚠️ EYE-CHECK — Mathias tunes this single
+// value against the real render (the eye-gate before beat 2).
+const BATTLE_BIG_DY = -8;
+function drawBig(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string): void {
+  ctx.font = BATTLE_BIG_FONT;
+  ctx.letterSpacing = '0px';
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'start';
+  ctx.fillStyle = color;
+  ctx.fillText(normalizeUiText(text), x, y + BATTLE_BIG_DY);
+}
+function measureBig(ctx: CanvasRenderingContext2D, text: string): number {
+  ctx.font = BATTLE_BIG_FONT;
+  ctx.letterSpacing = '0px';
+  return ctx.measureText(normalizeUiText(text)).width;
+}
+// Battle-local TYPE-BADGE colours (a copy of sprites.ts TYPE_COLOR — battle-scoped
+// per the isolation fence; the shared sprites helper stays untouched). Covers the
+// CH1 UPPERCASE vocabulary + the legacy fixture Mixed-case trio.
+const TYPE_BADGE_COLOR: { readonly [k: string]: string } = {
+  FLAME: '#c2491a', NATURE: '#246b38', AQUA: '#27579c', BASIC: '#a98e5a', GALE: '#9aaecf',
+  VENOM: '#7e3f9c', TERRA: '#7a4e2d', SPARK: '#f0c33a', FROST: '#8fc8e8', SPIRIT: '#9d7fcf',
+  BRAWN: '#c25a36', FORGE: '#6a6a72', DRAKE: '#3d6b50',
+  Flame: '#c2491a', Sprout: '#246b38', Splash: '#27579c',
+};
+
+// TYPE BADGE chips beside the mon name (species.types — up to 2; dual-typed mons
+// show both). A colour-filled framed chip, 16px fine-print label. Returns the
+// x just past the last chip (for laying the name/badges out in a row).
+function drawTypeBadges(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  types: readonly string[],
+): number {
+  let cx = x;
+  ctx.font = UI_FONT;
+  ctx.letterSpacing = '0px';
+  for (const t of types.slice(0, 2)) {
+    const label = String(t).toUpperCase();
+    const w = Math.ceil(ctx.measureText(label).width) + 8;
+    const h = 14;
+    ctx.fillStyle = TYPE_BADGE_COLOR[t] ?? PALETTE.frameInkSoft;
+    ctx.fillRect(cx, y, w, h);
+    ctx.strokeStyle = PALETTE.silverMid;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cx + 0.5, y + 0.5, w - 1, h - 1);
+    drawText(ctx, label, cx + 4, y + 1, PALETTE.paper); // fine-print, cream on the colour
+    cx += w + 4;
+  }
+  return cx;
+}
+
+// MOMENTUM as a framed STAR-SOCKET meter: a boxed row of filled/empty ★ sockets
+// (battle-local — the shared drawMomentum/PALETTE.star used by ~15 other scenes
+// stays untouched, the same isolation pattern as drawBattlePanel). Returns the x
+// just past the last socket.
+const SOCKET_BOX = 16;
+const SOCKET_GAP = 3;
+function drawMomentumSockets(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  count: number,
+  cap = 3,
+): number {
+  for (let i = 0; i < cap; i += 1) {
+    const bx = x + i * (SOCKET_BOX + SOCKET_GAP);
+    ctx.fillStyle = PALETTE.frameWoodDark; // the empty socket well
+    ctx.fillRect(bx, y, SOCKET_BOX, SOCKET_BOX);
+    ctx.strokeStyle = PALETTE.silverMid;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx + 0.5, y + 0.5, SOCKET_BOX - 1, SOCKET_BOX - 1);
+    ctx.font = '12px monospace';
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'start';
+    ctx.letterSpacing = '0px';
+    ctx.fillStyle = i < count ? PALETTE.momentumGold : PALETTE.momentumOff;
+    ctx.fillText('★', bx + 3, y + 2);
+  }
+  return x + cap * (SOCKET_BOX + SOCKET_GAP);
+}
+
+// A HP/ST STAT ROW — a 32px primary LABEL, the value bar, and a fine-print
+// cur/max numeric readout right-aligned in the panel margin. `notchFrac` draws
+// the winded threshold on the ST bar (null = no notch). Shared by both panels.
+function drawStatRow(
+  ctx: CanvasRenderingContext2D,
+  panelX: number,
+  panelW: number,
+  rowY: number,
+  label: string,
+  labelColor: string,
+  cur: number,
+  max: number,
+  barColor: string,
+  notchFrac: number | null,
+): void {
+  drawBig(ctx, label, panelX + 12, rowY - 3, labelColor); // 32px primary label
+  const barX = panelX + 46;
+  const barW = panelW - 46 - 64; // leave the right margin for the numeric
+  const barY = rowY + 4;
+  drawBar(ctx, barX, barY, barW, cur, max, barColor, BATTLE_BAR_H);
+  if (notchFrac !== null) drawWindedNotch(ctx, barX, barY, barW, BATTLE_BAR_H, notchFrac);
+  // Fine-print cur/max (rounded — cur ceils so a living mon never shows 0).
+  drawTextRight(
+    ctx,
+    `${Math.max(0, Math.ceil(cur))}/${Math.round(max)}`,
+    panelX + panelW - 10,
+    barY - 2,
+    PALETTE.frameInkSoft,
+  );
+}
+
+// STATUS TAGS — the combat-state indicator (FOCUS/DAZE/STAG/EXH) + the effect
+// chips (BRN/BULWARK…) as prominent framed tags, laid RIGHT-TO-LEFT from rightX
+// along the panel header. Restyle+reposition of the old drawStatusChips.
+function drawPanelTags(
+  ctx: CanvasRenderingContext2D,
+  rightX: number,
+  y: number,
+  tags: ReadonlyArray<{ readonly label: string; readonly color: string }>,
+): void {
+  let rx = rightX;
+  ctx.font = UI_FONT;
+  ctx.letterSpacing = '0px';
+  for (const tag of tags) {
+    const w = Math.ceil(ctx.measureText(tag.label).width) + 8;
+    const h = 15;
+    const tx = rx - w;
+    ctx.fillStyle = tag.color;
+    ctx.fillRect(tx, y, w, h);
+    ctx.strokeStyle = PALETTE.silverMid;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(tx + 0.5, y + 0.5, w - 1, h - 1);
+    drawText(ctx, tag.label, tx + 4, y + 1, PALETTE.paper);
+    rx = tx - 4;
+  }
+}
 
 // ── CD-format move grid + status chips (battle-UI rebuild Part 2b-1) ──────────
 // Tier → the compact grid badge (Combat 2.0 tiers light/mid/heavy/nuke) and a
@@ -263,33 +419,9 @@ function sideChips(side: SideState): ReadonlyArray<{ readonly label: string; rea
   return out;
 }
 
-// Draw the status chips on/near a mon's PANEL (2b-2: repositioned off the sprite).
-// 2b-2 skin: buffs read jewel-teal, debuffs velvet, with a silver-trim outline —
-// small "gemstone" tags on the parchment header. A horizontal row stops before
-// `maxRight` so it can't run into the panel's status-tag / momentum area.
-function drawStatusChips(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  chips: ReadonlyArray<{ readonly label: string; readonly buff: boolean }>,
-  maxRight: number,
-): void {
-  let cx = x;
-  ctx.font = UI_FONT;
-  for (const chip of chips) {
-    const w = Math.ceil(ctx.measureText(chip.label).width) + 8;
-    if (cx + w > maxRight) break; // never overrun the panel's tag/momentum area
-    const h = 12;
-    ctx.fillStyle = chip.buff ? PALETTE.jewelTeal : PALETTE.velvet;
-    ctx.fillRect(cx, y, w, h);
-    ctx.strokeStyle = PALETTE.silverMid; // silver trim
-    ctx.lineWidth = 1;
-    ctx.strokeRect(cx + 0.5, y + 0.5, w - 1, h - 1);
-    drawText(ctx, chip.label, cx + 4, y, PALETTE.paper);
-    cx += w + 3;
-  }
-}
-
+// (The old drawStatusChips — an external horizontal chip pass over the panel
+// header — is retired: chips are now the integrated top-right TAGS drawn INSIDE
+// each panel via buildTags + drawPanelTags, sharing the sideChips data.)
 
 export interface BattleSceneOpts {
   readonly state: BattleState;
@@ -432,6 +564,22 @@ interface DisplaySide {
 interface Display {
   player: DisplaySide;
   foe: DisplaySide;
+}
+
+// Build the panel's top-right TAG row: the combat-state indicator (FOCUS/DAZE/
+// STAG from the animated display, + EXH) followed by the effect chips (BRN /
+// BULWARK… from live engine state). Colours carry meaning (velvet warn / red
+// crit / amber stagger / jewel-teal buff). Consumed by drawPanelTags.
+function buildTags(disp: DisplaySide, live: SideState): { label: string; color: string }[] {
+  const tags: { label: string; color: string }[] = [];
+  if (disp.focusing) tags.push({ label: 'FOCUS', color: PALETTE.velvet });
+  else if (disp.dazed) tags.push({ label: 'DAZE', color: PALETTE.hpCrit });
+  else if (disp.staggered) tags.push({ label: 'STAG', color: PALETTE.hpWarn });
+  if (disp.exhausted) tags.push({ label: 'EXH', color: PALETTE.hpCrit });
+  for (const c of sideChips(live)) {
+    tags.push({ label: c.label, color: c.buff ? PALETTE.jewelTeal : PALETTE.velvet });
+  }
+  return tags;
 }
 
 function snapshot(side: SideState): DisplaySide {
@@ -830,9 +978,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   const breakThreshold = state.bossCard?.breakBar ?? 0;
   let displayBreakProgress = state.breakProgress ?? 0;
   let breakFlashT = 0;
-  // BUG 3 — boss legibility. Track the displayed phase + a short flash
-  // when the break meter ticks up, so the metronome boss READS like one.
-  let displayPhase = state.phase ?? 1;
+  // BUG 3 — boss legibility: a short flash when the break meter ticks up so the
+  // metronome boss READS like one. (The PHASE readout was retired with the old
+  // strip — beat 1: the integrated BREAK row is label + pips + role tag.)
   let breakPipFlashT = 0;
   // Combat legibility (S1) — the current round's committed stances (so a
   // landed strike can tell an A-vs-F "couldn't evade" from a normal hit)
@@ -1551,7 +1699,6 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
     if (ev.kind === 'break') {
       displayBreakProgress = 0;
-      displayPhase = ev.newPhase;
       breakFlashT = 0.6;
       pushLog(`BREAK! ${display.foe.species.name} reels — PHASE ${ev.newPhase}!`);
       animKind = 'clash';
@@ -2263,109 +2410,52 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // ---------- draw ----------
 
   function drawFoePanel(ctx: CanvasRenderingContext2D): void {
-    drawBattlePanel(ctx, FOE_PANEL.x, FOE_PANEL.y, FOE_PANEL.w, FOE_PANEL.h);
-    // Mon name in a deep, confident slate blue (locked palette) so it pops as a
-    // header, like the coloured HP/ST labels.
-    drawText(ctx, display.foe.species.name, FOE_PANEL.x + 12, FOE_PANEL.y + 8, PALETTE.stanceG);
-    if (display.foe.focusing) drawText(ctx, 'FOCUS', FOE_PANEL.x + 150, FOE_PANEL.y + 8, PALETTE.hpWarn);
-    else if (display.foe.dazed) drawText(ctx, 'DAZE', FOE_PANEL.x + 150, FOE_PANEL.y + 8, PALETTE.hpCrit);
-    else if (display.foe.staggered) drawText(ctx, 'STAG', FOE_PANEL.x + 150, FOE_PANEL.y + 8, PALETTE.hpWarn);
-    if (display.foe.exhausted) drawText(ctx, 'EXH', FOE_PANEL.x + 220, FOE_PANEL.y + 8, PALETTE.hpCrit);
-    // FOE ★/momentum is now SHOWN, mirroring the player's meter (same visual
-    // language). Playtest finding: the core mechanics run on the momentum
-    // DIFFERENTIAL — the behind-penalty (how far behind you are → your damage
-    // reduction) and phased-unlock (the foe's tier access, e.g. Falkner climbing
-    // to DIVE BOMB's 2★) — so the player can't reason about either without seeing
-    // the foe's ★. This REVERSES the playtest-polish-3 "hidden for bluff tension"
-    // call: legibility of the load-bearing differential wins. The info-warfare
-    // layer keeps its OTHER hidden info (foe bond, the intent tells). Display-only
-    // — reads the foe's existing momentum, changes no combat logic.
-    else drawText(ctx, 'MOMENTUM', FOE_PANEL.x + 210, FOE_PANEL.y + 8, PALETTE.stanceG);
-    drawMomentum(ctx, FOE_PANEL.x + FOE_PANEL.w - 34, FOE_PANEL.y + 5, display.foe.momentum);
-    // Break meter moved to the dedicated boss strip below the panel
-    // (BUG 3 — the in-panel pips were too small to notice).
-
-    drawText(ctx, 'HP', FOE_PANEL.x + 12, FOE_PANEL.y + 32, PALETTE.hpOk);
-    drawBar(
-      ctx,
-      FOE_PANEL.x + 40,
-      FOE_PANEL.y + 33,
-      FOE_PANEL.w - 54,
-      display.foe.hp,
-      display.foe.maxHp,
-      hpColor(display.foe.hp, display.foe.maxHp),
-      BATTLE_BAR_H,
-    );
-    drawText(ctx, 'ST', FOE_PANEL.x + 12, FOE_PANEL.y + 52, PALETTE.stamina);
-    drawBar(
-      ctx,
-      FOE_PANEL.x + 40,
-      FOE_PANEL.y + 53,
-      FOE_PANEL.w - 54,
-      display.foe.st,
-      display.foe.maxSt,
-      PALETTE.stamina,
-      BATTLE_BAR_H,
-    );
-    drawWindedNotch(ctx, FOE_PANEL.x + 40, FOE_PANEL.y + 53, FOE_PANEL.w - 54, BATTLE_BAR_H, COMBAT.winded / display.foe.maxSt);
-    // Bench indicators (S5): tucked just under the panel, 4×4 dots
-    // tinted by status (active / alive / fainted). For 1-mon "teams"
-    // nothing draws — the row stays empty and clean. Suppressed for a
-    // boss fight, where the boss strip owns that row.
-    if (breakThreshold === 0) {
-      drawBenchIndicators(ctx, FOE_PANEL.x + 12, FOE_PANEL.y + FOE_PANEL.h + 4, state.foe);
-    }
+    const boss = breakThreshold > 0;
+    const h = FOE_PANEL.h + (boss ? FOE_BREAK_ROW_H : 0); // a boss adds the BREAK row
+    const px = FOE_PANEL.x;
+    const pw = FOE_PANEL.w;
+    const py = FOE_PANEL.y;
+    drawBattlePanel(ctx, px, py, pw, h);
+    // Header — mon name (32px primary), type badge chip(s) beside it, and the
+    // combat-state / effect TAGS top-right.
+    const name = display.foe.species.name;
+    drawBig(ctx, name, px + 12, py + 6, PALETTE.stanceG);
+    drawTypeBadges(ctx, px + 12 + measureBig(ctx, name) + 8, py + 8, display.foe.species.types);
+    drawPanelTags(ctx, px + pw - 10, py + 5, buildTags(display.foe, activeMon(state.foe)));
+    // HP / ST rows — 32px labels + bars + fine-print cur/max numerics.
+    drawStatRow(ctx, px, pw, py + 26, 'HP', PALETTE.hpOk, display.foe.hp, display.foe.maxHp, hpColor(display.foe.hp, display.foe.maxHp), null);
+    drawStatRow(ctx, px, pw, py + 44, 'ST', PALETTE.stamina, display.foe.st, display.foe.maxSt, PALETTE.stamina, COMBAT.winded / display.foe.maxSt);
+    // MOMENTUM — the framed star-socket meter (the load-bearing ★ differential:
+    // behind-penalty + the foe's phased-unlock tier access are unreadable without
+    // it; display-only — reads the foe's existing momentum, no logic change).
+    drawBig(ctx, 'MOMENTUM', px + 12, py + 62, PALETTE.stanceG);
+    drawMomentumSockets(ctx, px + 12 + measureBig(ctx, 'MOMENTUM') + 10, py + 64, display.foe.momentum);
+    // BREAK row (boss only) INTEGRATED into the panel — the separate PHASE/BREAK
+    // strip is gone. Regular foes simply lack this row (+ show bench dots below).
+    if (boss) drawFoeBreakRow(ctx, px, pw, py + FOE_PANEL.h);
+    else drawBenchIndicators(ctx, px + 12, py + h + 4, state.foe);
   }
 
-  // BUG 3 — boss status strip under the foe panel: PHASE + a labeled,
-  // legible BREAK meter that fills on read-wins (flashes when it ticks),
-  // plus a compact bench row. Only for boss fights (breakThreshold > 0).
-  function drawBossStrip(ctx: CanvasRenderingContext2D): void {
-    const x = FOE_PANEL.x;
-    const y = FOE_PANEL.y + FOE_PANEL.h + 2;
-    const w = FOE_PANEL.w;
-    // Warm-dark leather strip (2b-2) with a silver top inlay line.
-    ctx.fillStyle = 'rgba(46,32,20,0.93)';
-    ctx.fillRect(x, y, w, 22);
-    ctx.fillStyle = PALETTE.silverDim;
-    ctx.fillRect(x + 2, y, w - 4, 1);
-    drawText(ctx, `PHASE ${displayPhase}`, x + 6, y + 5, PALETTE.silver);
-    drawText(
-      ctx,
-      'BREAK',
-      x + 96,
-      y + 5,
-      breakPipFlashT > 0 ? PALETTE.momentumGoldHi : PALETTE.frameInkDim,
-    );
-    // BREAK pips — GOLD when filled (same precious gold as the momentum ★; ruby
-    // read as brown on the warm frame), a bright pale-gold flash on the newest
-    // tick, and the ★'s unlit warm-dim for an empty slot.
-    const pipX = x + 150;
+  // The integrated boss BREAK row: BREAK label + gold pips + the role tag
+  // ("GYM LEADER"), plus Falkner's gust cue relocated here (the boss telegraph
+  // that lived in the old strip). Rendered as the foe panel's bottom row.
+  function drawFoeBreakRow(ctx: CanvasRenderingContext2D, x: number, w: number, y: number): void {
+    drawText(ctx, 'BREAK', x + 12, y + 4, breakPipFlashT > 0 ? PALETTE.momentumGoldHi : PALETTE.frameInkSoft);
+    const pipX = x + 62;
     for (let i = 0; i < breakThreshold; i += 1) {
       const filled = i < displayBreakProgress;
       const isNewest = breakPipFlashT > 0 && i === Math.max(0, displayBreakProgress - 1);
       ctx.fillStyle = isNewest ? PALETTE.momentumGoldHi : filled ? PALETTE.momentumGold : PALETTE.momentumOff;
-      ctx.fillRect(pipX + i * 16, y + 5, 12, 12);
+      ctx.fillRect(pipX + i * 16, y + 3, 12, 12);
       ctx.strokeStyle = PALETTE.silverDim;
       ctx.lineWidth = 1;
-      ctx.strokeRect(pipX + i * 16 + 0.5, y + 5 + 0.5, 11, 11);
+      ctx.strokeRect(pipX + i * 16 + 0.5, y + 3.5, 11, 11);
     }
-    // Compact bench row at the far right (always visible for the boss).
-    const foe = state.foe;
-    if (foe.members.length > 1) {
-      const bx = x + w - foe.members.length * 10 - 4;
-      for (let i = 0; i < foe.members.length; i += 1) {
-        const mon = foe.members[i]!;
-        ctx.fillStyle = mon.hp <= 0 ? '#1d1d28' : i === foe.active ? PALETTE.hpOk : PALETTE.frameInkDim;
-        ctx.fillRect(bx + i * 10, y + 7, 6, 6);
-        ctx.strokeStyle = PALETTE.frameInk;
-        ctx.strokeRect(bx + i * 10 + 0.5, y + 7 + 0.5, 5, 5);
-      }
-    }
-    // Gust cue — INTEGRATED into the boss strip (2b-1): a pill between the BREAK
-    // pips and the bench, so the gust telegraph no longer overlaps the arena /
-    // sprite (the 2a-flagged floating banner is gone). Only bosses have an arena
-    // schedule, so this is the single home for the gust cue.
+    // ROLE TAG right — CH1 bosses are gym leaders (a static default; reversible to
+    // a bossCard title field when cards carry one). Fine-print framed tag.
+    drawPanelTags(ctx, x + w - 10, y + 2, [{ label: 'GYM LEADER', color: PALETTE.velvet }]);
+    // Gust cue (Falkner) — relocated from the old strip into this row, between the
+    // pips and the role tag, so the boss's rhythm telegraph survives the merge.
     const arena = state.bossCard?.arenaSchedule;
     if (arena && arena.rhythmEveryN > 0) {
       const anchor = state.rhythmAnchor ?? 0;
@@ -2373,73 +2463,42 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const currentIsGust = (activeRound - anchor) % arena.rhythmEveryN === 0;
       const nextIsGust = (state.round + 1 - anchor) % arena.rhythmEveryN === 0;
       const gustX = pipX + breakThreshold * 16 + 8;
-      const gustW = 96;
-      const benchStart = foe.members.length > 1 ? x + w - foe.members.length * 10 - 8 : x + w - 4;
-      if ((currentIsGust || nextIsGust) && gustX + gustW <= benchStart) {
+      const gustW = 90;
+      if ((currentIsGust || nextIsGust) && gustX + gustW <= x + w - 90) {
         const pulse = currentIsGust ? 0.55 + 0.4 * Math.sin(tick * 6) : 0.5;
         ctx.fillStyle = currentIsGust ? `rgba(70,150,230,${pulse})` : 'rgba(80,140,210,0.5)';
-        ctx.fillRect(gustX, y + 4, gustW, 14);
+        ctx.fillRect(gustX, y + 3, gustW, 13);
         ctx.strokeStyle = PALETTE.frameInk;
         ctx.lineWidth = 1;
-        ctx.strokeRect(gustX + 0.5, y + 4.5, gustW - 1, 13);
-        drawText(ctx, currentIsGust ? 'GUST NOW' : 'GUST NEXT', gustX + 6, y + 5, PALETTE.paper);
+        ctx.strokeRect(gustX + 0.5, y + 3.5, gustW - 1, 12);
+        drawText(ctx, currentIsGust ? 'GUST NOW' : 'GUST NEXT', gustX + 6, y + 3, PALETTE.paper);
       }
     }
   }
 
   function drawPlayerPanel(ctx: CanvasRenderingContext2D): void {
-    drawBattlePanel(ctx, PL_PANEL.x, PL_PANEL.y, PL_PANEL.w, PL_PANEL.h);
-    drawText(ctx, monDisplayName(display.player), PL_PANEL.x + 12, PL_PANEL.y + 8, PALETTE.stanceG);
-    if (display.player.focusing) drawText(ctx, 'FOCUS', PL_PANEL.x + 150, PL_PANEL.y + 8, PALETTE.hpWarn);
-    else if (display.player.dazed) drawText(ctx, 'DAZE', PL_PANEL.x + 150, PL_PANEL.y + 8, PALETTE.hpCrit);
-    else if (display.player.staggered) drawText(ctx, 'STAG', PL_PANEL.x + 150, PL_PANEL.y + 8, PALETTE.hpWarn);
-    if (display.player.exhausted) drawText(ctx, 'EXH', PL_PANEL.x + 220, PL_PANEL.y + 8, PALETTE.hpCrit);
-    // Label YOUR ★ pips clearly (playtest-polish-3 — "MOM" was too terse): the
-    // player should immediately read this as their momentum meter. (The foe's
-    // now mirrors it on the top panel — the differential is what the mechanics
-    // read.) Skipped while EXH occupies the row.
-    // The ★ meter HEADER — deep slate blue (matching the mon names), a confident
-    // header colour; the gold ★ pips beside it carry the value.
-    else drawText(ctx, 'MOMENTUM', PL_PANEL.x + 210, PL_PANEL.y + 8, PALETTE.stanceG);
-    // ★ triangle (3 slots: apex + 2 base), right-aligned in the header row; fills
-    // with the live momentum (cap-2 today → apex empty until the cap-3 change).
-    drawMomentum(ctx, PL_PANEL.x + PL_PANEL.w - 34, PL_PANEL.y + 5, display.player.momentum);
-
-    drawText(ctx, 'HP', PL_PANEL.x + 12, PL_PANEL.y + 32, PALETTE.hpOk);
-    drawBar(
-      ctx,
-      PL_PANEL.x + 40,
-      PL_PANEL.y + 33,
-      PL_PANEL.w - 54,
-      display.player.hp,
-      display.player.maxHp,
-      hpColor(display.player.hp, display.player.maxHp),
-      BATTLE_BAR_H,
-    );
-    drawText(ctx, 'ST', PL_PANEL.x + 12, PL_PANEL.y + 52, PALETTE.stamina);
-    drawBar(
-      ctx,
-      PL_PANEL.x + 40,
-      PL_PANEL.y + 53,
-      PL_PANEL.w - 54,
-      display.player.st,
-      display.player.maxSt,
-      PALETTE.stamina,
-      BATTLE_BAR_H,
-    );
-    drawWindedNotch(ctx, PL_PANEL.x + 40, PL_PANEL.y + 53, PL_PANEL.w - 54, BATTLE_BAR_H, COMBAT.winded / display.player.maxSt);
-    // Bench dots + the bond meter share the slim row under the panel — see
-    // drawPlayerUnderPanel (bench relocated to the right so it clears the bar).
-  }
-
-  // Bond legibility (Lane A) — the slim "player shelf" under the panel: the
-  // bond meter (active mon's stage + progress) on the left, the team bench
-  // dots on the right. The bar is STATIC during the fight and fills on the
-  // post-win advance (bondAdvanceFrom/To). Bench dots render unconditionally
-  // (their own size/phase suppression) so a caller without bond data — sim /
-  // isolated tests — still shows team status; only the meter needs the thread.
-  function drawPlayerUnderPanel(ctx: CanvasRenderingContext2D): void {
-    const stripY = PL_PANEL.y + PL_PANEL.h; // just under the panel
+    const px = PL_PANEL.x;
+    const pw = PL_PANEL.w;
+    const py = PL_PANEL.y;
+    drawBattlePanel(ctx, px, py, pw, PL_PANEL.h);
+    // Header — name (32px), type badges, top-right tags.
+    const name = monDisplayName(display.player);
+    drawBig(ctx, name, px + 12, py + 6, PALETTE.stanceG);
+    drawTypeBadges(ctx, px + 12 + measureBig(ctx, name) + 8, py + 8, display.player.species.types);
+    drawPanelTags(ctx, px + pw - 10, py + 5, buildTags(display.player, activeMon(state.player)));
+    // HP / ST rows + numerics.
+    drawStatRow(ctx, px, pw, py + 26, 'HP', PALETTE.hpOk, display.player.hp, display.player.maxHp, hpColor(display.player.hp, display.player.maxHp), null);
+    drawStatRow(ctx, px, pw, py + 44, 'ST', PALETTE.stamina, display.player.st, display.player.maxSt, PALETTE.stamina, COMBAT.winded / display.player.maxSt);
+    // MOMENTUM — star sockets + the single teaching hint (fine-print), by the
+    // sockets. This REPLACES the old "win a read to charge ★" hint (one hint).
+    drawBig(ctx, 'MOMENTUM', px + 12, py + 62, PALETTE.stanceG);
+    const sockEnd = drawMomentumSockets(ctx, px + 12 + measureBig(ctx, 'MOMENTUM') + 10, py + 64, display.player.momentum);
+    drawText(ctx, 'STARS POWER CALLS + UNLOCK MOVES', sockEnd + 8, py + 66, PALETTE.frameInkDim);
+    // BOND — LABELED + HOUSED inside the panel frame (it used to float below).
+    // Static during the fight; animates on the post-win advance (bondAdvanceFrom/To).
+    const bondY = py + 84;
+    drawBig(ctx, 'BOND', px + 12, bondY - 3, PALETTE.bond);
+    const bondX = px + 12 + measureBig(ctx, 'BOND') + 8;
     const benchShown =
       state.player.members.length > 1 && phase !== 'resolve' && phase !== 'end' && phase !== 'text';
     const benchW = benchShown ? state.player.members.length * 10 + 6 : 0;
@@ -2451,16 +2510,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         const eased = 1 - (1 - t) * (1 - t); // ease-out — the bar settles in
         value = bondAdvanceFrom + (bondAdvanceTo - bondAdvanceFrom) * eased;
       }
-      ctx.fillStyle = 'rgba(46,32,20,0.9)'; // warm leather strip (2b-2)
-      ctx.fillRect(PL_PANEL.x, stripY, PL_PANEL.w, 14);
-      ctx.fillStyle = PALETTE.silverDim; // silver inlay line
-      ctx.fillRect(PL_PANEL.x + 2, stripY, PL_PANEL.w - 4, 1);
-      drawBondBar(ctx, PL_PANEL.x + 6, stripY + 2, PL_PANEL.w - 12 - benchW, value);
+      drawBondBar(ctx, bondX, bondY + 3, px + pw - 10 - bondX - benchW, value);
     }
-    // Right-aligned bench dots (relocated from the panel-left so they clear
-    // the bond meter). drawBenchIndicators no-ops for ≤1 mon / resolve phases.
-    const benchX = PL_PANEL.x + PL_PANEL.w - state.player.members.length * 10 - 4;
-    drawBenchIndicators(ctx, benchX, PL_PANEL.y + PL_PANEL.h + 3, state.player);
+    // Team bench dots — right end of the BOND row (no-op for ≤1 mon / resolve).
+    drawBenchIndicators(ctx, px + pw - 10 - state.player.members.length * 10, bondY + 2, state.player);
   }
 
   // Surface ③ — the read-win mon reaction. A soft, brief bond-tinted spark
@@ -3060,24 +3113,18 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       );
 
       drawReadReaction(ctx); // surface ③ — over the mon, under the HUD panels
+      // Battle-UI v2 (beat 1) — the panels now OWN their sub-elements: the foe
+      // panel integrates the BREAK row (boss) + status tags; the player panel
+      // houses BOND + bench + tags. The separate boss strip / under-panel /
+      // external status-chip passes are gone (folded in, no double-render).
       drawFoePanel(ctx);
-      if (breakThreshold > 0) drawBossStrip(ctx);
       drawPlayerPanel(ctx);
-      drawPlayerUnderPanel(ctx); // bond meter + bench dots (Lane A)
-      // Status chips (2b-2) — the effect-layer statuses (debuff + stacking buffs)
-      // as gemstone tags ON the mon's PANEL header (repositioned off the sprite
-      // feet), from live engine state. The row sits after the name and stops before
-      // the panel's status-tag / momentum area.
-      drawStatusChips(ctx, FOE_PANEL.x + 72, FOE_PANEL.y + 7, sideChips(activeMon(state.foe)), FOE_PANEL.x + 146);
-      drawStatusChips(ctx, PL_PANEL.x + 72, PL_PANEL.y + 7, sideChips(activeMon(state.player)), PL_PANEL.x + 146);
 
       if (phase === 'menu' || phase === 'move' || phase === 'call' || phase === 'release' || phase === 'throwoff') drawIntent(ctx);
       // S1 — the read-war callout occupies the intent slot during resolve. Drawn
       // whenever it's visible (situationAlpha > 0) so its fade-out completes even
       // a beat or two after resolve ends; drawCallout no-ops when faded out.
       drawCallout(ctx);
-      // Gust legibility now lives in the boss BREAK strip (drawBossStrip) — the
-      // 2a floating full-width banner was removed so it can't overlap the arena.
 
       if (breakFlashT > 0) {
         const a = breakFlashT / 0.6;

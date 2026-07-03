@@ -1688,3 +1688,186 @@ describe('DEV TOOL — dev combat-log overlay (opt-in; surfaces BattleEvents)', 
     expect(maxBottom).toBeLessThanOrEqual(360);
   });
 });
+
+// ── Battle-UI v2 (beat 1) — panels + type: BOUNDS harness + CRISPNESS ────────
+describe('battle UI v2 (beat 1) — panels + type', () => {
+  const W = 640;
+  const H = 360;
+
+  // A ctx that records every fillRect/strokeRect + fillText WITH the active font
+  // px, and a proportional measureText (≈ m3x6's 0.5em advance) so right-aligned
+  // + width-derived placements resolve realistically for the bounds check.
+  interface TextRec { x: number; y: number; text: string; px: number; align: string }
+  function recordingCtx(): CanvasRenderingContext2D & {
+    rects: { x: number; y: number; w: number; h: number }[];
+    texts: TextRec[];
+    fonts: string[];
+  } {
+    const rects: { x: number; y: number; w: number; h: number }[] = [];
+    const texts: TextRec[] = [];
+    const fonts: string[] = [];
+    let font = '16px m3x6, monospace';
+    let align = 'start';
+    const px = (f: string): number => {
+      const m = /(\d+)px/.exec(f);
+      return m ? parseInt(m[1]!, 10) : 16;
+    };
+    const noop = () => {};
+    return new Proxy(
+      { rects, texts, fonts },
+      {
+        get(t, p) {
+          if (p === 'rects') return (t as { rects: unknown }).rects;
+          if (p === 'texts') return (t as { texts: unknown }).texts;
+          if (p === 'fonts') return (t as { fonts: unknown }).fonts;
+          if (p === 'fillRect' || p === 'strokeRect') {
+            return (x: number, y: number, w: number, h: number) => rects.push({ x, y, w, h });
+          }
+          if (p === 'fillText') return (text: string, x: number, y: number) => texts.push({ x, y, text: String(text), px: px(font), align });
+          // m3x6's real average advance is ~0.25em (UI_CHAR_W 4.0 @ 16px). Use a
+          // CONSERVATIVE 0.3em: if a bound passes here it passes with margin live.
+          if (p === 'measureText') return (s: string) => ({ width: String(s).length * px(font) * 0.3 });
+          if (p === 'beginPath') return () => ({ fill: noop, stroke: noop, ellipse: noop });
+          if (p === 'canvas') return { width: 320, height: 180 };
+          if (p === 'font') return font;
+          if (p === 'textAlign') return align;
+          return noop;
+        },
+        set(_t, p, v) {
+          if (p === 'font') {
+            font = String(v);
+            fonts.push(font);
+          } else if (p === 'textAlign') align = String(v);
+          return true;
+        },
+      },
+    ) as unknown as CanvasRenderingContext2D & {
+      rects: { x: number; y: number; w: number; h: number }[];
+      texts: TextRec[];
+      fonts: string[];
+    };
+  }
+
+  function assertInBounds(ctx: ReturnType<typeof recordingCtx>, label: string): void {
+    for (const r of ctx.rects) {
+      expect(r.x, `${label}: rect x`).toBeGreaterThanOrEqual(0);
+      expect(r.y, `${label}: rect y`).toBeGreaterThanOrEqual(0);
+      expect(r.x + r.w, `${label}: rect right`).toBeLessThanOrEqual(W + 0.5);
+      expect(r.y + r.h, `${label}: rect bottom`).toBeLessThanOrEqual(H + 0.5);
+    }
+    for (const t of ctx.texts) {
+      const w = t.text.length * t.px * 0.3;
+      // Account for the draw's textAlign (drawTextRight anchors the RIGHT edge).
+      const left = t.align === 'right' ? t.x - w : t.align === 'center' ? t.x - w / 2 : t.x;
+      const right = t.align === 'right' ? t.x : t.align === 'center' ? t.x + w / 2 : t.x + w;
+      expect(left, `${label}: text "${t.text}" left`).toBeGreaterThanOrEqual(-1);
+      expect(right, `${label}: text "${t.text}" right`).toBeLessThanOrEqual(W + 1);
+      expect(t.y, `${label}: text "${t.text}" y`).toBeGreaterThanOrEqual(-1); // nudge can dip ~1px
+      expect(t.y + t.px, `${label}: text "${t.text}" bottom`).toBeLessThanOrEqual(H + 1);
+    }
+  }
+
+  // A rich scene: a long dual-typed name (badge width), a 2-mon team (bench), a
+  // debuff on each side (top-right tags), ★ on the player (filled sockets).
+  function richScene(bossCard?: unknown) {
+    const player = { ...createSide(CH1.GRUBLEAF!), momentum: 2, debuff: { kind: 'burn', duration: 3 } };
+    const bench = createSide(SPECIES.EMBERCUB!);
+    const foe = { ...createSide(CH1.FLITPECK!), momentum: 1, debuff: { kind: 'bulwark', duration: 3 } as never };
+    let state = createBattleState(createTeam([player, bench]), createTeam([foe]));
+    if (bossCard) {
+      state = { ...state, bossCard: bossCard as never, breakProgress: 1, phase: 1, rhythmAnchor: 0 };
+    }
+    return createBattleScene({
+      state,
+      rng: mulberry32(1),
+      chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'A' }),
+      intro: [],
+      catchBreathUnlocked: true,
+      devUnlockAllCalls: true,
+      canRun: true,
+      onResolve: () => {},
+      playerBond: [55, 10],
+    });
+  }
+
+  const BOSS_CARD = {
+    species: CH1.FLITPECK!,
+    breakBar: 3,
+    arenaSchedule: { rhythmEveryN: 3, heavyExtraCost: 5, heavyExtraInitWeight: 1.2, telegraphAheadBy: 1 },
+    teamSize: 1,
+  };
+
+  test('every primitive stays within 640×360 across the menu/move/call phases (regular foe)', () => {
+    const scene = richScene();
+    scene.update?.(0.01); // → menu
+    let ctx = recordingCtx();
+    scene.draw(ctx);
+    assertInBounds(ctx, 'menu');
+    scene.input?.('a'); // FIGHT → move grid
+    ctx = recordingCtx();
+    scene.draw(ctx);
+    assertInBounds(ctx, 'move');
+  });
+
+  test('every primitive stays within 640×360 in the CALL + THROW-OFF phases', () => {
+    const scene = richScene();
+    scene.update?.(0.01);
+    scene.input?.('down'); // CALL row
+    scene.input?.('a'); // Call submenu
+    let ctx = recordingCtx();
+    scene.draw(ctx);
+    assertInBounds(ctx, 'call');
+    // Step to Throw Them Off and open its plant picker.
+    for (let i = 0; i < 10; i += 1) {
+      ctx = recordingCtx();
+      scene.draw(ctx);
+      if (ctx.texts.some((t) => t.text.includes('>Throw Them Off'))) break;
+      scene.input?.('down');
+    }
+    scene.input?.('a'); // open plant picker
+    ctx = recordingCtx();
+    scene.draw(ctx);
+    assertInBounds(ctx, 'throwoff');
+  });
+
+  test('the integrated BREAK row + role tag stays within bounds (boss foe)', () => {
+    const scene = richScene(BOSS_CARD);
+    scene.update?.(0.01);
+    const ctx = recordingCtx();
+    scene.draw(ctx);
+    assertInBounds(ctx, 'boss-menu');
+    // The BREAK row renders its label + the role tag inside the (taller) panel.
+    expect(ctx.texts.some((t) => t.text === 'BREAK')).toBe(true);
+    expect(ctx.texts.some((t) => t.text === 'GYM LEADER')).toBe(true);
+  });
+
+  test('the primary tier is CRISP 32px (integer 2×); NO fuzzy 24px anywhere', () => {
+    const scene = richScene(BOSS_CARD);
+    scene.update?.(0.01);
+    const ctx = recordingCtx();
+    scene.draw(ctx);
+    // The primary type tier renders at exactly 32px m3x6 (a crisp integer scale).
+    expect(ctx.fonts.some((f) => f === '32px m3x6, monospace')).toBe(true);
+    // The fine-print tier stays the global 16px. NO 24px (1.5× = fuzzy) is used.
+    expect(ctx.fonts.some((f) => /\b24px\b/.test(f))).toBe(false);
+  });
+
+  test('the old separate PHASE/BREAK strip is GONE (no double-render): "PHASE n" not drawn', () => {
+    const scene = richScene(BOSS_CARD);
+    scene.update?.(0.01);
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    // The retired strip drew "PHASE 1"; the integrated row does not.
+    expect(ctx.texts.join('|')).not.toMatch(/PHASE \d/);
+  });
+
+  test('the momentum star-socket meter renders (filled ★ sockets for the player)', () => {
+    const scene = richScene();
+    scene.update?.(0.01);
+    const ctx = stubCtx();
+    scene.draw(ctx);
+    // Sockets draw the ★ glyph; the player holds 2★, the foe 1★ → several ★ drawn.
+    const stars = ctx.texts.filter((t) => t === '★').length;
+    expect(stars).toBeGreaterThanOrEqual(6); // 3 player + 3 foe sockets, min
+  });
+});
