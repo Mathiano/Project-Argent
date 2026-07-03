@@ -21,6 +21,8 @@ import { reader } from './archetypes';
 // DR — a Call spends ★, and ★ only comes from read-wins). Plus: the Calls fire
 // FOE-side (symmetry), and a NO-BOND profile casts ZERO Calls (bit-identical).
 
+const N_BATTLES = 800; // matches runCallSim's default n (the once-per-battle ceiling)
+
 interface CallSimResult {
   readonly foeWinPct: number;
   readonly meanRounds: number;
@@ -111,10 +113,37 @@ describe('trainer Call policies — fair-but-distinct vs a reading player', () =
     expect(rows.length).toBe(6);
   });
 
-  test('every Call policy is a FAIR fight (not sub-10%, not a 80%+ stomp)', () => {
-    for (const r of [clutch, liberalMid, defensive, clutchHigh, libHigh]) {
+  // The NON-HEALING policies stay in the tight fair FLOOR band vs the reader.
+  test('non-healing Call policies are FAIR (20–78% vs the reader floor)', () => {
+    for (const r of [clutch, liberalMid, libHigh]) {
       expect(r.foeWinPct).toBeGreaterThan(10);
-      expect(r.foeWinPct).toBeLessThan(80);
+      expect(r.foeWinPct).toBeLessThan(78);
+    }
+  });
+
+  // HIGH-BOND HEALERS (stonewall/duelist) exceed the reader-floor band — ACCEPTED
+  // + PROVISIONAL (Mathias's ruling). RECOVER is once-per-battle (kills the loop
+  // in principle + keeps the "no — it healed!" beat), but a single 50%-maxHP heal
+  // walls the READER specifically — a FLOOR yardstick with no heal / burst / Full
+  // Power / bait (the Call expansion outgrew it). No stall exists (terminate 100%,
+  // ~14 rounds). The TRUE gate for a real healing elite is its boss-card ladder +
+  // playtest (a human has the toolkit the reader lacks); these profiles are DORMANT.
+  // Band: bounded (not a 100% lock), re-judged when Gym-2+ content is authored.
+  test('high-bond HEALERS: accepted-but-bounded vs the reader floor (provisional)', () => {
+    for (const r of [defensive, clutchHigh]) {
+      expect(r.foeWinPct).toBeGreaterThan(20);
+      expect(r.foeWinPct).toBeLessThan(97); // bounded — not an unbeatable 100% lock
+      expect(r.terminatedPct).toBeGreaterThan(95); // NO stall (the real degeneracy)
+      expect(r.meanRounds).toBeLessThan(40);
+    }
+  });
+
+  test('RECOVER fires FOE-side, ONCE PER BATTLE (kit-rule bound holds in-sim)', () => {
+    // clutchHigh + defensive DO heal (full kit + low-HP trigger); the count never
+    // exceeds the battle count → at most one Recover per battle (the once-rule).
+    for (const r of [defensive, clutchHigh]) {
+      expect(r.foeCalls.recover ?? 0).toBeGreaterThan(0);
+      expect(r.foeCalls.recover ?? 0).toBeLessThanOrEqual(N_BATTLES); // ≤ 1 per battle
     }
   });
 
@@ -123,7 +152,7 @@ describe('trainer Call policies — fair-but-distinct vs a reading player', () =
     expect(liberalMid.foeWinPct).toBeLessThan(78);
   });
 
-  test('clutch is baitable (the reader wins a real share; clutch DOES spend Calls)', () => {
+  test('clutch (mid, no Recover) is baitable (the reader wins a real share)', () => {
     expect(clutch.foeWinPct).toBeLessThan(75); // reader beats it often enough
     const spent = Object.values(clutch.foeCalls).reduce((a, b) => a + b, 0);
     expect(spent).toBeGreaterThan(0);
@@ -132,8 +161,6 @@ describe('trainer Call policies — fair-but-distinct vs a reading player', () =
   test('defensive does NOT stall — battles terminate; survives via Calls', () => {
     expect(defensive.terminatedPct).toBeGreaterThan(85); // almost never times out
     expect(defensive.meanRounds).toBeLessThan(40); // well under the 80-round cap
-    // It survives via Calls (Catch Breath foe-side; Get Away needs the reader to
-    // focus, which the yardstick never does — see the policy unit test).
     expect(defensive.foeCalls.catchBreath ?? 0).toBeGreaterThan(0);
     expect(defensive.foeCalls.fullPower ?? 0).toBe(0); // never Full Power (survival-only)
   });
@@ -141,9 +168,10 @@ describe('trainer Call policies — fair-but-distinct vs a reading player', () =
   // NOTE: the reader NEVER initiates a Focus, so the trainer's Get Away / Dodge
   // (gated on a feared foe release) can't fire in this sim — that path is proven
   // by the engine foe-side symmetry tests + the deterministic policy unit test in
-  // trainerAI.test.ts. Here we gate the Call that DOES fire vs the reader.
-  test('symmetry: Full Power fires FOE-side (liberal dumps ★ on a buffed strike)', () => {
+  // trainerAI.test.ts. Here we gate the Calls that DO fire vs the reader.
+  test('symmetry: Full Power + Recover fire FOE-side', () => {
     expect(libHigh.foeCalls.fullPower ?? 0).toBeGreaterThan(0);
+    expect(clutchHigh.foeCalls.recover ?? 0).toBeGreaterThan(0);
   });
 
   test('a NO-BOND trainer casts ZERO Calls (toolkit none → bit-identical)', () => {

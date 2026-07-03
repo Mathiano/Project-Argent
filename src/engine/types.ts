@@ -220,6 +220,13 @@ export interface SideState {
   // echo" that re-maps the foe's next Call to this one). Absent until the mon
   // Calls; absent on every legacy/sim side that never Calls → bit-identical.
   readonly lastCall?: CallKind;
+  // Has this mon RECOVERED this battle? Set by the engine when a RECOVER Call
+  // resolves (either side). The TRAINER Call policy reads it to enforce the
+  // once-per-battle Recover KIT-RULE (a single dramatic gym-ace heal, not a
+  // repeatable wall); the PLAYER is never gated by it (player Recover stays
+  // unbounded — it's already skill-gated by the ★ economy). Absent by default
+  // → bit-identical for every side that never Recovers.
+  readonly recoveredThisBattle?: boolean;
   // Player-chosen display NICKNAME (game-layer cosmetic). The engine never
   // reads it — combat resolution is identity-agnostic — so it's absent on every
   // sim/legacy/foe side and the shape stays bit-identical. The GAME sets it at

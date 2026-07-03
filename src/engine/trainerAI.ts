@@ -236,16 +236,25 @@ function trainerCall(profile: TrainerProfile, state: BattleState, side: Side): A
       ? { kind: 'call', call: 'dodge' }
       : { kind: 'call', call: 'getAway' };
   }
-  // Survival heal — RECOVER is HELD from the trainer kit this increment (a
-  // deliberate hold, per the standing rule). SIM FINDING: a 50%-maxHP heal is
-  // NOT bounded by the #5 self-escalation DR (Recover is a ★-Call, not a self-
-  // escalation STATUS), and vs the reader it makes a high-bond clutch/defensive
-  // profile a 93–96% WALL (well above the fair 20–75% band) — a single decisive
-  // heal on an already-mitigating profile, not a loop. Recover ADOPTION waits on
-  // a foe-side BOUND (the "hard cooldown" config already banks — a design call
-  // for Mathias). The gate below is retained (dead) so it re-enables in one line.
-  const RECOVER_ADOPTED = false; // ← flip when Recover gets its foe-side bound
-  if (RECOVER_ADOPTED && full && lowHp && (use === 'clutch' || use === 'defensive')) {
+  // Survival heal — RECOVER is ONCE PER BATTLE for trainers (Mathias's ruling):
+  // a single dramatic gym-ace heal ("no — it healed!") is the beat + a natural
+  // second act; the once-rule is a KIT-RULE bound (like player-exclusives are
+  // player rules) — same ★1 cost, symmetric. Player Recover stays UNBOUNDED
+  // (already skill-gated: ★ only comes from won reads). Tracked engine-side per
+  // mon (recoveredThisBattle).
+  //
+  // SIM NOTE (measured): the once-rule kills the repeatable-heal LOOP in principle
+  // but barely moves the win rate (93.5→92.1% vs the reader) — one 50%-maxHP heal
+  // on a mitigating profile ≈ a 97% win when it lands. That residual "wall" is
+  // ACCEPTED vs the reader FLOOR yardstick specifically: the reader has no heal /
+  // burst / Full Power / bait game (the Call expansion outgrew it), and no stall
+  // exists (~14 rounds). PROVISIONAL, like the rival bands — the TRUE fairness gate
+  // for a real healing elite is its BOSS-CARD ladder + playtest (a human has Full
+  // Power / their own Recover / READ THEM / the bait). If playtest shows a real
+  // wall → the heal-SIZE lever, with evidence. These profiles are DORMANT, so
+  // nothing ships at 92% yet. (Banked: a reader-toolset upgrade as a future
+  // deliberate re-baseline — the yardstick should learn the game it measures.)
+  if (full && lowHp && me.recoveredThisBattle !== true && (use === 'clutch' || use === 'defensive')) {
     return { kind: 'call', call: 'recover' };
   }
   // Bank stamina when winded (UNIFIES the existing stamina-aware Catch Breath —

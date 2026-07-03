@@ -191,7 +191,9 @@ function applyRecover(
   if (call !== 'recover') return side;
   const healed = Math.min(side.maxHp, side.hp + Math.round(side.maxHp * COMBAT.recoverPct));
   events.push({ kind: 'recover', side: sideKey, healed: healed - side.hp });
-  return { ...side, hp: healed };
+  // Mark the mon as having Recovered this battle (read by the trainer policy's
+  // once-per-battle Recover kit-rule; the player is never gated by it).
+  return { ...side, hp: healed, recoveredThisBattle: true };
 }
 
 // SHAKE IT OFF Call (the Calls increment) — the owed CLEANSE: clear the caller's
