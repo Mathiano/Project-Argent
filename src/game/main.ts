@@ -59,7 +59,7 @@ import { createStarterPickScene } from './scenes/starterPick';
 import { createTitleScene } from './scenes/title';
 import { createNameEntryScene, NAME_MAX_LEN, sanitizeName } from './scenes/nameEntry';
 import { resolvePlayerName } from './playerName';
-import { buildDevPlan, AT_TARGETS, PRESETS, type DevPlan, type DevPartyMember } from './devNav';
+import { buildDevPlan, AT_TARGETS, PRESETS, FORGE_FOES, parseSeed, type DevPlan, type DevPartyMember } from './devNav';
 import { createDevMenuScene, type DevMenuItem } from './scenes/devMenu';
 import { createSfxSubscriber } from './sfx/sfx';
 import { createAudioEngine, loadMutedPref, saveMutedPref } from './audio/synth';
@@ -75,6 +75,7 @@ import { bagAdd, bagByPocket, bagConsume, ITEMS, seedStartingBag } from './items
 import type { BagEntry } from './items';
 import { STARTING_MONEY, awardMoney, buyItem, sellItem } from './economy';
 import {
+  BOND_STAGES,
   BOND_START_CAUGHT,
   BOND_START_STARTER,
   CATCH_RARITY,
@@ -1715,11 +1716,14 @@ function applyDevPlan(plan: DevPlan): void {
   applyBagFromUrl();
   applyMoneyFromUrl();
   if (run.bag.length === 0) bagAdd(run.bag, 'POTION', 3); // a sane default kit
+  if (plan.bond !== null) run.partyBond[0] = bondValueForStage(plan.bond); // after party construction
   if (plan.badges.length > 0) run.badges = [...plan.badges];
   for (const f of plan.flags) sessionFlags.add(f);
   recomputeSignpostFlags();
   const target = plan.at ?? AT_TARGETS.hearthwick!; // ?state without ?at → land post-opening in town
   showOverworld(target.map, target.spawn, false);
+  // ?fight spawns the forge matchup OVER the established overworld (a valid return target).
+  if (plan.fight) showForgeFight(plan.fight.foe, plan.fight.profile);
 }
 
 // Debug menu (the convenient form). Built from the same AT_TARGETS / PRESETS tables
@@ -1738,33 +1742,36 @@ function ensureDevParty(): void {
   run.partyBond = [BOND_START_STARTER];
   run.partyOrigin = ['starter'];
 }
-// DEV — a battle vs a DORMANT Reactive profile (DUELIST: full Reactive + the
-// high-bond Call kit) through the NORMAL trainer prep → battle path. The richest
-// test target in one fight: adaptivity + Calls + the THROW THEM OFF espionage
-// matchup. Dev-only (built only behind the DEV gate that opens this menu); touches
-// NO shipped encounter table — the profile is reached directly, not via a winFlag.
-function showDevReactiveFight(): void {
+// DEV — the BATTLE FORGE: an arbitrary matchup (any registered species vs any REAL
+// trainer profile) through the NORMAL trainer prep → battle path. Dev-only (built
+// only behind the DEV gate that opens this menu); touches NO shipped encounter table
+// — the profile is reached directly, not via a winFlag. `devUnlockAllCalls` gives the
+// full player Call kit so any Call/bond/espionage moment is exercisable in one fight.
+function forgeProfile(key: string | null) {
+  return key && TRAINER_PROFILES[key] ? TRAINER_PROFILES[key]! : TRAINER_PROFILES.duelist!;
+}
+function showForgeFight(foeName: string, profileKey: string | null): void {
   ensureDevParty();
-  const profile = TRAINER_PROFILES.duelist!;
-  const foeName = CH1_DEX.GALEHAWK ? 'GALEHAWK' : 'SPROUTLE'; // a real CH1 threat, else a fixture fallback
-  const foeTeam = buildTrainerTeam(foeName);
-  if (!foeTeam) return;
+  const profile = forgeProfile(profileKey);
+  const foeTeam = buildTrainerTeam(foeName.toUpperCase());
+  if (!foeTeam) { console.warn(`Argent dev forge: unknown foe "${foeName}"; skipped`); return; }
+  const foeIsCh1 = CH1_DEX[foeName.toUpperCase()] !== undefined; // CH1 mon → the CH1 (UPPERCASE) type chart
   scenes.push(
     createPrepScene({
       playerSpecies: partyLead(),
       foeSpecies: activeMon(foeTeam).species,
-      foeTrainerName: 'DUELIST',
+      foeTrainerName: profile.name,
       onContinue: () => {
-        const state = createBattleState(buildPlayerTeam(), foeTeam, { typeChart: TYPECHART_CH1 });
+        const state = createBattleState(buildPlayerTeam(), foeTeam, foeIsCh1 ? { typeChart: TYPECHART_CH1 } : {});
         scenes.replace(
           createBattleScene({
             state,
             rng: run.rng,
             ...bondSceneProps(foeTeam, 'trainer'), // Lane A — bond meter + post-win advance
-            devUnlockAllCalls: true, // dev — the full player Call kit (incl. THROW THEM OFF) to exercise the espionage matchup
+            devUnlockAllCalls: true,
             chooseFoeAction: (s, r) => trainerPolicy(profile)(s, 'foe', r),
             ...profileIntentInfo(profile),
-            intro: ['DEV BOUT —', 'a DUELIST reads you back.', '(full Reactive)'],
+            intro: ['DEV FORGE —', `${foeName.toUpperCase()} vs ${profile.name}`],
             catchBreathUnlocked: true,
             canRun: true,
             onResolve: (_winner, finalState) => {
@@ -1776,6 +1783,44 @@ function showDevReactiveFight(): void {
       },
     }),
   );
+}
+
+// ── Dev state setters (game-layer, dev-only-called) — flow through existing paths ─
+// Bond STAGE → a value comfortably inside that stage's band (derived from the real
+// BOND_STAGES so derived state — tells, survive-moment — stays consistent). Applied
+// to party slot 1 via the normal partyBond accessor (no parallel dev stage var).
+function bondValueForStage(stage: number): number {
+  if (stage <= 0) return 0; // fresh / Wary floor (tells silent)
+  const s = BOND_STAGES.find((b) => b.stage === stage);
+  if (!s) return 0;
+  const prevMax = BOND_STAGES.find((b) => b.stage === stage - 1)?.max ?? 0;
+  return Math.round((prevMax + s.max) / 2);
+}
+function applyBondStage(stage: number): void { ensureDevParty(); run.partyBond[0] = bondValueForStage(stage); }
+// A fixed dev bundle — every registered item (~5 each), via the normal bagAdd path.
+function stockDevBag(): void { for (const id of Object.keys(ITEMS)) bagAdd(run.bag, id, 5); }
+// Set the RNG seed through the EXISTING variable + rng flow (no change to how it's consumed/saved).
+function setRngSeed(seed: number): void { currentRngSeed = seed >>> 0; run.rng = mulberry32(currentRngSeed); }
+// Show an item list as the dev menu. Submenus REPLACE the list in place (the scene
+// swaps), so there's always exactly one menu scene on the stack; `onBack` (B / the
+// "← back" item) returns to the parent list, or closes at the top level.
+function showDevMenu(items: readonly DevMenuItem[], onBack: () => void): void {
+  const scene = createDevMenuScene(items, onBack);
+  if (devMenuOpen) scenes.replace(scene);
+  else { scenes.push(scene); devMenuOpen = true; }
+}
+// Forge — pick a foe (paged) → pick a REAL trainer profile → spawn the matchup.
+function forgeFoeMenu(): void {
+  const items: DevMenuItem[] = [{ label: '← back', run: openDevMenu }];
+  for (const foe of FORGE_FOES) items.push({ label: `foe: ${foe}`, run: () => forgeProfileMenu(foe) });
+  showDevMenu(items, openDevMenu);
+}
+function forgeProfileMenu(foe: string): void {
+  const items: DevMenuItem[] = [{ label: '← back', run: forgeFoeMenu }];
+  for (const key of Object.keys(TRAINER_PROFILES)) {
+    items.push({ label: `AI: ${key}`, run: () => { devSession = true; closeDevMenu(); showForgeFight(foe, key); } });
+  }
+  showDevMenu(items, forgeFoeMenu);
 }
 function openDevMenu(): void {
   const items: DevMenuItem[] = [];
@@ -1811,13 +1856,16 @@ function openDevMenu(): void {
       closeDevMenu();
     },
   });
+  // ── Battle Forge — arbitrary matchup spawner (foe → real AI profile) ──
+  items.push({ label: 'forge: pick foe ▸', run: forgeFoeMenu });
+  items.push({ label: 'forge: use current party (default)', run: closeDevMenu });
+  items.push({
+    label: 'forge: party = CH1 trio',
+    run: () => { devSession = true; applyDevParty([{ name: 'KINDRAKE', level: null }, { name: 'GRUBLEAF', level: null }, { name: 'SILTSKIP', level: null }]); closeDevMenu(); },
+  });
   items.push({
     label: 'fight: DUELIST (Reactive)',
-    run: () => {
-      devSession = true;
-      closeDevMenu(); // pop the menu → its underlying scene becomes the return target
-      showDevReactiveFight();
-    },
+    run: () => { devSession = true; closeDevMenu(); showForgeFight(CH1_DEX.GALEHAWK ? 'GALEHAWK' : 'SPROUTLE', 'duelist'); },
   });
   items.push({
     label: 'fight: KAMON gate',
@@ -1833,6 +1881,15 @@ function openDevMenu(): void {
       showKamonGate();
     },
   });
+  // ── Bond stage set (active mon) — feel rungs: tells fire at 4/6, survive at 6 ──
+  for (const stage of [0, 2, 4, 6]) {
+    items.push({ label: `bond: stage ${stage}`, run: () => { devSession = true; applyBondStage(stage); closeDevMenu(); } });
+  }
+  // ── Item grant + RNG seed ──
+  items.push({ label: 'items: stock bag', run: () => { devSession = true; stockDevBag(); closeDevMenu(); } });
+  items.push({ label: `seed: show (0x${(currentRngSeed >>> 0).toString(16)})`, run: openDevMenu });
+  items.push({ label: 'seed: set 0xA9C0', run: () => { setRngSeed(0xa9c0); closeDevMenu(); } });
+  items.push({ label: 'seed: reroll', run: () => { setRngSeed(partySeed()); closeDevMenu(); } });
   items.push({
     label: `sfx: ${sfx.isMuted() ? 'unmute' : 'mute'}`,
     run: () => {
@@ -1840,8 +1897,7 @@ function openDevMenu(): void {
       closeDevMenu();
     },
   });
-  devMenuOpen = true;
-  scenes.push(createDevMenuScene(items, closeDevMenu));
+  showDevMenu(items, closeDevMenu);
 }
 function toggleDevMenu(): void {
   if (devMenuOpen) closeDevMenu();
@@ -1852,6 +1908,9 @@ function toggleDevMenu(): void {
 // ?at/?state param is present, so a production build ignores ALL URL params and a
 // dev build without dev-nav params falls through to the legacy ?skip chain / title.
 const devPlan = buildDevPlan({ dev: DEV_BUILD, search: url });
+// ?seed (dev-only) — set the RNG seed BEFORE any consumption. A pure modifier: it
+// doesn't claim the boot, so it composes with a dev boot or a normal one.
+if (DEV_BUILD) { const sp = url.get('seed'); if (sp !== null) { const s = parseSeed(sp); if (s !== null) setRngSeed(s); } }
 if (!DEV_BUILD) {
   // Production: URL params are inert — always boot to the title.
   showTitle();

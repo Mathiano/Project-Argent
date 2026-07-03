@@ -5,7 +5,7 @@
 // the same callbacks. (The main.ts application + the DEV_BUILD read are browser-only.)
 
 import { describe, expect, test, vi } from 'vitest';
-import { AT_TARGETS, PRESETS, buildDevPlan, parsePartySpec, resolvePresets } from './devNav';
+import { AT_TARGETS, PRESETS, FORGE_FOES, buildDevPlan, parsePartySpec, parseFight, parseBond, parseSeed, resolvePresets } from './devNav';
 import { createDevMenuScene, type DevMenuItem } from './scenes/devMenu';
 
 describe('dev-nav — dev-gating (inert without the dev flag)', () => {
@@ -16,6 +16,8 @@ describe('dev-nav — dev-gating (inert without the dev flag)', () => {
     expect(plan.flags).toEqual([]);
     expect(plan.badges).toEqual([]);
     expect(plan.party).toBeNull();
+    expect(plan.fight).toBeNull();
+    expect(plan.bond).toBeNull();
   });
 
   test('a dev build with no dev-nav param is inert (falls through to legacy/title)', () => {
@@ -88,6 +90,50 @@ describe('dev-nav — ?party= loadout (mon:level)', () => {
       { name: 'GRUBLEAF', level: 12 },
       { name: 'KINDRAKE', level: 8 },
     ]);
+  });
+});
+
+describe('dev-nav v2 — ?fight= battle forge', () => {
+  test('parses foe (upper) + optional profile (lower)', () => {
+    expect(buildDevPlan({ dev: true, search: '?fight=galehawk:duelist' }).fight).toEqual({ foe: 'GALEHAWK', profile: 'duelist' });
+    expect(buildDevPlan({ dev: true, search: '?fight=FLITPECK' }).fight).toEqual({ foe: 'FLITPECK', profile: null });
+  });
+  test('?fight claims the boot; parseFight rejects a missing foe', () => {
+    expect(buildDevPlan({ dev: true, search: '?fight=galehawk' }).active).toBe(true);
+    expect(parseFight('')).toBeNull();
+    expect(parseFight('  :duelist')).toBeNull();
+  });
+});
+
+describe('dev-nav v2 — FORGE_FOES table (enumerated, no hardcoded drift)', () => {
+  test('holds real CH1 species + the fixtures; upper-cased, deduped', () => {
+    expect(FORGE_FOES.length).toBeGreaterThan(5);
+    expect(FORGE_FOES).toContain('GALEHAWK'); // CH1 species (from the manifest)
+    expect(FORGE_FOES).toContain('EMBERCUB'); // permanent fixture
+    expect(new Set(FORGE_FOES).size).toBe(FORGE_FOES.length); // deduped
+    for (const f of FORGE_FOES) expect(f).toBe(f.toUpperCase());
+  });
+});
+
+describe('dev-nav v2 — ?bond= stage set', () => {
+  test('accepts the feel rungs 0/2/4/6 only; claims the boot', () => {
+    for (const s of [0, 2, 4, 6]) expect(parseBond(String(s))).toBe(s);
+    expect(parseBond('3')).toBeNull();
+    expect(parseBond('7')).toBeNull();
+    expect(parseBond('x')).toBeNull();
+    expect(buildDevPlan({ dev: true, search: '?bond=6' }).bond).toBe(6);
+    expect(buildDevPlan({ dev: true, search: '?bond=6' }).active).toBe(true);
+  });
+});
+
+describe('dev-nav v2 — ?seed= rng seed', () => {
+  test('parses hex (0x optional) to an unsigned int; rejects non-hex / overlong', () => {
+    expect(parseSeed('a9c0')).toBe(0xa9c0);
+    expect(parseSeed('0xA9C0')).toBe(0xa9c0);
+    expect(parseSeed('FF')).toBe(255);
+    expect(parseSeed('')).toBeNull();
+    expect(parseSeed('xyz')).toBeNull();
+    expect(parseSeed('123456789')).toBeNull(); // > 8 hex digits
   });
 });
 
