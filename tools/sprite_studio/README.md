@@ -59,6 +59,31 @@ palette ∪ `.`, rows count == size, each row length == size (the `validateSprit
 shape). **Download-only** — registering the sprite into `src/game/sprites.ts` stays
 a separate, human step.
 
+## Sampling + 112px native (v1.2)
+
+Sprites ship at **112px native** now ("the game Silver never was") — the engine
+renders a 112px sprite 1× in the battle slot, a 56px sprite 2× (both blessed; other
+sizes letterbox by the integer rule). The size slider runs 40–112, default 112.
+
+Generated sources carry a real implied pixel grid (~8px cells). Two sampling modes
+(GRID + POOLING):
+
+- **area pool** (v1) — area-averages each output cell (softer edges). Unchanged; a
+  Mode-1 area-pool 56px export is byte-identical to v1.1.
+- **grid snap** (auto) — detects the source's implied grid (per-axis edge-energy
+  autocorrelation; shows `grid detected: ~8.5px`), then samples the **median colour
+  of a ±3px neighbourhood at each cell centre** — preserving edges the way
+  area-averaging softens them. On load, a detected grid auto-selects grid-snap and
+  sizes the sprite to its **native cell count** (clamped 40–112) so it fills the
+  slot at native density. A manual cell-size input (4–40) nudges detection.
+
+Extraction (Mode 2) additionally **merges** near-duplicate ramp centroids (RGB
+distance < 24) after median-cut — at 112px with many colours near-dupes cause
+mottle; the count shows `extracted 8 (merged from 12)`.
+
+The A/B strip + battle mock render at the **true in-slot scale** for the chosen
+size (112 → 1×, 56 → 2×), so the mock matches the game exactly.
+
 ## Not in v1
 
 Dex-icon derivation, front/back paired sessions, animation frames, batch import,
