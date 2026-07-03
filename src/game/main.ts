@@ -1618,6 +1618,45 @@ function ensureDevParty(): void {
   run.partyBond = [BOND_START_STARTER];
   run.partyOrigin = ['starter'];
 }
+// DEV — a battle vs a DORMANT Reactive profile (DUELIST: full Reactive + the
+// high-bond Call kit) through the NORMAL trainer prep → battle path. The richest
+// test target in one fight: adaptivity + Calls + the THROW THEM OFF espionage
+// matchup. Dev-only (built only behind the DEV gate that opens this menu); touches
+// NO shipped encounter table — the profile is reached directly, not via a winFlag.
+function showDevReactiveFight(): void {
+  ensureDevParty();
+  const profile = TRAINER_PROFILES.duelist!;
+  const foeName = CH1_DEX.GALEHAWK ? 'GALEHAWK' : 'SPROUTLE'; // a real CH1 threat, else a fixture fallback
+  const foeTeam = buildTrainerTeam(foeName);
+  if (!foeTeam) return;
+  scenes.push(
+    createPrepScene({
+      playerSpecies: partyLead(),
+      foeSpecies: activeMon(foeTeam).species,
+      foeTrainerName: 'DUELIST',
+      onContinue: () => {
+        const state = createBattleState(buildPlayerTeam(), foeTeam, { typeChart: TYPECHART_CH1 });
+        scenes.replace(
+          createBattleScene({
+            state,
+            rng: run.rng,
+            ...bondSceneProps(foeTeam, 'trainer'), // Lane A — bond meter + post-win advance
+            devUnlockAllCalls: true, // dev — the full player Call kit (incl. THROW THEM OFF) to exercise the espionage matchup
+            chooseFoeAction: (s, r) => trainerPolicy(profile)(s, 'foe', r),
+            ...profileIntentInfo(profile),
+            intro: ['DEV BOUT —', 'a DUELIST reads you back.', '(full Reactive)'],
+            catchBreathUnlocked: true,
+            canRun: true,
+            onResolve: (_winner, finalState) => {
+              writebackParty(finalState);
+              scenes.pop(); // back to the scene under the (now-closed) dev menu
+            },
+          }),
+        );
+      },
+    }),
+  );
+}
 function openDevMenu(): void {
   const items: DevMenuItem[] = [];
   for (const [alias, t] of Object.entries(AT_TARGETS)) {
@@ -1650,6 +1689,14 @@ function openDevMenu(): void {
       devSession = true;
       applyDevParty([{ name: 'KINDRAKE', level: null }, { name: 'GRUBLEAF', level: null }, { name: 'SILTSKIP', level: null }]);
       closeDevMenu();
+    },
+  });
+  items.push({
+    label: 'fight: DUELIST (Reactive)',
+    run: () => {
+      devSession = true;
+      closeDevMenu(); // pop the menu → its underlying scene becomes the return target
+      showDevReactiveFight();
     },
   });
   devMenuOpen = true;
