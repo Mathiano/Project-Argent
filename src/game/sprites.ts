@@ -4,6 +4,14 @@
 import embercubData from '../../assets/sprites/embercub.sprite.json';
 import grubleafData from '../../assets/sprites/GRUBLEAF.sprite.json';
 import kindrakeData from '../../assets/sprites/KINDRAKE.sprite.json';
+import flitpeckData from '../../assets/sprites/FLITPECK.sprite.json';
+import flitpeckBackData from '../../assets/sprites/FLITPECK_BACK.sprite.json';
+import galehawkData from '../../assets/sprites/GALEHAWK.sprite.json';
+import galehawkBackData from '../../assets/sprites/GALEHAWK_BACK.sprite.json';
+import marshmashData from '../../assets/sprites/MARSHMASH.sprite.json';
+import marshmashBackData from '../../assets/sprites/MARSHMASH_BACK.sprite.json';
+import siltskipData from '../../assets/sprites/SILTSKIP.sprite.json';
+import siltskipBackData from '../../assets/sprites/SILTSKIP_BACK.sprite.json';
 import ch1BatchData from '../../docs/ch1-batch.json';
 import type { ElementType } from '../engine';
 import type { Facing, Sprite } from './sprite';
@@ -12,6 +20,17 @@ import { drawSprite, drawSpriteInSlot, validateSprite } from './sprite';
 const EMBERCUB_56: Sprite = embercubData as Sprite;
 const GRUBLEAF_56: Sprite = grubleafData as Sprite;
 const KINDRAKE_56: Sprite = kindrakeData as Sprite;
+// Commissioned CH1 art (front + back). Fronts author facing:'left' (field omitted,
+// the existing convention); backs author facing:'right' → resolveFlip is a no-op
+// against the player slot's facing:'right' (no mirroring).
+const FLITPECK_56: Sprite = flitpeckData as Sprite;
+const FLITPECK_BACK_56: Sprite = flitpeckBackData as Sprite;
+const GALEHAWK_56: Sprite = galehawkData as Sprite;
+const GALEHAWK_BACK_56: Sprite = galehawkBackData as Sprite;
+const MARSHMASH_56: Sprite = marshmashData as Sprite;
+const MARSHMASH_BACK_56: Sprite = marshmashBackData as Sprite;
+const SILTSKIP_56: Sprite = siltskipData as Sprite;
+const SILTSKIP_BACK_56: Sprite = siltskipBackData as Sprite;
 
 const SPROUTLE_14: Sprite = {
   name: 'SPROUTLE',
@@ -80,7 +99,11 @@ const FUZZLET_14: Sprite = {
 };
 
 // Validate at module load so bad data fails fast.
-[EMBERCUB_56, GRUBLEAF_56, KINDRAKE_56, SPROUTLE_14, AQUAFIN_14, FUZZLET_14].forEach(validateSprite);
+[
+  EMBERCUB_56, GRUBLEAF_56, KINDRAKE_56, SPROUTLE_14, AQUAFIN_14, FUZZLET_14,
+  FLITPECK_56, FLITPECK_BACK_56, GALEHAWK_56, GALEHAWK_BACK_56,
+  MARSHMASH_56, MARSHMASH_BACK_56, SILTSKIP_56, SILTSKIP_BACK_56,
+].forEach(validateSprite);
 
 const REGISTRY: { readonly [name: string]: Sprite } = {
   EMBERCUB: EMBERCUB_56,
@@ -89,6 +112,19 @@ const REGISTRY: { readonly [name: string]: Sprite } = {
   SPROUTLE: SPROUTLE_14,
   AQUAFIN: AQUAFIN_14,
   FUZZLET: FUZZLET_14,
+  FLITPECK: FLITPECK_56,
+  GALEHAWK: GALEHAWK_56,
+  MARSHMASH: MARSHMASH_56,
+  SILTSKIP: SILTSKIP_56,
+};
+
+// Back-view sprites, keyed by species name. A species with no back entry falls
+// back to its front (see drawSpeciesInSlot), so un-authored mons are unchanged.
+const BACK_REGISTRY: { readonly [name: string]: Sprite } = {
+  FLITPECK: FLITPECK_BACK_56,
+  GALEHAWK: GALEHAWK_BACK_56,
+  MARSHMASH: MARSHMASH_BACK_56,
+  SILTSKIP: SILTSKIP_BACK_56,
 };
 
 export function getSprite(name: string): Sprite | null {
@@ -321,9 +357,12 @@ export function drawSpeciesInSlot(
   species: SpeciesRef,
   slotX: number,
   slotY: number,
-  options: { slotSize?: number; flip?: boolean; facing?: Facing; fillSlot?: boolean; bottomAnchor?: boolean } = {},
+  options: { slotSize?: number; flip?: boolean; facing?: Facing; fillSlot?: boolean; bottomAnchor?: boolean; view?: 'front' | 'back' } = {},
 ): void {
-  const sprite = getSprite(species.name);
+  // view defaults to FRONT (today's getSprite path — every existing caller is
+  // byte-identical). 'back' prefers the back sprite, falling back to the front so
+  // an un-authored mon (KINDRAKE, placeholders) is unchanged.
+  const sprite = options.view === 'back' ? BACK_REGISTRY[species.name] ?? getSprite(species.name) : getSprite(species.name);
   if (sprite) {
     const flip = resolveFlip(sprite, options);
     // `fillSlot` (beat 3) upscales real pixel art by the largest INTEGER factor

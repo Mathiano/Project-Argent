@@ -4,8 +4,17 @@
 // can tell the mons apart at a glance (not an identical "?").
 
 import { describe, expect, test } from 'vitest';
-import { drawPlaceholder, drawSprite, drawSpriteInSlot } from './sprites';
+import { drawPlaceholder, drawSprite, drawSpriteInSlot, drawSpeciesInSlot } from './sprites';
+import { validateSprite } from './sprite';
 import type { Sprite } from './sprite';
+import flitpeck from '../../assets/sprites/FLITPECK.sprite.json';
+import flitpeckBack from '../../assets/sprites/FLITPECK_BACK.sprite.json';
+import galehawk from '../../assets/sprites/GALEHAWK.sprite.json';
+import galehawkBack from '../../assets/sprites/GALEHAWK_BACK.sprite.json';
+import marshmash from '../../assets/sprites/MARSHMASH.sprite.json';
+import marshmashBack from '../../assets/sprites/MARSHMASH_BACK.sprite.json';
+import siltskip from '../../assets/sprites/SILTSKIP.sprite.json';
+import siltskipBack from '../../assets/sprites/SILTSKIP_BACK.sprite.json';
 
 // Recording ctx: maps every filled pixel → its colour, so we can compare
 // silhouette masks + colour palettes between species.
@@ -166,5 +175,104 @@ describe('integer sprite scaling (beat 3 — no fractional smoothing)', () => {
     const { ctx, rects } = rectCtx();
     drawSpriteInSlot(ctx, sprite, 0, 0, { slotSize: 112 }); // no fillSlot
     for (const r of rects) expect(r.w).toBe(1); // 1×1 cells → native, unscaled
+  });
+});
+
+// ── Back-view sprites + FLITPECK/GALEHAWK/MARSHMASH/SILTSKIP art ──────────────
+describe('commissioned CH1 art — front + back sprites', () => {
+  function rectCtx() {
+    const rects: { x: number; y: number; w: number; h: number }[] = [];
+    return {
+      rects,
+      ctx: new Proxy(
+        { rects },
+        {
+          get(_t, p) {
+            if (p === 'rects') return rects;
+            if (p === 'fillRect') return (x: number, y: number, w: number, h: number) => rects.push({ x, y, w, h });
+            return () => {};
+          },
+          set: () => true,
+        },
+      ) as unknown as CanvasRenderingContext2D & { rects: { x: number; y: number; w: number; h: number }[] },
+    };
+  }
+  // The battle-slot draw contract: 56px art, 112 slot, fillSlot 2× integer, bottom-anchored.
+  function renderInSlot(name: string, view?: 'front' | 'back') {
+    const { ctx, rects } = rectCtx();
+    drawSpeciesInSlot(ctx, { name, type: null }, 0, 0, {
+      slotSize: 112, fillSlot: true, bottomAnchor: true, ...(view ? { view } : {}),
+    });
+    return rects;
+  }
+
+  const NEW = [
+    { name: 'FLITPECK', front: flitpeck, back: flitpeckBack },
+    { name: 'GALEHAWK', front: galehawk, back: galehawkBack },
+    { name: 'MARSHMASH', front: marshmash, back: marshmashBack },
+    { name: 'SILTSKIP', front: siltskip, back: siltskipBack },
+  ] as const;
+
+  test('per-sprite pins — all eight validate, are 56px, and carry a palette', () => {
+    for (const { front, back } of NEW) {
+      for (const raw of [front, back]) {
+        const s = raw as unknown as Sprite;
+        expect(() => validateSprite(s)).not.toThrow();
+        expect(s.size).toBe(56);
+        expect(s.rows.length).toBe(56);
+        expect(Object.keys(s.palette).length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  test('fronts route through getSprite → real art (not the placeholder) in the slot', () => {
+    for (const { name } of NEW) {
+      const rects = renderInSlot(name); // default front
+      expect(rects.length, name).toBeGreaterThan(0);
+      // Real fillSlot art draws 2×2 blocks; the placeholder path draws 1×1 pixels.
+      expect(rects.every((r) => r.w === 2 && r.h === 2), name).toBe(true);
+    }
+  });
+
+  test('view:"back" renders the back art (distinct from the front) for authored mons', () => {
+    for (const { name } of NEW) {
+      const front = renderInSlot(name, 'front');
+      const back = renderInSlot(name, 'back');
+      expect(back.length, name).toBeGreaterThan(0);
+      // Front + back are different art → their rect footprints differ.
+      expect(back, name).not.toEqual(front);
+    }
+  });
+
+  test('back FALLBACK — a front-only mon (KINDRAKE) renders view:"back" bit-identical to front', () => {
+    const front = renderInSlot('KINDRAKE', 'front');
+    const back = renderInSlot('KINDRAKE', 'back'); // no back authored → falls back to front
+    expect(back).toEqual(front);
+  });
+
+  test('bounds harness — every new front + a back satisfies the fillSlot 2× / floor bounds', () => {
+    const cases: Array<[string, 'front' | 'back']> = [
+      ['FLITPECK', 'front'], ['GALEHAWK', 'front'], ['MARSHMASH', 'front'], ['SILTSKIP', 'front'], ['FLITPECK', 'back'],
+    ];
+    for (const [name, view] of cases) {
+      const rects = renderInSlot(name, view);
+      expect(rects.length, `${name}/${view}`).toBeGreaterThan(0);
+      for (const r of rects) {
+        // Clean integer 2× blocks.
+        expect(r.w, `${name}/${view}`).toBe(2);
+        expect(r.h, `${name}/${view}`).toBe(2);
+        expect(Number.isInteger(r.x) && Number.isInteger(r.y), `${name}/${view}`).toBe(true);
+        // Fully inside the 112 slot (floor bounds — nothing escapes the stage tile).
+        expect(r.x, `${name}/${view}`).toBeGreaterThanOrEqual(0);
+        expect(r.y, `${name}/${view}`).toBeGreaterThanOrEqual(0);
+        expect(r.x + r.w, `${name}/${view}`).toBeLessThanOrEqual(112);
+        expect(r.y + r.h, `${name}/${view}`).toBeLessThanOrEqual(112);
+      }
+      // Bottom-anchored: the 56-row grid's floor sits at the slot floor (112), so
+      // the lowest DRAWN block reaches within a grid row of it (art isn't floating).
+      const floor = Math.max(...rects.map((r) => r.y + r.h));
+      expect(floor, `${name}/${view}`).toBeLessThanOrEqual(112);
+      expect(floor, `${name}/${view}`).toBeGreaterThanOrEqual(108); // ≥ grid-row-55 minus one row (54→110)
+    }
   });
 });

@@ -3381,7 +3381,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         { name: monDisplayName(display.player), type: display.player.species.types[0] ?? null },
         plX,
         PL_SLOT.y,
-        { facing: 'right', slotSize: BATTLE_SLOT, fillSlot: true, bottomAnchor: true },
+        { facing: 'right', slotSize: BATTLE_SLOT, fillSlot: true, bottomAnchor: true, view: 'back' },
       );
       drawSpriteFlash(ctx, 'player', plX, PL_SLOT.y);
 
