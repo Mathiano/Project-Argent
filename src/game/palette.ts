@@ -29,6 +29,17 @@ export const PALETTE = {
   battleGround: '#cfe0b0',
   platform: '#c9d6a4',
 
+  // Battle ARENA (beat 3 — the painted stage). Additive keys; warm "not a desert"
+  // greens + tan. STARTING VALUES for the live eye-tune. Nothing shared repointed.
+  arenaSky: '#eaf1dc', // warm pale sky
+  arenaHorizon: '#d9e5bb', // the soft sky→ground transition band
+  arenaField: '#d4e2ad', // the big clearing ellipse — a lighter warm-green field
+  arenaGround: '#c3d79b', // base ground below the horizon
+  arenaGrass: '#9cbf6a', // scattered grass tufts
+  arenaPebble: '#c8b98e', // scattered pebbles (tan)
+  platformTop: '#cfdca4', // restyled platform — lit top
+  platformSide: '#a7bc7c', // restyled platform — shaded rim
+
   // Star / momentum
   star: '#c9a227',
   starOff: '#b8b09a',

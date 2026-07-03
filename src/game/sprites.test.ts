@@ -4,7 +4,8 @@
 // can tell the mons apart at a glance (not an identical "?").
 
 import { describe, expect, test } from 'vitest';
-import { drawPlaceholder } from './sprites';
+import { drawPlaceholder, drawSprite, drawSpriteInSlot } from './sprites';
+import type { Sprite } from './sprite';
 
 // Recording ctx: maps every filled pixel → its colour, so we can compare
 // silhouette masks + colour palettes between species.
@@ -104,5 +105,66 @@ describe('distinct placeholders', () => {
     ] as const) {
       expect(render(name, type).count, name).toBeGreaterThan(60);
     }
+  });
+});
+
+// ── Beat 3 — INTEGER sprite scaling (bigger battle sprites, pixel-crisp) ──────
+describe('integer sprite scaling (beat 3 — no fractional smoothing)', () => {
+  function rectCtx() {
+    const rects: { x: number; y: number; w: number; h: number }[] = [];
+    return {
+      rects,
+      ctx: new Proxy(
+        { rects },
+        {
+          get(_t, p) {
+            if (p === 'rects') return rects;
+            if (p === 'fillRect') return (x: number, y: number, w: number, h: number) => rects.push({ x, y, w, h });
+            return () => {};
+          },
+          set: () => true,
+        },
+      ) as unknown as CanvasRenderingContext2D & { rects: { x: number; y: number; w: number; h: number }[] },
+    };
+  }
+
+  test('drawSprite at scale 2 emits 2×2 integer blocks (crisp, no smoothing)', () => {
+    const sprite: Sprite = { name: 'T', size: 2, palette: { a: '#ff0000' }, rows: ['aa', 'a.'] };
+    const { ctx, rects } = rectCtx();
+    drawSprite(ctx, sprite, 10, 20, { scale: 2 });
+    expect(rects.length).toBe(3); // 3 filled cells (aa / a.)
+    for (const r of rects) {
+      expect(r.w).toBe(2);
+      expect(r.h).toBe(2);
+      expect(Number.isInteger(r.x)).toBe(true);
+      expect(Number.isInteger(r.y)).toBe(true);
+    }
+    // cells (0,0)(1,0)(0,1) → origins step by the scale (2) from (10,20).
+    expect(rects.map((r) => `${r.x},${r.y}`).sort()).toEqual(['10,20', '10,22', '12,20'].sort());
+  });
+
+  test('fillSlot fills a 112 slot with 56px art at a clean 2× (integer, bottom-anchored)', () => {
+    const rows = Array.from({ length: 56 }, () => 'a'.repeat(56));
+    const sprite: Sprite = { name: 'B', size: 56, palette: { a: '#00ff00' }, rows };
+    const { ctx, rects } = rectCtx();
+    drawSpriteInSlot(ctx, sprite, 0, 0, { slotSize: 112, fillSlot: true });
+    const xs = rects.map((r) => r.x);
+    const ys = rects.map((r) => r.y);
+    const right = Math.max(...rects.map((r) => r.x + r.w));
+    const bottom = Math.max(...rects.map((r) => r.y + r.h));
+    // 56 × floor(112/56)=2 → the art spans exactly 112px, integer, filling the slot.
+    expect(right - Math.min(...xs)).toBe(112);
+    expect(bottom - Math.min(...ys)).toBe(112);
+    expect(Math.min(...xs)).toBe(0); // centred: (112-112)/2
+    expect(Math.min(...ys)).toBe(0); // bottom-anchored: 112-112
+    for (const r of rects) expect(r.w).toBe(2); // every source pixel → a 2×2 block
+  });
+
+  test('WITHOUT fillSlot the sprite is NATIVE size (existing callers byte-identical)', () => {
+    const rows = Array.from({ length: 56 }, () => 'a'.repeat(56));
+    const sprite: Sprite = { name: 'N', size: 56, palette: { a: '#0000ff' }, rows };
+    const { ctx, rects } = rectCtx();
+    drawSpriteInSlot(ctx, sprite, 0, 0, { slotSize: 112 }); // no fillSlot
+    for (const r of rects) expect(r.w).toBe(1); // 1×1 cells → native, unscaled
   });
 });

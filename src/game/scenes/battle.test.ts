@@ -1835,23 +1835,42 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
   // where strike animations travel. Beat-1's grown panels intruded it; the tune
   // restores compact footprints so it is panel-FREE. Sample the centreline and
   // assert no point falls inside a panel rect (backgrounds excluded).
+  const SLOT = 112; // BATTLE_SLOT (beat 3)
+  // Full-WIDTH fills (w≥600) are the ARENA bands (sky/horizon/ground) + the console
+  // + the flash — the STAGE itself + chrome below it, NOT obstacles. Panels are
+  // ≤372 wide, so they're the only rects checked.
+  const panelRects = (ctx: ReturnType<typeof recordingCtx>) => ctx.rects.filter((r) => r.w < 600);
+
+  const hits = (panels: { x: number; y: number; w: number; h: number }[], px: number, py: number): boolean =>
+    panels.some((r) => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h);
+
   function assertCorridorClear(ctx: ReturnType<typeof recordingCtx>, label: string): void {
-    const A = { x: 96 + 48, y: 140 + 48 }; // PL_SLOT centre (BATTLE_SLOT 96)
-    const B = { x: 472 + 48, y: 12 + 48 }; // FOE_SLOT centre
-    const isBg = (r: { w: number; h: number }) => r.w >= 600 && r.h >= 300; // sky / flash
-    const panels = ctx.rects.filter((r) => !isBg(r));
+    const A = { x: 96 + SLOT / 2, y: 140 + SLOT / 2 }; // PL_SLOT centre
+    const B = { x: 472 + SLOT / 2, y: 12 + SLOT / 2 }; // FOE_SLOT centre
+    const panels = panelRects(ctx);
     const N = 24;
+    const bad: string[] = [];
     for (let i = 0; i <= N; i += 1) {
-      // Sample the MID-BAND (t∈[0.2,0.8]) — the endpoints sit inside the sprite
-      // placeholders themselves; the intrusion risk is a PANEL in the middle.
-      const t = 0.2 + 0.6 * (i / N);
+      const t = 0.2 + 0.6 * (i / N); // mid-band (endpoints sit inside the sprites)
       const cx = A.x + (B.x - A.x) * t;
       const cy = A.y + (B.y - A.y) * t;
-      for (const r of panels) {
-        const inside = cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h;
-        expect(inside, `${label}: corridor point (${cx.toFixed(0)},${cy.toFixed(0)}) inside a panel`).toBe(false);
+      if (hits(panels, cx, cy)) bad.push(`(${cx.toFixed(0)},${cy.toFixed(0)})`);
+    }
+    expect(bad, `${label}: corridor points inside a panel: ${bad.join(' ')}`).toEqual([]);
+  }
+
+  // Beat 3 — the ENLARGED STAGE: PL_PANEL nudged down (y150→196) + the compact foe
+  // panel open a WIDE middle band. Assert a generous stage rectangle (the mock's
+  // open centre) is entirely panel-free — the band grew vs pre-beat-3.
+  function assertStageBand(ctx: ReturnType<typeof recordingCtx>, label: string): void {
+    const panels = panelRects(ctx);
+    const bad: string[] = [];
+    for (let sy = 80; sy <= 190; sy += 10) {
+      for (let sx = 210; sx <= 430; sx += 20) {
+        if (hits(panels, sx, sy)) bad.push(`(${sx},${sy})`);
       }
     }
+    expect(bad, `${label}: stage points inside a panel: ${bad.join(' ')}`).toEqual([]);
   }
 
   // Check at RESOLVE — the phase where strikes actually animate. The INTENT tell
@@ -1863,17 +1882,30 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
     scene.input?.('a'); // commit → resolve (first frame: no callout yet)
   }
 
-  test('the attack corridor between the sprite slots is panel-free (regular + boss)', () => {
+  test('the attack corridor + the enlarged stage band are panel-free (regular + boss)', () => {
     const s1 = richScene();
     toResolve(s1);
     const c1 = recordingCtx();
     s1.draw(c1);
     assertCorridorClear(c1, 'regular');
+    assertStageBand(c1, 'regular'); // the wide middle band the nudge-down opened
     const s2 = richScene(BOSS_CARD);
     toResolve(s2);
     const c2 = recordingCtx();
     s2.draw(c2);
     assertCorridorClear(c2, 'boss'); // the taller (boss) foe panel must still clear it
+    assertStageBand(c2, 'boss');
+  });
+
+  test('beat 3 — the painted arena is DETERMINISTIC (no per-frame shimmer / RNG)', () => {
+    const scene = richScene();
+    scene.update?.(0.01);
+    const a = recordingCtx();
+    scene.draw(a);
+    const b = recordingCtx();
+    scene.draw(b); // same state, no update between → every primitive must match
+    expect(b.rects).toEqual(a.rects);
+    expect(b.texts).toEqual(a.texts);
   });
 
   test('the RELEASE + RESOLVE phases stay within 640×360 bounds', () => {

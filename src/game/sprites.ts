@@ -306,14 +306,17 @@ export function drawSpeciesInSlot(
   species: SpeciesRef,
   slotX: number,
   slotY: number,
-  options: { slotSize?: number; flip?: boolean; facing?: Facing } = {},
+  options: { slotSize?: number; flip?: boolean; facing?: Facing; fillSlot?: boolean } = {},
 ): void {
   const sprite = getSprite(species.name);
   if (sprite) {
     const flip = resolveFlip(sprite, options);
-    const drawOpts: { slotSize?: number; flip: boolean } =
+    // `fillSlot` (beat 3) upscales real pixel art by the largest INTEGER factor
+    // that fits (56px art in the 112px battle slot → 2×). The placeholder branch
+    // below already scales to slotSize (normalized sampling), so both fill the slot.
+    const drawOpts: { slotSize?: number; flip: boolean; fillSlot?: boolean } =
       options.slotSize !== undefined
-        ? { slotSize: options.slotSize, flip }
+        ? { slotSize: options.slotSize, flip, ...(options.fillSlot ? { fillSlot: true } : {}) }
         : { flip };
     drawSpriteInSlot(ctx, sprite, slotX, slotY, drawOpts);
     return;

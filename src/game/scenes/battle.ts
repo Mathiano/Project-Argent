@@ -134,14 +134,17 @@ const FOE_BREAK_EXTRA = 13; // a boss adds the compact GYM-LEADER/gust strip + t
 const FOE_SLOT = { x: 472, y: 12 } as const; // upper-right sprite slot
 const INTENT = { x: 8, y: 76, w: 340, h: 18 } as const; // mid strip — re-derived UP under the compacted foe panel (ends y60 / y65 boss), clear of the player sprite (y140)
 const PL_SLOT = { x: 96, y: 140 } as const; // mid-left sprite slot
-const PL_PANEL = { x: 300, y: 150, w: 332, h: 60 } as const; // mid-right (was h84; compacted rows, housed BOND kept)
+// Beat 3 — PL_PANEL NUDGES DOWN to hug the console (y150→196; ends y256, a ~4px
+// gap above BOTTOM y260), opening the mock's wide middle STAGE band. The housed
+// BOND/bench rows move with it.
+const PL_PANEL = { x: 300, y: 196, w: 332, h: 60 } as const; // mid-right (nudged down to hug the console)
 // Beat 2.5 — the console (BOTTOM) compacted + BOTTOM-anchored at 356 (a shorter
 // bar hugging the screen edge → MORE open stage above it, so the corridor only
 // widens). Was y244 h112.
 const BOTTOM = { x: 4, y: 260, w: 632, h: 92 } as const; // full-width bottom (bottom edge 352 → shadow clears 360)
 // Battle-scaled draw sizes: the sprite slot + the HP/ST bar height. Beat 2.5 —
 // the bars THIN to 8px (was 12) as part of the ~30% chrome compaction.
-const BATTLE_SLOT = 96;
+const BATTLE_SLOT = 112; // beat 3 — the CD spec's slot; 2× of the 56px source art (clean integer scale)
 const BATTLE_BAR_H = 8;
 
 // ── Battle-UI v2 (beat 2.5) — SINGLE-tier, SINGLE-weight type, battle-SCOPED ───
@@ -268,6 +271,59 @@ function drawStars(ctx: CanvasRenderingContext2D, x: number, y: number, count: n
     ctx.fillText('★', x + i * STAR_STEP, y);
   }
   return x + cap * STAR_STEP;
+}
+
+// ── Battle-UI v2 (beat 3) — the PAINTED STAGE ────────────────────────────────
+// The DEFAULT arena "made alive" (NOT the deferred biome-slot system). Deterministic
+// scatter computed ONCE at module load from a fixed seed → the stage never shimmers
+// between frames (zero per-frame RNG). Positions sit in the ground band, below the
+// horizon + above the console; panels/sprites draw ON TOP.
+const ARENA_HORIZON = 150; // sky above, ground below
+const ARENA_SCATTER = ((): { tufts: readonly (readonly [number, number])[]; pebbles: readonly (readonly [number, number])[] } => {
+  const rng = mulberry32(0xa2e33);
+  const tufts: [number, number][] = [];
+  const pebbles: [number, number][] = [];
+  for (let i = 0; i < 30; i += 1) tufts.push([12 + Math.floor(rng.next() * 616), 160 + Math.floor(rng.next() * 90)]);
+  for (let i = 0; i < 20; i += 1) pebbles.push([12 + Math.floor(rng.next() * 616), 166 + Math.floor(rng.next() * 86)]);
+  return { tufts, pebbles };
+})();
+
+function drawArena(ctx: CanvasRenderingContext2D): void {
+  // Sky + ground base.
+  ctx.fillStyle = PALETTE.arenaSky;
+  ctx.fillRect(0, 0, BATTLE_LOGICAL_W, ARENA_HORIZON);
+  ctx.fillStyle = PALETTE.arenaGround;
+  ctx.fillRect(0, ARENA_HORIZON, BATTLE_LOGICAL_W, BATTLE_LOGICAL_H - ARENA_HORIZON);
+  // The soft horizon transition band (sky meets ground).
+  ctx.fillStyle = PALETTE.arenaHorizon;
+  ctx.fillRect(0, ARENA_HORIZON - 5, BATTLE_LOGICAL_W, 10);
+  // The big soft CLEARING ellipse — a lighter warm-green field under both mons.
+  ctx.fillStyle = PALETTE.arenaField;
+  ctx.beginPath();
+  ctx.ellipse(BATTLE_LOGICAL_W / 2, 214, 300, 78, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Grass tufts (small 3px clusters) + pebbles (2px) — sparse, deterministic.
+  ctx.fillStyle = PALETTE.arenaGrass;
+  for (const [tx, ty] of ARENA_SCATTER.tufts) {
+    ctx.fillRect(tx, ty + 1, 1, 2);
+    ctx.fillRect(tx + 1, ty, 1, 3);
+    ctx.fillRect(tx + 2, ty + 1, 1, 2);
+  }
+  ctx.fillStyle = PALETTE.arenaPebble;
+  for (const [px, py] of ARENA_SCATTER.pebbles) ctx.fillRect(px, py, 2, 2);
+}
+
+// A restyled PLATFORM ellipse sitting IN the clearing (lit top + shaded rim),
+// rather than a flat disc floating on green.
+function drawPlatform(ctx: CanvasRenderingContext2D, cx: number, cy: number, rx: number, ry: number): void {
+  ctx.fillStyle = PALETTE.platformSide;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 2, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = PALETTE.platformTop;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 // A HP/ST STAT ROW — a 32px primary LABEL, the value bar, and a fine-print
@@ -2506,11 +2562,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // just above it. Replaces the old pip row.
   function drawBossBreak(ctx: CanvasRenderingContext2D, x: number, w: number, py: number, h: number): void {
     const stripY = py + FOE_PANEL.h; // the +FOE_BREAK_EXTRA strip
-    // GYM LEADER role tag (left) — CH1 bosses are gym leaders (a static default;
-    // reversible to a bossCard title field). Fine-print framed tag.
-    drawPanelTags(ctx, x + 62, stripY, [{ label: 'GYM LEADER', color: PALETTE.velvet }]);
+    // GYM LEADER role tag — RIGHT-ALIGNED to the panel's right inner edge (the
+    // mock's position; beat-3 eye-gate fix). CH1 bosses are gym leaders (a static
+    // default; reversible to a bossCard title field). Fine-print framed tag.
+    drawPanelTags(ctx, x + w - 6, stripY, [{ label: 'GYM LEADER', color: PALETTE.velvet }]);
     drawText(ctx, 'BREAK', x + 8, stripY + 1, breakPipFlashT > 0 ? PALETTE.momentumGoldHi : PALETTE.frameInkSoft);
-    // Gust cue (Falkner) — relocated to the right of the role tag, compact.
+    // Gust cue (Falkner) — to the LEFT (beside BREAK), keeping clear of the
+    // right-anchored role tag.
     const arena = state.bossCard?.arenaSchedule;
     if (arena && arena.rhythmEveryN > 0) {
       const anchor = state.rhythmAnchor ?? 0;
@@ -2519,7 +2577,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const nextIsGust = (state.round + 1 - anchor) % arena.rhythmEveryN === 0;
       if (currentIsGust || nextIsGust) {
         const gustW = 72;
-        const gustX = x + w - 10 - gustW;
+        const gustX = x + 58; // beside the BREAK label, clear of the right tag
         const pulse = currentIsGust ? 0.55 + 0.4 * Math.sin(tick * 6) : 0.5;
         ctx.fillStyle = currentIsGust ? `rgba(70,150,230,${pulse})` : 'rgba(80,140,210,0.5)';
         ctx.fillRect(gustX, stripY, gustW, 11);
@@ -3144,35 +3202,30 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     },
 
     draw(ctx) {
-      ctx.fillStyle = PALETTE.battleSky;
-      ctx.fillRect(0, 0, BATTLE_LOGICAL_W, BATTLE_LOGICAL_H);
-      // Arena ground band — the horizon the fighters stand on, just above the
-      // bottom command panel (BOTTOM.y 238).
-      ctx.fillStyle = PALETTE.battleGround;
-      ctx.fillRect(0, 214, BATTLE_LOGICAL_W, 24);
+      // Beat 3 — the PAINTED STAGE (sky · horizon band · ground · clearing ellipse
+      // · deterministic grass/pebbles). Replaces the flat sky + ground strip.
+      drawArena(ctx);
 
-      // Platforms under each fighter (centered on the BATTLE_SLOT sprite).
-      ctx.fillStyle = PALETTE.platform;
-      ctx.beginPath();
-      ctx.ellipse(FOE_SLOT.x + BATTLE_SLOT / 2, FOE_SLOT.y + BATTLE_SLOT, 52, 9, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(PL_SLOT.x + BATTLE_SLOT / 2, PL_SLOT.y + BATTLE_SLOT, 56, 10, 0, 0, Math.PI * 2);
-      ctx.fill();
+      // Restyled platforms IN the clearing under each fighter (grown to the 112
+      // slot). Lit top + shaded rim, so the mons stand on the field, not float.
+      drawPlatform(ctx, FOE_SLOT.x + BATTLE_SLOT / 2, FOE_SLOT.y + BATTLE_SLOT, 58, 10);
+      drawPlatform(ctx, PL_SLOT.x + BATTLE_SLOT / 2, PL_SLOT.y + BATTLE_SLOT, 64, 12);
 
+      // Sprites — fillSlot upscales real 56px art by the largest INTEGER factor
+      // that fits (2× → 112, pixel-crisp); placeholders already scale to the slot.
       drawSpeciesInSlot(
         ctx,
         { name: display.foe.species.name, type: display.foe.species.types[0] ?? null },
         FOE_SLOT.x + spriteOffset('foe'),
         FOE_SLOT.y,
-        { facing: 'left', slotSize: BATTLE_SLOT },
+        { facing: 'left', slotSize: BATTLE_SLOT, fillSlot: true },
       );
       drawSpeciesInSlot(
         ctx,
         { name: monDisplayName(display.player), type: display.player.species.types[0] ?? null },
         PL_SLOT.x + spriteOffset('player'),
         PL_SLOT.y,
-        { facing: 'right', slotSize: BATTLE_SLOT },
+        { facing: 'right', slotSize: BATTLE_SLOT, fillSlot: true },
       );
 
       drawReadReaction(ctx); // surface ③ — over the mon, under the HUD panels
