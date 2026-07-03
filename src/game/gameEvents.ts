@@ -8,12 +8,15 @@
 // Game-layer only — the engine stays pure/headless and emits nothing, so
 // the sim/ladders never touch this. Pure addition; no logic reads events.
 
-import type { Side, Stance } from '../engine';
+import type { ReleaseKind, Side, Stance } from '../engine';
 
 export type GameEvent =
   | { readonly kind: 'battle-start' }
   | { readonly kind: 'battle-end'; readonly winner: Side }
   | { readonly kind: 'menu-move' }
+  // A confirm/commit A-press (menu selection). Presentation-only — the SFX layer's
+  // "confirm" blip (distinct from menu-move's cursor tick).
+  | { readonly kind: 'ui-confirm' }
   // Menu back / cancel (B-press out of a menu). Presentation-only — emitted at the
   // pause-menu back this slice; the sound was already built (slice 1), now wired.
   | { readonly kind: 'ui-cancel' }
@@ -26,6 +29,13 @@ export type GameEvent =
   | { readonly kind: 'dialogue-open' }
   | { readonly kind: 'dialogue-advance' }
   | { readonly kind: 'hit-landed'; readonly side: Side; readonly effectiveness: number }
+  // FOCUS wind-up (R1) — a mon commits a hidden release. The SFX telegraph cue: the
+  // charge is PART OF THE READ (combat audio = information), so it must be unmistakable.
+  | { readonly kind: 'focus-windup'; readonly side: Side }
+  // FOCUS release (R2) — the hidden release lands. Carries the KIND (heavy/feint/hide)
+  // + the OUTCOME so the SFX plays a distinct impact per release (a player with eyes
+  // closed should know which one landed). Rides alongside the release's hit-landed.
+  | { readonly kind: 'release'; readonly side: Side; readonly release: ReleaseKind; readonly outcome: 'win' | 'lose' | 'neutral' }
   | { readonly kind: 'ko'; readonly side: Side }
   // BOND-MOMENT — a stage-6+ bond mon just survived a lethal hit at 1 HP. Routed
   // here so the future SFX + animation lanes can hit the dramatic beat.

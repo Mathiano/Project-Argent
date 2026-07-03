@@ -61,6 +61,7 @@ import { createNameEntryScene, NAME_MAX_LEN, sanitizeName } from './scenes/nameE
 import { resolvePlayerName } from './playerName';
 import { buildDevPlan, AT_TARGETS, PRESETS, type DevPlan, type DevPartyMember } from './devNav';
 import { createDevMenuScene, type DevMenuItem } from './scenes/devMenu';
+import { createSfxSubscriber } from './sfx/sfx';
 import { createAudioEngine, loadMutedPref, saveMutedPref } from './audio/synth';
 import { installAudio } from './audio/audioSubscriber';
 import { createConfirmScene } from './scenes/confirmPrompt';
@@ -1498,6 +1499,12 @@ if (wipeParam) wipeStorage();
 // Lane B — apply the ?calls=all dev override (default stays bond-gated).
 devUnlockAllCalls = url.get('calls') === 'all';
 
+// SFX subscriber #2 on the gameEvents bus (UI + combat feedback; synthesized, no
+// music). App-wide + created once; headless-safe (a no-op with no AudioContext).
+// The mute lever is exposed in the dev menu.
+const sfx = createSfxSubscriber();
+sfx.setMuted(url.get('mute') === '1'); // ?mute=1 boots silent
+
 function applyMoneyFromUrl(): void {
   if (moneyParam === null) return;
   const n = Number.parseInt(moneyParam, 10);
@@ -1697,6 +1704,13 @@ function openDevMenu(): void {
       devSession = true;
       closeDevMenu(); // pop the menu → its underlying scene becomes the return target
       showDevReactiveFight();
+    },
+  });
+  items.push({
+    label: `sfx: ${sfx.isMuted() ? 'unmute' : 'mute'}`,
+    run: () => {
+      sfx.toggleMuted();
+      closeDevMenu();
     },
   });
   devMenuOpen = true;

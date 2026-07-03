@@ -1714,6 +1714,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // the focuser took (informational; the cost was already applied via the
       // opponent's strike event, so don't subtract it again). Set the HUD tag.
       display[ev.side].focusing = true;
+      emitGameEvent({ kind: 'focus-windup', side: ev.side }); // SFX — the charge telegraph
       const who = monName(ev.side);
       calloutLine = `${who} is FOCUSING — gathering energy!`;
       pushLog(`${who} is FOCUSING — a release is coming (but not which).`);
@@ -1728,6 +1729,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const def = opposite(ev.side);
       display[def].hp = Math.max(0, display[def].hp - ev.damage);
       display[ev.side].focusing = false;
+      // SFX — the DISTINCT release impact (heavy/feint/hide). Emitted BEFORE the
+      // generic hit-landed so the SFX layer can suppress the generic impact for a
+      // release (the release patch is the one that should sound).
+      emitGameEvent({ kind: 'release', side: ev.side, release: ev.release, outcome: ev.outcome });
       emitGameEvent({ kind: 'hit-landed', side: ev.side, effectiveness: ev.effectiveness });
       if (ev.side === 'player' && ev.outcome === 'win') pendingReadWindow = true;
       const rel = ev.release.toUpperCase();
@@ -2208,7 +2213,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // START acts as a second confirm — no auto-jump to CALL (that
     // shortcut used to fire CALL even when the user thought they were
     // confirming the FIGHT row, which is the bug this guards against).
-    else if (key === 'a' || key === 'start') confirmMenu();
+    else if (key === 'a' || key === 'start') { emitGameEvent({ kind: 'ui-confirm' }); confirmMenu(); }
   }
 
   // Party-picker — used for both voluntary switching (PKMN menu) and
@@ -2556,6 +2561,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       return;
     }
     if (key !== 'a' && key !== 'start') return;
+    emitGameEvent({ kind: 'dialogue-advance' }); // SFX — the battle text-page blip
     textQueue.shift();
     if (textQueue.length === 0) {
       const next = textNext;
