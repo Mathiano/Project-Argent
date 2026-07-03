@@ -125,34 +125,30 @@ function devLogUrlFlag(): boolean {
 // they clear the ATTACK CORRIDOR (the diagonal band between the two sprite slots
 // that strike animations travel). All panel text is the 16px fine-print tier
 // (drawBig came OFF the panels → onto the menu rail); the beat-1 CONTENT is kept,
-// rows re-compressed. `h` on FOE_PANEL is the NON-boss base; a boss adds
-// FOE_BREAK_ROW_H (the integrated BREAK row), so drawFoePanel computes its total.
-const FOE_PANEL = { x: 8, y: 8, w: 340, h: 74 } as const; // upper-left (boss = +FOE_BREAK_ROW_H)
-const FOE_BREAK_ROW_H = 18; // the integrated BREAK row a boss adds (regular foes lack it)
+// rows re-compressed. Beat 2.5 (proportion pass): chrome COMPACTED ~30% at
+// IDENTICAL 16px glyphs — thinner bars, tighter row pitches, classic-Pokémon-tight.
+// `h` on FOE_PANEL is the NON-boss base; a boss adds FOE_BREAK_EXTRA (the thin
+// BREAK line + GYM LEADER/gust strip), so drawFoePanel computes its total.
+const FOE_PANEL = { x: 8, y: 8, w: 340, h: 52 } as const; // upper-left (was h74; boss = +FOE_BREAK_EXTRA)
+const FOE_BREAK_EXTRA = 13; // a boss adds the compact GYM-LEADER/gust strip + the thin BREAK line
 const FOE_SLOT = { x: 472, y: 12 } as const; // upper-right sprite slot
-const INTENT = { x: 8, y: 112, w: 340, h: 22 } as const; // mid strip — restored up under the compact foe panel (y82 non-boss / y92 boss), clear of the player sprite (y140)
+const INTENT = { x: 8, y: 76, w: 340, h: 18 } as const; // mid strip — re-derived UP under the compacted foe panel (ends y60 / y65 boss), clear of the player sprite (y140)
 const PL_SLOT = { x: 96, y: 140 } as const; // mid-left sprite slot
-const PL_PANEL = { x: 300, y: 150, w: 332, h: 84 } as const; // mid-right (restored y150; the housed BOND row is the only growth over the old h72)
-// Battle-UI v2 (beat 2) — the console (BOTTOM) TIGHTENED: a shorter, denser
-// full-width bar. The compact 16px rail reclaims the dead space the old 32px rail
-// held; the move grid re-compresses under the new narration strip. A shorter
-// console only helps the attack-corridor clearance (it sits further below).
-const BOTTOM = { x: 4, y: 244, w: 632, h: 112 } as const; // full-width bottom (bottom-anchored at 356)
-// Battle-scaled draw sizes: the sprite slot (was the 56px default) and the HP/ST
-// bar height (was BAR_HEIGHT_TALL 6) grow for the bigger canvas.
+const PL_PANEL = { x: 300, y: 150, w: 332, h: 60 } as const; // mid-right (was h84; compacted rows, housed BOND kept)
+// Beat 2.5 — the console (BOTTOM) compacted + BOTTOM-anchored at 356 (a shorter
+// bar hugging the screen edge → MORE open stage above it, so the corridor only
+// widens). Was y244 h112.
+const BOTTOM = { x: 4, y: 260, w: 632, h: 92 } as const; // full-width bottom (bottom edge 352 → shadow clears 360)
+// Battle-scaled draw sizes: the sprite slot + the HP/ST bar height. Beat 2.5 —
+// the bars THIN to 8px (was 12) as part of the ~30% chrome compaction.
 const BATTLE_SLOT = 96;
-const BATTLE_BAR_H = 12;
+const BATTLE_BAR_H = 8;
 
-// ── Battle-UI v2 (beat 2) — the type scale is now SINGLE-tier, battle-SCOPED ───
-// The 32px tier RETIRED (beat-1 eye-gate + beat-2: it blocked the corridor / was
-// too big for the rail). Everything is the crisp 16px m3x6, with EMPHASIS via
-// FAUX-BOLD (double-draw at +1px x — both integer positions → crisp, no smoothing,
-// no 24px). Used for the rail keywords + section headers. The global UI_FONT_PX /
-// drawText are UNTOUCHED (every other scene byte-identical) — this is battle-local.
-function drawBold(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string): void {
-  drawText(ctx, text, x, y, color);
-  drawText(ctx, text, x + 1, y, color); // +1px x → faux-bold weight, still pixel-crisp
-}
+// ── Battle-UI v2 (beat 2.5) — SINGLE-tier, SINGLE-weight type, battle-SCOPED ───
+// The 32px tier retired (beat 1/2); the FAUX-BOLD retired (beat 2.5 eye-gate). ALL
+// battle text is now plain 16px m3x6 drawText — hierarchy comes from COLOUR /
+// highlight / box only (m5x7 true-bold vendoring stays banked, NOT implemented).
+// The global UI_FONT_PX / drawText are UNTOUCHED (every other scene byte-identical).
 
 // ── Console (beat 2) — the menu RAIL data + shared console furniture ───────────
 type RailKind = 'fight' | 'pkmn' | 'catch' | 'call' | 'run';
@@ -184,12 +180,12 @@ const CALL_DESC: { readonly [id: string]: string } = {
 // line for the hovered thing, phase-aware (the caller supplies the text).
 function drawNarration(ctx: CanvasRenderingContext2D, text: string): void {
   const y = BOTTOM.y + 2;
-  const h = 16;
+  const h = 12; // compacted (beat 2.5)
   ctx.fillStyle = 'rgba(28,19,11,0.94)'; // dark leather header strip
   ctx.fillRect(BOTTOM.x + 6, y, BOTTOM.w - 12, h);
   ctx.fillStyle = PALETTE.silverDim; // silver base inlay
   ctx.fillRect(BOTTOM.x + 8, y + h - 1, BOTTOM.w - 16, 1);
-  drawText(ctx, text, BOTTOM.x + 12, y + 2, PALETTE.paper);
+  drawText(ctx, text, BOTTOM.x + 12, y, PALETTE.paper);
 }
 
 // A/B (and phase-specific) hints as small FRAMED BUTTON CHIPS, laid RIGHT-TO-LEFT
@@ -257,34 +253,21 @@ function drawTypeBadges(
   return cx;
 }
 
-// MOMENTUM as a framed STAR-SOCKET meter: a boxed row of filled/empty ★ sockets
-// (battle-local — the shared drawMomentum/PALETTE.star used by ~15 other scenes
-// stays untouched, the same isolation pattern as drawBattlePanel). Returns the x
-// just past the last socket.
-const SOCKET_BOX = 16;
-const SOCKET_GAP = 3;
-function drawMomentumSockets(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  count: number,
-  cap = 3,
-): number {
+// MOMENTUM as a compact ★★☆ STAR ROW (beat 2.5 — the framed sockets retired for a
+// small, tidy glyph row). Gold fill for held ★, warm-dim for empty. Battle-local
+// (the shared drawMomentum/PALETTE.star used by ~15 other scenes stays untouched).
+// Returns the x just past the last star.
+const STAR_STEP = 9;
+function drawStars(ctx: CanvasRenderingContext2D, x: number, y: number, count: number, cap = 3): number {
+  ctx.font = '11px monospace';
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'start';
+  ctx.letterSpacing = '0px';
   for (let i = 0; i < cap; i += 1) {
-    const bx = x + i * (SOCKET_BOX + SOCKET_GAP);
-    ctx.fillStyle = PALETTE.frameWoodDark; // the empty socket well
-    ctx.fillRect(bx, y, SOCKET_BOX, SOCKET_BOX);
-    ctx.strokeStyle = PALETTE.silverMid;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(bx + 0.5, y + 0.5, SOCKET_BOX - 1, SOCKET_BOX - 1);
-    ctx.font = '12px monospace';
-    ctx.textBaseline = 'top';
-    ctx.textAlign = 'start';
-    ctx.letterSpacing = '0px';
     ctx.fillStyle = i < count ? PALETTE.momentumGold : PALETTE.momentumOff;
-    ctx.fillText('★', bx + 3, y + 2);
+    ctx.fillText('★', x + i * STAR_STEP, y);
   }
-  return x + cap * (SOCKET_BOX + SOCKET_GAP);
+  return x + cap * STAR_STEP;
 }
 
 // A HP/ST STAT ROW — a 32px primary LABEL, the value bar, and a fine-print
@@ -2496,69 +2479,65 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
   function drawFoePanel(ctx: CanvasRenderingContext2D): void {
     const boss = breakThreshold > 0;
-    const h = FOE_PANEL.h + (boss ? FOE_BREAK_ROW_H : 0); // a boss adds the BREAK row
+    const h = FOE_PANEL.h + (boss ? FOE_BREAK_EXTRA : 0); // a boss adds the thin BREAK strip
     const px = FOE_PANEL.x;
     const pw = FOE_PANEL.w;
     const py = FOE_PANEL.y;
     drawBattlePanel(ctx, px, py, pw, h);
-    // Header — mon name (16px), type badge chip(s) beside it, combat-state /
-    // effect TAGS top-right.
+    // Header — mon name (16px), type badge chip(s), combat-state / effect TAGS.
     const name = display.foe.species.name;
-    drawText(ctx, name, px + 10, py + 4, PALETTE.stanceG);
-    drawTypeBadges(ctx, px + 10 + measureUiText(ctx, name) + 6, py + 3, display.foe.species.types);
-    drawPanelTags(ctx, px + pw - 10, py + 3, buildTags(display.foe, activeMon(state.foe)));
-    // HP / ST rows — 16px labels + bars + fine-print cur/max numerics.
-    drawStatRow(ctx, px, pw, py + 20, 'HP', PALETTE.hpOk, display.foe.hp, display.foe.maxHp, hpColor(display.foe.hp, display.foe.maxHp), null);
-    drawStatRow(ctx, px, pw, py + 37, 'ST', PALETTE.stamina, display.foe.st, display.foe.maxSt, PALETTE.stamina, COMBAT.winded / display.foe.maxSt);
-    // MOMENTUM — the framed star-socket meter (the load-bearing ★ differential:
-    // behind-penalty + the foe's phased-unlock tier access are unreadable without
-    // it; display-only — reads the foe's existing momentum, no logic change).
-    drawText(ctx, 'MOMENTUM', px + 10, py + 56, PALETTE.stanceG);
-    drawMomentumSockets(ctx, px + 10 + measureUiText(ctx, 'MOMENTUM') + 8, py + 54, display.foe.momentum);
-    // BREAK row (boss only) INTEGRATED into the panel — the separate PHASE/BREAK
-    // strip is gone. Regular foes simply lack this row (+ show bench dots below).
-    if (boss) drawFoeBreakRow(ctx, px, pw, py + FOE_PANEL.h);
-    else drawBenchIndicators(ctx, px + 12, py + h + 4, state.foe);
+    drawText(ctx, name, px + 10, py + 3, PALETTE.stanceG);
+    drawTypeBadges(ctx, px + 10 + measureUiText(ctx, name) + 6, py + 2, display.foe.species.types);
+    drawPanelTags(ctx, px + pw - 10, py + 2, buildTags(display.foe, activeMon(state.foe)));
+    // HP / ST rows — 16px labels + THIN bars + fine-print cur/max numerics.
+    drawStatRow(ctx, px, pw, py + 15, 'HP', PALETTE.hpOk, display.foe.hp, display.foe.maxHp, hpColor(display.foe.hp, display.foe.maxHp), null);
+    drawStatRow(ctx, px, pw, py + 27, 'ST', PALETTE.stamina, display.foe.st, display.foe.maxSt, PALETTE.stamina, COMBAT.winded / display.foe.maxSt);
+    // MOMENTUM — a compact ★★☆ star row (the load-bearing ★ differential; display-
+    // only — reads the foe's existing momentum, no logic change).
+    drawText(ctx, 'MOMENTUM', px + 10, py + 40, PALETTE.stanceG);
+    drawStars(ctx, px + 10 + measureUiText(ctx, 'MOMENTUM') + 8, py + 40, display.foe.momentum);
+    // BOSS: the thin BREAK line + GYM LEADER / gust strip. Regular foes lack it.
+    if (boss) drawBossBreak(ctx, px, pw, py, h);
+    else drawBenchIndicators(ctx, px + 12, py + h + 3, state.foe);
   }
 
-  // The integrated boss BREAK row: BREAK label + gold pips + the role tag
-  // ("GYM LEADER"), plus Falkner's gust cue relocated here (the boss telegraph
-  // that lived in the old strip). Rendered as the foe panel's bottom row.
-  function drawFoeBreakRow(ctx: CanvasRenderingContext2D, x: number, w: number, y: number): void {
-    drawText(ctx, 'BREAK', x + 12, y + 4, breakPipFlashT > 0 ? PALETTE.momentumGoldHi : PALETTE.frameInkSoft);
-    const pipX = x + 62;
-    for (let i = 0; i < breakThreshold; i += 1) {
-      const filled = i < displayBreakProgress;
-      const isNewest = breakPipFlashT > 0 && i === Math.max(0, displayBreakProgress - 1);
-      ctx.fillStyle = isNewest ? PALETTE.momentumGoldHi : filled ? PALETTE.momentumGold : PALETTE.momentumOff;
-      ctx.fillRect(pipX + i * 16, y + 3, 12, 12);
-      ctx.strokeStyle = PALETTE.silverDim;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(pipX + i * 16 + 0.5, y + 3.5, 11, 11);
-    }
-    // ROLE TAG right — CH1 bosses are gym leaders (a static default; reversible to
-    // a bossCard title field when cards carry one). Fine-print framed tag.
-    drawPanelTags(ctx, x + w - 10, y + 2, [{ label: 'GYM LEADER', color: PALETTE.velvet }]);
-    // Gust cue (Falkner) — relocated from the old strip into this row, between the
-    // pips and the role tag, so the boss's rhythm telegraph survives the merge.
+  // BOSS BREAK — a slim progress LINE along the foe panel's bottom inner edge (gold
+  // fill over a dim track), with the GYM LEADER tag + gust cue on the compact strip
+  // just above it. Replaces the old pip row.
+  function drawBossBreak(ctx: CanvasRenderingContext2D, x: number, w: number, py: number, h: number): void {
+    const stripY = py + FOE_PANEL.h; // the +FOE_BREAK_EXTRA strip
+    // GYM LEADER role tag (left) — CH1 bosses are gym leaders (a static default;
+    // reversible to a bossCard title field). Fine-print framed tag.
+    drawPanelTags(ctx, x + 62, stripY, [{ label: 'GYM LEADER', color: PALETTE.velvet }]);
+    drawText(ctx, 'BREAK', x + 8, stripY + 1, breakPipFlashT > 0 ? PALETTE.momentumGoldHi : PALETTE.frameInkSoft);
+    // Gust cue (Falkner) — relocated to the right of the role tag, compact.
     const arena = state.bossCard?.arenaSchedule;
     if (arena && arena.rhythmEveryN > 0) {
       const anchor = state.rhythmAnchor ?? 0;
       const activeRound = phase === 'resolve' ? state.round - 1 : state.round;
       const currentIsGust = (activeRound - anchor) % arena.rhythmEveryN === 0;
       const nextIsGust = (state.round + 1 - anchor) % arena.rhythmEveryN === 0;
-      const gustX = pipX + breakThreshold * 16 + 8;
-      const gustW = 90;
-      if ((currentIsGust || nextIsGust) && gustX + gustW <= x + w - 90) {
+      if (currentIsGust || nextIsGust) {
+        const gustW = 72;
+        const gustX = x + w - 10 - gustW;
         const pulse = currentIsGust ? 0.55 + 0.4 * Math.sin(tick * 6) : 0.5;
         ctx.fillStyle = currentIsGust ? `rgba(70,150,230,${pulse})` : 'rgba(80,140,210,0.5)';
-        ctx.fillRect(gustX, y + 3, gustW, 13);
+        ctx.fillRect(gustX, stripY, gustW, 11);
         ctx.strokeStyle = PALETTE.frameInk;
         ctx.lineWidth = 1;
-        ctx.strokeRect(gustX + 0.5, y + 3.5, gustW - 1, 12);
-        drawText(ctx, currentIsGust ? 'GUST NOW' : 'GUST NEXT', gustX + 6, y + 3, PALETTE.paper);
+        ctx.strokeRect(gustX + 0.5, stripY + 0.5, gustW - 1, 10);
+        drawText(ctx, currentIsGust ? 'GUST NOW' : 'GUST NEXT', gustX + 5, stripY, PALETTE.paper);
       }
     }
+    // The thin BREAK progress line along the panel's bottom inner edge.
+    const lineY = py + h - 5;
+    const lineX = x + 5;
+    const lineW = w - 10;
+    ctx.fillStyle = PALETTE.momentumOff; // dim track
+    ctx.fillRect(lineX, lineY, lineW, 3);
+    const frac = breakThreshold > 0 ? Math.min(1, displayBreakProgress / breakThreshold) : 0;
+    ctx.fillStyle = breakPipFlashT > 0 ? PALETTE.momentumGoldHi : PALETTE.momentumGold; // gold fill
+    ctx.fillRect(lineX, lineY, Math.round(lineW * frac), 3);
   }
 
   function drawPlayerPanel(ctx: CanvasRenderingContext2D): void {
@@ -2571,17 +2550,17 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawText(ctx, name, px + 10, py + 3, PALETTE.stanceG);
     drawTypeBadges(ctx, px + 10 + measureUiText(ctx, name) + 6, py + 2, display.player.species.types);
     drawPanelTags(ctx, px + pw - 10, py + 2, buildTags(display.player, activeMon(state.player)));
-    // HP / ST rows + numerics.
-    drawStatRow(ctx, px, pw, py + 19, 'HP', PALETTE.hpOk, display.player.hp, display.player.maxHp, hpColor(display.player.hp, display.player.maxHp), null);
-    drawStatRow(ctx, px, pw, py + 35, 'ST', PALETTE.stamina, display.player.st, display.player.maxSt, PALETTE.stamina, COMBAT.winded / display.player.maxSt);
-    // MOMENTUM — star sockets + the single teaching hint (fine-print), by the
-    // sockets. This REPLACES the old "win a read to charge ★" hint (one hint).
-    drawText(ctx, 'MOMENTUM', px + 10, py + 53, PALETTE.stanceG);
-    const sockEnd = drawMomentumSockets(ctx, px + 10 + measureUiText(ctx, 'MOMENTUM') + 8, py + 51, display.player.momentum);
-    drawText(ctx, 'STARS POWER CALLS + UNLOCK MOVES', sockEnd + 8, py + 53, PALETTE.frameInkDim);
+    // HP / ST rows + numerics (thin bars).
+    drawStatRow(ctx, px, pw, py + 15, 'HP', PALETTE.hpOk, display.player.hp, display.player.maxHp, hpColor(display.player.hp, display.player.maxHp), null);
+    drawStatRow(ctx, px, pw, py + 27, 'ST', PALETTE.stamina, display.player.st, display.player.maxSt, PALETTE.stamina, COMBAT.winded / display.player.maxSt);
+    // MOMENTUM — a compact ★★☆ star row + the single teaching hint (fine-print),
+    // beside the stars. Replaces the old "win a read to charge ★" hint (one hint).
+    drawText(ctx, 'MOMENTUM', px + 10, py + 38, PALETTE.stanceG);
+    const sockEnd = drawStars(ctx, px + 10 + measureUiText(ctx, 'MOMENTUM') + 8, py + 38, display.player.momentum);
+    drawText(ctx, 'STARS POWER CALLS + UNLOCK MOVES', sockEnd + 8, py + 38, PALETTE.frameInkDim);
     // BOND — LABELED + HOUSED inside the panel frame (it used to float below).
     // Static during the fight; animates on the post-win advance (bondAdvanceFrom/To).
-    const bondY = py + 69;
+    const bondY = py + 49;
     drawText(ctx, 'BOND', px + 10, bondY, PALETTE.bond);
     const bondX = px + 10 + measureUiText(ctx, 'BOND') + 6;
     const benchShown =
@@ -2725,7 +2704,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     return '';
   }
 
-  // The MENU RAIL — 16px FAUX-BOLD keywords (drawBold), notes beside them, and (in
+  // The MENU RAIL — plain 16px keywords, notes beside them, and (in
   // 'full' mode) a DESCRIPTION column behind a dotted divider. In 'breadcrumb'
   // mode (move/call phases) it renders COMPACT + DIMMED with the drilled-in item
   // BOXED + a ◄ marker — a "you are here" trail beside the active list. DISPLAY-
@@ -2733,7 +2712,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function drawRail(ctx: CanvasRenderingContext2D, x: number, yTop: number, mode: 'full' | 'breadcrumb', boxedKind?: RailKind): void {
     const me = activeMon(state.player);
     const items = menuItems();
-    const pitch = 17;
+    const pitch = 14; // compacted (beat 2.5)
     const kwX = x + 12;
     if (mode === 'full') drawDottedV(ctx, x + 82, yTop, pitch * items.length - 3);
     items.forEach((it, i) => {
@@ -2754,7 +2733,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       }
       const marker = cursorHere ? '>' : ' ';
       const kwLabel = `${marker} ${RAIL_KEYWORD[it.kind]}`;
-      drawBold(ctx, kwLabel, kwX, rowY, color);
+      drawText(ctx, kwLabel, kwX, rowY, color);
       // The note + description columns render in 'full' (menu) mode only — the
       // breadcrumb stays compact/narrow so the active list has room beside it.
       if (mode === 'full') {
@@ -2804,10 +2783,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawNarration(ctx, narrationText());
     const me = activeMon(state.player);
     // The full rail (keyword · note · dotted divider · description).
-    drawRail(ctx, BOTTOM.x + 4, BOTTOM.y + 24, 'full');
+    drawRail(ctx, BOTTOM.x + 4, BOTTOM.y + 16, 'full');
     // When the player has no ★, teach what charges it (a micro-hint, top-right).
     if (me.momentum === 0) {
-      drawText(ctx, 'win a read to charge ★', BOTTOM.x + BOTTOM.w - 190, BOTTOM.y + 24, PALETTE.frameInkDim);
+      drawText(ctx, 'win a read to charge ★', BOTTOM.x + BOTTOM.w - 190, BOTTOM.y + 16, PALETTE.frameInkDim);
     }
     drawButtonChips(ctx, ['A CONFIRM', 'B BACK']);
   }
@@ -2825,7 +2804,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const hpStr = `HP ${Math.round(side.hp)}/${side.maxHp}`;
       const tag = fainted ? 'FNT' : isActive ? 'ACT' : '';
       const row = `${cursor}${monDisplayName(side).padEnd(10, ' ')} ${hpStr.padEnd(10, ' ')} ${tag}`;
-      drawText(ctx, row, BOTTOM.x + 16, BOTTOM.y + 26 + i * 16, color);
+      drawText(ctx, row, BOTTOM.x + 16, BOTTOM.y + 20 + i * 15, color);
     });
     drawButtonChips(ctx, partyMode === 'forced' ? ['A SEND OUT'] : ['A SWITCH', 'B BACK']);
   }
@@ -2843,38 +2822,38 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     const moves = [...attacks, ...techs]; // == gridMoves(); moveCursor indexes this
 
     // ── LEFT: the breadcrumb RAIL (FIGHT boxed) — display-only trail ──────────
-    drawRail(ctx, BOTTOM.x + 4, BOTTOM.y + 24, 'breadcrumb', 'fight');
+    drawRail(ctx, BOTTOM.x + 4, BOTTOM.y + 16, 'breadcrumb', 'fight');
 
-    // ── MIDDLE: the 2×3 grid, BESIDE the rail ────────────────────────────────
+    // ── MIDDLE: the 2×3 grid, BESIDE the rail (compacted cells) ───────────────
     const gx = BOTTOM.x + 92;
     const cellW = 148;
     const cellGX = 152;
-    drawText(ctx, 'ATTACKS', gx, BOTTOM.y + 20, PALETTE.frameInkSoft);
+    drawText(ctx, 'ATTACKS', gx, BOTTOM.y + 14, PALETTE.frameInkSoft);
     for (let i = 0; i < attacks.length; i += 1) {
       const col = i % 2;
       const row = Math.floor(i / 2);
-      drawMoveCell(ctx, gx + col * cellGX, BOTTOM.y + 30 + row * 20, cellW, 18, moveCellInfo(side, attacks[i]!), moveCursor === i);
+      drawMoveCell(ctx, gx + col * cellGX, BOTTOM.y + 24 + row * 16, cellW, 14, moveCellInfo(side, attacks[i]!), moveCursor === i);
     }
-    drawText(ctx, 'TECHNIQUES', gx, BOTTOM.y + 72, PALETTE.frameInkSoft);
+    drawText(ctx, 'TECHNIQUES', gx, BOTTOM.y + 56, PALETTE.frameInkSoft);
     for (let j = 0; j < techs.length; j += 1) {
-      drawMoveCell(ctx, gx + j * cellGX, BOTTOM.y + 82, cellW, 18, moveCellInfo(side, techs[j]!), moveCursor === attacks.length + j);
+      drawMoveCell(ctx, gx + j * cellGX, BOTTOM.y + 64, cellW, 14, moveCellInfo(side, techs[j]!), moveCursor === attacks.length + j);
     }
 
     // Divider between the grid and the detail/stance column.
     ctx.fillStyle = PALETTE.frameInkSoft;
-    ctx.fillRect(BOTTOM.x + 398, BOTTOM.y + 22, 1, BOTTOM.h - 30);
+    ctx.fillRect(BOTTOM.x + 398, BOTTOM.y + 16, 1, BOTTOM.h - 24);
 
     // ── RIGHT: SELECTED detail + stance selector ─────────────────────────────
     const rx = BOTTOM.x + 406;
     const sel = moves[moveCursor] ? moveCellInfo(side, moves[moveCursor]!) : null;
-    drawText(ctx, 'SELECTED', rx, BOTTOM.y + 20, PALETTE.frameInkSoft);
+    drawText(ctx, 'SELECTED', rx, BOTTOM.y + 14, PALETTE.frameInkSoft);
     if (sel) {
-      drawBold(ctx, sel.name, rx, BOTTOM.y + 31, sel.legal ? PALETTE.frameInk : PALETTE.frameInkDim);
+      drawText(ctx, sel.name, rx, BOTTOM.y + 25, sel.legal ? PALETTE.frameInk : PALETTE.frameInkDim);
       drawText(
         ctx,
         `${sel.badge} ${sel.isTech ? 'TECHNIQUE' : 'ATTACK'} · ${sel.type ?? 'NEUTRAL'} · ST${sel.cost}`,
         rx,
-        BOTTOM.y + 44,
+        BOTTOM.y + 37,
         PALETTE.frameInkSoft,
       );
       const move = lookupMove(sel.name);
@@ -2883,7 +2862,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       else if (sel.isTech && move.effect) {
         eff = move.effect.polarity === 'buff' ? `Self-buff — grants ${sel.effectTag}.` : `Read-win → inflicts ${sel.effectTag}.`;
       } else eff = `A ${TIER_WORD[sel.tier]} ${(sel.type ?? 'neutral').toLowerCase()} strike.`;
-      drawText(ctx, eff, rx, BOTTOM.y + 56, sel.legal ? PALETTE.frameInk : PALETTE.hpCrit);
+      drawText(ctx, eff, rx, BOTTOM.y + 47, sel.legal ? PALETTE.frameInk : PALETTE.hpCrit);
     }
 
     // NEXT — the honest turn-order preview for THIS move.
@@ -2891,10 +2870,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     const foeSt = actionStance(foeAction);
     const order = orderHint(side, activeMon(state.foe), moves[moveCursor]!, stance, actionMove(foeAction), foeSt);
     const fluidFirst = (stance === 'F' && foeSt === 'G') || (foeSt === 'F' && stance === 'G');
-    drawText(ctx, `NEXT: ${order}${fluidFirst ? ' ·FLUID' : ''}`, rx, BOTTOM.y + 68, fluidFirst ? PALETTE.stanceF : PALETTE.frameInkSoft);
+    drawText(ctx, `NEXT: ${order}${fluidFirst ? ' ·FLUID' : ''}`, rx, BOTTOM.y + 58, fluidFirst ? PALETTE.stanceF : PALETTE.frameInkSoft);
 
     // Stance selector — boxed A/G/F badges, active highlighted + NAMED (e.g. GUARD).
-    const sy = BOTTOM.y + 82;
+    const sy = BOTTOM.y + 69;
     for (let i = 0; i < STANCES.length; i += 1) {
       const bx = rx + i * 18;
       if (STANCES[i] === stance) {
@@ -2903,14 +2882,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       }
       drawStanceBadge(ctx, bx, sy, STANCES[i]!);
     }
-    drawText(ctx, STANCE_NAME[stance], rx + 60, sy + 1, PALETTE.frameInk);
-    if (pendingFullPower) drawText(ctx, '▶FULL+50%', rx + 118, sy + 1, PALETTE.momentumGold);
-    // ▶FOCUS only shows for a chargeable move — a technique can't Focus (its
-    // effect would be discarded), so the indicator hides on a technique.
-    else if (committing && sel && !sel.isTech) drawText(ctx, '▶FOCUS', rx + 118, sy + 1, PALETTE.hpCrit);
+    drawText(ctx, STANCE_NAME[stance], rx + 60, sy, PALETTE.frameInk);
+    if (pendingFullPower) drawText(ctx, '▶FULL+50%', rx + 118, sy, PALETTE.momentumGold);
+    // ▶FOCUS only shows for a chargeable move — a technique can't Focus.
+    else if (committing && sel && !sel.isTech) drawText(ctx, '▶FOCUS', rx + 118, sy, PALETTE.hpCrit);
 
     // Move-specific controls (fine-print, left of the chips) + the A/B button chips.
-    drawText(ctx, 'SEL stance · L/R commit', rx, BOTTOM.y + BOTTOM.h - 16, PALETTE.frameInkDim);
+    drawText(ctx, 'SEL stance · L/R commit', gx, BOTTOM.y + BOTTOM.h - 14, PALETTE.frameInkDim);
     drawButtonChips(ctx, ['A CONFIRM', 'B BACK']);
   }
 
@@ -2924,10 +2902,10 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     drawNarration(ctx, narrationText());
     RELEASES.forEach((r, i) => {
-      const y = BOTTOM.y + 28 + i * 20;
+      const y = BOTTOM.y + 20 + i * 16;
       const marker = releaseCursor === i ? '>' : ' ';
       const color = releaseCursor === i ? PALETTE.frameInk : PALETTE.frameInkSoft;
-      if (releaseCursor === i) drawRowHighlight(ctx, BOTTOM.x + 12, y - 1, 260, 16);
+      if (releaseCursor === i) drawRowHighlight(ctx, BOTTOM.x + 12, y - 1, 260, 15);
       // "HEAVY ATTACK" (not bare "HEAVY") — YOUR charged attack delivered that way.
       drawText(ctx, `${marker}${r.name} ATTACK`, BOTTOM.x + 18, y, color);
     });
@@ -2938,18 +2916,18 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     const chargedName = activeMon(state.player).focus?.move;
     if (chargedName) {
       const info = moveCellInfo(activeMon(state.player), chargedName);
-      drawText(ctx, 'RELEASING:', rx, BOTTOM.y + 24, PALETTE.frameInkSoft);
-      drawBold(ctx, info.name, rx, BOTTOM.y + 38, PALETTE.frameInk);
+      drawText(ctx, 'RELEASING:', rx, BOTTOM.y + 18, PALETTE.frameInkSoft);
+      drawText(ctx, info.name, rx, BOTTOM.y + 30, PALETTE.frameInk);
       drawText(
         ctx,
         `${info.badge} ${info.isTech ? 'TECHNIQUE' : 'ATTACK'} · ${info.type ?? 'NEUTRAL'} · ST${info.cost}`,
         rx,
-        BOTTOM.y + 52,
+        BOTTOM.y + 42,
         PALETTE.frameInkSoft,
       );
     }
     const sel = RELEASES[releaseCursor]!;
-    drawText(ctx, `${sel.name}: ${sel.beats}`, rx, BOTTOM.y + 70, PALETTE.frameInkSoft);
+    drawText(ctx, `${sel.name}: ${sel.beats}`, rx, BOTTOM.y + 58, PALETTE.frameInkSoft);
     drawButtonChips(ctx, ['A RELEASE']);
   }
 
@@ -2958,7 +2936,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawNarration(ctx, narrationText());
     // The CALLS breadcrumb rail + the 9-slot list BESIDE it (2 columns). Locked +
     // unaffordable render greyed; the cursor skips locked rows.
-    drawRail(ctx, BOTTOM.x + 4, BOTTOM.y + 24, 'breadcrumb', 'call');
+    drawRail(ctx, BOTTOM.x + 4, BOTTOM.y + 16, 'breadcrumb', 'call');
     const perCol = Math.ceil(CALL_SET.length / 2); // 5 left, 4 right
     const listX = BOTTOM.x + 92;
     const colW = 268;
@@ -2969,8 +2947,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const col = i < perCol ? 0 : 1;
       const row = i < perCol ? i : i - perCol;
       const x = listX + col * colW;
-      const y = BOTTOM.y + 24 + row * 17;
-      if (callCursor === i) drawRowHighlight(ctx, x - 4, y - 1, colW - 8, 16);
+      const y = BOTTOM.y + 16 + row * 14;
+      if (callCursor === i) drawRowHighlight(ctx, x - 4, y - 1, colW - 8, 14);
       const marker = callCursor === i ? '>' : ' ';
       const tag = !unlocked ? ' ·LOCKED' : '';
       drawText(ctx, `${marker}${call.name}${tag}`, x, y, color);
@@ -2985,14 +2963,14 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   function drawBottomThrowOff(ctx: CanvasRenderingContext2D): void {
     drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     drawNarration(ctx, narrationText());
-    drawText(ctx, 'Which stance should they THINK you played?', BOTTOM.x + 16, BOTTOM.y + 26, PALETTE.frameInkSoft);
+    drawText(ctx, 'Which stance should they THINK you played?', BOTTOM.x + 16, BOTTOM.y + 18, PALETTE.frameInkSoft);
     const labels: { readonly [k in Stance]: string } = {
       A: 'AGGRESSIVE', G: 'GUARD', F: 'FLUID',
     };
     STANCES.forEach((s, i) => {
-      const y = BOTTOM.y + 48 + i * 18;
+      const y = BOTTOM.y + 38 + i * 16;
       const on = throwOffCursor === i;
-      if (on) drawRowHighlight(ctx, BOTTOM.x + 12, y - 1, 300, 16);
+      if (on) drawRowHighlight(ctx, BOTTOM.x + 12, y - 1, 300, 15);
       drawText(ctx, `${on ? '>' : ' '}Feign ${labels[s]}`, BOTTOM.x + 16, y, on ? PALETTE.frameInk : PALETTE.frameInkSoft);
     });
     drawButtonChips(ctx, ['A PLANT', 'B BACK']);
@@ -3002,19 +2980,19 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
     drawNarration(ctx, narrationText());
     const foeName = display.foe.species.name;
-    drawText(ctx, `The wild ${foeName} fell. Tend it — show mercy?`, BOTTOM.x + 16, BOTTOM.y + 28, PALETTE.frameInkSoft);
+    drawText(ctx, `The wild ${foeName} fell. Tend it — show mercy?`, BOTTOM.x + 16, BOTTOM.y + 20, PALETTE.frameInkSoft);
     drawText(
       ctx,
       `${spareCursor === 0 ? '>' : ' '} YES — spare it`,
       BOTTOM.x + 20,
-      BOTTOM.y + 58,
+      BOTTOM.y + 44,
       spareCursor === 0 ? PALETTE.frameInk : PALETTE.frameInkDim,
     );
     drawText(
       ctx,
       `${spareCursor === 1 ? '>' : ' '} NO — claim the win`,
       BOTTOM.x + 320,
-      BOTTOM.y + 58,
+      BOTTOM.y + 44,
       spareCursor === 1 ? PALETTE.frameInk : PALETTE.frameInkDim,
     );
     drawButtonChips(ctx, ['A CHOOSE', 'B DECLINE']);

@@ -1936,13 +1936,13 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
     expect(ctx.texts.join('|')).not.toMatch(/PHASE \d/);
   });
 
-  test('the momentum star-socket meter renders (filled ★ sockets for the player)', () => {
+  test('the momentum ★★☆ star row renders (beat 2.5: compact stars, framed sockets gone)', () => {
     const scene = richScene();
     scene.update?.(0.01);
     const ctx = stubCtx();
     scene.draw(ctx);
-    // Sockets draw the ★ glyph; the player holds 2★, the foe 1★ → several ★ drawn.
+    // The compact star row draws a ★ glyph per slot; player + foe = 3 + 3 min.
     const stars = ctx.texts.filter((t) => t === '★').length;
-    expect(stars).toBeGreaterThanOrEqual(6); // 3 player + 3 foe sockets, min
+    expect(stars).toBeGreaterThanOrEqual(6);
   });
 });
