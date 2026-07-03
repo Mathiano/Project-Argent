@@ -1,0 +1,6 @@
+{
+  "id": "battle.hpDrain",
+  "tracks": [
+    { "target": "bar", "property": "hpProgress", "from": 0, "to": 1, "durationFrames": 16, "easing": "easeOut", "delayFrames": 0 }
+  ]
+}

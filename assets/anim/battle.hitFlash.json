@@ -1,0 +1,10 @@
+{
+  "id": "battle.hitFlash",
+  "tracks": [
+    { "target": "sprite", "property": "flashAlpha", "from": 0, "to": 0.85, "durationFrames": 3, "easing": "easeOut", "delayFrames": 0 },
+    { "target": "sprite", "property": "flashAlpha", "from": 0.85, "to": 0, "durationFrames": 9, "easing": "easeIn", "delayFrames": 3 },
+    { "target": "stage", "property": "shakeX", "from": 0, "to": 3, "durationFrames": 2, "easing": "easeOut", "delayFrames": 0 },
+    { "target": "stage", "property": "shakeX", "from": 3, "to": -2, "durationFrames": 3, "easing": "easeInOut", "delayFrames": 2 },
+    { "target": "stage", "property": "shakeX", "from": -2, "to": 0, "durationFrames": 4, "easing": "easeInOut", "delayFrames": 5 }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "id": "battle.enterWipe",
+  "tracks": [
+    { "target": "wipe", "property": "alpha", "from": 1, "to": 1, "durationFrames": 6, "easing": "hold", "delayFrames": 0 },
+    { "target": "wipe", "property": "alpha", "from": 1, "to": 0, "durationFrames": 14, "easing": "easeOut", "delayFrames": 6 }
+  ]
+}

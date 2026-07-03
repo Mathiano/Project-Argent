@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Argent — Animation Preview Harness</title>
+<style>
+  :root { --bg:#20202c; --ink:#f6efda; --dim:#9a8e72; --wood:#734b2c; --parch:#f6e7c2; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+  header { padding:12px 16px; border-bottom:1px solid #000; }
+  header b { color:#f6c92e; }
+  main { display:flex; gap:20px; padding:16px; flex-wrap:wrap; }
+  .stage { background:#000; padding:8px; border:1px solid var(--wood); }
+  /* THE IDENTITY: logical-resolution canvas, integer-scaled, NEVER smoothed. */
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; width:640px; height:360px; display:block; }
+  .panel { min-width:320px; max-width:460px; }
+  .row { margin:8px 0; }
+  button, select { font:inherit; background:var(--parch); color:#3a2a1c; border:1px solid var(--wood); padding:4px 8px; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  textarea { width:100%; height:150px; background:#12121a; color:var(--ink); border:1px solid var(--wood); font:12px/1.4 ui-monospace, monospace; }
+  .err { color:#e6705f; white-space:pre-wrap; }
+  .ok { color:#6fbf73; }
+  label { color:var(--dim); }
+  .kv { color:var(--dim); }
+  .kv b { color:var(--ink); }
+  input[type=range] { width:100%; }
+</style>
+</head>
+<body>
+<header>
+  <b>ARGENT</b> · animation preview harness —
+  <span class="kv">the SAME JSON the game plays. 60fps · logical 640×360 · <b>image-rendering: pixelated</b></span>
+</header>
+<main>
+  <div class="stage">
+    <canvas id="cv" width="640" height="360"></canvas>
+  </div>
+  <div class="panel">
+    <div class="row">
+      <label>preset (served build):</label>
+      <select id="preset">
+        <option value="">— pick a shipped animation —</option>
+        <option value="battle.hitFlash">battle.hitFlash</option>
+        <option value="battle.hpDrain">battle.hpDrain</option>
+        <option value="battle.starPop">battle.starPop</option>
+        <option value="battle.enterWipe">battle.enterWipe</option>
+      </select>
+      <button id="loadPreset">load</button>
+    </div>
+    <div class="row">
+      <label>…or open a JSON file:</label>
+      <input type="file" id="file" accept="application/json,.json" />
+    </div>
+    <div class="row">
+      <label>…or paste JSON, then Apply:</label>
+      <textarea id="json" spellcheck="false"></textarea>
+      <button id="apply">apply pasted JSON</button>
+    </div>
+    <div class="row">
+      <button id="play">▶ play</button>
+      <button id="loop">loop: on</button>
+      <span class="kv">id <b id="curId">—</b> · frames <b id="curLen">—</b> · frame <b id="frame">0</b></span>
+    </div>
+    <div class="row"><input type="range" id="scrub" min="0" max="60" value="0" step="1" /></div>
+    <div class="row" id="status" class="ok"></div>
+  </div>
+</main>
+<script>
+// ── The interpreter — a faithful, minimal MIRROR of src/game/anim/timeline.ts.
+// Source of truth is timeline.ts; kept tiny so the schema + easing semantics that
+// SHIP are exactly what this harness plays (that identity is the whole point).
+const EASINGS = {
+  linear: t => t,
+  easeIn: t => t * t,
+  easeOut: t => 1 - (1 - t) * (1 - t),
+  easeInOut: t => (t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t)),
+  hold: t => (t >= 1 ? 1 : 0),
+};
+const EASING_NAMES = Object.keys(EASINGS);
+const ID_RE = /^[a-z][a-zA-Z0-9]*(\.[a-zA-Z0-9]+)+$/;
+
+function parseDef(raw) {
+  if (typeof raw !== 'object' || raw === null) throw new Error('def must be an object');
+  if (typeof raw.id !== 'string' || !ID_RE.test(raw.id)) throw new Error(`id "${raw.id}" must be dot-namespaced`);
+  if (!Array.isArray(raw.tracks) || raw.tracks.length === 0) throw new Error('tracks must be a non-empty array');
+  let total = 0;
+  const tracks = raw.tracks.map((t, i) => {
+    for (const f of ['target', 'property']) if (typeof t[f] !== 'string' || !t[f]) throw new Error(`track ${i} ${f}`);
+    if (!EASING_NAMES.includes(t.easing)) throw new Error(`track ${i} easing "${t.easing}" not in [${EASING_NAMES.join(', ')}]`);
+    for (const f of ['from', 'to', 'durationFrames']) if (typeof t[f] !== 'number' || !isFinite(t[f])) throw new Error(`track ${i} ${f}`);
+    if (!Number.isInteger(t.durationFrames) || t.durationFrames <= 0) throw new Error(`track ${i} durationFrames must be a positive integer`);
+    const delay = t.delayFrames === undefined ? 0 : t.delayFrames;
+    if (!Number.isInteger(delay) || delay < 0) throw new Error(`track ${i} delayFrames must be a non-negative integer`);
+    total = Math.max(total, delay + t.durationFrames);
+    return { channel: `${t.target}.${t.property}`, from: t.from, to: t.to, dur: t.durationFrames, easing: t.easing, delay };
+  });
+  return { id: raw.id, tracks, total };
+}
+// Evaluate every channel at a given frame → { channel: value }.
+function sample(def, frame) {
+  const out = {};
+  for (const t of def.tracks) {
+    const local = frame - t.delay;
+    if (local < 0) continue;
+    const p = Math.min(1, local / t.dur);
+    out[t.channel] = t.from + (t.to - t.from) * EASINGS[t.easing](p);
+  }
+  return out;
+}
+
+// ── Argent palette (the keys these stubs paint with) ────────────────────────
+const P = {
+  shellBlack:'#000000', arenaField:'#d4e2ad', arenaGround:'#c3d79b', platformTop:'#cfdca4', platformSide:'#a7bc7c',
+  parch:'#f6e7c2', wood:'#734b2c', ink:'#3a2a1c', hpOk:'#3e9a52', hpCrit:'#c23a2a', barEmpty:'#cfc6a8',
+  gold:'#f6c92e', goldHi:'#fff2b8', bond:'#c0608a',
+};
+
+const cv = document.getElementById('cv');
+const g = cv.getContext('2d');
+g.imageSmoothingEnabled = false;
+
+// ── Target STUBS — a generic battle-stage read of each channel, so any JSON
+// plays without the game. Channels absent from the JSON stay at their rest value.
+function draw(vals) {
+  const shakeX = vals['stage.shakeX'] || 0;
+  const foeFlash = vals['sprite.flashAlpha'] || 0;
+  const hpP = vals['bar.hpProgress'];         // 0..1 drain progress (undefined → full)
+  const starScale = vals['star.scale'] ?? 1;
+  const starFlash = vals['star.flashAlpha'] || 0;
+  const wipe = vals['wipe.alpha'] || 0;
+
+  // stage
+  g.fillStyle = '#eaf1dc'; g.fillRect(0, 0, 640, 150);
+  g.fillStyle = P.arenaGround; g.fillRect(0, 150, 640, 210);
+  // platforms + sprite boxes (foe upper-right, player lower-left), shaken by shakeX
+  const foeX = 472 + shakeX, plX = 96 + shakeX;
+  g.fillStyle = P.platformSide; g.ellipseFill(foeX + 56, 124 + 2, 58, 10); g.ellipseFill(plX + 64, 252 + 2, 64, 12);
+  g.fillStyle = P.platformTop;  g.ellipseFill(foeX + 56, 124, 58, 10);     g.ellipseFill(plX + 64, 252, 64, 12);
+  g.fillStyle = '#8a6f4a'; g.fillRect(foeX + 20, 44, 72, 80);  // "foe" body stub
+  g.fillStyle = '#6b8f4a'; g.fillRect(plX + 20, 172, 72, 80);  // "player" body stub
+  if (foeFlash > 0.01) { g.globalAlpha = Math.min(1, foeFlash); g.fillStyle = P.goldHi; g.fillRect(foeX, 12, 112, 112); g.globalAlpha = 1; }
+
+  // a HUD panel + HP bar (drains with hpProgress)
+  g.fillStyle = P.parch; g.fillRect(8, 8, 340, 52); g.strokeStyle = P.wood; g.strokeRect(8.5, 8.5, 339, 51);
+  g.fillStyle = P.ink; g.fillText('FOE', 18, 26);
+  const barW = 250, frac = hpP === undefined ? 1 : (1 - hpP * 0.6); // stub: drain 60%
+  g.fillStyle = P.barEmpty; g.fillRect(40, 34, barW, 8);
+  g.fillStyle = frac > 0.35 ? P.hpOk : P.hpCrit; g.fillRect(40, 34, Math.round(barW * frac), 8);
+
+  // momentum ★ (scales/flashes with starPop)
+  const sx = 300, sy = 46, size = Math.max(1, Math.round(11 * starScale));
+  g.fillStyle = starFlash > 0.3 ? P.goldHi : P.gold;
+  g.font = `${size}px monospace`; g.textBaseline = 'alphabetic';
+  g.fillText('★', sx - (size - 11) / 2, sy + (size - 11) / 2);
+  g.font = '13px monospace';
+
+  // enter wipe (covers the stage, fades out)
+  if (wipe > 0.001) { g.globalAlpha = Math.min(1, wipe); g.fillStyle = P.shellBlack; g.fillRect(0, 0, 640, 360); g.globalAlpha = 1; }
+}
+// tiny ellipse helper
+g.ellipseFill = function (cx, cy, rx, ry) { this.beginPath(); this.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); this.fill(); };
+g.font = '13px monospace';
+
+// ── Playback loop (60fps, deterministic — frame advances by real dt × 60) ────
+let def = null, frame = 0, playing = false, loop = true, lastT = 0;
+const $ = id => document.getElementById(id);
+
+function setDef(d) {
+  def = d; frame = 0;
+  $('curId').textContent = d.id; $('curLen').textContent = d.total;
+  $('scrub').max = String(Math.ceil(d.total)); $('scrub').value = '0';
+  $('status').textContent = 'loaded ✓'; $('status').className = 'ok';
+  render();
+}
+function fail(e) { $('status').textContent = String(e && e.message || e); $('status').className = 'err'; }
+function loadRaw(text) { try { setDef(parseDef(JSON.parse(text))); } catch (e) { fail(e); } }
+
+function render() {
+  g.clearRect(0, 0, 640, 360);
+  draw(def ? sample(def, frame) : {});
+  $('frame').textContent = frame.toFixed(1);
+  $('scrub').value = String(Math.min($('scrub').max, Math.round(frame)));
+}
+function tick(t) {
+  if (!playing) return;
+  if (!lastT) lastT = t;
+  frame += ((t - lastT) / 1000) * 60; lastT = t;
+  if (def && frame >= def.total) { if (loop) frame = 0; else { playing = false; $('play').textContent = '▶ play'; } }
+  render();
+  requestAnimationFrame(tick);
+}
+
+$('play').onclick = () => { if (!def) return; playing = !playing; lastT = 0; $('play').textContent = playing ? '⏸ pause' : '▶ play'; if (playing) requestAnimationFrame(tick); };
+$('loop').onclick = () => { loop = !loop; $('loop').textContent = 'loop: ' + (loop ? 'on' : 'off'); };
+$('scrub').oninput = e => { if (!def) return; playing = false; $('play').textContent = '▶ play'; frame = Number(e.target.value); render(); };
+$('apply').onclick = () => loadRaw($('json').value);
+$('file').onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { $('json').value = r.result; loadRaw(r.result); }; r.readAsText(f); };
+$('loadPreset').onclick = async () => {
+  const id = $('preset').value; if (!id) return;
+  try {
+    const res = await fetch(`../../assets/anim/${id}.json`);
+    if (!res.ok) throw new Error(`fetch ${id}: ${res.status} (serve the repo, e.g. \`npm run dev\`, or use the file picker)`);
+    const text = await res.text(); $('json').value = text; loadRaw(text);
+  } catch (e) { fail(e); }
+};
+render();
+</script>
+</body>
+</html>

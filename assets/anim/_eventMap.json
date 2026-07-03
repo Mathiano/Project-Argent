@@ -1,0 +1,5 @@
+{
+  "hit-landed": ["battle.hitFlash", "battle.hpDrain"],
+  "read-win": ["battle.starPop"],
+  "battle-start": ["battle.enterWipe"]
+}

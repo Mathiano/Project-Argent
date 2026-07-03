@@ -1,0 +1,8 @@
+{
+  "id": "battle.starPop",
+  "tracks": [
+    { "target": "star", "property": "scale", "from": 0.2, "to": 1.45, "durationFrames": 5, "easing": "easeOut", "delayFrames": 0 },
+    { "target": "star", "property": "scale", "from": 1.45, "to": 1, "durationFrames": 7, "easing": "easeInOut", "delayFrames": 5 },
+    { "target": "star", "property": "flashAlpha", "from": 1, "to": 0, "durationFrames": 12, "easing": "easeIn", "delayFrames": 0 }
+  ]
+}

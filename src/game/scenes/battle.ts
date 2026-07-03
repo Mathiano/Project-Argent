@@ -44,7 +44,8 @@ import {
   TUTORIAL_FOE_PROMPT,
   TUTORIAL_WINDOW_PROMPT,
 } from '../tutorialCatch';
-import { emitGameEvent } from '../gameEvents';
+import { emitGameEvent, onGameEvent } from '../gameEvents';
+import { createBattleAnimRuntime } from '../anim/battleAnim';
 import { drawSpeciesInSlot } from '../sprites';
 import {
   STANCE_NAME,
@@ -1246,8 +1247,34 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   const READ_REACT_SEC = 0.5;
   let readReactT = 0;
 
+  // ── Animation runtime (presentation-only; docs/animation-pipeline-plan.md) ──
+  // A subscriber on gameEvents that plays timeline-JSON (assets/anim/) against the
+  // named BINDINGS below — the battle scene's target registry. No timelines live
+  // here (they're data); these bindings are the only battle-side surface. All rest
+  // at their neutral value → when nothing is animating the draw is byte-identical.
+  const anim = createBattleAnimRuntime();
+  const spriteFlash: Record<Side, number> = { player: 0, foe: 0 }; // white hit-flash over the struck sprite
+  let stageShakeX = 0; // stage-only x jolt (sprites + platforms, NOT the UI panels)
+  const barHp: Record<Side, number> = { player: display.player.hp, foe: display.foe.hp }; // the DRAWN hp (lags on a hit)
+  const drainFrom: Record<Side, number> = { player: 0, foe: 0 };
+  const drainTo: Record<Side, number> = { player: 0, foe: 0 };
+  let starPopScale = 1; // the earned ★ pops (rests at 1)
+  let starPopFlash = 0;
+  let wipeAlpha = 0; // battle-enter wipe overlay
+  anim.register('sprite.flashAlpha', { set: (v, s) => { spriteFlash[s ?? 'foe'] = v; } });
+  anim.register('stage.shakeX', { set: (v) => { stageShakeX = v; } });
+  anim.register('bar.hpProgress', {
+    onStart: (s) => { const side = s ?? 'foe'; drainFrom[side] = barHp[side]; drainTo[side] = display[side].hp; },
+    set: (v, s) => { const side = s ?? 'foe'; barHp[side] = drainFrom[side] + (drainTo[side] - drainFrom[side]) * v; },
+  });
+  anim.register('star.scale', { set: (v) => { starPopScale = v; } });
+  anim.register('star.flashAlpha', { set: (v) => { starPopFlash = v; } });
+  anim.register('wipe.alpha', { set: (v) => { wipeAlpha = v; } });
+  // React to the scene's OWN emitted events (mapped to ids as data). Disposed in exit().
+  const disposeAnim = onGameEvent((ev) => anim.trigger(ev.kind, 'side' in ev ? ev.side : null));
+
   // Audio seam — a battle began (see gameEvents). Fire-and-forget; no-op
-  // until an audio layer subscribes.
+  // until an audio layer subscribes. Also the anim trigger for the enter wipe.
   emitGameEvent({ kind: 'battle-start' });
 
   function clampMoveScroll(): void {
@@ -2549,6 +2576,18 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     advanceToNextBeat();
   }
 
+  // Anim — the hit-flash overlay over a struck sprite's slot (proof-grade: a slot
+  // wash, not a silhouette tint — the silhouette-flash needs a sprite-tint hook,
+  // a banked follow-up). No-op at rest (alpha 0) → byte-identical when idle.
+  function drawSpriteFlash(ctx: CanvasRenderingContext2D, side: Side, x: number, y: number): void {
+    const a = spriteFlash[side];
+    if (a <= 0.01) return;
+    ctx.globalAlpha = Math.min(1, a);
+    ctx.fillStyle = PALETTE.momentumGoldHi; // a warm bright flash, not stark white
+    ctx.fillRect(x, y, BATTLE_SLOT, BATTLE_SLOT);
+    ctx.globalAlpha = 1;
+  }
+
   function spriteOffset(side: Side): number {
     if (animSide !== side || animT <= 0) return 0;
     if (animKind === 'strike' || animKind === 'opening' || animKind === 'clash') {
@@ -2573,7 +2612,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawTypeBadges(ctx, px + 10 + measureUiText(ctx, name) + 6, py + 2, display.foe.species.types);
     drawPanelTags(ctx, px + pw - 10, py + 2, buildTags(display.foe, activeMon(state.foe)));
     // HP / ST rows — 16px labels + THIN bars + fine-print cur/max numerics.
-    drawStatRow(ctx, px, pw, py + 15, 'HP', PALETTE.hpOk, display.foe.hp, display.foe.maxHp, hpColor(display.foe.hp, display.foe.maxHp), null);
+    drawStatRow(ctx, px, pw, py + 15, 'HP', PALETTE.hpOk, barHp.foe, display.foe.maxHp, hpColor(barHp.foe, display.foe.maxHp), null);
     drawStatRow(ctx, px, pw, py + 27, 'ST', PALETTE.stamina, display.foe.st, display.foe.maxSt, PALETTE.stamina, COMBAT.winded / display.foe.maxSt);
     // MOMENTUM — a compact ★★☆ star row (the load-bearing ★ differential; display-
     // only — reads the foe's existing momentum, no logic change).
@@ -2641,11 +2680,24 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     drawPanelTags(ctx, px + pw - 10, py + 1, buildTags(display.player, activeMon(state.player)));
     // HP / ST rows + numerics (thin bars). Beat 3.1 — rows pulled UP so the BOND
     // row (label + bar + bench dots) sits FULLY inside the frame body (was clipped).
-    drawStatRow(ctx, px, pw, py + 14, 'HP', PALETTE.hpOk, display.player.hp, display.player.maxHp, hpColor(display.player.hp, display.player.maxHp), null);
+    drawStatRow(ctx, px, pw, py + 14, 'HP', PALETTE.hpOk, barHp.player, display.player.maxHp, hpColor(barHp.player, display.player.maxHp), null);
     drawStatRow(ctx, px, pw, py + 26, 'ST', PALETTE.stamina, display.player.st, display.player.maxSt, PALETTE.stamina, COMBAT.winded / display.player.maxSt);
     // MOMENTUM — a compact ★★☆ star row + the single teaching hint (fine-print).
     drawText(ctx, 'MOMENTUM', px + 10, py + 37, PALETTE.stanceG);
-    const sockEnd = drawStars(ctx, px + 10 + measureUiText(ctx, 'MOMENTUM') + 8, py + 37, display.player.momentum);
+    const starX = px + 10 + measureUiText(ctx, 'MOMENTUM') + 8;
+    const sockEnd = drawStars(ctx, starX, py + 37, display.player.momentum);
+    // STAR POP (anim, battle.starPop on read-win) — the just-earned ★ scales +
+    // flashes in over its socket. No-op at rest (scale 1, flash 0) → byte-identical.
+    if (display.player.momentum > 0 && (starPopScale > 1.02 || starPopFlash > 0.02)) {
+      const size = Math.max(1, Math.round(11 * starPopScale));
+      const grow = (size - 11) / 2;
+      const sx = starX + (display.player.momentum - 1) * STAR_STEP - grow;
+      ctx.font = `${size}px monospace`;
+      ctx.textBaseline = 'top';
+      ctx.textAlign = 'start';
+      ctx.fillStyle = starPopFlash > 0.3 ? PALETTE.momentumGoldHi : PALETTE.momentumGold;
+      ctx.fillText('★', sx, py + 37 - grow);
+    }
     drawText(ctx, 'STARS POWER CALLS + UNLOCK MOVES', sockEnd + 8, py + 37, PALETTE.frameInkDim);
     // BOND — LABELED + HOUSED inside the panel frame (it used to float below).
     // Static during the fight; animates on the post-win advance (bondAdvanceFrom/To).
@@ -3176,6 +3228,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     logicalSize: { width: BATTLE_LOGICAL_W, height: BATTLE_LOGICAL_H },
     update(dt) {
       tick += dt;
+      // Animation runtime (presentation). Advance active timelines, then SNAP each
+      // hp bar to the truth on any side NOT mid-drain (so heals/settles don't lag;
+      // a drain owns barHp for its ~16 frames, ending exactly on display.hp).
+      anim.update(dt);
+      for (const s of ['player', 'foe'] as const) {
+        if (!anim.isActive('battle.hpDrain', s)) barHp[s] = display[s].hp;
+      }
       if (breakFlashT > 0) breakFlashT = Math.max(0, breakFlashT - dt);
       if (breakPipFlashT > 0) breakPipFlashT = Math.max(0, breakPipFlashT - dt);
       if (readReactT > 0) readReactT = Math.max(0, readReactT - dt);
@@ -3244,25 +3303,30 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
 
       // Restyled platforms IN the clearing under each fighter (grown to the 112
       // slot). Lit top + shaded rim, so the mons stand on the field, not float.
-      drawPlatform(ctx, FOE_SLOT.x + BATTLE_SLOT / 2, FOE_SLOT.y + BATTLE_SLOT, 58, 10);
-      drawPlatform(ctx, PL_SLOT.x + BATTLE_SLOT / 2, PL_SLOT.y + BATTLE_SLOT, 64, 12);
+      // stageShakeX (anim) jolts the STAGE only — sprites + platforms, never the UI.
+      drawPlatform(ctx, FOE_SLOT.x + BATTLE_SLOT / 2 + stageShakeX, FOE_SLOT.y + BATTLE_SLOT, 58, 10);
+      drawPlatform(ctx, PL_SLOT.x + BATTLE_SLOT / 2 + stageShakeX, PL_SLOT.y + BATTLE_SLOT, 64, 12);
 
       // Sprites — fillSlot upscales real 56px art by the largest INTEGER factor
       // that fits (2× → 112, pixel-crisp); placeholders already scale to the slot.
+      const foeX = FOE_SLOT.x + spriteOffset('foe') + stageShakeX;
+      const plX = PL_SLOT.x + spriteOffset('player') + stageShakeX;
       drawSpeciesInSlot(
         ctx,
         { name: display.foe.species.name, type: display.foe.species.types[0] ?? null },
-        FOE_SLOT.x + spriteOffset('foe'),
+        foeX,
         FOE_SLOT.y,
         { facing: 'left', slotSize: BATTLE_SLOT, fillSlot: true, bottomAnchor: true },
       );
+      drawSpriteFlash(ctx, 'foe', foeX, FOE_SLOT.y);
       drawSpeciesInSlot(
         ctx,
         { name: monDisplayName(display.player), type: display.player.species.types[0] ?? null },
-        PL_SLOT.x + spriteOffset('player'),
+        plX,
         PL_SLOT.y,
         { facing: 'right', slotSize: BATTLE_SLOT, fillSlot: true, bottomAnchor: true },
       );
+      drawSpriteFlash(ctx, 'player', plX, PL_SLOT.y);
 
       drawReadReaction(ctx); // surface ③ — over the mon, under the HUD panels
       // Battle-UI v2 (beat 1) — the panels now OWN their sub-elements: the foe
@@ -3294,6 +3358,15 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       else if (phase === 'party') drawBottomParty(ctx);
       else if (phase === 'resolve' || phase === 'end') drawBottomLog(ctx);
 
+      // ENTER WIPE (anim, battle.enterWipe on battle-start) — a full-screen overlay
+      // that covers the stage on entry + fades off. Over everything but the dev log.
+      if (wipeAlpha > 0.001) {
+        ctx.globalAlpha = Math.min(1, wipeAlpha);
+        ctx.fillStyle = PALETTE.shellBlack;
+        ctx.fillRect(0, 0, BATTLE_LOGICAL_W, BATTLE_LOGICAL_H);
+        ctx.globalAlpha = 1;
+      }
+
       drawDevLog(ctx); // DEV TOOL — over everything; no-op when off
     },
 
@@ -3303,6 +3376,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
         window.removeEventListener('keydown', onDevLogKey);
       }
+      disposeAnim(); // drop the gameEvents subscription (the anim runtime)
     },
   };
 }

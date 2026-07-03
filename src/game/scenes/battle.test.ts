@@ -5,7 +5,8 @@
 // start with a CH1 starter would freeze the canvas on the first menu
 // frame — the user perceived it as "boots back to title".
 
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
+import { clearGameEventListeners, emitGameEvent } from '../gameEvents';
 import {
   SPECIES,
   activeMon,
@@ -69,6 +70,10 @@ function stubCtx(): RecordingCtx {
 // One-time CH1 move registration so lookupMove finds THORN FLICK etc.
 registerMoves(loadMoves(movesData as MoveJson[]));
 const CH1 = loadDex(ch1BatchData as DexEntryJson[], 13);
+
+// Each battle scene subscribes its animation runtime to the gameEvents bus; drop
+// those subscriptions between tests so a prior (dead) scene never reacts here.
+afterEach(clearGameEventListeners);
 
 function ch1FoeAI(): (state: BattleState, rng: RNG) => Action {
   return (state, rng): Action => {
@@ -2198,5 +2203,21 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
     const screen = ctx.texts.join('|');
     expect(screen).toContain('BOND'); // the panel BOND label stays
     expect(screen).not.toContain(bondStageName(55)); // the always-on stage word is gone
+  });
+
+  // ── Animation runtime — bounds hold DURING active animation frames ──────────
+  test('anim: every primitive stays within 640×360 mid-animation (wipe · flash · shake · star pop · hp drain)', () => {
+    const scene = richScene(); // player momentum 2 → the star pop has a lit ★ to grow
+    scene.update?.(0.01); // → menu; the enter-wipe is live from battle-start
+    // Fire the stage animations the way the scene does (its runtime subscribed).
+    emitGameEvent({ kind: 'hit-landed', side: 'foe', effectiveness: 1 }); // hitFlash + hpDrain
+    emitGameEvent({ kind: 'read-win', side: 'player' }); // starPop
+    // Sample several points across the animations' spans (frames ~1..24).
+    for (let step = 0; step < 8; step += 1) {
+      scene.update?.(3 / 60); // +3 frames
+      const ctx = recordingCtx();
+      scene.draw(ctx);
+      assertInBounds(ctx, `mid-animation frame ~${(step + 1) * 3}`);
+    }
   });
 });
