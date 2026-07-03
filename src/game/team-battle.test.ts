@@ -155,7 +155,9 @@ describe('Phase 1 GATE — 2v2 player battle, voluntary + forced switching', () 
     scene.input?.('a'); // open party screen
     let ctx = stubCtx();
     scene.draw(ctx);
-    expect(ctx.texts.some((t) => t.includes('PARTY') || t.includes('SEND OUT'))).toBe(true);
+    // Beat-2: the party title moved into the narration strip ("SWITCH …" for a
+    // voluntary switch, "SEND OUT WHO?" when forced).
+    expect(ctx.texts.some((t) => t.includes('SWITCH') || t.includes('SEND OUT'))).toBe(true);
     // Default cursor lands on first selectable bench mon (SILTSKIP at idx 1).
     expect(ctx.texts.some((t) => t.includes('>SILTSKIP'))).toBe(true);
 

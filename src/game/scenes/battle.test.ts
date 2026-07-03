@@ -9,6 +9,7 @@ import { describe, expect, test } from 'vitest';
 import {
   SPECIES,
   activeMon,
+  attackPool,
   createBattleState,
   createSide,
   createTeam,
@@ -1875,6 +1876,31 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
     assertCorridorClear(c2, 'boss'); // the taller (boss) foe panel must still clear it
   });
 
+  test('the RELEASE + RESOLVE phases stay within 640×360 bounds', () => {
+    // RELEASE: put the player mid-focus so beginTurn opens the release picker.
+    const chargeMove = attackPool(CH1.GRUBLEAF!)[0]!;
+    const player = { ...createSide(CH1.GRUBLEAF!), momentum: 2, focus: { stance: 'A' as const, move: chargeMove } };
+    const state = createBattleState(createTeam([player]), createTeam([createSide(CH1.FLITPECK!)]));
+    const scene = createBattleScene({
+      state,
+      rng: mulberry32(1),
+      chooseFoeAction: () => ({ kind: 'move', move: 'TACKLE', stance: 'A' }),
+      intro: [],
+      catchBreathUnlocked: true,
+      canRun: true,
+      onResolve: () => {},
+    });
+    scene.update?.(0.01); // mid-focus → phase = release
+    let ctx = recordingCtx();
+    scene.draw(ctx);
+    assertInBounds(ctx, 'release');
+    // RESOLVE: fire the release and draw the resolving console.
+    scene.input?.('a'); // A RELEASE → resolve
+    ctx = recordingCtx();
+    scene.draw(ctx);
+    assertInBounds(ctx, 'resolve');
+  });
+
   test('the integrated BREAK row + role tag stays within bounds (boss foe)', () => {
     const scene = richScene(BOSS_CARD);
     scene.update?.(0.01);
@@ -1886,15 +1912,19 @@ describe('battle UI v2 (beat 1) — panels + type', () => {
     expect(ctx.texts.some((t) => t.text === 'GYM LEADER')).toBe(true);
   });
 
-  test('the primary tier is CRISP 32px (integer 2×); NO fuzzy 24px anywhere', () => {
+  test('type is SINGLE-tier crisp 16px m3x6 (beat-2: 32px retired); NO 24px/32px', () => {
+    // Sample menu + move phases (the rail + grid where emphasis lives).
     const scene = richScene(BOSS_CARD);
-    scene.update?.(0.01);
+    scene.update?.(0.01); // menu
     const ctx = recordingCtx();
     scene.draw(ctx);
-    // The primary type tier renders at exactly 32px m3x6 (a crisp integer scale).
-    expect(ctx.fonts.some((f) => f === '32px m3x6, monospace')).toBe(true);
-    // The fine-print tier stays the global 16px. NO 24px (1.5× = fuzzy) is used.
+    scene.input?.('a'); // → move grid
+    scene.draw(ctx);
+    // The text tier is the global 16px m3x6 (emphasis is faux-bold double-draw).
+    expect(ctx.fonts.some((f) => f === '16px m3x6, monospace')).toBe(true);
+    // NO fuzzy 24px, and the 32px tier is fully retired (beat 2).
     expect(ctx.fonts.some((f) => /\b24px\b/.test(f))).toBe(false);
+    expect(ctx.fonts.some((f) => /\b32px\b/.test(f))).toBe(false);
   });
 
   test('the old separate PHASE/BREAK strip is GONE (no double-render): "PHASE n" not drawn', () => {

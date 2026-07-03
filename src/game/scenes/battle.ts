@@ -59,7 +59,6 @@ import {
   drawWindedNotch,
   hpColor,
   measureUiText,
-  normalizeUiText,
 } from '../ui';
 
 // Battle-text stream speed (chars/sec). Tuned readable, ~modern-Pokémon feel
@@ -134,40 +133,92 @@ const FOE_SLOT = { x: 472, y: 12 } as const; // upper-right sprite slot
 const INTENT = { x: 8, y: 112, w: 340, h: 22 } as const; // mid strip — restored up under the compact foe panel (y82 non-boss / y92 boss), clear of the player sprite (y140)
 const PL_SLOT = { x: 96, y: 140 } as const; // mid-left sprite slot
 const PL_PANEL = { x: 300, y: 150, w: 332, h: 84 } as const; // mid-right (restored y150; the housed BOND row is the only growth over the old h72)
-const BOTTOM = { x: 4, y: 238, w: 632, h: 118 } as const; // full-width bottom
+// Battle-UI v2 (beat 2) — the console (BOTTOM) TIGHTENED: a shorter, denser
+// full-width bar. The compact 16px rail reclaims the dead space the old 32px rail
+// held; the move grid re-compresses under the new narration strip. A shorter
+// console only helps the attack-corridor clearance (it sits further below).
+const BOTTOM = { x: 4, y: 244, w: 632, h: 112 } as const; // full-width bottom (bottom-anchored at 356)
 // Battle-scaled draw sizes: the sprite slot (was the 56px default) and the HP/ST
 // bar height (was BAR_HEIGHT_TALL 6) grow for the bigger canvas.
 const BATTLE_SLOT = 96;
 const BATTLE_BAR_H = 12;
 
-// ── Battle-UI v2 — the two-tier TYPE scale, battle-SCOPED ─────────────────────
-// m3x6 is crisp only at INTEGER scales of its 16px design size. The PRIMARY tier
-// is 32px (2× — crisp), used for the MENU RAIL items only (FIGHT/CALLS/MONS/
-// BALLS/RUN — the console has the room). Everything else — ALL panel text (mon
-// names, HP/ST/MOMENTUM/BOND/BREAK labels, numerics, tags, hints) + move names +
-// lock notes — stays the global 16px drawText fine-print. NO 24px (1.5× = fuzzy).
-// (Beat-1 put 32px on the panels; the eye-gate moved it OFF — the grown panels
-// blocked the attack corridor.) The global UI_FONT_PX / drawText are UNTOUCHED
-// (every other scene byte-identical) — these are battle-local.
-const BATTLE_BIG_PX = 32;
-const BATTLE_BIG_FONT = `${BATTLE_BIG_PX}px m3x6, monospace`;
-// Vertical-align nudge, RE-DERIVED for 32px (NOT copied): m3x6's caps sit ~2×
-// lower in the 2× em, so the 16px UI_TEXT_DY (−4) doubles to −8 to land the caps
-// where the fine-print tier lands them. ⚠️ EYE-CHECK — Mathias tunes this single
-// value against the real render (the eye-gate before beat 2).
-const BATTLE_BIG_DY = -8;
-function drawBig(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string): void {
-  ctx.font = BATTLE_BIG_FONT;
-  ctx.letterSpacing = '0px';
-  ctx.textBaseline = 'top';
-  ctx.textAlign = 'start';
-  ctx.fillStyle = color;
-  ctx.fillText(normalizeUiText(text), x, y + BATTLE_BIG_DY);
+// ── Battle-UI v2 (beat 2) — the type scale is now SINGLE-tier, battle-SCOPED ───
+// The 32px tier RETIRED (beat-1 eye-gate + beat-2: it blocked the corridor / was
+// too big for the rail). Everything is the crisp 16px m3x6, with EMPHASIS via
+// FAUX-BOLD (double-draw at +1px x — both integer positions → crisp, no smoothing,
+// no 24px). Used for the rail keywords + section headers. The global UI_FONT_PX /
+// drawText are UNTOUCHED (every other scene byte-identical) — this is battle-local.
+function drawBold(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string): void {
+  drawText(ctx, text, x, y, color);
+  drawText(ctx, text, x + 1, y, color); // +1px x → faux-bold weight, still pixel-crisp
 }
-function measureBig(ctx: CanvasRenderingContext2D, text: string): number {
-  ctx.font = BATTLE_BIG_FONT;
+
+// ── Console (beat 2) — the menu RAIL data + shared console furniture ───────────
+type RailKind = 'fight' | 'pkmn' | 'catch' | 'call' | 'run';
+const RAIL_KEYWORD: { readonly [K in RailKind]: string } = {
+  fight: 'FIGHT', pkmn: 'MONS', catch: 'BALLS', call: 'CALLS', run: 'RUN',
+};
+// The description column (menu phase, behind a dotted divider).
+const RAIL_DESC: { readonly [K in RailKind]: string } = {
+  fight: 'Engage the foe.',
+  call: 'Use a learned Call.',
+  pkmn: 'Switch your monster.',
+  catch: 'Use an item.',
+  run: 'Escape from battle.',
+};
+// One-liners for the narration strip (Call phase) — display-only, battle-local.
+const CALL_DESC: { readonly [id: string]: string } = {
+  'catch-breath': 'Recover stamina.',
+  'get-away': 'Jump clear — a grazing hit.',
+  'shake-off': 'Clear the active status.',
+  recover: 'Heal half your HP.',
+  dodge: 'Fully evade the incoming hit.',
+  'full-power': 'Your next attack hits +50%.',
+  'read-them': 'Read the foe honestly this round.',
+  'throw-off': 'Plant a false stance in history.',
+  'come-back': 'Recall + send another — no free hit.',
+};
+
+// The NARRATION STRIP — the dark header line across the console top; a context
+// line for the hovered thing, phase-aware (the caller supplies the text).
+function drawNarration(ctx: CanvasRenderingContext2D, text: string): void {
+  const y = BOTTOM.y + 2;
+  const h = 16;
+  ctx.fillStyle = 'rgba(28,19,11,0.94)'; // dark leather header strip
+  ctx.fillRect(BOTTOM.x + 6, y, BOTTOM.w - 12, h);
+  ctx.fillStyle = PALETTE.silverDim; // silver base inlay
+  ctx.fillRect(BOTTOM.x + 8, y + h - 1, BOTTOM.w - 16, 1);
+  drawText(ctx, text, BOTTOM.x + 12, y + 2, PALETTE.paper);
+}
+
+// A/B (and phase-specific) hints as small FRAMED BUTTON CHIPS, laid RIGHT-TO-LEFT
+// from the console's bottom-right corner. Replaces the old floating hint text.
+function drawButtonChips(
+  ctx: CanvasRenderingContext2D,
+  chips: readonly string[],
+): void {
+  let rx = BOTTOM.x + BOTTOM.w - 8;
+  const y = BOTTOM.y + BOTTOM.h - 17;
+  ctx.font = UI_FONT;
   ctx.letterSpacing = '0px';
-  return ctx.measureText(normalizeUiText(text)).width;
+  for (const label of chips) {
+    const w = Math.ceil(ctx.measureText(label).width) + 8;
+    const tx = rx - w;
+    ctx.fillStyle = PALETTE.frameParchmentDim;
+    ctx.fillRect(tx, y, w, 14);
+    ctx.strokeStyle = PALETTE.frameWoodDark;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(tx + 0.5, y + 0.5, w - 1, 13);
+    drawText(ctx, label, tx + 4, y + 1, PALETTE.frameInk);
+    rx = tx - 5;
+  }
+}
+
+// A dotted vertical divider (menu rail keyword | description columns).
+function drawDottedV(ctx: CanvasRenderingContext2D, x: number, y: number, h: number): void {
+  ctx.fillStyle = PALETTE.frameInkSoft;
+  for (let yy = y; yy < y + h; yy += 3) ctx.fillRect(x, yy, 1, 1);
 }
 // Battle-local TYPE-BADGE colours (a copy of sprites.ts TYPE_COLOR — battle-scoped
 // per the isolation fence; the shared sprites helper stays untouched). Covers the
@@ -370,9 +421,34 @@ function moveCellInfo(side: SideState, name: string): MoveCellInfo {
   };
 }
 
-// A move cell in the 2×3 grid: tier badge + name + (ST cost / effect tag), or the
-// lock reason for an unavailable move. 2b-2 skin: inset parchment cell, jewel tier
-// badge, a velvet accent stripe + brass tag for techniques, a velvet selection wash.
+// A tiny PADLOCK glyph (m3x6 has none) — a 6×8 code-drawn lock, for a locked cell.
+function drawPadlock(ctx: CanvasRenderingContext2D, x: number, y: number, color: string): void {
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y + 3, 6, 5); // body
+  ctx.fillRect(x + 1, y, 1, 4); // shackle left
+  ctx.fillRect(x + 4, y, 1, 4); // shackle right
+  ctx.fillRect(x + 1, y, 4, 1); // shackle top
+}
+
+// A small framed chip (tier badge / effect tag) — a colour box + silver trim +
+// cream label. Returns the x just past it. Battle-local console furniture.
+function drawChip(ctx: CanvasRenderingContext2D, x: number, y: number, label: string, fill: string): number {
+  ctx.font = UI_FONT;
+  ctx.letterSpacing = '0px';
+  const w = Math.ceil(ctx.measureText(label).width) + 7;
+  ctx.fillStyle = fill;
+  ctx.fillRect(x, y, w, 12);
+  ctx.strokeStyle = PALETTE.silverDim;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, 11);
+  drawText(ctx, label, x + 3, y, PALETTE.paper);
+  return x + w;
+}
+
+// A move cell in the 2×3 grid (beat-2 richer): a BOXED tier chip (T0/T1…), the
+// name, and on the right either an EFFECT chip (BURN/…) + ST for a technique, or
+// the ST cost, or a PADLOCK + the lock reason ("NEEDS ★★") for an illegal move.
+// Selected cells get the stronger (double gold) border. Velvet stripe marks TEC.
 function drawMoveCell(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -382,33 +458,38 @@ function drawMoveCell(
   info: MoveCellInfo,
   selected: boolean,
 ): void {
-  // Inset parchment cell (a shade down from the panel body).
-  ctx.fillStyle = PALETTE.frameParchmentDim;
+  ctx.fillStyle = PALETTE.frameParchmentDim; // inset parchment cell
   ctx.fillRect(x, y, w, h);
   if (selected) {
-    ctx.fillStyle = 'rgba(158,74,58,0.5)'; // velvet selection wash — stronger for clear hierarchy (2b-2 tune)
+    ctx.fillStyle = 'rgba(158,74,58,0.5)'; // velvet selection wash
     ctx.fillRect(x, y, w, h);
   }
-  // Technique cells carry a velvet accent stripe down the left edge (the two
-  // pools read apart at a glance).
   if (info.isTech) {
-    ctx.fillStyle = PALETTE.velvet;
+    ctx.fillStyle = PALETTE.velvet; // TEC accent stripe (the two pools read apart)
     ctx.fillRect(x, y, 3, h);
   }
-  ctx.strokeStyle = selected ? PALETTE.velvet : PALETTE.frameWoodDark;
+  ctx.strokeStyle = selected ? PALETTE.momentumGold : PALETTE.frameWoodDark;
   ctx.lineWidth = 1;
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  if (selected) ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3); // stronger (double) border
   const ty = y + Math.round(h / 2) - 6;
-  const nameColor = info.legal ? PALETTE.frameInk : PALETTE.frameInkDim;
-  const badgeColor = info.legal ? TIER_BADGE_COLOR[info.tier] : PALETTE.frameInkDim;
-  drawText(ctx, info.badge, x + 8, ty, badgeColor);
-  // Cursor + name as one string so the selected move reads ">NAME".
-  drawText(ctx, `${selected ? '>' : ' '}${info.name}`, x + 30, ty, nameColor);
+  const legal = info.legal;
+  // Boxed tier chip.
+  drawChip(ctx, x + 6, ty - 1, info.badge, legal ? TIER_BADGE_COLOR[info.tier] : PALETTE.frameInkDim);
+  // Name (with the > cursor).
+  drawText(ctx, `${selected ? '>' : ' '}${info.name}`, x + 32, ty, legal ? PALETTE.frameInk : PALETTE.frameInkDim);
+  // Right side.
   if (info.lockLabel) {
-    drawTextRight(ctx, info.lockLabel, x + w - 5, ty, PALETTE.hpCrit);
+    const lw = Math.ceil(measureUiText(ctx, info.lockLabel));
+    drawText(ctx, info.lockLabel, x + w - 5 - lw, ty, PALETTE.hpCrit);
+    drawPadlock(ctx, x + w - 5 - lw - 9, ty + 1, PALETTE.hpCrit);
+  } else if (info.effectTag) {
+    // Effect chip + ST for a technique.
+    drawTextRight(ctx, `ST${info.cost}`, x + w - 5, ty, PALETTE.frameInkSoft);
+    const ew = Math.ceil(measureUiText(ctx, `ST${info.cost}`));
+    drawChip(ctx, x + w - 5 - ew - 4 - (Math.ceil(ctx.measureText(info.effectTag).width) + 7), ty - 1, info.effectTag, PALETTE.brass);
   } else {
-    const right = info.effectTag ? `${info.effectTag}·ST${info.cost}` : `ST${info.cost}`;
-    drawTextRight(ctx, right, x + w - 5, ty, info.isTech ? PALETTE.brass : PALETTE.frameInkSoft);
+    drawTextRight(ctx, `ST${info.cost}`, x + w - 5, ty, PALETTE.frameInkSoft);
   }
 }
 
@@ -2634,65 +2715,106 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
   }
 
-  function drawBottomMenu(ctx: CanvasRenderingContext2D): void {
-    drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+  // The CALLS-row note (ball count / Call ★ or lock reason), used by the rail.
+  function railNote(kind: RailKind): string {
     const me = activeMon(state.player);
-    // The MENU RAIL — the 32px PRIMARY tier lives here (the console has the room):
-    // FIGHT / CALLS / MONS / BALLS / RUN keywords in drawBig, with the informative
-    // NOTES (ball count, Call ★/lock reason) kept as 16px FINE-PRINT beside them.
-    const keyword: { readonly [K in 'fight' | 'pkmn' | 'catch' | 'call' | 'run']: string } = {
-      fight: 'FIGHT', pkmn: 'MONS', catch: 'BALLS', call: 'CALLS', run: 'RUN',
-    };
-    const note: { readonly [K in 'fight' | 'pkmn' | 'catch' | 'call' | 'run']: string } = {
-      fight: '',
-      pkmn: '',
-      catch: opts.canCatch ? `x${opts.ballCount?.() ?? 0}` : '-',
-      // Legibility #3 — the CALLS note states WHY it's unavailable: not unlocked, or
-      // unlocked but no ★ to spend.
-      call: !opts.catchBreathUnlocked ? 'locked' : me.momentum < 1 ? 'needs ★' : `★${me.momentum}`,
-      run: '',
-    };
+    if (kind === 'catch') return opts.canCatch ? `x${opts.ballCount?.() ?? 0}` : '-';
+    if (kind === 'call') {
+      return !opts.catchBreathUnlocked ? 'locked' : me.momentum < 1 ? 'needs ★' : `★${me.momentum}`;
+    }
+    return '';
+  }
+
+  // The MENU RAIL — 16px FAUX-BOLD keywords (drawBold), notes beside them, and (in
+  // 'full' mode) a DESCRIPTION column behind a dotted divider. In 'breadcrumb'
+  // mode (move/call phases) it renders COMPACT + DIMMED with the drilled-in item
+  // BOXED + a ◄ marker — a "you are here" trail beside the active list. DISPLAY-
+  // ONLY: the rail in a drilled phase is not interactive (B backs out as always).
+  function drawRail(ctx: CanvasRenderingContext2D, x: number, yTop: number, mode: 'full' | 'breadcrumb', boxedKind?: RailKind): void {
+    const me = activeMon(state.player);
     const items = menuItems();
+    const pitch = 17;
+    const kwX = x + 12;
+    if (mode === 'full') drawDottedV(ctx, x + 82, yTop, pitch * items.length - 3);
     items.forEach((it, i) => {
-      // MONS is dimmed when no bench survivor; CALLS when locked or 0 ★;
-      // RUN never dimmed (its row dispatches the "no running" text when
-      // canRun is false). FIGHT always lit.
       let dim = !it.enabled;
       if (it.kind === 'call' && (!opts.catchBreathUnlocked || me.momentum < 1)) dim = true;
-      const color = dim ? PALETTE.frameInkDim : PALETTE.frameInk;
-      // 5 rows at the 32px rail pitch, left column of the full-width bottom panel.
-      const rowY = BOTTOM.y + 8 + i * 21;
-      if (menuCursor === i) drawRowHighlight(ctx, BOTTOM.x + 10, rowY + 2, 250, 20);
-      const kw = `${menuCursor === i ? '>' : ' '} ${keyword[it.kind]}`;
-      drawBig(ctx, kw, BOTTOM.x + 14, rowY, color);
-      if (note[it.kind]) {
-        drawText(ctx, note[it.kind], BOTTOM.x + 14 + measureBig(ctx, kw) + 10, rowY + 8, dim ? PALETTE.frameInkDim : PALETTE.frameInkSoft);
+      const rowY = yTop + i * pitch;
+      const cursorHere = mode === 'full' && menuCursor === i;
+      const boxedHere = mode === 'breadcrumb' && it.kind === boxedKind;
+      // In breadcrumb mode the drilled item is bright; the rest are dim context.
+      const color = boxedHere ? PALETTE.frameInk : mode === 'breadcrumb' ? PALETTE.frameInkDim : dim ? PALETTE.frameInkDim : PALETTE.frameInk;
+      if (cursorHere) drawRowHighlight(ctx, x + 6, rowY - 1, mode === 'full' ? 76 : 72, 15);
+      if (boxedHere) {
+        const bw = Math.ceil(measureUiText(ctx, RAIL_KEYWORD[it.kind])) + 7;
+        ctx.strokeStyle = PALETTE.momentumGold;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(kwX - 3.5, rowY - 0.5, bw, 15);
+        drawText(ctx, '◄', kwX + bw, rowY, PALETTE.momentumGold);
+      }
+      const marker = cursorHere ? '>' : ' ';
+      const kwLabel = `${marker} ${RAIL_KEYWORD[it.kind]}`;
+      drawBold(ctx, kwLabel, kwX, rowY, color);
+      // The note + description columns render in 'full' (menu) mode only — the
+      // breadcrumb stays compact/narrow so the active list has room beside it.
+      if (mode === 'full') {
+        const note = railNote(it.kind);
+        if (note) {
+          drawText(ctx, note, kwX + Math.ceil(measureUiText(ctx, kwLabel)) + 6, rowY, dim ? PALETTE.frameInkDim : PALETTE.frameInkSoft);
+        }
+        drawText(ctx, RAIL_DESC[it.kind], x + 90, rowY, PALETTE.frameInkSoft);
       }
     });
-    // (Removed the dim "R{round}" debug round-counter — not player-facing.)
-    // Legibility #2 — when the player has no ★, teach what charges it (the
-    // cause/effect the callouts now also show: win a read → +★).
-    if (me.momentum === 0) {
-      drawText(ctx, 'win a read to charge ★', BOTTOM.x + 280, BOTTOM.y + 14, PALETTE.frameInkDim);
+  }
+
+  // A short one-liner for the narration strip (move phase).
+  function moveOneLiner(info: MoveCellInfo): string {
+    if (info.lockLabel) return `Locked — needs ${info.lockLabel.replace('NEEDS ', '')}`;
+    if (info.isTech && info.effectTag) {
+      const move = lookupMove(info.name);
+      return move.effect?.polarity === 'buff' ? `Self-buff: grants ${info.effectTag}.` : `Inflicts ${info.effectTag} on a read-win.`;
     }
-    drawText(
-      ctx,
-      'A confirm  B back',
-      BOTTOM.x + 280,
-      BOTTOM.y + BOTTOM.h - 20,
-      PALETTE.frameInkDim,
-    );
+    return `A ${TIER_WORD[info.tier]} ${(info.type ?? 'neutral').toLowerCase()} strike.`;
+  }
+
+  // The NARRATION strip's text for the current console phase.
+  function narrationText(): string {
+    const side = activeMon(state.player);
+    if (phase === 'move') {
+      const moves = gridMoves();
+      const name = moves[moveCursor];
+      return name ? `MOVE  |  ${moveCellInfo(side, name).name} — ${moveOneLiner(moveCellInfo(side, name))}` : 'MOVE';
+    }
+    if (phase === 'call') {
+      const call = CALL_SET[callCursor];
+      return call ? `CALL  |  ${call.name} — ${CALL_DESC[call.id] ?? ''}` : 'CALL';
+    }
+    if (phase === 'release') {
+      const r = RELEASES[releaseCursor]!;
+      return `RELEASE  |  ${r.name} — ${r.beats}`;
+    }
+    if (phase === 'throwoff') return 'THROW THEM OFF  |  plant a false read';
+    if (phase === 'party') return partyMode === 'forced' ? 'SEND OUT WHO?' : 'SWITCH  |  choose a monster';
+    if (phase === 'spare') return 'SPARE  |  the fallen foe?';
+    return `${monDisplayName(display.player)} — what will you do?`; // menu
+  }
+
+  function drawBottomMenu(ctx: CanvasRenderingContext2D): void {
+    drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+    drawNarration(ctx, narrationText());
+    const me = activeMon(state.player);
+    // The full rail (keyword · note · dotted divider · description).
+    drawRail(ctx, BOTTOM.x + 4, BOTTOM.y + 24, 'full');
+    // When the player has no ★, teach what charges it (a micro-hint, top-right).
+    if (me.momentum === 0) {
+      drawText(ctx, 'win a read to charge ★', BOTTOM.x + BOTTOM.w - 190, BOTTOM.y + 24, PALETTE.frameInkDim);
+    }
+    drawButtonChips(ctx, ['A CONFIRM', 'B BACK']);
   }
 
   function drawBottomParty(ctx: CanvasRenderingContext2D): void {
     drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
-    drawText(
-      ctx,
-      partyMode === 'forced' ? 'SEND OUT WHO?' : 'PARTY',
-      BOTTOM.x + 16,
-      BOTTOM.y + 8,
-      PALETTE.frameInkSoft,
-    );
+    drawNarration(ctx, narrationText());
     const team = state.player;
     team.members.forEach((side, i) => {
       const isActive = i === team.active;
@@ -2703,10 +2825,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       const hpStr = `HP ${Math.round(side.hp)}/${side.maxHp}`;
       const tag = fainted ? 'FNT' : isActive ? 'ACT' : '';
       const row = `${cursor}${monDisplayName(side).padEnd(10, ' ')} ${hpStr.padEnd(10, ' ')} ${tag}`;
-      drawText(ctx, row, BOTTOM.x + 16, BOTTOM.y + 30 + i * 16, color);
+      drawText(ctx, row, BOTTOM.x + 16, BOTTOM.y + 26 + i * 16, color);
     });
-    const help = partyMode === 'forced' ? 'A: send out' : 'A: switch  B: back';
-    drawText(ctx, help, BOTTOM.x + 16, BOTTOM.y + BOTTOM.h - 20, PALETTE.frameInkDim);
+    drawButtonChips(ctx, partyMode === 'forced' ? ['A SEND OUT'] : ['A SWITCH', 'B BACK']);
   }
 
   // The CD-format move view (2b-1): a 2×3 grid — 4 ATTACKS (2 columns) + 2
@@ -2715,115 +2836,82 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // colors (2b-2 skins it). Reads the two-pool + tier-gate engine truth.
   function drawBottomMoves(ctx: CanvasRenderingContext2D): void {
     drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+    drawNarration(ctx, narrationText());
     const side = activeMon(state.player);
     const attacks = attackPool(side.species);
     const techs = techniquePool(side.species);
     const moves = [...attacks, ...techs]; // == gridMoves(); moveCursor indexes this
 
-    // ── LEFT column: the 2×3 grid ────────────────────────────────────────────
-    const gx = BOTTOM.x + 12;
-    const cellW = 158;
-    const cellGX = 164;
-    drawText(ctx, 'ATTACKS', gx, BOTTOM.y + 6, PALETTE.frameInkSoft);
+    // ── LEFT: the breadcrumb RAIL (FIGHT boxed) — display-only trail ──────────
+    drawRail(ctx, BOTTOM.x + 4, BOTTOM.y + 24, 'breadcrumb', 'fight');
+
+    // ── MIDDLE: the 2×3 grid, BESIDE the rail ────────────────────────────────
+    const gx = BOTTOM.x + 92;
+    const cellW = 148;
+    const cellGX = 152;
+    drawText(ctx, 'ATTACKS', gx, BOTTOM.y + 20, PALETTE.frameInkSoft);
     for (let i = 0; i < attacks.length; i += 1) {
       const col = i % 2;
       const row = Math.floor(i / 2);
-      drawMoveCell(
-        ctx,
-        gx + col * cellGX,
-        BOTTOM.y + 22 + row * 28,
-        cellW,
-        24,
-        moveCellInfo(side, attacks[i]!),
-        moveCursor === i,
-      );
+      drawMoveCell(ctx, gx + col * cellGX, BOTTOM.y + 30 + row * 20, cellW, 18, moveCellInfo(side, attacks[i]!), moveCursor === i);
     }
-    drawText(ctx, 'TECHNIQUES', gx, BOTTOM.y + 78, PALETTE.frameInkSoft);
+    drawText(ctx, 'TECHNIQUES', gx, BOTTOM.y + 72, PALETTE.frameInkSoft);
     for (let j = 0; j < techs.length; j += 1) {
-      drawMoveCell(
-        ctx,
-        gx + j * cellGX,
-        BOTTOM.y + 92,
-        cellW,
-        22,
-        moveCellInfo(side, techs[j]!),
-        moveCursor === attacks.length + j,
-      );
+      drawMoveCell(ctx, gx + j * cellGX, BOTTOM.y + 82, cellW, 18, moveCellInfo(side, techs[j]!), moveCursor === attacks.length + j);
     }
 
     // Divider between the grid and the detail/stance column.
     ctx.fillStyle = PALETTE.frameInkSoft;
-    ctx.fillRect(BOTTOM.x + 344, BOTTOM.y + 8, 1, BOTTOM.h - 16);
+    ctx.fillRect(BOTTOM.x + 398, BOTTOM.y + 22, 1, BOTTOM.h - 30);
 
-    // ── RIGHT column: SELECTED detail + stance selector ──────────────────────
-    const rx = BOTTOM.x + 356;
+    // ── RIGHT: SELECTED detail + stance selector ─────────────────────────────
+    const rx = BOTTOM.x + 406;
     const sel = moves[moveCursor] ? moveCellInfo(side, moves[moveCursor]!) : null;
-    drawText(ctx, 'SELECTED', rx, BOTTOM.y + 6, PALETTE.frameInkSoft);
+    drawText(ctx, 'SELECTED', rx, BOTTOM.y + 20, PALETTE.frameInkSoft);
     if (sel) {
-      drawText(ctx, sel.name, rx, BOTTOM.y + 20, sel.legal ? PALETTE.frameInk : PALETTE.frameInkDim);
+      drawBold(ctx, sel.name, rx, BOTTOM.y + 31, sel.legal ? PALETTE.frameInk : PALETTE.frameInkDim);
       drawText(
         ctx,
         `${sel.badge} ${sel.isTech ? 'TECHNIQUE' : 'ATTACK'} · ${sel.type ?? 'NEUTRAL'} · ST${sel.cost}`,
         rx,
-        BOTTOM.y + 38,
+        BOTTOM.y + 44,
         PALETTE.frameInkSoft,
       );
       const move = lookupMove(sel.name);
-      let desc: string;
-      if (sel.isTech && move.effect) {
-        desc =
-          move.effect.polarity === 'buff'
-            ? `Self-buff — grants ${sel.effectTag}. Chip damage.`
-            : `On a read-win, inflicts ${sel.effectTag}.`;
-      } else {
-        desc = `A ${TIER_WORD[sel.tier]} ${(sel.type ?? 'neutral').toLowerCase()} strike.`;
-      }
-      if (sel.lockLabel) desc += ` Locked: ${sel.lockLabel}.`;
-      // Wrap to two lines at ~40 chars.
-      const words = desc.split(' ');
-      let l1 = '';
-      let l2 = '';
-      for (const w of words) {
-        if ((l1 + ' ' + w).trim().length <= 40 || !l1) l1 = (l1 + ' ' + w).trim();
-        else l2 = (l2 + ' ' + w).trim();
-      }
-      drawText(ctx, l1, rx, BOTTOM.y + 54, sel.legal ? PALETTE.frameInk : PALETTE.hpCrit);
-      if (l2) drawText(ctx, l2, rx, BOTTOM.y + 68, sel.legal ? PALETTE.frameInk : PALETTE.hpCrit);
+      let eff: string;
+      if (sel.lockLabel) eff = `Locked: ${sel.lockLabel}.`;
+      else if (sel.isTech && move.effect) {
+        eff = move.effect.polarity === 'buff' ? `Self-buff — grants ${sel.effectTag}.` : `Read-win → inflicts ${sel.effectTag}.`;
+      } else eff = `A ${TIER_WORD[sel.tier]} ${(sel.type ?? 'neutral').toLowerCase()} strike.`;
+      drawText(ctx, eff, rx, BOTTOM.y + 56, sel.legal ? PALETTE.frameInk : PALETTE.hpCrit);
     }
 
-    // Stance selector — the three stance badges, current one boxed + named.
+    // NEXT — the honest turn-order preview for THIS move.
     const stance = STANCES[stanceIdx]!;
-    const sy = BOTTOM.y + 84;
+    const foeSt = actionStance(foeAction);
+    const order = orderHint(side, activeMon(state.foe), moves[moveCursor]!, stance, actionMove(foeAction), foeSt);
+    const fluidFirst = (stance === 'F' && foeSt === 'G') || (foeSt === 'F' && stance === 'G');
+    drawText(ctx, `NEXT: ${order}${fluidFirst ? ' ·FLUID' : ''}`, rx, BOTTOM.y + 68, fluidFirst ? PALETTE.stanceF : PALETTE.frameInkSoft);
+
+    // Stance selector — boxed A/G/F badges, active highlighted + NAMED (e.g. GUARD).
+    const sy = BOTTOM.y + 82;
     for (let i = 0; i < STANCES.length; i += 1) {
       const bx = rx + i * 18;
       if (STANCES[i] === stance) {
-        ctx.fillStyle = 'rgba(201,162,39,0.5)'; // highlight the active badge (plain)
+        ctx.fillStyle = 'rgba(201,162,39,0.5)'; // highlight the active badge
         ctx.fillRect(bx - 2, sy - 2, 13, 13);
       }
       drawStanceBadge(ctx, bx, sy, STANCES[i]!);
     }
-    // Current stance name, and the commit indicator (FULL POWER / FOCUS).
     drawText(ctx, STANCE_NAME[stance], rx + 60, sy + 1, PALETTE.frameInk);
-    if (pendingFullPower) drawText(ctx, '▶FULL+50%', rx + 116, sy + 1, PALETTE.momentumGold);
+    if (pendingFullPower) drawText(ctx, '▶FULL+50%', rx + 118, sy + 1, PALETTE.momentumGold);
     // ▶FOCUS only shows for a chargeable move — a technique can't Focus (its
     // effect would be discarded), so the indicator hides on a technique.
-    else if (committing && sel && !sel.isTech) drawText(ctx, '▶FOCUS', rx + 116, sy + 1, PALETTE.hpCrit);
+    else if (committing && sel && !sel.isTech) drawText(ctx, '▶FOCUS', rx + 118, sy + 1, PALETTE.hpCrit);
 
-    // Turn-order preview — the HONEST "who acts first" for THIS move (initiative
-    // = speed ÷ move weight, with the Fluid-vs-Guard override), and the controls.
-    const foeSt = actionStance(foeAction);
-    const order = orderHint(side, activeMon(state.foe), moves[moveCursor]!, stance, actionMove(foeAction), foeSt);
-    const fluidFirst = (stance === 'F' && foeSt === 'G') || (foeSt === 'F' && stance === 'G');
-    drawText(
-      ctx,
-      `NEXT: ${order}${fluidFirst ? ' ·FLUID' : ''}`,
-      rx,
-      BOTTOM.y + 102,
-      fluidFirst ? PALETTE.stanceF : PALETTE.frameInkSoft,
-    );
-    // Controls hint — right-aligned so it can't overflow the panel; ASCII only
-    // (m3x6 lacks the ←→ arrows). SEL cycles stance, L/R toggles the FOCUS commit.
-    drawTextRight(ctx, 'SEL stance · L/R commit · B back', BOTTOM.x + BOTTOM.w - 8, BOTTOM.y + 102, PALETTE.frameInkDim);
+    // Move-specific controls (fine-print, left of the chips) + the A/B button chips.
+    drawText(ctx, 'SEL stance · L/R commit', rx, BOTTOM.y + BOTTOM.h - 16, PALETTE.frameInkDim);
+    drawButtonChips(ctx, ['A CONFIRM', 'B BACK']);
   }
 
   // FOCUS R2 — the release picker (the hidden release is chosen NOW).
@@ -2834,107 +2922,102 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // line at the same x — "RELEASE:" collided with ">HEAVY" and its hint.
   function drawBottomRelease(ctx: CanvasRenderingContext2D): void {
     drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
-    drawText(ctx, 'RELEASE:', BOTTOM.x + 16, BOTTOM.y + 10, PALETTE.frameInkSoft);
+    drawNarration(ctx, narrationText());
     RELEASES.forEach((r, i) => {
-      const y = BOTTOM.y + 34 + i * 20; // rows below the header
+      const y = BOTTOM.y + 28 + i * 20;
       const marker = releaseCursor === i ? '>' : ' ';
       const color = releaseCursor === i ? PALETTE.frameInk : PALETTE.frameInkSoft;
-      // "HEAVY ATTACK" (not bare "HEAVY") — it's YOUR charged attack delivered
-      // that way, NOT a damage tier. Heavy/Feint/Hide is the read-multiplier on top.
+      if (releaseCursor === i) drawRowHighlight(ctx, BOTTOM.x + 12, y - 1, 260, 16);
+      // "HEAVY ATTACK" (not bare "HEAVY") — YOUR charged attack delivered that way.
       drawText(ctx, `${marker}${r.name} ATTACK`, BOTTOM.x + 18, y, color);
     });
-
-    // Right column — the CHARGED ATTACK that carries through this release. Its
-    // type/tier/damage/initiative all carry (via focus.move → rawHit); Heavy/Feint/
-    // Hide only sets the read-outcome multiplier. Showing it here (mirroring the
-    // move view's SELECTED detail) makes concrete WHICH attack is being released,
-    // so "HEAVY" can't misread as a generic heavy-tier hit. Display-only.
-    const rx = BOTTOM.x + 300;
+    // Right column — the CHARGED ATTACK carried through this release (its type/
+    // tier/ST all carry via focus.move → rawHit; Heavy/Feint/Hide is the read
+    // multiplier on top). Mirrors the move view's SELECTED detail. Display-only.
+    const rx = BOTTOM.x + 320;
     const chargedName = activeMon(state.player).focus?.move;
     if (chargedName) {
       const info = moveCellInfo(activeMon(state.player), chargedName);
-      drawText(ctx, 'RELEASING:', rx, BOTTOM.y + 8, PALETTE.frameInkSoft);
-      drawText(ctx, info.name, rx, BOTTOM.y + 22, PALETTE.frameInk);
+      drawText(ctx, 'RELEASING:', rx, BOTTOM.y + 24, PALETTE.frameInkSoft);
+      drawBold(ctx, info.name, rx, BOTTOM.y + 38, PALETTE.frameInk);
       drawText(
         ctx,
         `${info.badge} ${info.isTech ? 'TECHNIQUE' : 'ATTACK'} · ${info.type ?? 'NEUTRAL'} · ST${info.cost}`,
         rx,
-        BOTTOM.y + 40,
+        BOTTOM.y + 52,
         PALETTE.frameInkSoft,
       );
     }
-    // The selected release's rotation hint + the confirm prompt.
     const sel = RELEASES[releaseCursor]!;
-    drawText(ctx, `${sel.name}: ${sel.beats}`, rx, BOTTOM.y + 64, PALETTE.frameInkSoft);
-    drawText(ctx, 'A=release', rx, BOTTOM.y + BOTTOM.h - 20, PALETTE.frameInkDim);
+    drawText(ctx, `${sel.name}: ${sel.beats}`, rx, BOTTOM.y + 70, PALETTE.frameInkSoft);
+    drawButtonChips(ctx, ['A RELEASE']);
   }
 
   function drawBottomCall(ctx: CanvasRenderingContext2D): void {
     drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
-    // Two columns (the full set is 9 — the classic kit + the info-war/tempo
-    // lanes) so the player sees the Calls they grow into. Locked + unaffordable
-    // render greyed; the cursor skips locked rows.
+    drawNarration(ctx, narrationText());
+    // The CALLS breadcrumb rail + the 9-slot list BESIDE it (2 columns). Locked +
+    // unaffordable render greyed; the cursor skips locked rows.
+    drawRail(ctx, BOTTOM.x + 4, BOTTOM.y + 24, 'breadcrumb', 'call');
     const perCol = Math.ceil(CALL_SET.length / 2); // 5 left, 4 right
+    const listX = BOTTOM.x + 92;
+    const colW = 268;
     CALL_SET.forEach((call, i) => {
       const unlocked = callUnlocked(call);
       const greyed = !unlocked || !callAffordable(call);
       const color = greyed ? PALETTE.frameInkDim : PALETTE.frameInk;
       const col = i < perCol ? 0 : 1;
       const row = i < perCol ? i : i - perCol;
-      const x = BOTTOM.x + 16 + col * 306;
-      const y = BOTTOM.y + 10 + row * 18;
-      if (callCursor === i) drawRowHighlight(ctx, x - 4, y - 2, 300, 17);
+      const x = listX + col * colW;
+      const y = BOTTOM.y + 24 + row * 17;
+      if (callCursor === i) drawRowHighlight(ctx, x - 4, y - 1, colW - 8, 16);
       const marker = callCursor === i ? '>' : ' ';
       const tag = !unlocked ? ' ·LOCKED' : '';
       drawText(ctx, `${marker}${call.name}${tag}`, x, y, color);
-      drawTextRight(ctx, `★${call.starCost}`, x + 290, y, color);
+      drawTextRight(ctx, `★${call.starCost}`, x + colW - 16, y, color);
     });
-    drawText(
-      ctx,
-      `Your ★${activeMon(state.player).momentum}   A use · B back`,
-      BOTTOM.x + 16,
-      BOTTOM.y + BOTTOM.h - 18,
-      PALETTE.frameInkDim,
-    );
+    drawText(ctx, `Your ★${activeMon(state.player).momentum}`, listX, BOTTOM.y + BOTTOM.h - 16, PALETTE.frameInkDim);
+    drawButtonChips(ctx, ['A USE', 'B BACK']);
   }
 
   // THROW THEM OFF — the stance-plant picker. The player chooses which STANCE to
   // log into history as a lie (the surface a history-reading foe consults).
   function drawBottomThrowOff(ctx: CanvasRenderingContext2D): void {
     drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
-    drawText(ctx, 'THROW THEM OFF — plant a false read', BOTTOM.x + 16, BOTTOM.y + 12, PALETTE.frameInk);
-    drawText(ctx, 'Which stance should they THINK you played?', BOTTOM.x + 16, BOTTOM.y + 30, PALETTE.frameInkSoft);
+    drawNarration(ctx, narrationText());
+    drawText(ctx, 'Which stance should they THINK you played?', BOTTOM.x + 16, BOTTOM.y + 26, PALETTE.frameInkSoft);
     const labels: { readonly [k in Stance]: string } = {
       A: 'AGGRESSIVE', G: 'GUARD', F: 'FLUID',
     };
     STANCES.forEach((s, i) => {
-      const y = BOTTOM.y + 52 + i * 18;
+      const y = BOTTOM.y + 48 + i * 18;
       const on = throwOffCursor === i;
-      if (on) drawRowHighlight(ctx, BOTTOM.x + 12, y - 2, 300, 17);
+      if (on) drawRowHighlight(ctx, BOTTOM.x + 12, y - 1, 300, 16);
       drawText(ctx, `${on ? '>' : ' '}Feign ${labels[s]}`, BOTTOM.x + 16, y, on ? PALETTE.frameInk : PALETTE.frameInkSoft);
     });
-    drawText(ctx, 'A=plant · B back', BOTTOM.x + 16, BOTTOM.y + BOTTOM.h - 18, PALETTE.frameInkDim);
+    drawButtonChips(ctx, ['A PLANT', 'B BACK']);
   }
 
   function drawBottomSpare(ctx: CanvasRenderingContext2D): void {
     drawBattlePanel(ctx, BOTTOM.x, BOTTOM.y, BOTTOM.w, BOTTOM.h);
+    drawNarration(ctx, narrationText());
     const foeName = display.foe.species.name;
-    drawText(ctx, `The wild ${foeName} fell.`, BOTTOM.x + 16, BOTTOM.y + 12);
-    drawText(ctx, 'Tend it with medicine — show mercy?', BOTTOM.x + 16, BOTTOM.y + 32, PALETTE.frameInkSoft);
+    drawText(ctx, `The wild ${foeName} fell. Tend it — show mercy?`, BOTTOM.x + 16, BOTTOM.y + 28, PALETTE.frameInkSoft);
     drawText(
       ctx,
       `${spareCursor === 0 ? '>' : ' '} YES — spare it`,
       BOTTOM.x + 20,
-      BOTTOM.y + 64,
+      BOTTOM.y + 58,
       spareCursor === 0 ? PALETTE.frameInk : PALETTE.frameInkDim,
     );
     drawText(
       ctx,
       `${spareCursor === 1 ? '>' : ' '} NO — claim the win`,
       BOTTOM.x + 320,
-      BOTTOM.y + 64,
+      BOTTOM.y + 58,
       spareCursor === 1 ? PALETTE.frameInk : PALETTE.frameInkDim,
     );
+    drawButtonChips(ctx, ['A CHOOSE', 'B DECLINE']);
   }
 
   function drawBottomLog(ctx: CanvasRenderingContext2D): void {
