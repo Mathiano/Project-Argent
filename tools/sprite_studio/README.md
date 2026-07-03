@@ -31,6 +31,26 @@ Ships with `MASTER_PAL`. Click a source colour, then a ramp entry (or *transpare
 / *outline*) to reassign; live re-render. Custom ramps add/remove entries and
 import/export as JSON (no localStorage, per project rule).
 
+## Palette modes (v1.1)
+
+Three acceptance ranges on the same source — A/B them with **compare modes** and
+pick by feel:
+
+- **master / custom** (default) — the global `MASTER_PAL` (or a hand-edited ramp).
+  Exactly the v1 behaviour.
+- **extract from source** — median-cut the source's *own* colours into N ramp
+  entries (**colours** slider, 4–16), so a slate-blue bird stays blue instead of
+  collapsing to shared master greys. Keys are auto-assigned `a,b,c…` dark→light;
+  the darkest is pre-selected as the outline char. The extracted ramp lands in the
+  normal editor — fully remappable. A soft, non-blocking hint fires if the ramp
+  lacks a dark outline / light accent (value discipline; never mutates the ramp).
+- **raw (no quantize)** — pool the cell's average source colour directly. On export
+  the distinct grid colours are collapsed to chars automatically (≤ 60 → direct;
+  > 60 → median-cut down to 60 with a notice), so it still passes `validateExport`.
+
+All three keep the same export invariants (every char ∈ palette ∪ `.`, square
+`size×size`). v1 exports reproduce exactly in Mode 1.
+
 ## Export
 
 `NAME.sprite.json` in the exact engine format `{ name, size, palette (used chars),

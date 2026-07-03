@@ -121,6 +121,12 @@
         <div><div class="cap">2× battle (56→112)</div><canvas id="p2" width="112" height="112"></canvas></div>
         <div><div class="cap">4× work</div><canvas id="p4" width="224" height="224"></canvas></div>
       </div>
+      <div class="row" style="margin-top:8px"><button id="cmp">compare modes ▸</button><span class="cap">read-only A/B at 2× battle scale — clicking a pane does not switch modes</span></div>
+      <div id="abwrap" class="canvwrap" style="display:none">
+        <div><div class="cap" id="ab0L">master</div><canvas id="ab0" width="112" height="112"></canvas></div>
+        <div><div class="cap" id="ab1L">extract</div><canvas id="ab1" width="112" height="112"></canvas></div>
+        <div><div class="cap" id="ab2L">raw</div><canvas id="ab2" width="112" height="112"></canvas></div>
+      </div>
     </div>
   </div>
 
@@ -129,6 +135,16 @@
     <div class="panel">
       <h2>3 · Target ramp</h2>
       <div class="row">
+        <label class="tog"><input type="radio" name="pmode" value="master" checked> master / custom</label>
+      </div>
+      <div class="row">
+        <label class="tog"><input type="radio" name="pmode" value="extract"> extract from source</label>
+        <button id="doExtract" disabled>extract</button>
+      </div>
+      <div class="row"><label>colours</label><input type="range" id="nc" min="4" max="16" value="8" disabled><span class="val" id="ncV">8</span></div>
+      <div class="row"><label class="tog"><input type="radio" name="pmode" value="raw"> raw (no quantize)</label></div>
+      <div class="hint" id="modeHint">Mode 1 · master/custom ramp (v1 behaviour). Mode 2 · quantize the source's own colours into N ramp entries (per-mon identity). Mode 3 · raw average colours, collapsed to chars only at export.</div>
+      <div class="row" style="margin-top:8px">
         <button id="loadMaster">reset to master</button>
         <button id="impRamp">import</button>
         <button id="expRamp">export</button>
@@ -174,10 +190,13 @@ const S = {
   fg:null,                         // Uint8 foreground mask (1=creature)
   bbox:null,                       // {x0,y0,x1,y1} of foreground
   bucket:null,                     // Int16 per-pixel nearest-source-colour index
-  srcColors:[],                    // [{rgb:[r,g,b], count}] ≤16
+  srcColors:[],                    // [{rgb:[r,g,b], count}] ≤16 (source-colour panel)
+  buckets:[],                      // [{rgb, n}] full weighted 12-bit bucket list (median-cut input)
   map:[],                          // srcIndex → ramp char | '#T' (transparent) | '#K' (outline)
   ramp:{...MASTER_PAL},            // target palette {char:hex}
   outlineChar:'k',
+  mode:'master',                   // 'master' | 'extract' | 'raw' (palette mode)
+  ncolors:8,                       // extract-mode colour count (4–16)
   size:56, tol:24, bgt:0.55, despeckle:3, outline:true,
   selSrc:-1, brush:'k', zoom:8, mock:false,
   base:null,                       // pipeline output grid (array of char[])
@@ -243,8 +262,9 @@ function extractColors(){
     let e=buckets.get(key); if(!e){ e={r:0,g:0,b:0,n:0}; buckets.set(key,e); }
     e.r+=px[o]; e.g+=px[o+1]; e.b+=px[o+2]; e.n++;
   }
-  const cols=[...buckets.values()].sort((a,b)=>b.n-a.n).slice(0,16)
-    .map(e=>({rgb:[Math.round(e.r/e.n),Math.round(e.g/e.n),Math.round(e.b/e.n)], count:e.n}));
+  // Full weighted bucket list (median-cut reuses THIS walk — no second pass).
+  S.buckets=[...buckets.values()].map(e=>({rgb:[Math.round(e.r/e.n),Math.round(e.g/e.n),Math.round(e.b/e.n)], n:e.n}));
+  const cols=S.buckets.slice().sort((a,b)=>b.n-a.n).slice(0,16).map(e=>({rgb:e.rgb, count:e.n}));
   S.srcColors=cols;
   // per-pixel nearest source colour
   const bucket=new Int16Array(W*H).fill(-1);
@@ -261,6 +281,40 @@ function autoMap(){
   });
 }
 function mappedChar(i){ return i>=0 ? S.map[i] : TRANS; }
+
+// ── Extract mode: median-cut the source's own colours into N ramp entries ────
+const LUM = c => 0.299*c[0]+0.587*c[1]+0.114*c[2];
+function boxRange(box){ const mn=[255,255,255],mx=[0,0,0]; for(const e of box) for(let a=0;a<3;a++){ if(e.rgb[a]<mn[a])mn[a]=e.rgb[a]; if(e.rgb[a]>mx[a])mx[a]=e.rgb[a]; } let axis=0,max=-1; for(let a=0;a<3;a++){ const d=mx[a]-mn[a]; if(d>max){max=d;axis=a;} } return {axis,max}; }
+function medianCut(buckets, N){
+  if(!buckets.length) return [];
+  let boxes=[buckets.slice()];
+  while(boxes.length<N){
+    let bi=-1,br=-1; boxes.forEach((box,i)=>{ if(box.length<2) return; const r=boxRange(box); if(r.max>br){br=r.max;bi=i;} });
+    if(bi<0) break;
+    const box=boxes[bi], r=boxRange(box); box.sort((a,b)=>a.rgb[r.axis]-b.rgb[r.axis]);
+    const total=box.reduce((s,e)=>s+e.n,0); let acc=0,mid=1; for(let k=0;k<box.length;k++){ acc+=box[k].n; if(acc>=total/2){ mid=k+1; break; } }
+    mid=Math.max(1,Math.min(box.length-1,mid));
+    boxes.splice(bi,1, box.slice(0,mid), box.slice(mid));
+  }
+  return boxes.map(box=>{ let r=0,g=0,b=0,n=0; for(const e of box){ r+=e.rgb[0]*e.n; g+=e.rgb[1]*e.n; b+=e.rgb[2]*e.n; n+=e.n; } return [Math.round(r/n),Math.round(g/n),Math.round(b/n)]; });
+}
+const EXCHARS='abcdefghijklmnop'; // ≤16 extract keys
+// Pure: source → {ramp, outlineChar, dark, light}. No S/UI mutation.
+function computeExtractRamp(N){
+  const cols=medianCut(S.buckets, N).sort((a,b)=>LUM(a)-LUM(b)); // dark → light
+  const ramp={}; cols.forEach((c,i)=>ramp[EXCHARS[i]]=rgbToHex(...c));
+  return { ramp, outlineChar:EXCHARS[0], dark: cols.length?LUM(cols[0]):0, light: cols.length?LUM(cols[cols.length-1]):255 };
+}
+function valueGuard(r){ // soft, non-blocking hint; never mutates the ramp
+  if(r.dark>90 || r.light<160) setErr('hint: ramp lacks a dark outline / light accent — 200 mons read as one game through shared value structure');
+  else setErr('');
+}
+function applyExtract(){ // interactive
+  if(!S.buckets.length){ setErr('load an image first'); return; }
+  const r=computeExtractRamp(S.ncolors);
+  S.ramp=r.ramp; S.outlineChar=r.outlineChar; autoMap(); valueGuard(r);
+  recomputePipeline();
+}
 
 // ── Pooling (mode vote, outline-aware) — mirrors ingest() ────────────────────
 function pool(ih){
@@ -336,10 +390,48 @@ function fit(g, slot){
   return final;
 }
 
+// ── Raw mode: pool the cell's AVERAGE source colour directly (cells are hex) ──
+function rawPool(ih){
+  const {W,H,fg,data,bbox}=S, px=data.data; if(!bbox) return [['.']];
+  const cw=bbox.x1-bbox.x0+1, ch=bbox.y1-bbox.y0+1, cell=ch/ih, ow=Math.max(1,Math.round(cw/cell));
+  const grid=[];
+  for(let gy=0;gy<ih;gy++){ const row=[];
+    for(let gx=0;gx<ow;gx++){
+      const cx0=bbox.x0+gx*cell, cy0=bbox.y0+gy*cell; let total=0,bg=0,r=0,g=0,b=0,n=0;
+      for(let sy=Math.floor(cy0); sy<Math.min(Math.floor(cy0+cell)+1,H); sy++)
+        for(let sx=Math.floor(cx0); sx<Math.min(Math.floor(cx0+cell)+1,W); sx++){
+          total++; const p=sy*W+sx; if(!fg[p]){ bg++; continue; } const o=p*4; r+=px[o]; g+=px[o+1]; b+=px[o+2]; n++;
+        }
+      row.push((total===0 || bg/total>S.bgt || n===0) ? '.' : rgbToHex(Math.round(r/n),Math.round(g/n),Math.round(b/n)));
+    }
+    grid.push(row);
+  }
+  return grid;
+}
+function rawCleanup(g){
+  const H=g.length, W=g[0].length;
+  if(S.despeckle>0){
+    const seen=Array.from({length:H},()=>new Uint8Array(W));
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      if(g[y][x]==='.'||seen[y][x]) continue;
+      const comp=[], st=[[x,y]];
+      while(st.length){ const [cx,cy]=st.pop(); if(cx<0||cy<0||cx>=W||cy>=H||seen[cy][cx]||g[cy][cx]==='.') continue; seen[cy][cx]=1; comp.push([cx,cy]); st.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]); }
+      if(comp.length<S.despeckle) for(const [cx,cy] of comp) g[cy][cx]='.';
+    }
+  }
+  if(S.outline){ // paint the configured outline HEX on body edges (no soft-edge in raw)
+    const outHex=S.ramp[S.outlineChar] || '#2a1c20'; const orig=g.map(r=>r.slice());
+    const isBg=(x,y)=> x<0||y<0||x>=W||y>=H || orig[y][x]==='.';
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){ if(orig[y][x]==='.') continue; if(isBg(x+1,y)||isBg(x-1,y)||isBg(x,y+1)||isBg(x,y-1)) g[y][x]=outHex; }
+  }
+  return g;
+}
+
 function buildBase(){
   if(!S.bbox){ S.base=null; return; }
+  const buildOne = S.mode==='raw' ? (ih)=>fit(rawCleanup(rawPool(ih)), S.size) : (ih)=>fit(cleanup(pool(ih)), S.size);
   let ih=S.size;
-  while(ih>=8){ const f=fit(cleanup(pool(ih)), S.size); if(f){ S.base=f; return; } ih-=2; }
+  while(ih>=8){ const f=buildOne(ih); if(f){ S.base=f; return; } ih-=2; }
   S.base=Array.from({length:S.size},()=>Array.from({length:S.size},()=>'.'));
 }
 function applyOverrides(){
@@ -350,14 +442,25 @@ function applyOverrides(){
 }
 
 // ── Recompute chain ──────────────────────────────────────────────────────────
-function recomputePipeline(){ buildBase(); applyOverrides(); render(); }
+function recomputePipeline(){ buildBase(); applyOverrides(); render(); updateModeUI(); }
+function updateModeUI(){ const ex=S.mode==='extract'; $('nc').disabled=!ex; $('doExtract').disabled=!(ex && S.buckets.length); }
+const qsa = sel => { const r=document.querySelectorAll(sel); return r && typeof r.length==='number' ? [...r] : []; };
+function setMode(m){
+  S.mode=m; S.overrides.clear(); S.undo.length=0;
+  S.brush = m==='raw' ? '.' : (S.outlineChar in S.ramp ? S.outlineChar : Object.keys(S.ramp)[0]);
+  if(m==='extract') applyExtract(); else recomputePipeline();
+  updateModeUI();
+}
 function recomputeAll(){
   if(!S.data){ render(); return; }
-  floodBg(); extractColors(); autoMap(); S.overrides.clear(); S.undo.length=0; recomputePipeline();
+  floodBg(); extractColors();
+  if(S.mode==='extract' && S.buckets.length){ const r=computeExtractRamp(S.ncolors); S.ramp=r.ramp; S.outlineChar=r.outlineChar; valueGuard(r); }
+  autoMap(); S.overrides.clear(); S.undo.length=0; recomputePipeline();
 }
 
 // ── Rendering ────────────────────────────────────────────────────────────────
-function colorOf(ch){ return ch==='.'? null : (S.ramp[ch] || '#ff00ff'); }
+// A grid cell is a ramp CHAR (master/extract) or a raw HEX ('#…'); '.' = transparent.
+function colorOf(v){ return v==='.'? null : v[0]==='#'? v : (S.ramp[v] || '#ff00ff'); }
 function paintGrid(ctx, grid, z, ox=0, oy=0){
   for(let y=0;y<grid.length;y++) for(let x=0;x<grid[0].length;x++){ const c=colorOf(grid[y][x]); if(!c) continue; ctx.fillStyle=c; ctx.fillRect(ox+x*z, oy+y*z, z, z); }
 }
@@ -415,6 +518,13 @@ function assignSelected(target){ if(S.selSrc<0) return; S.map[S.selSrc]=target; 
 function renderBrushbar(){
   const bar=$('brushbar'); bar.innerHTML='';
   const er=document.createElement('div'); er.className='brush eraser'+(S.brush==='.'?' sel':''); er.title='eraser'; er.onclick=()=>{S.brush='.';render();}; bar.appendChild(er);
+  if(S.mode==='raw'){
+    // raw brush palette = the distinct grid colours, top 24 by frequency.
+    const freq=new Map(); if(S.grid) for(const row of S.grid) for(const v of row) if(v!=='.'&&v[0]==='#') freq.set(v,(freq.get(v)||0)+1);
+    const cols=[...freq.entries()].sort((a,b)=>b[1]-a[1]).slice(0,24).map(e=>e[0]);
+    for(const hex of cols){ const b=document.createElement('div'); b.className='brush'+(S.brush===hex?' sel':''); b.style.background=hex; b.title=hex; b.onclick=()=>{S.brush=hex;render();}; bar.appendChild(b); }
+    return;
+  }
   for(const ch of Object.keys(S.ramp)){ const b=document.createElement('div'); b.className='brush'+(S.brush===ch?' sel':''); b.style.background=S.ramp[ch]; b.innerHTML=`<span class="k">${ch}</span>`; b.title=ch; b.onclick=()=>{S.brush=ch;render();}; bar.appendChild(b); }
 }
 
@@ -431,29 +541,46 @@ function pushUndo(){ S.undo.push(new Map(S.overrides)); if(S.undo.length>50) S.u
 
 // ── Export ───────────────────────────────────────────────────────────────────
 function usedPalette(rows){ const used=new Set(); for(const r of rows) for(const c of r) if(c!=='.') used.add(c); const p={}; for(const c of used) if(S.ramp[c]) p[c]=S.ramp[c]; return {used,palette:p}; }
-function validateExport(rows){
+// Invariants unchanged from v1: every rows char ∈ palette ∪ '.', square size×size.
+function validateExport(rows, palette){
   const errs=[];
   if(rows.length!==S.size) errs.push(`rows count ${rows.length} ≠ size ${S.size}`);
   for(let i=0;i<rows.length;i++) if(rows[i].length!==S.size) errs.push(`row ${i} length ${rows[i].length} ≠ size ${S.size}`);
-  const {used}=usedPalette(rows);
-  for(const c of used) if(!(c in S.ramp)) errs.push(`char '${c}' not in ramp`);
+  for(const r of rows) for(const c of r) if(c!=='.' && !(c in palette)) errs.push(`char '${c}' not in palette`);
   if(S.size>56) errs.push(`size ${S.size} > 56 — engine convention is 56 (width must be ≤ 56)`);
-  return errs;
+  return [...new Set(errs)];
+}
+// Raw grids hold hex cells → collapse distinct colours to chars for export. ≤60 →
+// direct char assignment; >60 → median-cut down to 60 (nearest-remap) + a notice.
+const RAWSEQ='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567'; // 60
+function collapseRaw(grid){
+  const freq=new Map(); for(const row of grid) for(const v of row) if(v!=='.') freq.set(v,(freq.get(v)||0)+1);
+  const distinct=[...freq.keys()]; const hexToChar=new Map(); const palette={}; let note='';
+  if(distinct.length<=60){
+    distinct.forEach((hex,i)=>{ hexToChar.set(hex,RAWSEQ[i]); palette[RAWSEQ[i]]=hex; });
+  } else {
+    const reps=medianCut(distinct.map(hex=>({rgb:hexToRgb(hex), n:freq.get(hex)})), 60).map(c=>rgbToHex(...c));
+    for(const hex of distinct){ const rgb=hexToRgb(hex); let bi=0,bd=1e18; for(let i=0;i<reps.length;i++){ const d=dist2(rgb,hexToRgb(reps[i])); if(d<bd){bd=d;bi=i;} } const ch=RAWSEQ[bi]; hexToChar.set(hex,ch); palette[ch]=reps[bi]; }
+    note=` — raw: ${distinct.length} colours → ${new Set(hexToChar.values()).size}`;
+  }
+  const rows=grid.map(row=>row.map(v=> v==='.'? '.' : hexToChar.get(v)).join(''));
+  return {rows, palette, note};
 }
 function download(name, text, type='application/json'){ const b=new Blob([text],{type}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
 
 function exportJson(){
   setErr('');
   if(!S.grid){ setErr('nothing to export — drop a PNG first'); return; }
-  const rows=S.grid.map(r=>r.join(''));
-  const errs=validateExport(rows);
+  let rows, palette, note='';
+  if(S.mode==='raw'){ const c=collapseRaw(S.grid); rows=c.rows; palette=c.palette; note=c.note; }
+  else { rows=S.grid.map(r=>r.join('')); palette=usedPalette(rows).palette; }
+  const errs=validateExport(rows, palette);
   if(errs.length){ setErr('EXPORT REFUSED:\n· '+errs.join('\n· ')); return; }
   const name=($('name').value||'NEWMON').trim().toUpperCase().replace(/[^A-Z0-9_]/g,'');
   const facing=document.querySelector('input[name=facing]:checked').value;
-  const {palette}=usedPalette(rows);
   const obj={ name, size:S.size, palette, rows, facing };
   download(`${name}.sprite.json`, JSON.stringify(obj,null,1));
-  setErr(`✓ ${name}.sprite.json — ${Object.keys(palette).length} colours, ${S.size}×${S.size}`, true);
+  setErr(`✓ ${name}.sprite.json — ${Object.keys(palette).length} colours, ${S.size}×${S.size}${note}`, true);
 }
 function exportPng(){
   if(!S.grid){ setErr('nothing to export'); return; }
@@ -463,6 +590,31 @@ function exportPng(){
   cv.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=`${name}.preview.png`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); });
 }
 function setErr(msg, ok=false){ const e=$('err'); e.textContent=msg||''; e.className='err'+(ok?' ok':''); }
+
+// ── A/B strip: render all three modes read-only; MUST leave S unchanged ───────
+function abStrip(){
+  if(!S.bbox){ setErr('load an image first'); return; }
+  const snap={ mode:S.mode, ramp:{...S.ramp}, outlineChar:S.outlineChar, map:S.map.slice(), base:S.base, grid:S.grid };
+  const results=[];
+  for(const m of ['master','extract','raw']){
+    S.mode=m;
+    if(m==='master'){ S.ramp={...MASTER_PAL}; S.outlineChar='k'; autoMap(); }
+    else if(m==='extract'){ const r=computeExtractRamp(S.ncolors); S.ramp=r.ramp; S.outlineChar=r.outlineChar; autoMap(); }
+    buildBase(); // raw path dispatches internally
+    results.push({ label:m, grid:S.base? S.base.map(r=>r.slice()) : null, ramp:{...S.ramp} });
+  }
+  Object.assign(S, snap); // full restore (mode, ramp, outlineChar, map, base, grid)
+  renderAB(results);
+}
+function renderAB(results){
+  $('abwrap').style.display='flex';
+  ['ab0','ab1','ab2'].forEach((id,i)=>{
+    const res=results[i], cv=$(id), ctx=cv.getContext('2d'); cv.width=112; cv.height=112; ctx.imageSmoothingEnabled=false;
+    ctx.fillStyle='#e8e4d8'; ctx.fillRect(0,0,112,112);
+    if(res.grid) for(let y=0;y<res.grid.length;y++) for(let x=0;x<res.grid[0].length;x++){ const v=res.grid[y][x]; const c= v==='.'?null : v[0]==='#'?v:(res.ramp[v]||'#f0f'); if(c){ ctx.fillStyle=c; ctx.fillRect(x*2,y*2,2,2); } }
+    $(id+'L').textContent=res.label;
+  });
+}
 
 // ── Wiring ───────────────────────────────────────────────────────────────────
 const drop=$('drop');
@@ -491,6 +643,13 @@ $('expRamp').onclick=()=>download('ramp.json', JSON.stringify(S.ramp,null,1));
 $('impRamp').onclick=()=>$('rampFile').click();
 $('rampFile').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ const o=JSON.parse(r.result); if(typeof o!=='object')throw 0; S.ramp=o; if(!(S.outlineChar in S.ramp)) S.outlineChar=Object.keys(S.ramp)[0]; autoMap(); recomputePipeline(); setErr('ramp imported',true); }catch{ setErr('bad ramp JSON'); } }; r.readAsText(f); };
 $('expJson').onclick=exportJson; $('expPng').onclick=exportPng;
+
+// v1.1 — palette modes + A/B strip
+qsa('input[name=pmode]').forEach(el=>{ el.onchange=e=>{ if(e.target.checked) setMode(e.target.value); }; });
+$('doExtract').onclick=applyExtract;
+slider('nc','ncV', v=>{ S.ncolors=v; if(S.mode==='extract') applyExtract(); });
+$('cmp').onclick=abStrip;
+updateModeUI();
 
 const wc=$('work');
 wc.addEventListener('mousedown',e=>{ pushUndo(); painting=true; paintAt(e); });
