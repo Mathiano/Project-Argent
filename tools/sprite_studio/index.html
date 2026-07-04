@@ -69,7 +69,7 @@
       <h2>2 · Grid + pooling</h2>
       <div class="row"><label>size (slot)</label><input type="range" id="size" min="40" max="112" step="1" value="112"><span class="val" id="sizeV">112</span></div>
       <div class="row"><label>sampling</label>
-        <select id="samp"><option value="area">area pool (v1)</option><option value="grid">grid snap (auto)</option></select>
+        <select id="samp"><option value="area">area pool (v1)</option><option value="grid">grid snap (force)</option></select>
         <label style="min-width:0">cell</label><input type="number" id="cell" min="4" max="40" value="8" disabled>
       </div>
       <div class="hint" id="gridMsg">drop an image — grid auto-detected on load.</div>
@@ -466,7 +466,8 @@ function detectGrid(){
     return {lag:bl,str:bs};
   };
   const pX=peak(ex), pY=peak(ey);
-  return (pX.str>=0.5 && pY.str>=0.5) ? { cell:(pX.lag+pY.lag)/2, sx:pX.str, sy:pY.str } : { cell:null, sx:pX.str, sy:pY.str };
+  const guessCell=(pX.lag+pY.lag)/2; // strongest lag even when below the lock threshold
+  return (pX.str>=0.5 && pY.str>=0.5) ? { cell:guessCell, sx:pX.str, sy:pY.str, guessCell } : { cell:null, sx:pX.str, sy:pY.str, guessCell };
 }
 function nearestSrc(rgb){ let bi=0,bd=1e18; for(let i=0;i<S.srcColors.length;i++){ const d=dist2(rgb,S.srcColors[i].rgb); if(d<bd){bd=d;bi=i;} } return bi; }
 // Median colour of a ±3px neighbourhood of (cx,cy) on the HI source; null when
@@ -534,6 +535,7 @@ function recomputeAll(){
   floodBg(); extractColors();
   const det=detectGrid();
   if(det.cell){ S.cell=Math.round(det.cell); }
+  else if(freshLoad && det.guessCell){ S.cell=Math.max(4,Math.min(40,Math.round(det.guessCell))); } // seed best-guess so forcing grid-snap starts sane
   const nativeCells = det.cell ? Math.round((S.hi.bbox.y1-S.hi.bbox.y0+1)/det.cell) : 0;
   if(freshLoad){
     // A grid → sample at native density: the sprite SIZE is the native cell count
@@ -546,7 +548,7 @@ function recomputeAll(){
   const gm=$('gridMsg');
   if(gm){
     if(det.cell) gm.textContent = `grid detected: ~${det.cell.toFixed(1)}px → ~${nativeCells} native cells (ac ${det.sx.toFixed(2)}/${det.sy.toFixed(2)}) → size ${S.size}`;
-    else gm.textContent = `no grid detected (ac ${det.sx.toFixed(2)}/${det.sy.toFixed(2)}) — using area pool`;
+    else gm.textContent = `no grid locked (ac ${det.sx.toFixed(2)}/${det.sy.toFixed(2)}) — area pool. Force “grid snap” to override${det.guessCell?` (best-guess cell ~${Math.round(det.guessCell)}px)`:''}.`;
   }
   reflectSampling();
   if(S.mode==='extract' && S.buckets.length){ const r=computeExtractRamp(S.ncolors); S.ramp=r.ramp; S.outlineChar=r.outlineChar; valueGuard(r); }
