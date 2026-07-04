@@ -2,7 +2,7 @@
 // writes, no server. Covers the allowlist + every rejection the endpoint must make.
 
 import { describe, expect, test } from 'vitest';
-import { validateSaveRequest, SAVE_ALLOWLIST_DIRS } from './dev-save-plugin';
+import { validateSaveRequest, normalizeAllowlistedDir, SAVE_ALLOWLIST_DIRS } from './dev-save-plugin';
 
 const ROOT = process.platform === 'win32' ? 'C:\\repo' : '/repo';
 const good = (over: Record<string, unknown> = {}) => ({
@@ -60,4 +60,21 @@ describe('validateSaveRequest — rejections (each a distinct 4xx)', () => {
   test('a bad extension is rejected', () => rejects({ filename: 'evil.exe' }, 'extension'));
   test('a bad encoding is rejected', () => rejects({ encoding: 'hex' }, 'encoding'));
   test('non-string content is rejected', () => rejects({ content: 123 }, 'content'));
+});
+
+describe('normalizeAllowlistedDir — the shared read/list dir gate', () => {
+  test('accepts every allowlisted dir (trailing slash + backslashes tolerated)', () => {
+    for (const dir of SAVE_ALLOWLIST_DIRS) {
+      expect(normalizeAllowlistedDir(dir)).toBe(dir);
+      expect(normalizeAllowlistedDir(dir + '/')).toBe(dir);
+    }
+    expect(normalizeAllowlistedDir('assets\\sprites')).toBe('assets/sprites');
+  });
+  test('rejects non-allowlisted dirs + traversal + non-strings', () => {
+    expect(normalizeAllowlistedDir('src/game')).toBeNull();
+    expect(normalizeAllowlistedDir('assets/../etc')).toBeNull();
+    expect(normalizeAllowlistedDir('assets')).toBeNull();
+    expect(normalizeAllowlistedDir(42)).toBeNull();
+    expect(normalizeAllowlistedDir(undefined)).toBeNull();
+  });
 });

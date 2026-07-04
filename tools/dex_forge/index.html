@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dex Forge</title>
+<style>
+  :root{ --bg:#0e1015; --panel:#171a21; --line:#2a2f3a; --dim:#8b93a7; --fg:#e6e9f0; --accent:#6fd3c8;
+         --green:#57c977; --amber:#e0b341; --red:#e05b5b; --parch:#e8e4d8; --chip:#222834; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--fg); font:13px/1.4 ui-monospace,Menlo,Consolas,monospace; }
+  header{ padding:10px 14px; border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  h1{ font-size:16px; margin:0; letter-spacing:1px; }
+  .sub{ color:var(--dim); }
+  #notice{ display:none; margin:10px 14px; padding:12px 14px; border:1px solid var(--amber); border-radius:6px; background:#241f13; color:#f0dca0; }
+  #rollup{ padding:8px 14px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:6px 16px; color:var(--dim); font-size:12px; }
+  #rollup b{ color:var(--fg); }
+  .bar{ padding:8px 14px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .bar label{ color:var(--dim); }
+  select,button,input{ background:var(--chip); color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:4px 8px; font:inherit; }
+  button{ cursor:pointer; }
+  button.on{ border-color:var(--accent); color:var(--accent); }
+  #scan{ margin:0; }
+  #scan summary{ padding:8px 14px; cursor:pointer; color:var(--dim); border-bottom:1px solid var(--line); }
+  #scan .body{ padding:8px 14px; border-bottom:1px solid var(--line); }
+  .scanrow{ margin:2px 0; }
+  .scanrow.err{ color:var(--red); } .scanrow.warn{ color:var(--amber); } .scanrow.ok{ color:var(--green); }
+  main{ display:flex; }
+  #gridwrap{ flex:1; overflow:auto; max-height:calc(100vh - 200px); }
+  table{ border-collapse:collapse; width:100%; font-size:12px; }
+  th,td{ text-align:left; padding:3px 8px; border-bottom:1px solid #20242e; white-space:nowrap; }
+  th{ position:sticky; top:0; background:var(--panel); border-bottom:1px solid var(--line); color:var(--dim); cursor:pointer; user-select:none; }
+  tr.slot:hover{ background:#1a1e28; }
+  tr.slot.sel{ background:#1e2733; }
+  tr.slot.hasart{ cursor:pointer; }
+  .light{ display:inline-block; min-width:34px; text-align:center; padding:1px 5px; border-radius:4px; font-size:11px; }
+  .l-green{ background:#16351f; color:var(--green); } .l-amber{ background:#332a12; color:var(--amber); }
+  .l-red{ background:#331515; color:var(--red); } .l-dim{ background:#1c2029; color:var(--dim); }
+  .type{ display:inline-block; padding:0 5px; border-radius:3px; background:#222b33; color:#bfe; font-size:11px; margin-right:2px; }
+  .linehdr td{ background:#12151c; color:var(--accent); font-weight:bold; border-top:1px solid var(--line); }
+  #peek{ width:0; transition:width .12s; overflow:hidden; border-left:1px solid var(--line); }
+  #peek.open{ width:300px; }
+  #peek .inner{ width:300px; padding:12px; }
+  #peek h3{ margin:0 0 8px; font-size:13px; }
+  .canvwrap{ display:flex; gap:12px; flex-wrap:wrap; margin:6px 0 14px; }
+  .canvwrap figure{ margin:0; }
+  .canvwrap figcaption{ color:var(--dim); font-size:11px; text-align:center; margin-top:3px; }
+  canvas{ background:var(--parch); image-rendering:pixelated; border:1px solid var(--line); border-radius:3px; }
+  .muted{ color:var(--dim); }
+  a{ color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>DEX FORGE <span class="sub">v1</span></h1>
+  <span class="sub">dex production grid — manifest × identity × art × registry (read-only)</span>
+  <span style="margin-left:auto"><button id="lineToggle" title="group by evolution line">line view</button> <button id="reload">reload</button></span>
+</header>
+
+<div id="notice">
+  <b>Serve via <code>npm run dev</code>.</b> Dex Forge reads the repo through the dev server
+  (<code>/docs/mon-manifest.csv</code>, batch JSONs, <code>/assets/sprites/</code>, <code>/src/game/sprites.ts</code>,
+  and <code>GET /api/list-dir</code>). Opened as a static file it can't reach them — start the dev server and reload.
+</div>
+
+<div id="rollup" class="muted">loading…</div>
+
+<div class="bar">
+  <label>bucket</label><select id="fBucket"></select>
+  <label>type</label><select id="fType"></select>
+  <label>archetype</label><select id="fArch"></select>
+  <label>rarity</label><select id="fRarity"></select>
+  <label>status</label><select id="fStatus">
+    <option value="">all</option>
+    <option value="noident">no identity</option>
+    <option value="hasident">has identity</option>
+    <option value="nofront">missing front art</option>
+    <option value="hasfront">has front art</option>
+    <option value="noback">missing back art</option>
+    <option value="legacy">legacy-56 front</option>
+    <option value="reg">registered</option>
+    <option value="unreg">identity, not registered</option>
+  </select>
+  <span id="count" class="muted"></span>
+</div>
+
+<details id="scan" open><summary>collision scan</summary><div class="body" id="scanBody">—</div></details>
+
+<main>
+  <div id="gridwrap"><table id="grid"><thead></thead><tbody></tbody></table></div>
+  <div id="peek"><div class="inner" id="peekInner"></div></div>
+</main>
+
+<script>
+// ── Dex Forge — READ-ONLY production dashboard. Vanilla single-file; reads the repo
+// via the dev server (same-origin GET, the Argent Studio precedent) + GET /api/list-dir
+// for the sprite-file enumeration the orphan scan needs. No writes, no localStorage.
+
+// Future batches: add the file here (one line) — identity = "name appears in a batch".
+const BATCH_FILES = ['/docs/ch1-batch.json'];
+const SPRITES_DIR = 'assets/sprites';
+
+const $ = id => document.getElementById(id);
+const S = {
+  manifest: [], // [{line_id,stage,name,stages_total,bucket,habitat,type1,type2,archetype,rarity,evolve_at,note}]
+  ident: new Map(), // NAME -> identity object (first batch that has it)
+  reg: new Set(), backReg: new Set(),
+  files: new Set(), // sprite filenames present in assets/sprites/
+  art: new Map(), // filename -> sprite JSON {name,size,palette,rows,facing}
+  lineView: false, sel: null,
+  filt: { bucket:'', type:'', arch:'', rarity:'', status:'' },
+};
+
+// ── RFC4180 CSV (quoted fields, embedded commas + newlines) ───────────────────
+function parseCSV(text){
+  const rows=[]; let row=[], f='', q=false;
+  for(let i=0;i<text.length;i++){ const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){ f+='"'; i++; } else q=false; } else f+=c; }
+    else { if(c==='"') q=true; else if(c===','){ row.push(f); f=''; }
+      else if(c==='\n'){ row.push(f); f=''; if(row.length>1||row[0]!=='') rows.push(row); row=[]; }
+      else if(c==='\r'){} else f+=c; } }
+  if(f!==''||row.length){ row.push(f); if(row.length>1||row[0]!=='') rows.push(row); }
+  return rows;
+}
+function manifestFromCSV(text){
+  const rows=parseCSV(text); const head=rows[0].map(h=>h.trim());
+  return rows.slice(1).map(r=>{ const o={}; head.forEach((h,i)=>o[h]=(r[i]??'').trim()); return o; });
+}
+
+// ── Registry parse — regex the (type-stripped, dev-served) sprites.ts ─────────
+function parseRegistry(src, anchor){
+  const m=new RegExp(anchor+'\\s*=\\s*\\{([\\s\\S]*?)\\}').exec(src);
+  if(!m) return new Set();
+  return new Set([...m[1].matchAll(/([A-Z][A-Z0-9_]*)\s*:/g)].map(x=>x[1]));
+}
+
+async function getJSON(url){ const r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw new Error(r.status+' '+url); return r.json(); }
+async function getText(url){ const r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw new Error(r.status+' '+url); return r.text(); }
+
+async function boot(){
+  $('rollup').textContent='loading…';
+  let csv;
+  try { csv = await getText('/docs/mon-manifest.csv'); }
+  catch(e){ $('notice').style.display='block'; $('rollup').textContent=''; return; }
+  S.manifest = manifestFromCSV(csv);
+
+  // identities (batch files)
+  S.ident.clear();
+  for(const bf of BATCH_FILES){
+    try{ const arr=await getJSON(bf); for(const m of arr) if(m && m.name && !S.ident.has(m.name)) S.ident.set(m.name, m); }
+    catch(e){ /* a missing batch file is non-fatal — just no identities from it */ }
+  }
+  // registry
+  try{ const src=await getText('/src/game/sprites.ts'); S.reg=parseRegistry(src,'const REGISTRY'); S.backReg=parseRegistry(src,'const BACK_REGISTRY'); }
+  catch(e){ S.reg=new Set(); S.backReg=new Set(); }
+  // sprite files (list-dir) + their sizes
+  S.files=new Set(); S.art.clear();
+  try{
+    const j=await getJSON('/api/list-dir?dir='+SPRITES_DIR);
+    for(const f of (j.files||[])) if(f.endsWith('.sprite.json')) S.files.add(f);
+    await Promise.all([...S.files].map(async f=>{ try{ S.art.set(f, await getJSON('/'+SPRITES_DIR+'/'+f)); }catch{} }));
+  }catch(e){ /* no listing → orphan scan degrades; grid still renders */ }
+
+  buildFilters(); renderAll();
+}
+
+// ── per-row derived state ─────────────────────────────────────────────────────
+function frontOf(name){ const a=S.art.get(name+'.sprite.json'); return a?{size:a.size}:null; }
+function backOf(name){ const a=S.art.get(name+'_BACK.sprite.json'); return a?{size:a.size}:null; }
+function rowState(r){
+  const name=r.name;
+  return {
+    ident: S.ident.has(name),
+    front: frontOf(name),
+    back: backOf(name),
+    reg: S.reg.has(name),
+    backReg: S.backReg.has(name),
+  };
+}
+function sizeLight(a){
+  if(!a) return '<span class="light l-red">none</span>';
+  const cls = a.size===112?'l-green':(a.size===56?'l-amber':'l-dim');
+  return `<span class="light ${cls}">${a.size}</span>`;
+}
+
+// ── filters ───────────────────────────────────────────────────────────────────
+function uniq(vals){ return [...new Set(vals.filter(Boolean))].sort(); }
+function buildFilters(){
+  const fill=(sel,vals)=>{ const s=$(sel); const cur=s.value; s.innerHTML='<option value="">all</option>'+vals.map(v=>`<option>${v}</option>`).join(''); s.value=cur; };
+  fill('fBucket', uniq(S.manifest.map(r=>r.bucket)));
+  fill('fType', uniq(S.manifest.flatMap(r=>[r.type1,r.type2])));
+  fill('fArch', uniq(S.manifest.map(r=>r.archetype)));
+  fill('fRarity', uniq(S.manifest.map(r=>r.rarity)));
+}
+function passFilter(r){
+  const f=S.filt;
+  if(f.bucket && r.bucket!==f.bucket) return false;
+  if(f.type && r.type1!==f.type && r.type2!==f.type) return false;
+  if(f.arch && r.archetype!==f.arch) return false;
+  if(f.rarity && r.rarity!==f.rarity) return false;
+  if(f.status){ const st=rowState(r);
+    if(f.status==='noident' && st.ident) return false;
+    if(f.status==='hasident' && !st.ident) return false;
+    if(f.status==='nofront' && st.front) return false;
+    if(f.status==='hasfront' && !st.front) return false;
+    if(f.status==='noback' && st.back) return false;
+    if(f.status==='legacy' && !(st.front && st.front.size===56)) return false;
+    if(f.status==='reg' && !st.reg) return false;
+    if(f.status==='unreg' && !(st.ident && !st.reg)) return false;
+  }
+  return true;
+}
+
+// ── rollup (per bucket: slots · identity/slots · front/back/reg out of identity · legacy) ──
+function renderRollup(){
+  const buckets=uniq(S.manifest.map(r=>r.bucket));
+  const parts=buckets.map(b=>{
+    const rows=S.manifest.filter(r=>r.bucket===b);
+    const id=rows.filter(r=>S.ident.has(r.name));
+    const front=id.filter(r=>frontOf(r.name)), back=id.filter(r=>backOf(r.name));
+    const reg=id.filter(r=>S.reg.has(r.name));
+    const legacy=front.filter(r=>frontOf(r.name).size===56).length;
+    return `<span><b>${b}</b>: ${id.length}/${rows.length} id · ${front.length}/${id.length} front · ${back.length}/${id.length} back · ${reg.length}/${id.length} reg${legacy?` · <b>${legacy}</b> legacy-56`:''}</span>`;
+  });
+  $('rollup').innerHTML = `<span><b>${S.manifest.length}</b> slots · <b>${S.ident.size}</b> identities · <b>${S.files.size}</b> sprite files</span>` + parts.join('');
+}
+
+// ── collision scan ─────────────────────────────────────────────────────────────
+function renderScan(){
+  const out=[];
+  // duplicate manifest names
+  const nameCount=new Map(); for(const r of S.manifest) nameCount.set(r.name,(nameCount.get(r.name)||0)+1);
+  const dups=[...nameCount].filter(([,n])=>n>1);
+  out.push(dups.length
+    ? {c:'err', t:`DUPLICATE manifest names (${dups.length}): ${dups.map(([n,c])=>`${n}×${c}`).join(', ')}`}
+    : {c:'ok', t:'no duplicate manifest names'});
+  // drift: batch identity name vs the manifest row at the same line_id+stage
+  const byLineStage=new Map(); for(const r of S.manifest) byLineStage.set(r.line_id+'#'+r.stage, r.name);
+  const drift=[]; for(const m of S.ident.values()){ const key=(m.line_id||'')+'#'+(m.stage||''); const mn=byLineStage.get(key); if(mn && mn!==m.name) drift.push(`${m.line_id}/st${m.stage}: manifest "${mn}" ≠ batch "${m.name}"`); }
+  out.push(drift.length ? {c:'err', t:`NAME DRIFT (${drift.length}): ${drift.join(' · ')}`} : {c:'ok', t:'no manifest↔batch name drift'});
+  // orphans: sprite files whose base (upper, minus _BACK) isn't a manifest name nor a registered fixture
+  const names=new Set(S.manifest.map(r=>r.name));
+  const orphans=[]; for(const f of S.files){ const base=f.replace(/\.sprite\.json$/,'').replace(/_BACK$/,'').toUpperCase(); if(!names.has(base) && !S.reg.has(base)) orphans.push(f); }
+  out.push(orphans.length ? {c:'err', t:`ORPHAN sprite files (${orphans.length}) — no manifest row: ${orphans.join(', ')}`} : {c:'ok', t:'no orphan sprite files'});
+  if(!S.files.size) out.push({c:'warn', t:'sprite-file listing unavailable (need the dev server /api/list-dir) — orphan scan degraded'});
+  $('scanBody').innerHTML = out.map(o=>`<div class="scanrow ${o.c}">${o.c==='ok'?'✓':(o.c==='warn'?'⚠':'✗')} ${o.t}</div>`).join('');
+}
+
+// ── grid ───────────────────────────────────────────────────────────────────────
+const COLS=['line','stage','name','bucket','types','archetype','rarity','identity','front','back','registered'];
+function renderGridHead(){ $('grid').tHead.innerHTML='<tr>'+COLS.map(c=>`<th>${c}</th>`).join('')+'</tr>'; }
+function typeCell(r){ return [r.type1,r.type2].filter(Boolean).map(t=>`<span class="type">${t}</span>`).join(''); }
+function rowCells(r){
+  const st=rowState(r);
+  const ident= st.ident?'<span class="light l-green">yes</span>':'<span class="light l-dim">—</span>';
+  const back= st.back? sizeLight(st.back) : (st.ident? '<span class="light l-amber">need</span>':'<span class="light l-dim">—</span>');
+  const reg = st.reg? `<span class="light l-green">reg${st.backReg?'+B':''}</span>` : (st.ident?'<span class="light l-amber">no</span>':'<span class="light l-dim">—</span>');
+  return `<td>${r.line_id}</td><td>${r.stage}/${r.stages_total}</td><td><b>${r.name}</b></td><td>${r.bucket}</td>`
+    + `<td>${typeCell(r)}</td><td>${r.archetype}</td><td>${r.rarity}</td>`
+    + `<td>${ident}</td><td>${sizeLight(st.front)}</td><td>${back}</td><td>${reg}</td>`;
+}
+function renderGrid(){
+  const rows=S.manifest.filter(passFilter);
+  $('count').textContent=`${rows.length} / ${S.manifest.length} rows`;
+  const tb=$('grid').tBodies[0]; tb.innerHTML='';
+  if(S.lineView){
+    const byLine=new Map(); for(const r of rows){ (byLine.get(r.line_id)||byLine.set(r.line_id,[]).get(r.line_id)).push(r); }
+    for(const [line,rs] of byLine){ rs.sort((a,b)=>(+a.stage)-(+b.stage));
+      const hdr=document.createElement('tr'); hdr.className='linehdr';
+      hdr.innerHTML=`<td colspan="${COLS.length}">${line} — ${rs[0].name}${rs.length>1?' line ('+rs.length+' stages)':''}</td>`;
+      tb.appendChild(hdr);
+      for(const r of rs) tb.appendChild(mkRow(r));
+    }
+  } else {
+    for(const r of rows) tb.appendChild(mkRow(r));
+  }
+}
+function mkRow(r){
+  const tr=document.createElement('tr'); tr.className='slot';
+  const st=rowState(r); const hasArt=st.front||st.back;
+  if(hasArt){ tr.classList.add('hasart'); tr.onclick=()=>peek(r); }
+  if(S.sel===r.name) tr.classList.add('sel');
+  tr.innerHTML=rowCells(r);
+  return tr;
+}
+
+// ── sprite peek (paint-from-rows on parchment) ────────────────────────────────
+function paint(cv, sprite, z){
+  const sz=sprite.size; cv.width=sz*z; cv.height=sz*z; const ctx=cv.getContext('2d'); ctx.imageSmoothingEnabled=false;
+  ctx.fillStyle='#e8e4d8'; ctx.fillRect(0,0,cv.width,cv.height);
+  const rows=sprite.rows||[];
+  for(let y=0;y<rows.length;y++){ const row=rows[y]; for(let x=0;x<row.length;x++){ const ch=row[x]; if(ch==='.') continue; const col=sprite.palette&&sprite.palette[ch]; if(!col) continue; ctx.fillStyle=col; ctx.fillRect(x*z,y*z,z,z); } }
+}
+function peekFig(sprite, label){
+  const fig=document.createElement('figure');
+  for(const z of [1,2]){ const c=document.createElement('canvas'); paint(c,sprite,z); fig.appendChild(c); }
+  const cap=document.createElement('figcaption'); cap.textContent=`${label} · ${sprite.size}px`; fig.appendChild(cap);
+  return fig;
+}
+function peek(r){
+  S.sel=r.name; renderGrid();
+  const front=S.art.get(r.name+'.sprite.json'), back=S.art.get(r.name+'_BACK.sprite.json');
+  const inner=$('peekInner'); inner.innerHTML=`<h3>${r.name} <span class="muted">${r.line_id} · ${r.bucket}</span></h3>`;
+  if(S.ident.has(r.name)){ const id=S.ident.get(r.name); inner.innerHTML+=`<div class="muted" style="margin-bottom:8px">${(id.types||[]).join('/')} · ${id.archetype||''} · ${id.rarity||''}</div>`; }
+  const wrap=document.createElement('div'); wrap.className='canvwrap';
+  if(front) wrap.appendChild(peekFig(front,'front'));
+  if(back) wrap.appendChild(peekFig(back,'back'));
+  if(!front&&!back){ const p=document.createElement('div'); p.className='muted'; p.textContent='no art yet'; wrap.appendChild(p); }
+  inner.appendChild(wrap);
+  if(r.note){ const n=document.createElement('div'); n.className='muted'; n.style.fontSize='11px'; n.textContent=r.note; inner.appendChild(n); }
+  $('peek').classList.add('open');
+}
+
+function renderAll(){ renderGridHead(); renderRollup(); renderScan(); renderGrid(); }
+
+// ── wiring ─────────────────────────────────────────────────────────────────────
+$('fBucket').onchange=e=>{ S.filt.bucket=e.target.value; renderGrid(); };
+$('fType').onchange=e=>{ S.filt.type=e.target.value; renderGrid(); };
+$('fArch').onchange=e=>{ S.filt.arch=e.target.value; renderGrid(); };
+$('fRarity').onchange=e=>{ S.filt.rarity=e.target.value; renderGrid(); };
+$('fStatus').onchange=e=>{ S.filt.status=e.target.value; renderGrid(); };
+$('lineToggle').onclick=e=>{ S.lineView=!S.lineView; e.target.classList.toggle('on',S.lineView); renderGrid(); };
+$('reload').onclick=()=>boot();
+boot();
+</script>
+</body>
+</html>

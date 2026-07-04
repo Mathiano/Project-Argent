@@ -19,7 +19,7 @@
 // Other endpoints:
 //   GET  /api/save-asset/ping → 200 {ok} — feature-detect (tools hide save buttons when absent).
 //   GET  /api/assets          → the current tileset manifest.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join, resolve, sep } from 'node:path';
 import type { Plugin } from 'vite';
@@ -38,6 +38,13 @@ export const SAVE_ALLOWLIST_DIRS: ReadonlySet<string> = new Set([
 ]);
 const FILENAME_RE = /^[A-Za-z0-9._-]+$/; // single path component — no separators, no absolute paths
 
+// Normalise + allowlist-check a repo-relative dir (shared by save + the read-only
+// GET /api/list-dir listing). Returns the normalised dir or null if not allowlisted.
+export function normalizeAllowlistedDir(dirRaw: unknown): string | null {
+  const dir = typeof dirRaw === 'string' ? dirRaw.replace(/\\/g, '/').replace(/\/+$/, '') : '';
+  return SAVE_ALLOWLIST_DIRS.has(dir) ? dir : null;
+}
+
 export type SaveValidation =
   | { readonly ok: true; readonly dir: string; readonly filename: string; readonly buf: Buffer; readonly rel: string }
   | { readonly ok: false; readonly code: number; readonly error: string };
@@ -48,9 +55,9 @@ export type SaveValidation =
 // resolved path that escapes the allowlisted dir. No filesystem writes here (pure).
 export function validateSaveRequest(body: unknown, repoRoot: string): SaveValidation {
   const b = (body ?? {}) as { dir?: unknown; filename?: unknown; content?: unknown; encoding?: unknown };
-  const dir = typeof b.dir === 'string' ? b.dir.replace(/\\/g, '/').replace(/\/+$/, '') : '';
-  if (!SAVE_ALLOWLIST_DIRS.has(dir)) {
-    return { ok: false, code: 400, error: `dir "${dir}" not in the allowlist (${[...SAVE_ALLOWLIST_DIRS].join(', ')})` };
+  const dir = normalizeAllowlistedDir(b.dir);
+  if (dir === null) {
+    return { ok: false, code: 400, error: `dir "${String(b.dir)}" not in the allowlist (${[...SAVE_ALLOWLIST_DIRS].join(', ')})` };
   }
   const filename = typeof b.filename === 'string' ? b.filename : '';
   if (!FILENAME_RE.test(filename)) {
@@ -145,6 +152,25 @@ export function argentStudioSavePlugin(repoRoot: string): Plugin {
         }
         if (url === '/api/assets' && req.method === 'GET') {
           sendJSON(res, 200, readManifest());
+          return;
+        }
+        // READ-ONLY directory listing (Dex Forge): GET /api/list-dir?dir=<allowlisted>
+        // → { ok, dir, files } (files only, sorted). Non-existent dir → empty list.
+        if (url.startsWith('/api/list-dir') && req.method === 'GET') {
+          const q = new URL(url, 'http://localhost').searchParams.get('dir');
+          const dir = normalizeAllowlistedDir(q);
+          if (dir === null) {
+            sendJSON(res, 400, { ok: false, error: `dir "${String(q)}" not in the allowlist (${[...SAVE_ALLOWLIST_DIRS].join(', ')})` });
+            return;
+          }
+          const abs = resolve(repoRoot, dir);
+          let files: string[] = [];
+          try {
+            if (existsSync(abs)) files = readdirSync(abs, { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name).sort();
+          } catch {
+            files = [];
+          }
+          sendJSON(res, 200, { ok: true, dir, files });
           return;
         }
         if (url !== '/api/save-asset' || req.method !== 'POST') {
