@@ -47,6 +47,10 @@ whitespace grouping is lost on edit.
 
 - **Load** — pick an `assets/anim/*.json` (via `/api/list-dir`), or **new animation**
   (dot-namespaced id, validated).
+- **Import (CD hand-off)** — paste animation JSON (Claude Design's chat output) or drop
+  a `.json` file. Validated by the **real** `parseAnimationDef`; a rejection shows the
+  loader's reason **verbatim** (paste it back to CD as correction feedback). A valid
+  import opens in the editor **unsaved** — writing to the repo stays an explicit save.
 - **Timeline** — one lane per track: a bar from `delayFrames` to `+durationFrames`
   on a frame ruler, labelled `target.property from→to easing [side]`. Click to select;
   **drag** the bar to change delay, drag its right edge for duration.

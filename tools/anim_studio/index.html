@@ -65,6 +65,12 @@
     <div class="row"><button id="save" class="accent">💾 save → assets/anim/</button></div>
     <div class="status" id="saveStatus"></div>
 
+    <h2>Import (CD hand-off)</h2>
+    <div id="dropZone" class="muted" style="border:1px dashed var(--line);border-radius:6px;padding:8px;text-align:center;font-size:11px">drop a .json file here, or paste below</div>
+    <textarea id="importBox" rows="4" style="width:100%;margin-top:6px;background:#12141b;color:var(--ink);border:1px solid var(--line);border-radius:5px;font:12px/1.4 ui-monospace,monospace" spellcheck="false" placeholder='paste animation JSON from Claude Design…'></textarea>
+    <div class="row"><button id="importBtn">import + validate</button></div>
+    <div class="status" id="importStatus"></div>
+
     <h2>Stage mons (optional)</h2>
     <div class="row"><label>foe</label><select id="foeMon" style="flex:1"></select></div>
     <div class="row"><label>player</label><select id="plMon" style="flex:1"></select></div>
@@ -286,6 +292,29 @@ async function openAnim(name){
 $('open').onclick=()=>{ const n=$('animList').value; if(n&&n!=='—') openAnim(n); };
 $('newAnim').onclick=()=>{ setDef({ id:'battle.newAnim', tracks:[{target:'sprite',property:'flashAlpha',from:0,to:0.85,durationFrames:6,easing:'easeOut',delayFrames:0}] }, null); dirty=true; };
 $('idField').oninput=()=>{ if(def){ pushUndo(); def.id=$('idField').value.trim(); markDirty(); rebuild(); showEventContext(def.id); } };
+
+// ── Import (CD hand-off): paste / drop JSON → validate via the REAL runtime loader,
+// showing its reason VERBATIM on rejection (so Mathias can paste it back to CD). A
+// valid import opens in the editor UNSAVED — writing to the repo stays an explicit save.
+function importText(text){
+  let raw;
+  try{ raw=JSON.parse(text); }
+  catch(e){ $('importStatus').textContent='REJECTED (invalid JSON): '+(e.message||e); $('importStatus').className='status err'; return; }
+  try{ RT.parseAnimationDef(raw); }                       // the schema authority — the same loader the game uses
+  catch(e){ $('importStatus').textContent='REJECTED: '+(e.message||e); $('importStatus').className='status err'; return; }
+  const d={ id:raw.id, tracks:raw.tracks.map(t=>({ target:t.target, property:t.property, ...(t.side!==undefined?{side:t.side}:{}), from:t.from, to:t.to, durationFrames:t.durationFrames, easing:t.easing, delayFrames:t.delayFrames??0 })) };
+  setDef(d, null); dirty=true;                            // opens UNSAVED
+  $('importStatus').textContent='✓ imported (unsaved) — edit, then click save'; $('importStatus').className='status ok';
+}
+$('importBtn').onclick=()=>importText($('importBox').value);
+(function importDnd(){
+  const dz=$('dropZone'), ib=$('importBox');
+  const drop=e=>{ e.preventDefault(); dz.style.borderColor=''; const f=e.dataTransfer&&e.dataTransfer.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ ib.value=r.result; importText(String(r.result)); }; r.readAsText(f); };
+  ['dragover','dragenter'].forEach(t=>dz.addEventListener(t,e=>{ e.preventDefault(); dz.style.borderColor='var(--accent)'; }));
+  dz.addEventListener('dragleave',e=>{ e.preventDefault(); dz.style.borderColor=''; });
+  dz.addEventListener('drop',drop); ib.addEventListener('drop',drop); ib.addEventListener('dragover',e=>e.preventDefault());
+})();
+window.addEventListener('dragover',e=>e.preventDefault()); window.addEventListener('drop',e=>e.preventDefault());
 
 let eventMap={};
 function showEventContext(id){ const evs=Object.entries(eventMap).filter(([,ids])=>ids.includes(id)).map(([e])=>e);
