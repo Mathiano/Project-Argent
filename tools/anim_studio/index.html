@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Anim Studio</title>
+<style>
+  :root{ --bg:#20202c; --panel:#171a21; --line:#33323f; --ink:#f6efda; --dim:#9a8e72; --wood:#734b2c;
+         --parch:#f6e7c2; --accent:#6fd3c8; --gold:#f6c92e; --green:#6fbf73; --red:#e6705f; --bar:#3a6ea5; --barsel:#6fd3c8; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font:13px/1.45 ui-monospace,Menlo,Consolas,monospace; }
+  header{ padding:9px 14px; border-bottom:1px solid #000; display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; }
+  header b{ color:var(--gold); } .sub{ color:var(--dim); }
+  #notice{ display:none; margin:12px 14px; padding:12px 14px; border:1px solid var(--gold); border-radius:6px; background:#2a2413; color:#f0dca0; }
+  main{ display:grid; grid-template-columns:300px 1fr; gap:0; }
+  .col{ padding:10px 12px; }
+  .col.left{ border-right:1px solid var(--line); min-height:calc(100vh - 40px); }
+  h2{ font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; margin:14px 0 6px; }
+  h2:first-child{ margin-top:0; }
+  select,button,input,textarea{ background:#222834; color:var(--ink); border:1px solid var(--line); border-radius:5px; padding:4px 7px; font:inherit; }
+  button{ cursor:pointer; } button:disabled{ opacity:.45; cursor:default; }
+  button.accent{ border-color:var(--accent); color:var(--accent); }
+  .row{ display:flex; gap:6px; align-items:center; margin:5px 0; flex-wrap:wrap; }
+  .row label{ color:var(--dim); min-width:58px; }
+  input[type=number]{ width:64px; } input[type=text]{ width:110px; }
+  .stagewrap{ background:#000; padding:6px; border:1px solid var(--wood); display:inline-block; }
+  canvas#stage{ image-rendering:pixelated; width:640px; height:360px; display:block; background:#000; }
+  input[type=range]{ width:100%; }
+  #timeline{ margin-top:10px; border:1px solid var(--line); border-radius:6px; background:#12141b; padding:6px; overflow-x:auto; }
+  .ruler{ position:relative; height:16px; color:var(--dim); font-size:10px; border-bottom:1px solid var(--line); margin-bottom:3px; }
+  .ruler span{ position:absolute; top:1px; }
+  .lane{ position:relative; height:22px; margin:2px 0; }
+  .lanebg{ position:absolute; inset:0; background:#181b23; border-radius:3px; }
+  .bartrack{ position:absolute; top:2px; height:18px; border-radius:3px; background:var(--bar); cursor:grab; overflow:hidden; white-space:nowrap;
+             font-size:10px; color:#eaf1ff; padding:2px 4px; border:1px solid #2b527a; }
+  .bartrack.sel{ background:var(--barsel); color:#06222b; border-color:#bff; }
+  .bartrack .rz{ position:absolute; right:0; top:0; width:6px; height:100%; cursor:ew-resize; }
+  #playhead{ position:absolute; top:0; width:1px; background:var(--gold); pointer-events:none; z-index:5; }
+  #editor{ margin-top:8px; border:1px solid var(--line); border-radius:6px; padding:8px; background:#12141b; }
+  .status{ margin-top:6px; white-space:pre-wrap; } .status.err{ color:var(--red); } .status.ok{ color:var(--green); }
+  .muted{ color:var(--dim); } .pill{ background:#222834; border:1px solid var(--line); border-radius:10px; padding:1px 8px; font-size:11px; }
+  a{ color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <b>ARGENT</b> <span>· ANIM STUDIO <span class="sub">v1</span></span>
+  <span class="sub">timeline editor over the real <code>timeline.ts</code> interpreter · 60fps · frames, not ms</span>
+  <span style="margin-left:auto" class="sub" id="epLine">—</span>
+</header>
+
+<div id="notice">
+  <b>Serve via <code>npm run dev</code>.</b> Anim Studio runs the <b>real</b> interpreter
+  (<code>/src/game/anim/timeline.ts</code>, imported through the dev server) and reads/writes
+  <code>assets/anim/</code> via the dev endpoints. Opened as a static file it can't reach them —
+  start the dev server and reload. (This is by design: the tool plays the exact JSON the game loads.)
+</div>
+
+<main id="app" style="display:none">
+  <div class="col left">
+    <h2>Animation</h2>
+    <div class="row"><select id="animList" style="flex:1"><option>—</option></select><button id="open">open</button></div>
+    <div class="row"><button id="newAnim">+ new animation</button></div>
+    <div class="row"><label>id</label><input type="text" id="idField" style="flex:1;width:auto" placeholder="battle.myAnim"></div>
+    <div class="row"><button id="save" class="accent">💾 save → assets/anim/</button></div>
+    <div class="status" id="saveStatus"></div>
+
+    <h2>Stage mons (optional)</h2>
+    <div class="row"><label>foe</label><select id="foeMon" style="flex:1"></select></div>
+    <div class="row"><label>player</label><select id="plMon" style="flex:1"></select></div>
+    <div class="row"><label>subject</label><select id="subject"><option value="foe">foe</option><option value="player">player</option></select></div>
+
+    <h2>Track editor</h2>
+    <div id="editor"><div class="muted">select a track bar</div></div>
+    <div class="row"><button id="addTrack">+ track (dup)</button><button id="delTrack">− delete</button></div>
+    <div class="muted" style="font-size:11px;margin-top:6px">Ctrl-Z undo · drag a bar = delay · drag right edge = duration</div>
+  </div>
+
+  <div class="col">
+    <div class="stagewrap"><canvas id="stage" width="640" height="360"></canvas></div>
+    <div class="row" style="margin-top:8px">
+      <button id="play">▶ play</button>
+      <button id="stepB" title="frame back (←)">⟨</button><button id="stepF" title="frame fwd (→)">⟩</button>
+      <button id="loop" class="accent">loop: on</button>
+      <label>speed</label><select id="speed"><option>0.25</option><option>0.5</option><option selected>1</option></select>
+      <span class="pill">frame <b id="frameNum">0</b> / <b id="totalNum">0</b></span>
+      <span class="pill" id="validPill">—</span>
+    </div>
+    <div class="row"><input type="range" id="scrub" min="0" max="60" value="0" step="1"></div>
+    <div id="timeline"><div class="ruler" id="ruler"></div><div id="lanes"></div><div id="playhead" style="display:none"></div></div>
+    <div class="status" id="parseStatus"></div>
+  </div>
+</main>
+
+<script>
+// ── Anim Studio — a timeline EDITOR over the REAL runtime. It imports the shipped
+// interpreter (src/game/anim/timeline.ts, dev-served) so the motion it plays and the
+// JSON it saves are exactly what the game loads. No reimplementation of easing/timing.
+const $ = id => document.getElementById(id);
+const FPX = 11;           // px per frame on the timeline
+const REST = { 'panel.alpha_foe':1, 'panel.alpha_player':1, 'star.scale':1 }; // channel rest values
+// The 10 REAL binding channels (from src/game/scenes/battle.ts) — global vs per-side.
+const GLOBAL_CH = ['stage.shakeX','bar.hpProgress','star.scale','star.flashAlpha','wipe.alpha','wipe.offsetX'];
+const SIDED_CH  = ['sprite.flashAlpha','sprite.offsetX','panel.offsetY','panel.alpha'];
+const CHANNELS  = [...SIDED_CH, ...GLOBAL_CH];
+
+let RT = null;            // the imported timeline.ts module
+let EASINGS = [];         // EASING_NAMES from the runtime
+let def = null;           // editable def in FILE shape: { id, tracks:[{target,property,side?,from,to,durationFrames,easing,delayFrames}] }
+let originalRaw = null;   // raw text of the loaded file (byte-identical untouched save)
+let dirty = false;
+let rt = null, curVals = {}, valid = false;   // runtime instance + live binding target + validity
+let frame = 0, playing = false, loop = true, speed = 1, sel = -1;
+let sprites = {};         // name -> sprite JSON (for real stage sprites)
+let saveOK = false;
+const undo = [];
+
+// ── canonical serializer — matches assets/anim/*.json EXACTLY (one line per track,
+// key order target,property,[side],from,to,durationFrames,easing,delayFrames; 2-sp; trailing \n).
+function num(n){ return JSON.stringify(n); }
+function serializeTrack(t){
+  const parts = [`"target": ${JSON.stringify(t.target)}`, `"property": ${JSON.stringify(t.property)}`];
+  if (t.side !== undefined) parts.push(`"side": ${JSON.stringify(t.side)}`);
+  parts.push(`"from": ${num(t.from)}`, `"to": ${num(t.to)}`, `"durationFrames": ${num(t.durationFrames)}`,
+             `"easing": ${JSON.stringify(t.easing)}`, `"delayFrames": ${num(t.delayFrames)}`);
+  return '    { ' + parts.join(', ') + ' }';
+}
+function serialize(d){
+  return `{\n  "id": ${JSON.stringify(d.id)},\n  "tracks": [\n` + d.tracks.map(serializeTrack).join(',\n') + `\n  ]\n}\n`;
+}
+
+// ── real-runtime rebuild (parse the current file-shape def; validity gates play+save) ──
+function toRaw(d){ return { id: d.id, tracks: d.tracks.map(t => ({ ...t })) }; }
+function rebuild(){
+  if (!RT) return;
+  try {
+    const parsed = RT.parseAnimationDef(toRaw(def));
+    rt = new RT.AnimRuntime(new Map([[parsed.id, parsed]]), {});
+    for (const ch of GLOBAL_CH) rt.register(ch, { set:(v)=>{ curVals[ch]=v; } });
+    for (const ch of SIDED_CH)  rt.register(ch, { set:(v,s)=>{ curVals[ch+'_'+(s??'foe')]=v; } });
+    valid = true; $('parseStatus').textContent=''; $('parseStatus').className='status';
+    $('validPill').textContent='valid ✓'; $('validPill').style.color='var(--green)';
+    $('totalNum').textContent = parsed.totalFrames;
+    $('scrub').max = String(parsed.totalFrames);
+  } catch(e){
+    valid = false; $('parseStatus').textContent = String(e.message||e); $('parseStatus').className='status err';
+    $('validPill').textContent='invalid ✗'; $('validPill').style.color='var(--red)';
+  }
+  $('save').disabled = !(saveOK && valid);
+}
+
+// ── render one frame through the REAL interpreter (play → advance to F) ──────────
+function renderAtFrame(F){
+  curVals = { ...REST };
+  if (valid && rt && def){ const subj = $('subject').value; rt.play(def.id, subj); if (F>0) rt.update(F/60); }
+  drawStage(curVals);
+  frame = F;
+  $('frameNum').textContent = F.toFixed(1);
+  $('scrub').value = String(Math.min(Number($('scrub').max), Math.round(F)));
+  const ph = $('playhead'); ph.style.display='block'; ph.style.left = (F*FPX)+'px'; ph.style.height = ($('lanes').offsetHeight+3)+'px';
+}
+
+// ── stage draw — mirrors the harness stub + battle.ts channels; real sprites if picked ──
+const g = $('stage').getContext('2d'); g.imageSmoothingEnabled=false; g.font='13px monospace';
+g.ellipseFill = function(cx,cy,rx,ry){ this.beginPath(); this.ellipse(cx,cy,rx,ry,0,0,Math.PI*2); this.fill(); };
+function paintSprite(sp, x, y, box){ // fit sprite's size grid into a `box`px square at (x,y)
+  const z = box/sp.size; const rows=sp.rows||[];
+  for(let r=0;r<rows.length;r++){ const row=rows[r]; for(let c=0;c<row.length;c++){ const ch=row[c]; if(ch==='.')continue; const col=sp.palette&&sp.palette[ch]; if(!col)continue; g.fillStyle=col; g.fillRect(Math.round(x+c*z),Math.round(y+r*z),Math.ceil(z),Math.ceil(z)); } }
+}
+function drawStage(v){
+  g.clearRect(0,0,640,360);
+  const shakeX=v['stage.shakeX']??0, hpP=v['bar.hpProgress'], starScale=v['star.scale']??1, starFlash=v['star.flashAlpha']??0;
+  const wipe=v['wipe.alpha']??0, wipeX=v['wipe.offsetX']??0;
+  const foeOffX=v['sprite.offsetX_foe']??0, plOffX=v['sprite.offsetX_player']??0;
+  const foeFlash=v['sprite.flashAlpha_foe']??0, plFlash=v['sprite.flashAlpha_player']??0;
+  const foePanY=v['panel.offsetY_foe']??0, plPanY=v['panel.offsetY_player']??0;
+  const foePanA=v['panel.alpha_foe']??1, plPanA=v['panel.alpha_player']??1;
+  // stage
+  g.fillStyle='#eaf1dc'; g.fillRect(0,0,640,150); g.fillStyle='#c3d79b'; g.fillRect(0,150,640,210);
+  const foeX=472+shakeX+foeOffX, plX=96+shakeX+plOffX;
+  g.fillStyle='#a7bc7c'; g.ellipseFill(472+56+shakeX,126,58,10); g.ellipseFill(96+64+shakeX,254,64,12);
+  g.fillStyle='#cfdca4'; g.ellipseFill(472+56+shakeX,124,58,10); g.ellipseFill(96+64+shakeX,252,64,12);
+  // sprites (real if picked, else labeled rects)
+  const foeSp=sprites[$('foeMon').value], plSp=sprites[$('plMon').value];
+  if(foeSp) paintSprite(foeSp, foeX, 12, 112); else { g.fillStyle='#8a6f4a'; g.fillRect(foeX+20,44,72,80); g.fillStyle='#3a2a1c'; g.fillText('FOE',foeX+38,90); }
+  if(plSp) paintSprite(plSp, plX, 140, 112); else { g.fillStyle='#6b8f4a'; g.fillRect(plX+20,172,72,80); g.fillStyle='#eaf1dc'; g.fillText('YOU',plX+38,216); }
+  if(foeFlash>0.01){ g.globalAlpha=Math.min(1,foeFlash); g.fillStyle='#fff2b8'; g.fillRect(foeX,12,112,112); g.globalAlpha=1; }
+  if(plFlash>0.01){ g.globalAlpha=Math.min(1,plFlash); g.fillStyle='#fff2b8'; g.fillRect(plX,140,112,112); g.globalAlpha=1; }
+  // foe HUD panel + HP bar + momentum ★
+  g.globalAlpha=Math.max(0,Math.min(1,foePanA));
+  g.fillStyle='#f6e7c2'; g.fillRect(8,8+foePanY,340,52); g.strokeStyle='#734b2c'; g.strokeRect(8.5,8.5+foePanY,339,51);
+  g.fillStyle='#3a2a1c'; g.fillText('FOE',18,26+foePanY);
+  const barW=250, frac=hpP===undefined?1:(1-hpP*0.6);
+  g.fillStyle='#cfc6a8'; g.fillRect(40,34+foePanY,barW,8); g.fillStyle=frac>0.35?'#3e9a52':'#c23a2a'; g.fillRect(40,34+foePanY,Math.round(barW*frac),8);
+  const size=Math.max(1,Math.round(11*starScale)); g.fillStyle=starFlash>0.3?'#fff2b8':'#f6c92e'; g.font=`${size}px monospace`; g.fillText('★',300-(size-11)/2,46+foePanY+(size-11)/2); g.font='13px monospace';
+  g.globalAlpha=1;
+  // player HUD panel
+  g.globalAlpha=Math.max(0,Math.min(1,plPanA));
+  g.fillStyle='#f6e7c2'; g.fillRect(300,300+plPanY,332,52); g.strokeStyle='#734b2c'; g.strokeRect(300.5,300.5+plPanY,331,51);
+  g.fillStyle='#3a2a1c'; g.fillText('YOU',310,320+plPanY); g.globalAlpha=1;
+  // enter wipe
+  if(wipe>0.001){ g.globalAlpha=Math.min(1,wipe); g.fillStyle='#000'; g.fillRect(wipeX,0,640,360); g.globalAlpha=1; }
+}
+
+// ── timeline (DOM lanes + draggable bars) ───────────────────────────────────────
+function total(){ let m=0; for(const t of def.tracks) m=Math.max(m, t.delayFrames+t.durationFrames); return m; }
+function renderTimeline(){
+  const T=total(), lanes=$('lanes'); lanes.innerHTML='';
+  const ruler=$('ruler'); ruler.innerHTML=''; ruler.style.width=(T*FPX+40)+'px';
+  for(let f=0; f<=T; f+=Math.max(1,Math.round(T/24))){ const s=document.createElement('span'); s.style.left=(f*FPX)+'px'; s.textContent=f; ruler.appendChild(s); }
+  def.tracks.forEach((t,i)=>{
+    const lane=document.createElement('div'); lane.className='lane'; lane.style.width=(T*FPX+40)+'px';
+    const bg=document.createElement('div'); bg.className='lanebg'; lane.appendChild(bg);
+    const bar=document.createElement('div'); bar.className='bartrack'+(i===sel?' sel':'');
+    bar.style.left=(t.delayFrames*FPX)+'px'; bar.style.width=Math.max(10,t.durationFrames*FPX)+'px';
+    bar.textContent=`${t.target}.${t.property} ${t.from}→${t.to} ${t.easing}${t.side?(' ['+t.side+']'):''}`;
+    const rz=document.createElement('div'); rz.className='rz'; bar.appendChild(rz);
+    bar.onmousedown=(e)=>startDrag(e,i,e.target===rz?'dur':'delay');
+    lane.appendChild(bar); lanes.appendChild(lane);
+  });
+}
+let drag=null;
+function startDrag(e,i,mode){ e.preventDefault(); sel=i; pushUndo(); drag={ i, mode, x0:e.clientX, d0:def.tracks[i].delayFrames, u0:def.tracks[i].durationFrames }; renderTrackEditor(); renderTimeline(); }
+window.addEventListener('mousemove',e=>{ if(!drag)return; const dF=Math.round((e.clientX-drag.x0)/FPX); const t=def.tracks[drag.i];
+  if(drag.mode==='delay') t.delayFrames=Math.max(0,drag.d0+dF); else t.durationFrames=Math.max(1,drag.u0+dF);
+  markDirty(); rebuild(); renderTimeline(); renderTrackEditor(); renderAtFrame(frame); });
+window.addEventListener('mouseup',()=>{ if(drag){ drag=null; } });
+
+// ── track editor ────────────────────────────────────────────────────────────────
+function renderTrackEditor(){
+  const el=$('editor'); if(sel<0||!def.tracks[sel]){ el.innerHTML='<div class="muted">select a track bar</div>'; return; }
+  const t=def.tracks[sel];
+  const easeOpts=EASINGS.map(e=>`<option${e===t.easing?' selected':''}>${e}</option>`).join('');
+  const sideOpts=['(subject)','player','foe'].map(s=>{ const val=s==='(subject)'?'':s; return `<option value="${val}"${(t.side||'')===val?' selected':''}>${s}</option>`; }).join('');
+  const chList=CHANNELS.map(c=>`<option value="${c}">`).join('');
+  el.innerHTML=`
+    <div class="row"><label>target</label><input type="text" id="e_target" list="chTargets" value="${t.target}"></div>
+    <div class="row"><label>property</label><input type="text" id="e_property" value="${t.property}"></div>
+    <datalist id="chTargets">${[...new Set(CHANNELS.map(c=>c.split('.')[0]))].map(x=>`<option value="${x}">`).join('')}</datalist>
+    <div class="row"><label>from</label><input type="number" step="any" id="e_from" value="${t.from}"><label>to</label><input type="number" step="any" id="e_to" value="${t.to}"></div>
+    <div class="row"><label>delay</label><input type="number" id="e_delay" value="${t.delayFrames}"><label>dur</label><input type="number" id="e_dur" value="${t.durationFrames}"></div>
+    <div class="row"><label>easing</label><select id="e_easing">${easeOpts}</select></div>
+    <div class="row"><label>side</label><select id="e_side">${sideOpts}</select></div>
+    <div class="muted" style="font-size:11px">channel: <b>${t.target}.${t.property}</b>${CHANNELS.includes(t.target+'.'+t.property)?'':' — not a known stage channel (plays inert)'}</div>`;
+  const bind=(id,fn)=>{ const n=$(id); n.oninput=()=>{ pushUndo(); fn(n.value); commitEdit(); }; };
+  bind('e_target',v=>t.target=v); bind('e_property',v=>t.property=v);
+  bind('e_from',v=>t.from=Number(v)); bind('e_to',v=>t.to=Number(v));
+  bind('e_delay',v=>t.delayFrames=Math.max(0,Math.round(Number(v)||0)));
+  bind('e_dur',v=>t.durationFrames=Math.max(1,Math.round(Number(v)||1)));
+  $('e_easing').onchange=()=>{ pushUndo(); t.easing=$('e_easing').value; commitEdit(); };
+  $('e_side').onchange=()=>{ pushUndo(); const val=$('e_side').value; if(val) t.side=val; else delete t.side; commitEdit(); };
+}
+function commitEdit(){ markDirty(); rebuild(); renderTimeline(); renderTrackEditor(); renderAtFrame(frame); }
+
+// ── edit ops ────────────────────────────────────────────────────────────────────
+function pushUndo(){ undo.push(JSON.stringify(def)); if(undo.length>100) undo.shift(); }
+function markDirty(){ dirty=true; }
+$('addTrack').onclick=()=>{ pushUndo(); const base=sel>=0?def.tracks[sel]:{target:'sprite',property:'flashAlpha',from:0,to:1,durationFrames:6,easing:'easeOut',delayFrames:0}; def.tracks.splice(sel>=0?sel+1:def.tracks.length,0,{...base}); sel=(sel>=0?sel+1:def.tracks.length-1); commitEdit(); };
+$('delTrack').onclick=()=>{ if(sel<0||def.tracks.length<=1)return; pushUndo(); def.tracks.splice(sel,1); sel=Math.min(sel,def.tracks.length-1); commitEdit(); };
+window.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ if(undo.length){ def=JSON.parse(undo.pop()); markDirty(); rebuild(); renderTimeline(); renderTrackEditor(); renderAtFrame(frame); } e.preventDefault(); }
+  else if(e.key==='ArrowLeft'&&def){ e.preventDefault(); step(-1); } else if(e.key==='ArrowRight'&&def){ e.preventDefault(); step(1); } });
+
+// ── playback ────────────────────────────────────────────────────────────────────
+let lastT=0;
+function loopTick(t){ if(!playing)return; if(!lastT)lastT=t; frame += ((t-lastT)/1000)*60*speed; lastT=t;
+  const T=total(); if(frame>=T){ if(loop) frame=0; else { playing=false; $('play').textContent='▶ play'; frame=T; } }
+  renderAtFrame(frame); if(playing) requestAnimationFrame(loopTick); }
+function step(d){ playing=false; $('play').textContent='▶ play'; renderAtFrame(Math.max(0,Math.min(total(),Math.round(frame)+d))); }
+$('play').onclick=()=>{ if(!def)return; playing=!playing; lastT=0; $('play').textContent=playing?'⏸ pause':'▶ play'; if(playing)requestAnimationFrame(loopTick); };
+$('stepB').onclick=()=>step(-1); $('stepF').onclick=()=>step(1);
+$('loop').onclick=()=>{ loop=!loop; $('loop').textContent='loop: '+(loop?'on':'off'); };
+$('speed').onchange=e=>speed=Number(e.target.value);
+$('scrub').oninput=e=>{ playing=false; $('play').textContent='▶ play'; renderAtFrame(Number(e.target.value)); };
+$('subject').onchange=()=>renderAtFrame(frame);
+$('foeMon').onchange=()=>renderAtFrame(frame); $('plMon').onchange=()=>renderAtFrame(frame);
+
+// ── load / new / save ───────────────────────────────────────────────────────────
+function setDef(d, raw){ def=d; originalRaw=raw; dirty=false; sel=def.tracks.length?0:-1; undo.length=0; frame=0;
+  $('idField').value=d.id; rebuild(); renderTimeline(); renderTrackEditor(); renderAtFrame(0); showEventContext(d.id); }
+async function openAnim(name){
+  try{ const raw=await (await fetch('/assets/anim/'+name,{cache:'no-store'})).text(); const d=JSON.parse(raw);
+    d.tracks=d.tracks.map(t=>({ target:t.target, property:t.property, ...(t.side!==undefined?{side:t.side}:{}), from:t.from, to:t.to, durationFrames:t.durationFrames, easing:t.easing, delayFrames:t.delayFrames??0 }));
+    setDef(d, raw); $('saveStatus').textContent=''; }
+  catch(e){ $('saveStatus').textContent='open failed: '+(e.message||e); $('saveStatus').className='status err'; }
+}
+$('open').onclick=()=>{ const n=$('animList').value; if(n&&n!=='—') openAnim(n); };
+$('newAnim').onclick=()=>{ setDef({ id:'battle.newAnim', tracks:[{target:'sprite',property:'flashAlpha',from:0,to:0.85,durationFrames:6,easing:'easeOut',delayFrames:0}] }, null); dirty=true; };
+$('idField').oninput=()=>{ if(def){ pushUndo(); def.id=$('idField').value.trim(); markDirty(); rebuild(); showEventContext(def.id); } };
+
+let eventMap={};
+function showEventContext(id){ const evs=Object.entries(eventMap).filter(([,ids])=>ids.includes(id)).map(([e])=>e);
+  $('epLine').textContent = evs.length ? ('event: '+evs.join(', ')) : 'event: unmapped'; }
+
+async function save(){
+  if(!def) return;
+  let out;
+  if(!dirty && originalRaw!==null){ out=originalRaw; }        // untouched → byte-identical
+  else { try{ RT.parseAnimationDef(toRaw(def)); }catch(e){ $('saveStatus').textContent='REFUSED: '+(e.message||e); $('saveStatus').className='status err'; return; } out=serialize(def); }
+  const filename=def.id.split('.').slice(0).join('.')+'.json'; // e.g. battle.hitFlash.json (id IS the dot-name)
+  try{ const r=await fetch('/api/save-asset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dir:'assets/anim',filename,content:out,encoding:'utf8'})});
+    const j=await r.json().catch(()=>({})); if(r.ok&&j.ok){ $('saveStatus').textContent=`✓ saved ${j.path}${j.overwrote?' (overwrote)':''}`; $('saveStatus').className='status ok'; originalRaw=out; dirty=false; loadList(); }
+    else { $('saveStatus').textContent='save failed: '+(j.error||('HTTP '+r.status)); $('saveStatus').className='status err'; } }
+  catch(e){ $('saveStatus').textContent='save failed: '+(e.message||e); $('saveStatus').className='status err'; }
+}
+$('save').onclick=save;
+
+async function loadList(){
+  try{ const j=await (await fetch('/api/list-dir?dir=assets/anim',{cache:'no-store'})).json();
+    const anims=(j.files||[]).filter(f=>f.endsWith('.json')&&f!=='_eventMap.json');
+    $('animList').innerHTML=anims.map(f=>`<option>${f}</option>`).join('')||'<option>—</option>'; }catch{}
+}
+async function loadSprites(){
+  try{ const j=await (await fetch('/api/list-dir?dir=assets/sprites',{cache:'no-store'})).json();
+    const files=(j.files||[]).filter(f=>f.endsWith('.sprite.json'));
+    await Promise.all(files.map(async f=>{ try{ sprites[f]=await (await fetch('/assets/sprites/'+f)).json(); }catch{} }));
+    const opts='<option value="">— rect —</option>'+files.map(f=>`<option value="${f}">${f.replace('.sprite.json','')}</option>`).join('');
+    $('foeMon').innerHTML=opts; $('plMon').innerHTML=opts;
+  }catch{}
+}
+
+// ── boot ─────────────────────────────────────────────────────────────────────────
+(async function boot(){
+  try { RT = await import('/src/game/anim/timeline.ts'); }
+  catch(e){ $('notice').style.display='block'; return; }
+  EASINGS = RT.EASING_NAMES.slice();
+  $('app').style.display='grid';
+  // save endpoint feature-detect
+  try{ const p=await fetch('/api/save-asset/ping',{cache:'no-store'}); saveOK=p.ok; }catch{ saveOK=false; }
+  $('save').disabled=true;
+  try{ eventMap = await (await fetch('/assets/anim/_eventMap.json',{cache:'no-store'})).json(); }catch{ eventMap={}; }
+  await loadList(); await loadSprites();
+  // open the first shipped anim by default
+  const first=$('animList').value; if(first&&first!=='—') openAnim(first);
+})();
+</script>
+</body>
+</html>
