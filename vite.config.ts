@@ -1,6 +1,6 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
-import { argentStudioSavePlugin } from './tools/argent_studio/dev-save-plugin';
+import { argentStudioSavePlugin } from './tools/dev-save-plugin';
 
 export default defineConfig({
   // Dev-only: lets Argent Studio persist authored tile sheets into assets/tilesets/

@@ -20,20 +20,22 @@ argent_studio is a standalone, zero-dependency HTML/JS pixel workbench served by
 - **Preview** — 3×3 live tiling to catch seams / graph-paper lines.
 - **Workspaces** — 1×1 up to multi-tile (e.g. the 2×3 `tree_big`).
 - **Load IN** — "load .json…" fetches an existing tileset from the dev server (same-origin), so a tile can be pulled in to edit.
-- **Export OUT** — "PNG sheet" / "tileset.json" / "prefab.json" **download to the browser's Downloads folder.**
+- **Export OUT** — "PNG sheet" / "tileset.json" / "prefab.json" download to the browser's Downloads folder, **and (Build A, shipped) also save straight into the repo via the dev endpoint.**
 
-**The sync gap:** there is no save-back path. The current round-trip is:
+**The sync gap (now CLOSED — Build A shipped, see below).** The *old* round-trip was:
 
 ```
 paint in Studio → export to Downloads → manually copy PNG + JSON into
 assets/tilesets/ → CC validates + commits
 ```
 
-The "load .json…" half of the loop works; the "save back" half does not exist.
+The "load .json…" half of the loop works; the "save back" half **now works too — a dev-only save endpoint writes exports straight into the repo (Build A).**
 
 ## The two Phase 7 builds (specs reserved)
 
-### Build A — Asset sync endpoint (the cheap unlock, ~30 min CC)
+### Build A — Asset sync endpoint — ✅ SHIPPED (66cc8bc general endpoint + 298a421 list-dir)
+
+Dev-only Vite middleware (`tools/dev-save-plugin.ts`, `apply:'serve'` → never in a production build). **As built:** `POST /api/save-asset { dir, filename, content, encoding }` — an allowlist of dirs (`assets/{sprites,tilesets,prefabs,anim,palettes}`), writes the file, reports `{ path, overwrote }`; a legacy `{ name, tileset }` branch keeps Argent Studio's tileset+manifest save; `GET /api/save-asset/ping` for feature-detection; and a read-only `GET /api/list-dir?dir=…` (added for Dex Forge). Sprite Studio + Argent Studio have "save to repo" buttons — **export in Studio = file lands in repo**, no manual copy. Original design below (the cheap unlock, ~30 min CC):
 
 Add a dev-only `POST /api/save-asset` handler to the Vite dev config (Node middleware, ~30 LOC). Studio POSTs the exported JSON/PNG; the handler writes it straight into `assets/tilesets/` (or `assets/prefabs/`). Then **export in Studio = file lands in repo**, no manual copy. Dev-server-only, never in a production build. This is the first thing to build when Phase 7 art work begins — it makes every subsequent tile/prefab edit frictionless.
 

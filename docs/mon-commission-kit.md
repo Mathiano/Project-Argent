@@ -1,6 +1,6 @@
 # Mon Commission Kit v1 — outsourcing the dex to Gemini, safely
 
-Companion to `mon-manifest.csv` (200 slots, 105 lines, pre-assigned chapter/habitat/types/archetype/rarity). Gemini fills slots creatively; the pipeline keeps stats, balance, and consistency. The old starter trio (EMBERCUB/SPROUTLE/AQUAFIN) is retired from shipping content and becomes permanent sim fixtures — engine tests never change.
+Companion to `mon-manifest.csv` (345 slots, 169 lines at HEAD — the manifest is the live source of truth for these counts; it grows, so recount there rather than trusting this line), pre-assigned chapter/habitat/types/archetype/rarity. Gemini fills slots creatively; the pipeline keeps stats, balance, and consistency. The old starter trio (EMBERCUB/SPROUTLE/AQUAFIN) is retired from shipping content and becomes permanent sim fixtures — engine tests never change.
 
 > **Sprite production is now a DEFINED method** — see `docs/sprite-pipeline-roles.md` (the four-agent roles + end-to-end workflow) and `docs/gemini-sprite-briefing.md` (the standing governance brief handed to Gemini: aesthetic law + forbidden list, GBC format, archetype→shape language, and the **anti-drift method** — real-animal anchoring + "NOT this" lists — with a worked L001 example). The L001 pilot established that anti-drift method after prose drifted to a bear and a drawn silhouette drifted to a hippo: brief from a real-animal anchor, and Claude Design supplies palette/structure ONLY (never silhouettes — its primitives drift to blobs).
 

@@ -19,7 +19,7 @@ npm run dev        # then open http://localhost:5173/tools/dex_forge/
 **Read-only.** It never writes. It reads the repo through the dev server:
 `/docs/mon-manifest.csv`, the batch JSONs, `/assets/sprites/*`, `/src/game/sprites.ts`,
 and `GET /api/list-dir?dir=assets/sprites` (the read-only listing endpoint in
-`tools/argent_studio/dev-save-plugin.ts`). Opened as a static `file://` it shows a
+`tools/dev-save-plugin.ts`). Opened as a static `file://` it shows a
 "serve via `npm run dev`" notice and does not crash.
 
 ## The grid

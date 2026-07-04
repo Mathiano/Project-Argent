@@ -1,5 +1,7 @@
 # Argent Sprite Pipeline — Roles & Workflow (four agents)
 
+> **SUPERSEDED in part by `docs/DECISION-sprite-canon-112.md` (pipeline v2, 112px native, per-mon palettes) — roles below describe the pre-Studio loop.**
+
 **Purpose:** define exactly who does what in sprite production, so the pipeline is clear and nothing falls between the agents. Derived from the L001 constraint-sheet pilot, which taught us the real boundaries (esp. that Claude Design draws *structure*, not creature silhouettes — those drift; real-animal anchoring in the Gemini brief is the actual drift-fix).
 
 ## The four agents
