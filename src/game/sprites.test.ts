@@ -15,6 +15,8 @@ import marshmash from '../../assets/sprites/MARSHMASH.sprite.json';
 import marshmashBack from '../../assets/sprites/MARSHMASH_BACK.sprite.json';
 import siltskip from '../../assets/sprites/SILTSKIP.sprite.json';
 import siltskipBack from '../../assets/sprites/SILTSKIP_BACK.sprite.json';
+import grithoax from '../../assets/sprites/GRITHOAX.sprite.json';
+import grithoaxBack from '../../assets/sprites/GRITHOAX_BACK.sprite.json';
 
 // Recording ctx: maps every filled pixel → its colour, so we can compare
 // silhouette masks + colour palettes between species.
@@ -212,6 +214,7 @@ describe('commissioned CH1 art — front + back sprites', () => {
     { name: 'GALEHAWK', front: galehawk, back: galehawkBack },
     { name: 'MARSHMASH', front: marshmash, back: marshmashBack },
     { name: 'SILTSKIP', front: siltskip, back: siltskipBack },
+    { name: 'GRITHOAX', front: grithoax, back: grithoaxBack },
   ] as const;
   // The integer in-slot scale for a sprite's own size (112 slot): 112 → 1×, 56 → 2×.
   const slotScaleFor = (size: number) => Math.max(1, Math.floor(112 / size));
@@ -220,7 +223,7 @@ describe('commissioned CH1 art — front + back sprites', () => {
     return (view === 'back' ? e.back : e.front) as unknown as Sprite;
   };
 
-  test('per-sprite pins — all eight validate, are a BLESSED size (56 or 112), and carry a palette', () => {
+  test('per-sprite pins — every commissioned front+back validates, is a BLESSED size (56 or 112), and carries a palette', () => {
     for (const { front, back } of NEW) {
       for (const raw of [front, back]) {
         const s = raw as unknown as Sprite;
@@ -261,7 +264,8 @@ describe('commissioned CH1 art — front + back sprites', () => {
 
   test('bounds harness — every new front + a back satisfies the fillSlot integer-scale / floor bounds', () => {
     const cases: Array<[string, 'front' | 'back']> = [
-      ['FLITPECK', 'front'], ['GALEHAWK', 'front'], ['MARSHMASH', 'front'], ['SILTSKIP', 'front'], ['FLITPECK', 'back'],
+      ['FLITPECK', 'front'], ['GALEHAWK', 'front'], ['MARSHMASH', 'front'], ['SILTSKIP', 'front'], ['GRITHOAX', 'front'],
+      ['FLITPECK', 'back'], ['GRITHOAX', 'back'],
     ];
     for (const [name, view] of cases) {
       const rects = renderInSlot(name, view);

@@ -12,6 +12,8 @@ import marshmashData from '../../assets/sprites/MARSHMASH.sprite.json';
 import marshmashBackData from '../../assets/sprites/MARSHMASH_BACK.sprite.json';
 import siltskipData from '../../assets/sprites/SILTSKIP.sprite.json';
 import siltskipBackData from '../../assets/sprites/SILTSKIP_BACK.sprite.json';
+import grithoaxData from '../../assets/sprites/GRITHOAX.sprite.json';
+import grithoaxBackData from '../../assets/sprites/GRITHOAX_BACK.sprite.json';
 import ch1BatchData from '../../docs/ch1-batch.json';
 import type { ElementType } from '../engine';
 import type { Facing, Sprite } from './sprite';
@@ -31,6 +33,10 @@ const MARSHMASH_56: Sprite = marshmashData as Sprite;
 const MARSHMASH_BACK_56: Sprite = marshmashBackData as Sprite;
 const SILTSKIP_56: Sprite = siltskipData as Sprite;
 const SILTSKIP_BACK_56: Sprite = siltskipBackData as Sprite;
+// GRITHOAX (L023, CH1 TERRA Trickster) — 112px native front+back. `_56` suffix kept
+// for block uniformity; the whole cohort renames suffix-free in a later sweep.
+const GRITHOAX_56: Sprite = grithoaxData as Sprite;
+const GRITHOAX_BACK_56: Sprite = grithoaxBackData as Sprite;
 
 const SPROUTLE_14: Sprite = {
   name: 'SPROUTLE',
@@ -103,6 +109,7 @@ const FUZZLET_14: Sprite = {
   EMBERCUB_56, GRUBLEAF_56, KINDRAKE_56, SPROUTLE_14, AQUAFIN_14, FUZZLET_14,
   FLITPECK_56, FLITPECK_BACK_56, GALEHAWK_56, GALEHAWK_BACK_56,
   MARSHMASH_56, MARSHMASH_BACK_56, SILTSKIP_56, SILTSKIP_BACK_56,
+  GRITHOAX_56, GRITHOAX_BACK_56,
 ].forEach(validateSprite);
 
 const REGISTRY: { readonly [name: string]: Sprite } = {
@@ -116,6 +123,7 @@ const REGISTRY: { readonly [name: string]: Sprite } = {
   GALEHAWK: GALEHAWK_56,
   MARSHMASH: MARSHMASH_56,
   SILTSKIP: SILTSKIP_56,
+  GRITHOAX: GRITHOAX_56,
 };
 
 // Back-view sprites, keyed by species name. A species with no back entry falls
@@ -125,6 +133,7 @@ const BACK_REGISTRY: { readonly [name: string]: Sprite } = {
   GALEHAWK: GALEHAWK_BACK_56,
   MARSHMASH: MARSHMASH_BACK_56,
   SILTSKIP: SILTSKIP_BACK_56,
+  GRITHOAX: GRITHOAX_BACK_56,
 };
 
 export function getSprite(name: string): Sprite | null {
