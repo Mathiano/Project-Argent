@@ -141,10 +141,10 @@
     <div class="panel">
       <h2>3 · Target ramp</h2>
       <div class="row">
-        <label class="tog"><input type="radio" name="pmode" value="master" checked> master / custom</label>
+        <label class="tog"><input type="radio" name="pmode" value="master"> master / custom</label>
       </div>
       <div class="row">
-        <label class="tog"><input type="radio" name="pmode" value="extract"> extract from source</label>
+        <label class="tog"><input type="radio" name="pmode" value="extract" checked> extract from source</label>
         <button id="doExtract" disabled>extract</button>
       </div>
       <div class="row"><label>colours</label><input type="range" id="nc" min="4" max="16" value="8" disabled><span class="val" id="ncV">8</span></div>
@@ -204,7 +204,7 @@ const S = {
   map:[],                          // srcIndex → ramp char | '#T' (transparent) | '#K' (outline)
   ramp:{...MASTER_PAL},            // target palette {char:hex}
   outlineChar:'k',
-  mode:'master',                   // 'master' | 'extract' | 'raw' (palette mode)
+  mode:'extract',                   // 'master' | 'extract' | 'raw' (palette mode)
   ncolors:8,                       // extract-mode colour count (4–16), pre-merge target
   sampling:'area',                 // 'area' (v1 pool) | 'grid' (grid-snap sampling)
   cell:8,                          // grid-snap source cell size (detected or manual)
