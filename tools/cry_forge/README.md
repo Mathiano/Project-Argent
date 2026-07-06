@@ -38,6 +38,14 @@ randomness). Directional intent (constants live at the top of the tool, tune fre
 - **mass** = `hp + dfn` → base frequency, inverse (heavier mon = lower voice). For
   manifest-only mons with no stats, mass is **stage-derived** (later evolution stage =
   heavier) and speed defaults neutral — the UI flags this.
+
+> **Fallback model (statless mons):** stats live only in the batch JSONs
+> (`docs/ch1-batch.json`) — the 345-row manifest carries no `hp/dfn/spd`. So the seed
+> is **fully data-driven only for batch mons (★)**; for every other manifest mon,
+> `type1 → timbre` and `archetype → envelope` still apply, but `mass` is derived from
+> evolution stage and `spd` is a neutral constant. The generated cry is a deliberately
+> coarser starting point there — the feel-gate + manual sculpt close the gap, and a
+> real cry only ships once that mon's stats are authored and it's re-seeded.
 - **element (type1)** → timbre recipe, one per the 17 canonical types
   (`BASIC/FLAME/AQUA/NATURE/SPARK/FROST/BRAWN/VENOM/TERRA/GALE/PSI/INSECT/STONE/SPIRIT/
   DRAKE/UMBRA/FORGE`, verified against `typechart.json`): waveform + an optional harmony
