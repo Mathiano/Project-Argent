@@ -35,6 +35,7 @@ export const SAVE_ALLOWLIST_DIRS: ReadonlySet<string> = new Set([
   'assets/prefabs',
   'assets/anim',
   'assets/palettes',
+  'assets/cries', // Cry Forge — procedural mon vocalizations (Patch JSON)
 ]);
 const FILENAME_RE = /^[A-Za-z0-9._-]+$/; // single path component — no separators, no absolute paths
 

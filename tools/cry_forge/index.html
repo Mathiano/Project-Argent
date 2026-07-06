@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cry Forge</title>
+<style>
+  :root{ --bg:#14121a; --panel:#1c1a24; --line:#332f3f; --ink:#ece7f3; --dim:#948da6; --accent:#c79bff;
+         --gold:#f6c92e; --green:#6fbf73; --red:#e6705f; --bar:#7a5aa8; --barsel:#c79bff; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font:13px/1.45 ui-monospace,Menlo,Consolas,monospace; }
+  header{ padding:9px 14px; border-bottom:1px solid #000; display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; }
+  header b{ color:var(--accent); } .sub{ color:var(--dim); }
+  #notice{ display:none; margin:12px 14px; padding:12px 14px; border:1px solid var(--gold); border-radius:6px; background:#2a2413; color:#f0dca0; }
+  main{ display:grid; grid-template-columns:270px 1fr; gap:0; }
+  .col{ padding:10px 12px; } .col.left{ border-right:1px solid var(--line); min-height:calc(100vh - 40px); }
+  h2{ font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; margin:14px 0 6px; } h2:first-child{ margin-top:0; }
+  select,button,input,textarea{ background:#241f30; color:var(--ink); border:1px solid var(--line); border-radius:5px; padding:4px 7px; font:inherit; }
+  button{ cursor:pointer; } button:disabled{ opacity:.45; cursor:default; }
+  button.accent{ border-color:var(--accent); color:var(--accent); }
+  button.big{ font-size:15px; padding:8px 18px; }
+  .row{ display:flex; gap:6px; align-items:center; margin:5px 0; flex-wrap:wrap; }
+  .row label{ color:var(--dim); min-width:56px; }
+  input[type=number]{ width:70px; } input[type=range]{ flex:1; accent-color:var(--accent); }
+  .num{ color:var(--accent); min-width:42px; text-align:right; font-size:11px; }
+  #monList{ width:100%; }
+  .voice{ border:1px solid var(--line); border-radius:6px; padding:7px; margin:6px 0; background:#181620; }
+  .voice h4{ margin:0 0 5px; font-size:11px; color:var(--dim); display:flex; justify-content:space-between; }
+  .voice .g{ display:grid; grid-template-columns:1fr 1fr; gap:3px 8px; }
+  .vf{ display:flex; align-items:center; gap:4px; } .vf label{ color:var(--dim); font-size:10px; min-width:34px; }
+  .vf input{ width:100%; } .vf input[type=number]{ width:56px; }
+  .status{ margin-top:6px; white-space:pre-wrap; font-size:12px; } .status.err{ color:var(--red); } .status.ok{ color:var(--green); }
+  .pill{ background:#241f30; border:1px solid var(--line); border-radius:10px; padding:1px 8px; font-size:11px; }
+  .muted{ color:var(--dim); } .tag{ display:inline-block; padding:0 5px; border-radius:3px; background:#2c2438; color:#dcc; font-size:11px; margin-right:2px; }
+  a{ color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <b>CRY FORGE</b> <span class="sub">v1</span>
+  <span class="sub">procedural mon vocalizations — synthesized, never recorded · seeds from mon data, you sculpt + feel-gate</span>
+</header>
+
+<div id="notice">
+  <b>Serve via <code>npm run dev</code>.</b> Cry Forge reads the mon roster (<code>/docs/mon-manifest.csv</code>,
+  <code>/docs/ch1-batch.json</code>), auditions through the <b>real</b> synth
+  (<code>/src/game/sfx/synth.ts</code>, imported as a module — zero playback drift), and saves to
+  <code>assets/cries/</code> via the dev endpoint. Opened as a static file, mon data + audition are
+  unavailable; the editor still works in free mode and <b>save falls back to a file download</b>.
+</div>
+
+<main>
+  <div class="col left">
+    <h2>Mon</h2>
+    <div class="row"><select id="monList"><option value="">— free mode (blank patch) —</option></select></div>
+    <div id="monInfo" class="muted" style="font-size:11px;min-height:16px"></div>
+    <div class="row"><button id="seedBtn" class="accent">⟳ seed cry from mon data</button></div>
+    <div class="muted" style="font-size:11px" id="seedNote"></div>
+
+    <h2>Audition</h2>
+    <div class="row"><button id="play" class="big accent">▶ play</button><button id="abHold">A/B: hold</button><button id="abPlay" disabled>play A</button></div>
+    <div class="row"><label class="tog"><input type="checkbox" id="replay" checked> replay on change</label></div>
+    <div id="audioStatus" class="muted" style="font-size:11px"></div>
+
+    <h2>Save / Load</h2>
+    <div class="row"><label>name</label><input type="text" id="cryName" placeholder="MONNAME" style="flex:1;width:auto"></div>
+    <div class="row"><button id="save" class="accent">💾 save → assets/cries/</button></div>
+    <div class="row"><label>load</label><select id="cryList" style="flex:1"><option value="">—</option></select><button id="loadCry">open</button></div>
+    <div class="status" id="saveStatus"></div>
+  </div>
+
+  <div class="col">
+    <div class="row">
+      <h2 style="margin:0">Patch</h2>
+      <span class="pill">gain <b id="gainNum">0.60</b></span>
+      <input type="range" id="gain" min="0" max="1" step="0.01" value="0.6" style="max-width:200px">
+      <span style="margin-left:auto"><button id="addVoice">+ voice</button></span>
+    </div>
+    <div class="muted" style="font-size:11px">A cry is a cry, not a song: freq 40–4000 Hz · times 0–2 s · dur ≤ 1.5 s · ≤ 6 voices. Values clamp on input.</div>
+    <div id="voices"></div>
+    <div class="status" id="patchStatus"></div>
+    <details style="margin-top:10px"><summary class="muted">patch JSON (read-only preview)</summary><pre id="jsonPreview" style="font-size:11px;overflow-x:auto;color:var(--dim)"></pre></details>
+  </div>
+</main>
+
+<script>
+// ── Cry Forge — procedural mon-cry workbench. Reads the mon roster + the SHIPPED
+// synth (synth.ts, dev-served as a module → zero audition/runtime drift) and saves
+// the Patch schema (patches.ts) verbatim to assets/cries/<NAME>.cry.json. No recorded
+// audio, ever. The generator is a TOOL-SIDE starting point; the shipped artifact is
+// the feel-gated JSON. Vanilla single-file, no deps, no localStorage.
+const $ = id => document.getElementById(id);
+const WAVES = ['sine','triangle','square','sawtooth'];
+// Clamp ranges (a cry, not a song).
+const CL = { freq:[40,4000], time:[0,2], dur:[0,1.5], sustain:[0,1], peak:[0,1], gain:[0,1], delay:[0,2] };
+const clamp=(v,[lo,hi])=>Math.max(lo,Math.min(hi,v));
+
+let Engine=null, engine=null;   // the real AudioEngine (dynamic-imported)
+let manifest=[], batch=new Map();
+let patch=null, abPatch=null, saveOK=false;
+
+// ── The 17 canonical types → timbre recipes (verified vs typechart.json at HEAD).
+// Each: primary wave, optional harmony {wave, interval-ratio}, and a sweep bias
+// (>1 rises, <1 falls, 1 flat) that the base freq glides toward over the cry.
+const TYPE_RECIPE = {
+  BASIC:  { wave:'triangle', sweep:1.0 },
+  FLAME:  { wave:'sawtooth', harm:{ wave:'square', ratio:1.5 }, sweep:0.9 },   // crackle
+  AQUA:   { wave:'sine',     sweep:1.12, wobble:true },                        // wet wobble
+  NATURE: { wave:'triangle', harm:{ wave:'triangle', ratio:2.0 }, sweep:1.25 },// chirp up
+  SPARK:  { wave:'square',   sweep:1.3 },                                      // zap
+  FROST:  { wave:'sine',     harm:{ wave:'triangle', ratio:2.02 }, sweep:1.05 },// glassy
+  BRAWN:  { wave:'square',   sweep:0.85 },                                     // grunt
+  VENOM:  { wave:'sawtooth', sweep:0.95, wobble:true },                        // buzzy hiss
+  TERRA:  { wave:'triangle', harm:{ wave:'square', ratio:0.5 }, sweep:0.8 },   // low rumble
+  GALE:   { wave:'sine',     sweep:1.4 },                                      // whoosh up
+  PSI:    { wave:'sine',     harm:{ wave:'sine', ratio:1.5 }, sweep:1.1 },     // eerie fifth
+  INSECT: { wave:'sawtooth', harm:{ wave:'sawtooth', ratio:1.01 }, sweep:1.0, wobble:true }, // buzz
+  STONE:  { wave:'square',   sweep:0.82 },                                     // thud
+  SPIRIT: { wave:'sine',     harm:{ wave:'triangle', ratio:1.005 }, sweep:1.15 }, // wail/detune
+  DRAKE:  { wave:'sawtooth', harm:{ wave:'square', ratio:0.5 }, sweep:0.88 },  // roar
+  UMBRA:  { wave:'triangle', sweep:0.9 },                                      // murmur
+  FORGE:  { wave:'square',   harm:{ wave:'sawtooth', ratio:2.0 }, sweep:1.0 }, // metallic
+};
+// The 8 archetypes → envelope shape (attack/decay/sustain/release scalars + a
+// duration multiplier). Wall groans, Glass nuke punches, Trickster darts.
+const ARCH_ENV = {
+  'Wall':        { atk:0.06,  dec:0.22, sus:0.35, rel:0.14, durMul:1.25 },
+  'Counter-tank':{ atk:0.03,  dec:0.16, sus:0.30, rel:0.10, durMul:1.1 },
+  'Brawler':     { atk:0.006, dec:0.12, sus:0.10, rel:0.06, durMul:0.95 },
+  'Glass nuke':  { atk:0.003, dec:0.08, sus:0.0,  rel:0.04, durMul:0.7 },
+  'Dodger':      { atk:0.004, dec:0.05, sus:0.0,  rel:0.03, durMul:0.6 },
+  'Pacer':       { atk:0.02,  dec:0.14, sus:0.25, rel:0.09, durMul:1.0 },
+  'Drainer':     { atk:0.04,  dec:0.2,  sus:0.4,  rel:0.16, durMul:1.15 },
+  'Trickster':   { atk:0.004, dec:0.06, sus:0.05, rel:0.04, durMul:0.75, doubleTap:true },
+};
+const round=(n,p=3)=>Number(n.toFixed(p));
+
+// DETERMINISTIC seed: pure function of (type1, archetype, mass, spd). Same mon in →
+// same patch out, always (no randomness). mass = hp+dfn (heavier = lower); spd →
+// gesture duration (faster = shorter). Manifest-only mons (no stats) fall back to a
+// stage-derived mass + a neutral speed (documented in the UI).
+function seedPatch(mon){
+  const type = (mon.type1 || 'BASIC').toUpperCase();
+  const recipe = TYPE_RECIPE[type] || TYPE_RECIPE.BASIC;
+  const env = ARCH_ENV[mon.archetype] || ARCH_ENV['Pacer'];
+  const mass = mon.mass;                       // hp+dfn, or stage-fallback
+  const spd = mon.spd;                         // 40..120-ish, or fallback 70
+  // mass 90..200 → base freq 420..150 (inverse, heavier = lower). clamp.
+  const base = clamp(420 - (mass - 90) * (270 / 110), [110, 520]);
+  // spd 50..110 → dur 0.5..0.18 (faster = shorter), then archetype durMul.
+  const dur = clamp((0.5 - (spd - 50) * (0.32 / 60)) * env.durMul, CL.dur);
+  const freqTo = clamp(base * recipe.sweep, CL.freq);
+  const mk = (freq, to, wave, peak, extra={}) => ({
+    wave, freq:round(freq,1), ...(Math.abs(to-freq)>1?{ freqTo:round(to,1), curve:'exp' }:{}),
+    attack:round(env.atk), decay:round(env.dec), sustain:round(env.sus), release:round(env.rel),
+    peak:round(peak,2), dur:round(dur), ...extra,
+  });
+  const voices = [ mk(base, freqTo, recipe.wave, 0.75) ];
+  if (recipe.harm) voices.push(mk(base*recipe.harm.ratio, freqTo*recipe.harm.ratio, recipe.harm.wave, 0.4));
+  if (recipe.wobble) voices.push(mk(base*0.995, base*1.02, recipe.wave, 0.3, { curve:'lin' })); // detune wobble
+  if (env.doubleTap) voices.push(mk(base*1.15, freqTo*1.15, recipe.wave, 0.55, { delay:round(dur*0.6) })); // the trickster's second dart
+  const seed = { type, archetype:mon.archetype, mass, spd, hasStats:mon.hasStats };
+  return { gain:0.6, voices, seed };
+}
+
+// ── validation against the Patch shape (shape-check before save) ────────────────
+function validatePatch(p){
+  if(!p || typeof p.gain!=='number') return 'gain must be a number';
+  if(!Array.isArray(p.voices) || p.voices.length===0) return 'voices must be a non-empty array';
+  if(p.voices.length>6) return 'a cry is ≤ 6 voices';
+  for(let i=0;i<p.voices.length;i++){ const v=p.voices[i];
+    if(!WAVES.includes(v.wave)) return `voice ${i}: wave "${v.wave}" not in ${WAVES.join('|')}`;
+    for(const f of ['freq','attack','decay','sustain','release','peak','dur']) if(typeof v[f]!=='number'||!isFinite(v[f])) return `voice ${i}: ${f} must be a finite number`;
+    if(v.freqTo!==undefined && (typeof v.freqTo!=='number'||!isFinite(v.freqTo))) return `voice ${i}: freqTo must be a number`;
+    if(v.curve!==undefined && v.curve!=='lin' && v.curve!=='exp') return `voice ${i}: curve must be lin|exp`;
+    if(v.freq<CL.freq[0]||v.freq>CL.freq[1]) return `voice ${i}: freq ${v.freq} out of ${CL.freq.join('–')} Hz`;
+    if(v.dur>CL.dur[1]) return `voice ${i}: dur ${v.dur} > ${CL.dur[1]}s (a cry, not a song)`;
+  }
+  return null;
+}
+// Strip tool-only fields (seed metadata is OPTIONAL + game-ignored, kept in the file).
+function patchOut(p){
+  const voices = p.voices.map(v=>{ const o={ wave:v.wave, freq:v.freq }; if(v.freqTo!==undefined)o.freqTo=v.freqTo; if(v.curve!==undefined)o.curve=v.curve; if(v.delay!==undefined)o.delay=v.delay;
+    o.attack=v.attack; o.decay=v.decay; o.sustain=v.sustain; o.release=v.release; o.peak=v.peak; o.dur=v.dur; return o; });
+  const out={ gain:p.gain, voices }; if(p.seed) out.seed=p.seed; return out;
+}
+
+// ── audition (the REAL AudioEngine) ─────────────────────────────────────────────
+function playPatch(p){
+  if(!engine){ $('audioStatus').textContent='audition needs the dev server (real synth) — serve via npm run dev'; return; }
+  const err=validatePatch(p); if(err){ $('audioStatus').textContent='cannot play: '+err; return; }
+  engine.play(patchOut(p)); $('audioStatus').textContent='♪ '+p.voices.length+' voice'+(p.voices.length>1?'s':'');
+}
+$('play').onclick=()=>{ if(patch) playPatch(patch); };
+$('abHold').onclick=()=>{ if(patch){ abPatch=JSON.parse(JSON.stringify(patch)); $('abPlay').disabled=false; $('audioStatus').textContent='held current as A'; } };
+$('abPlay').onclick=()=>{ if(abPatch) playPatch(abPatch); };
+function autoReplay(){ if($('replay').checked && patch) playPatch(patch); }
+
+// ── editor render ────────────────────────────────────────────────────────────────
+function renderVoices(){
+  const el=$('voices'); el.innerHTML='';
+  patch.voices.forEach((v,i)=>{
+    const d=document.createElement('div'); d.className='voice';
+    const waveOpts=WAVES.map(w=>`<option${w===v.wave?' selected':''}>${w}</option>`).join('');
+    const curveOpts=['(none)','lin','exp'].map(c=>{ const val=c==='(none)'?'':c; return `<option value="${val}"${(v.curve||'')===val?' selected':''}>${c}</option>`; }).join('');
+    d.innerHTML=`<h4><span>voice ${i} · <select data-i="${i}" data-k="wave">${waveOpts}</select></span>
+      <span><button data-dup="${i}" title="duplicate">⧉</button> <button data-del="${i}" title="delete">✕</button></span></h4>
+      <div class="g">
+        ${numF(i,'freq',v.freq,'Hz')} ${numF(i,'freqTo',v.freqTo??'','Hz')}
+        <div class="vf"><label>curve</label><select data-i="${i}" data-k="curve">${curveOpts}</select></div>
+        ${numF(i,'delay',v.delay??'','s')}
+        ${numF(i,'attack',v.attack,'s')} ${numF(i,'decay',v.decay,'s')}
+        ${numF(i,'sustain',v.sustain,'')} ${numF(i,'release',v.release,'s')}
+        ${numF(i,'peak',v.peak,'')} ${numF(i,'dur',v.dur,'s')}
+      </div>`;
+    el.appendChild(d);
+  });
+  // wire
+  el.querySelectorAll('select[data-k]').forEach(s=>s.onchange=()=>{ const i=+s.dataset.i,k=s.dataset.k; if(k==='curve'){ if(s.value) patch.voices[i].curve=s.value; else delete patch.voices[i].curve; } else patch.voices[i][k]=s.value; commit(); });
+  el.querySelectorAll('input[data-k]').forEach(n=>n.oninput=()=>{ const i=+n.dataset.i,k=n.dataset.k; const raw=n.value.trim();
+    if(raw===''&&(k==='freqTo'||k==='delay')){ delete patch.voices[i][k]; commit(); return; }
+    let val=Number(raw); if(!isFinite(val)) return;
+    const rng = k==='freq'||k==='freqTo'?CL.freq : k==='dur'?CL.dur : k==='sustain'?CL.sustain : k==='peak'?CL.peak : k==='delay'?CL.delay : CL.time;
+    val=clamp(val,rng); patch.voices[i][k]=val; if(String(val)!==raw && document.activeElement!==n) n.value=val; commit(); });
+  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ if(patch.voices.length>1){ patch.voices.splice(+b.dataset.del,1); render(); autoReplay(); } });
+  el.querySelectorAll('[data-dup]').forEach(b=>b.onclick=()=>{ if(patch.voices.length<6){ patch.voices.splice(+b.dataset.dup+1,0,JSON.parse(JSON.stringify(patch.voices[+b.dataset.dup]))); render(); autoReplay(); } });
+}
+function numF(i,k,val,unit){ return `<div class="vf"><label>${k}</label><input type="number" step="any" data-i="${i}" data-k="${k}" value="${val}"><span class="num">${unit}</span></div>`; }
+function render(){
+  $('gainNum').textContent=patch.gain.toFixed(2); $('gain').value=patch.gain;
+  renderVoices();
+  const err=validatePatch(patch);
+  $('patchStatus').textContent = err ? '✗ '+err : '✓ valid patch';
+  $('patchStatus').className = 'status'+(err?' err':' ok');
+  $('jsonPreview').textContent = JSON.stringify(patchOut(patch),null,1);
+  $('save').disabled = !(saveOK && !err) && saveOK; // stays clickable for download fallback; validity checked on save
+}
+function commit(){ render(); if($('replay').checked) autoReplay(); }
+$('gain').oninput=e=>{ patch.gain=clamp(Number(e.target.value),CL.gain); render(); autoReplay(); };
+$('addVoice').onclick=()=>{ if(patch.voices.length<6){ patch.voices.push({ wave:'sine', freq:440, attack:0.01, decay:0.1, sustain:0.2, release:0.06, peak:0.6, dur:0.2 }); render(); } };
+
+// ── mon picker + seed ────────────────────────────────────────────────────────────
+function monData(name){
+  const row=manifest.find(m=>m.name===name); if(!row) return null;
+  const b=batch.get(name);
+  const hasStats=!!b;
+  // mass = hp+dfn when known; else stage-derived (later stage = heavier). spd known or neutral 70.
+  const stageFrac = row.stages_total>1 ? (Number(row.stage)-1)/(Number(row.stages_total)-1) : 0.5;
+  const mass = hasStats ? (b.stats.hp+b.stats.dfn) : Math.round(100 + stageFrac*80);
+  const spd  = hasStats ? b.stats.spd : 70;
+  return { name, type1:row.type1, type2:row.type2, archetype:row.archetype, mass, spd, hasStats };
+}
+$('monList').onchange=()=>{ const name=$('monList').value; const info=$('monInfo');
+  if(!name){ info.textContent='free mode — a blank patch to sculpt from scratch.'; $('seedNote').textContent=''; return; }
+  const m=monData(name);
+  info.innerHTML=`<b>${name}</b> · ${[m.type1,m.type2].filter(Boolean).map(t=>`<span class="tag">${t}</span>`).join('')} · ${m.archetype}`;
+  $('seedNote').textContent = m.hasStats ? `mass ${m.mass} (hp+dfn) · spd ${m.spd}` : `no stats in a batch → mass ${m.mass} (stage-derived), spd ${m.spd} (neutral)`;
+  $('cryName').value=name;
+};
+$('seedBtn').onclick=()=>{ const name=$('monList').value;
+  if(!name){ patch={ gain:0.6, voices:[{ wave:'sine', freq:440, attack:0.01, decay:0.1, sustain:0.2, release:0.06, peak:0.6, dur:0.2 }] }; render(); autoReplay(); return; }
+  patch=seedPatch(monData(name)); render(); autoReplay();
+};
+
+// ── save / load ────────────────────────────────────────────────────────────────
+function download(name,text){ const b=new Blob([text],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+async function save(){
+  const err=validatePatch(patch); if(err){ $('saveStatus').textContent='SAVE REFUSED: '+err; $('saveStatus').className='status err'; return; }
+  const name=($('cryName').value||'NEWMON').trim().toUpperCase().replace(/[^A-Z0-9_]/g,'')||'NEWMON';
+  const filename=name+'.cry.json'; const content=JSON.stringify(patchOut(patch),null,1);
+  if(!saveOK){ download(filename,content); $('saveStatus').textContent=`⬇ downloaded ${filename} (no dev server — move it into assets/cries/)`; $('saveStatus').className='status ok'; return; }
+  try{ const r=await fetch('/api/save-asset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dir:'assets/cries',filename,content,encoding:'utf8'})});
+    const j=await r.json().catch(()=>({})); if(r.ok&&j.ok){ $('saveStatus').textContent=`✓ saved ${j.path}${j.overwrote?' (overwrote)':''}`; $('saveStatus').className='status ok'; loadCryList(); }
+    else { $('saveStatus').textContent='save failed: '+(j.error||('HTTP '+r.status)); $('saveStatus').className='status err'; } }
+  catch(e){ $('saveStatus').textContent='save failed: '+(e.message||e); $('saveStatus').className='status err'; }
+}
+$('save').onclick=save;
+async function loadCryList(){ try{ const j=await (await fetch('/api/list-dir?dir=assets/cries',{cache:'no-store'})).json();
+  const cries=(j.files||[]).filter(f=>f.endsWith('.cry.json')); $('cryList').innerHTML='<option value="">—</option>'+cries.map(f=>`<option>${f}</option>`).join(''); }catch{} }
+$('loadCry').onclick=async ()=>{ const f=$('cryList').value; if(!f) return;
+  try{ const p=await (await fetch('/assets/cries/'+f,{cache:'no-store'})).json(); const err=validatePatch(p); if(err){ $('saveStatus').textContent='loaded file is not a valid Patch: '+err; $('saveStatus').className='status err'; return; }
+    patch=p; $('cryName').value=f.replace('.cry.json',''); render(); $('saveStatus').textContent='opened '+f; $('saveStatus').className='status ok'; }
+  catch(e){ $('saveStatus').textContent='open failed: '+(e.message||e); $('saveStatus').className='status err'; } };
+
+// ── data loaders ───────────────────────────────────────────────────────────────
+function parseCSV(text){ const rows=[]; let row=[],f='',q=false;
+  for(let i=0;i<text.length;i++){ const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){f+='"';i++;} else q=false; } else f+=c; }
+    else { if(c==='"') q=true; else if(c===','){ row.push(f); f=''; } else if(c==='\n'){ row.push(f); f=''; if(row.length>1||row[0]!=='') rows.push(row); row=[]; } else if(c==='\r'){} else f+=c; } }
+  if(f!==''||row.length){ row.push(f); if(row.length>1||row[0]!=='') rows.push(row); } return rows; }
+
+(async function boot(){
+  // real synth (module import) — the audition path. Failure (static open) → notice.
+  try{ const mod=await import('/src/game/sfx/synth.ts'); Engine=mod.AudioEngine; engine=new Engine(0.5); }
+  catch(e){ engine=null; }
+  // roster
+  let ok=false;
+  try{ const csv=await (await fetch('/docs/mon-manifest.csv',{cache:'no-store'})).text(); const rows=parseCSV(csv); const head=rows[0].map(h=>h.trim());
+    manifest=rows.slice(1).map(r=>{ const o={}; head.forEach((h,i)=>o[h]=(r[i]??'').trim()); return o; }); ok=true; }catch(e){ manifest=[]; }
+  try{ for(const m of await (await fetch('/docs/ch1-batch.json',{cache:'no-store'})).json()) batch.set(m.name,m); }catch{}
+  if(!ok && !engine){ $('notice').style.display='block'; }
+  else if(!ok){ $('notice').style.display='block'; }
+  // populate mon list (batch mons first — they have stats — then the rest)
+  const withStats=manifest.filter(m=>batch.has(m.name)), rest=manifest.filter(m=>!batch.has(m.name) && m.name);
+  const opt=m=>`<option value="${m.name}">${m.name} · ${m.type1}${m.type2?'/'+m.type2:''} · ${m.archetype}${batch.has(m.name)?' ★':''}</option>`;
+  $('monList').innerHTML='<option value="">— free mode (blank patch) —</option>'
+    + (withStats.length?`<optgroup label="★ has stats (batch)">${withStats.map(opt).join('')}</optgroup>`:'')
+    + (rest.length?`<optgroup label="manifest (stage-derived mass)">${rest.map(opt).join('')}</optgroup>`:'');
+  // save endpoint feature-detect
+  try{ const p=await fetch('/api/save-asset/ping',{cache:'no-store'}); saveOK=p.ok; }catch{ saveOK=false; }
+  await loadCryList();
+  if(!engine) $('audioStatus').textContent='audition unavailable (static open) — serve via npm run dev';
+  if(!saveOK) $('save').textContent='⬇ download .cry.json';
+  // start in free mode
+  patch={ gain:0.6, voices:[{ wave:'sine', freq:440, attack:0.01, decay:0.1, sustain:0.2, release:0.06, peak:0.6, dur:0.2 }] };
+  $('monInfo').textContent='free mode — a blank patch to sculpt from scratch.';
+  render();
+})();
+</script>
+</body>
+</html>

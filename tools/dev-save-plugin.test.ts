@@ -39,6 +39,19 @@ describe('validateSaveRequest — accepts a well-formed request', () => {
       expect(validateSaveRequest(good({ dir }), ROOT).ok).toBe(true);
     }
   });
+
+  test('assets/cries (Cry Forge) is allowlisted; a <NAME>.cry.json save is accepted', () => {
+    expect(SAVE_ALLOWLIST_DIRS.has('assets/cries')).toBe(true);
+    const v = validateSaveRequest(good({ dir: 'assets/cries', filename: 'GRITHOAX.cry.json', content: '{"gain":0.6,"voices":[]}' }), ROOT);
+    expect(v.ok).toBe(true);
+    if (v.ok) expect(v.rel).toBe('assets/cries/GRITHOAX.cry.json'); // .cry.json ends in .json → passes the ext gate
+  });
+
+  test('assets/cries still rejects traversal + a bad filename (allowlisting one dir did not weaken the guards)', () => {
+    expect(validateSaveRequest(good({ dir: 'assets/cries/../../etc', filename: 'x.cry.json' }), ROOT).ok).toBe(false);
+    expect(validateSaveRequest(good({ dir: 'assets/cries', filename: '../ESCAPE.cry.json' }), ROOT).ok).toBe(false);
+    expect(validateSaveRequest(good({ dir: 'assets/cries', filename: 'evil.exe' }), ROOT).ok).toBe(false);
+  });
 });
 
 describe('validateSaveRequest — rejections (each a distinct 4xx)', () => {
