@@ -15,6 +15,12 @@ export interface TileDef {
   // `color`; `color` stays as the fallback (no DOM / unregistered → flat fill,
   // never a broken tile). Tiled will lean on this same bridge.
   readonly tileRef?: { readonly tileset: string; readonly tile: string };
+  // Prop layering for a transparent-backed `tileRef` (furniture over a floor):
+  // the sibling char of THIS tileset to draw first beneath the cell. The
+  // renderer draws that def (its own tileRef or flat colour), then this one.
+  // One level only — an `under` on the under-def is ignored. Omitted → the
+  // cell draws alone, exactly as before.
+  readonly under?: string;
 }
 
 export interface Spawn {

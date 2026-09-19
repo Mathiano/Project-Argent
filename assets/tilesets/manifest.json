@@ -118,6 +118,13 @@
    "tilesize": 16,
    "count": 12,
    "description": "decoration props (signs, small objects)"
+  },
+  {
+   "name": "interior_props",
+   "file": "assets/tilesets/interior_props.tileset.json",
+   "tilesize": 16,
+   "count": 32,
+   "description": "placeholder interior set — walls/floors/doors + furniture for the graybox interiors"
   }
  ]
 }

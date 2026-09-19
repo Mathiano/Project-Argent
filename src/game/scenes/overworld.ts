@@ -4,7 +4,7 @@ import { getMap } from '../overworld/maps';
 import { emitGameEvent } from '../gameEvents';
 import type { Tile, Tileset } from '../overworld/tileset';
 import { getTileset, hasTileset } from '../overworld/tilesetCatalog';
-import type { Facing, MapData, MapObject, PlacedProp, ScriptCommand } from '../overworld/types';
+import type { Facing, MapData, MapObject, PlacedProp, ScriptCommand, TileDef } from '../overworld/types';
 import { findObjectAt, isWalkable } from '../overworld/types';
 import { ySortOrder } from '../overworld/ysort';
 import { PALETTE } from '../palette';
@@ -203,7 +203,17 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
   // arrives). Persists for the scene's life so the trainer renders at the spot
   // it confronted the player from — through the dialogue, battle, and relent —
   // instead of snapping back to its map spawn tile.
-  let confront: { npc: NpcObj; x: number; y: number } | null = null;
+  let confront: { npc: NpcObj; x: number; y: number; facing: Facing } | null = null;
+
+  // The way a walking-up NPC faces: its direction of travel, else its authored
+  // facing (the sight line), else toward the camera.
+  function approachFacing(a: { npc: NpcObj; px: number; py: number; x: number; y: number }): Facing {
+    if (a.x > a.px) return 'right';
+    if (a.x < a.px) return 'left';
+    if (a.y > a.py) return 'down';
+    if (a.y < a.py) return 'up';
+    return a.npc.facing ?? 'down';
+  }
 
   // Begin a trainer's walk-up cutscene: the NPC paces from its tile to
   // (stopX, stopY) (adjacent to the player), then fires its interact. Used by
@@ -275,7 +285,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
       // Persist the WALKED-UP position so the trainer STAYS there through the
       // dialogue + battle (he's confronting you — no snap-back to his spawn
       // tile). The scene survives the battle, so this holds for the relent too.
-      confront = { npc, x: approach.x, y: approach.y };
+      confront = { npc, x: approach.x, y: approach.y, facing: approachFacing(approach) };
       approach = null;
       scriptQueue = [...npc.interact];
       runNextCommand();
@@ -876,11 +886,8 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
         const ax = lerp(approach.px, approach.x, approach.t) * ts - camX;
         const ay = lerp(approach.py, approach.y, approach.t) * ts - camY;
-        ctx.fillStyle = approach.npc.color ?? '#d22f2f';
-        ctx.fillRect(ax + 3, ay + 3, ts - 6, ts - 6);
-        ctx.strokeStyle = '#1d1d28';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(ax + 3.5, ay + 3.5, ts - 7, ts - 7);
+        const stride: 0 | 1 | 2 = approach.t < 1 ? (Math.floor(tick * 8) % 2 === 0 ? 1 : 2) : 0;
+        drawCharacter(ctx, ax, ay, ts, approachFacing(approach), stride, approach.npc.color ?? '#d22f2f');
         if (approach.alertT > 0) {
           drawText(ctx, '!', ax + ts / 2 - 1, ay - 7, PALETTE.hpCrit);
         }
@@ -889,11 +896,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         // (+ relent), no snap-back to spawn.
         const cx = confront.x * ts - camX;
         const cy = confront.y * ts - camY;
-        ctx.fillStyle = confront.npc.color ?? '#d22f2f';
-        ctx.fillRect(cx + 3, cy + 3, ts - 6, ts - 6);
-        ctx.strokeStyle = '#1d1d28';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(cx + 3.5, cy + 3.5, ts - 7, ts - 7);
+        drawCharacter(ctx, cx, cy, ts, confront.facing, 0, confront.npc.color ?? '#d22f2f');
       }
       // Walk phase: idle (0) when standing; otherwise the current stride
       // foot lifts for the middle 60% of the move and lands flat at the
@@ -1006,19 +1009,37 @@ function drawTiles(
       if (!def) continue;
       const sx = x * ts - camX;
       const sy = y * ts - camY;
-      // Registry pixel tile, if this cell opts in and the asset resolved.
-      const ref = def.tileRef;
-      if (ref) {
-        const rts = refTilesets.get(ref.tileset);
-        if (rts && rts.tiles[ref.tile]) {
-          drawOneTile(ctx, rts, refCaches.get(ref.tileset) ?? null, ref.tile, sx, sy, tick);
-          continue;
-        }
-      }
-      ctx.fillStyle = def.color; // flat-color fallback (graybox default)
-      ctx.fillRect(sx, sy, ts, ts);
+      // A transparent-backed prop declares the floor it stands on (TileDef.under):
+      // draw that def first so the floor shows through, not last frame's pixels.
+      const under = def.under !== undefined ? map.tileset[def.under] : undefined;
+      if (under) drawGrayboxCell(ctx, under, sx, sy, ts, refTilesets, refCaches, tick);
+      drawGrayboxCell(ctx, def, sx, sy, ts, refTilesets, refCaches, tick);
     }
   }
+}
+
+// One graybox cell: the registry pixel tile if the def opts in and the asset
+// resolved, else the flat colour (the graybox default / no-DOM fallback).
+function drawGrayboxCell(
+  ctx: CanvasRenderingContext2D,
+  def: TileDef,
+  sx: number,
+  sy: number,
+  ts: number,
+  refTilesets: Map<string, Tileset>,
+  refCaches: Map<string, Map<string, (HTMLCanvasElement | OffscreenCanvas)[]> | null>,
+  tick: number,
+): void {
+  const ref = def.tileRef;
+  if (ref) {
+    const rts = refTilesets.get(ref.tileset);
+    if (rts && rts.tiles[ref.tile]) {
+      drawOneTile(ctx, rts, refCaches.get(ref.tileset) ?? null, ref.tile, sx, sy, tick);
+      return;
+    }
+  }
+  ctx.fillStyle = def.color;
+  ctx.fillRect(sx, sy, ts, ts);
 }
 
 // Pre-bake each tile to an OffscreenCanvas / canvas at load time so the
@@ -1329,15 +1350,11 @@ function drawObjectMarkers(
         );
         continue;
       }
+      // Placeholder person: the player's own ¾ sprite, shirt in the NPC's colour
+      // (grey once a trainer is beaten), standing still, facing its sight line.
       const beaten = obj.blockedUntilFlag ? flags.has(obj.blockedUntilFlag) : false;
       const color = beaten ? '#777' : obj.color ?? '#d22f2f';
-      const px = obj.x * ts - camX + 3;
-      const py = obj.y * ts - camY + 3;
-      ctx.fillStyle = color;
-      ctx.fillRect(px, py, ts - 6, ts - 6);
-      ctx.strokeStyle = '#1d1d28';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(px + 0.5, py + 0.5, ts - 7, ts - 7);
+      drawCharacter(ctx, obj.x * ts - camX, obj.y * ts - camY, ts, obj.facing ?? 'down', 0, color);
     }
   }
 }
@@ -1396,6 +1413,22 @@ function drawPlayer(
   facing: Facing,
   walkPhase: 0 | 1 | 2,
 ): void {
+  drawCharacter(ctx, px, py, ts, facing, walkPhase, '#d22f2f');
+}
+
+// The one ¾ person placeholder — the player (red shirt) and every NPC (its own
+// `color` as the shirt) share it, so the cast reads as one set until real
+// overworld sprites land. Head-on ¾ view with visible body height (the
+// tileset_rules.md Rule 3 reference).
+function drawCharacter(
+  ctx: CanvasRenderingContext2D,
+  px: number,
+  py: number,
+  ts: number,
+  facing: Facing,
+  walkPhase: 0 | 1 | 2,
+  shirt: string,
+): void {
   // Head
   const headInset = 3;
   const headH = 6;
@@ -1406,7 +1439,7 @@ function drawPlayer(
   ctx.strokeRect(px + headInset + 0.5, py + 1 + 0.5, ts - 2 * headInset - 1, headH - 1);
 
   // Body / shirt
-  ctx.fillStyle = '#d22f2f';
+  ctx.fillStyle = shirt;
   ctx.fillRect(px + 3, py + 7, ts - 6, 5);
   ctx.strokeRect(px + 3 + 0.5, py + 7 + 0.5, ts - 6 - 1, 5 - 1);
 

@@ -35,6 +35,7 @@ import pctFencesTileset from '../../../assets/tilesets/pct_fences.tileset.json';
 import pctBuildingsTileset from '../../../assets/tilesets/pct_buildings.tileset.json';
 import pctDecorTileset from '../../../assets/tilesets/pct_decor.tileset.json';
 import pctFlowersTileset from '../../../assets/tilesets/pct_flowers.tileset.json';
+import interiorPropsTileset from '../../../assets/tilesets/interior_props.tileset.json';
 import pctVerifyData from '../maps/pct_verify.json';
 import testMapTmj from '../maps/tiled/test-map.tmj.json';
 import kitchenSinkTmj from '../maps/tiled/test-map-kitchen-sink.tmj.json';
@@ -70,6 +71,7 @@ registerTileset(pctFencesTileset as TilesetJson);
 registerTileset(pctBuildingsTileset as TilesetJson);
 registerTileset(pctDecorTileset as TilesetJson);
 registerTileset(pctFlowersTileset as TilesetJson);
+registerTileset(interiorPropsTileset as TilesetJson); // placeholder interiors (walls/floors/furniture)
 registerPrefab(houseVioletPrefab as PrefabJson);
 registerPrefab(gymVioletPrefab as PrefabJson);
 registerPrefab(treeBigPrefab as PrefabJson);

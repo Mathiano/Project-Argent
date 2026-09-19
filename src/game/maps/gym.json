@@ -5,11 +5,52 @@
   "tilesize": 16,
   "tiles": "WWWWWWWWWWWWWWWW\nW..............W\nW.....F........W\nW..............W\nW..............W\nW..............W\nWllllllllllllllW\nW..............W\nW..............W\nWllllllllllllllW\nW..............W\nW..............W\nW..............W\nW..............W\nW..............W\nWWWWWWWDWWWWWWWW",
   "tileset": {
-    "W": { "color": "#7c6a52", "solid": true, "label": "rooftop_wall" },
-    ".": { "color": "#d6c7a3", "solid": false, "label": "rooftop_floor" },
-    "l": { "color": "#aebccc", "solid": false, "label": "gust_lane" },
-    "F": { "color": "#7c4fa8", "solid": true, "label": "leader_throne" },
-    "D": { "color": "#daa520", "solid": false, "label": "door" }
+    "W": {
+      "color": "#7c6a52",
+      "solid": true,
+      "label": "rooftop_wall",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "roof_wall"
+      }
+    },
+    ".": {
+      "color": "#d6c7a3",
+      "solid": false,
+      "label": "rooftop_floor",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "roof_floor"
+      }
+    },
+    "l": {
+      "color": "#aebccc",
+      "solid": false,
+      "label": "gust_lane",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "gust_lane"
+      }
+    },
+    "F": {
+      "color": "#7c4fa8",
+      "solid": true,
+      "label": "leader_throne",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "throne"
+      },
+      "under": "."
+    },
+    "D": {
+      "color": "#daa520",
+      "solid": false,
+      "label": "door",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "door"
+      }
+    }
   },
   "objects": [
     {
@@ -36,20 +77,34 @@
       "color": "#3a7fbe",
       "blockedUntilFlag": "gym_trainer_beaten",
       "interact": [
-        { "kind": "dialog", "lines": [
-          "GYM TRAINER: Falkner's wind",
-          "favors the bold.",
-          "Let me see your read!"
-        ]},
-        { "kind": "start-trainer-battle", "foeSpecies": ["FLITPECK", "FLITPECK"], "winFlag": "gym_trainer_beaten", "reward": 800 }
+        {
+          "kind": "dialog",
+          "lines": [
+            "GYM TRAINER: Falkner's wind",
+            "favors the bold.",
+            "Let me see your read!"
+          ]
+        },
+        {
+          "kind": "start-trainer-battle",
+          "foeSpecies": [
+            "FLITPECK",
+            "FLITPECK"
+          ],
+          "winFlag": "gym_trainer_beaten",
+          "reward": 800
+        }
       ],
       "interactAfterFlag": [
-        { "kind": "dialog", "lines": [
-          "GYM TRAINER: Good show.",
-          "Falkner doubles when",
-          "the wind rises — count",
-          "to three."
-        ]}
+        {
+          "kind": "dialog",
+          "lines": [
+            "GYM TRAINER: Good show.",
+            "Falkner doubles when",
+            "the wind rises — count",
+            "to three."
+          ]
+        }
       ]
     },
     {
@@ -61,19 +116,33 @@
       "sightRange": 13,
       "blockedUntilFlag": "gym_trainer_2_beaten",
       "interact": [
-        { "kind": "dialog", "lines": [
-          "BIRDKEEPER: My eyes don't",
-          "miss! Up here, neither",
-          "does the wind."
-        ]},
-        { "kind": "start-trainer-battle", "foeSpecies": ["FLITPECK", "GALEHAWK"], "winFlag": "gym_trainer_2_beaten", "reward": 900 }
+        {
+          "kind": "dialog",
+          "lines": [
+            "BIRDKEEPER: My eyes don't",
+            "miss! Up here, neither",
+            "does the wind."
+          ]
+        },
+        {
+          "kind": "start-trainer-battle",
+          "foeSpecies": [
+            "FLITPECK",
+            "GALEHAWK"
+          ],
+          "winFlag": "gym_trainer_2_beaten",
+          "reward": 900
+        }
       ],
       "interactAfterFlag": [
-        { "kind": "dialog", "lines": [
-          "BIRDKEEPER: Sharp reads.",
-          "Falkner will test them",
-          "harder."
-        ]}
+        {
+          "kind": "dialog",
+          "lines": [
+            "BIRDKEEPER: Sharp reads.",
+            "Falkner will test them",
+            "harder."
+          ]
+        }
       ]
     },
     {
@@ -85,19 +154,32 @@
       "sightRange": 13,
       "blockedUntilFlag": "gym_trainer_3_beaten",
       "interact": [
-        { "kind": "dialog", "lines": [
-          "FLEDGLING: You walked",
-          "into my line! No turning",
-          "back now."
-        ]},
-        { "kind": "start-trainer-battle", "foeSpecies": ["GALEHAWK"], "winFlag": "gym_trainer_3_beaten", "reward": 950 }
+        {
+          "kind": "dialog",
+          "lines": [
+            "FLEDGLING: You walked",
+            "into my line! No turning",
+            "back now."
+          ]
+        },
+        {
+          "kind": "start-trainer-battle",
+          "foeSpecies": [
+            "GALEHAWK"
+          ],
+          "winFlag": "gym_trainer_3_beaten",
+          "reward": 950
+        }
       ],
       "interactAfterFlag": [
-        { "kind": "dialog", "lines": [
-          "FLEDGLING: One bird, one",
-          "lesson. The rooftop's",
-          "yours to climb."
-        ]}
+        {
+          "kind": "dialog",
+          "lines": [
+            "FLEDGLING: One bird, one",
+            "lesson. The rooftop's",
+            "yours to climb."
+          ]
+        }
       ]
     },
     {
@@ -109,18 +191,32 @@
       "sightRange": 13,
       "blockedUntilFlag": "gym_trainer_4_beaten",
       "interact": [
-        { "kind": "dialog", "lines": [
-          "ACE: Last gate before",
-          "Falkner. Two on the",
-          "wing — read them both!"
-        ]},
-        { "kind": "start-trainer-battle", "foeSpecies": ["GALEHAWK", "FLITPECK"], "winFlag": "gym_trainer_4_beaten", "reward": 1000 }
+        {
+          "kind": "dialog",
+          "lines": [
+            "ACE: Last gate before",
+            "Falkner. Two on the",
+            "wing — read them both!"
+          ]
+        },
+        {
+          "kind": "start-trainer-battle",
+          "foeSpecies": [
+            "GALEHAWK",
+            "FLITPECK"
+          ],
+          "winFlag": "gym_trainer_4_beaten",
+          "reward": 1000
+        }
       ],
       "interactAfterFlag": [
-        { "kind": "dialog", "lines": [
-          "ACE: You're ready.",
-          "Falkner is just ahead."
-        ]}
+        {
+          "kind": "dialog",
+          "lines": [
+            "ACE: You're ready.",
+            "Falkner is just ahead."
+          ]
+        }
       ]
     },
     {
@@ -130,18 +226,27 @@
       "color": "#c2491a",
       "blockedUntilFlag": "falkner_beaten",
       "interact": [
-        { "kind": "dialog", "lines": [
-          "FALKNER: Step onto the",
-          "rooftop — the wind is",
-          "the third combatant."
-        ]},
-        { "kind": "start-boss-battle", "bossId": "falkner" }
+        {
+          "kind": "dialog",
+          "lines": [
+            "FALKNER: Step onto the",
+            "rooftop — the wind is",
+            "the third combatant."
+          ]
+        },
+        {
+          "kind": "start-boss-battle",
+          "bossId": "falkner"
+        }
       ],
       "interactAfterFlag": [
-        { "kind": "dialog", "lines": [
-          "FALKNER: The wind",
-          "remembers you. Onward."
-        ]}
+        {
+          "kind": "dialog",
+          "lines": [
+            "FALKNER: The wind",
+            "remembers you. Onward."
+          ]
+        }
       ]
     },
     {
@@ -192,6 +297,10 @@
     }
   ],
   "spawns": {
-    "fromRoute": { "x": 7, "y": 14, "facing": "up" }
+    "fromRoute": {
+      "x": 7,
+      "y": 14,
+      "facing": "up"
+    }
   }
 }

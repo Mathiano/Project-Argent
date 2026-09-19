@@ -11,7 +11,8 @@
 //
 // BAKED-IN (constant across towns): the 10×8 layout skeleton, the counter, the door,
 // the entry spawn, the per-building tileset palette (Center warm, Mart blue), the
-// heal machine + nurse, the storage PC + box, the shopkeeper. PARAMETERIZED (varies
+// heal machine + nurse, the storage PC + box, the shopkeeper, the placeholder
+// interior art (interior_props tileRefs). PARAMETERIZED (varies
 // per town): the town id (→ map name, return-warp target, entry-spawn key), the
 // Mart's stock, and optional dialogue/sign flavor (defaults reproduce HEARTHWICK).
 
@@ -44,10 +45,10 @@ export interface CenterOpts {
 export function makeCenter(townId: string, opts: CenterOpts = {}): GrayboxMapJson {
   const id = townId.toUpperCase();
   const tileset: { readonly [k: string]: TileDef } = {
-    W: { color: '#9c8a78', solid: true, label: 'wall' },
-    '.': { color: '#cec3a0', solid: false, label: 'floor' },
-    C: { color: '#caa148', solid: true, label: 'counter' },
-    d: { color: '#daa520', solid: false, label: 'door' },
+    W: { color: '#9c8a78', solid: true, label: 'wall', tileRef: { tileset: 'interior_props', tile: 'wall_wood' } },
+    '.': { color: '#cec3a0', solid: false, label: 'floor', tileRef: { tileset: 'interior_props', tile: 'floor_plank' } },
+    C: { color: '#caa148', solid: true, label: 'counter', tileRef: { tileset: 'interior_props', tile: 'counter' }, under: '.' },
+    d: { color: '#daa520', solid: false, label: 'door', tileRef: { tileset: 'interior_props', tile: 'door' } },
   };
   const objects: MapObject[] = [
     { type: 'warp', x: DOOR.x, y: DOOR.y, target: `${id}:fromCenter` },
@@ -99,10 +100,10 @@ export interface MartOpts {
 export function makeMart(townId: string, stock: readonly string[], opts: MartOpts = {}): GrayboxMapJson {
   const id = townId.toUpperCase();
   const tileset: { readonly [k: string]: TileDef } = {
-    W: { color: '#3a4a6a', solid: true, label: 'wall' },
-    '.': { color: '#c3c8d6', solid: false, label: 'floor' },
-    C: { color: '#5a78b0', solid: true, label: 'counter' },
-    d: { color: '#daa520', solid: false, label: 'door' },
+    W: { color: '#3a4a6a', solid: true, label: 'wall', tileRef: { tileset: 'interior_props', tile: 'wall_plaster' } },
+    '.': { color: '#c3c8d6', solid: false, label: 'floor', tileRef: { tileset: 'interior_props', tile: 'floor_tile' } },
+    C: { color: '#5a78b0', solid: true, label: 'counter', tileRef: { tileset: 'interior_props', tile: 'counter' }, under: '.' },
+    d: { color: '#daa520', solid: false, label: 'door', tileRef: { tileset: 'interior_props', tile: 'door' } },
   };
   const objects: MapObject[] = [
     { type: 'warp', x: DOOR.x, y: DOOR.y, target: `${id}:fromMart` },

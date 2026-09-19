@@ -3,17 +3,96 @@
   "width": 9,
   "height": 8,
   "tilesize": 16,
-  "tiles": "WWWWWWWWW\nW.D...r.W\nW.....P.W\nWbb.x...W\nW.......W\nW.......W\nW.......W\nWWWWdWWWW",
-  "_layout": "9x8 KAMON's room (hearthwick-design.md). The one new interior — characterizes KAMON environmentally before the theft. D training-log desk (2,1); r ribbon shelf (6,1); P faded photo (6,2); bb bed (1-2,3); x outgrown toy (4,3). Door (4,7) -> HEARTHWICK:fromKamonHouse. Parent NPC (6,5), light/optional. ISOLATED from the theft + combat (untouched).",
+  "tiles": "WWWWWWWWW\nW.D...r.W\nW.....P.W\nWbB.x...W\nW.......W\nW.......W\nW.......W\nWWWWdWWWW",
+  "_layout": "9x8 KAMON's room (hearthwick-design.md). The one new interior — characterizes KAMON environmentally before the theft. D training-log desk (2,1); r ribbon shelf (6,1); P faded photo (6,2); bB bed (1-2,3; pillow end + foot end); x outgrown toy (4,3). Door (4,7) -> HEARTHWICK:fromKamonHouse. Parent NPC (6,5), light/optional. ISOLATED from the theft + combat (untouched).",
   "tileset": {
-    "W": { "color": "#3a2f44", "solid": true, "label": "wall" },
-    ".": { "color": "#cabfa0", "solid": false, "label": "floor" },
-    "D": { "color": "#5a4632", "solid": true, "label": "desk" },
-    "r": { "color": "#8a6d3a", "solid": true, "label": "ribbon_shelf" },
-    "P": { "color": "#7a5a44", "solid": true, "label": "photo" },
-    "b": { "color": "#5a6a8a", "solid": true, "label": "bed" },
-    "x": { "color": "#9a7a4a", "solid": true, "label": "toy" },
-    "d": { "color": "#daa520", "solid": false, "label": "door" }
+    "W": {
+      "color": "#3a2f44",
+      "solid": true,
+      "label": "wall",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "wall_wood"
+      }
+    },
+    ".": {
+      "color": "#cabfa0",
+      "solid": false,
+      "label": "floor",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "floor_plank"
+      }
+    },
+    "D": {
+      "color": "#5a4632",
+      "solid": true,
+      "label": "desk",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "desk"
+      },
+      "under": "."
+    },
+    "r": {
+      "color": "#8a6d3a",
+      "solid": true,
+      "label": "ribbon_shelf",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "ribbon_shelf"
+      },
+      "under": "."
+    },
+    "P": {
+      "color": "#7a5a44",
+      "solid": true,
+      "label": "photo",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "photos"
+      },
+      "under": "."
+    },
+    "b": {
+      "color": "#5a6a8a",
+      "solid": true,
+      "label": "bed",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "bed_h_l"
+      },
+      "under": "."
+    },
+    "x": {
+      "color": "#9a7a4a",
+      "solid": true,
+      "label": "toy",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "toy"
+      },
+      "under": "."
+    },
+    "d": {
+      "color": "#daa520",
+      "solid": false,
+      "label": "door",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "door"
+      }
+    },
+    "B": {
+      "color": "#5a6a8a",
+      "solid": true,
+      "label": "bed",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "bed_h_r"
+      },
+      "under": "."
+    }
   },
   "objects": [
     {
@@ -68,7 +147,10 @@
       "type": "sign",
       "x": 1,
       "y": 3,
-      "lines": ["His bed, hastily made.", "He was up before you were."]
+      "lines": [
+        "His bed, hastily made.",
+        "He was up before you were."
+      ]
     },
     {
       "type": "npc",
@@ -89,6 +171,10 @@
     }
   ],
   "spawns": {
-    "fromHearthwick": { "x": 4, "y": 6, "facing": "up" }
+    "fromHearthwick": {
+      "x": 4,
+      "y": 6,
+      "facing": "up"
+    }
   }
 }

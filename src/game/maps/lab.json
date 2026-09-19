@@ -6,11 +6,53 @@
   "tiles": "WWWWWWWWWWWWWW\nW..b........bW\nW..b........bW\nW............W\nW............W\nW............W\nW............W\nW.SSS........W\nW............W\nW............W\nWWWWWdWWWWWWWW",
   "_layout": "14x11. Bookshelves cap NW/NE corners (b). Three pedestals SSS at (2-4, 7) — the starter pedestals (visual; the actual choice is via Larch's interact). Larch NPC at (3,4). KAMON theft step-on at (5,9), requiresFlag=player_has_starter. South door (d) → HEARTHWICK.",
   "tileset": {
-    "W": { "color": "#5a4a2a", "solid": true, "label": "wall" },
-    ".": { "color": "#b9bcc9", "solid": false, "label": "floor" },
-    "b": { "color": "#4a3c1f", "solid": true, "label": "bookshelf" },
-    "S": { "color": "#7a3e0c", "solid": true, "label": "pedestal" },
-    "d": { "color": "#daa520", "solid": false, "label": "door" }
+    "W": {
+      "color": "#5a4a2a",
+      "solid": true,
+      "label": "wall",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "wall_plaster"
+      }
+    },
+    ".": {
+      "color": "#b9bcc9",
+      "solid": false,
+      "label": "floor",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "floor_tile"
+      }
+    },
+    "b": {
+      "color": "#4a3c1f",
+      "solid": true,
+      "label": "bookshelf",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "bookshelf"
+      },
+      "under": "."
+    },
+    "S": {
+      "color": "#7a3e0c",
+      "solid": true,
+      "label": "pedestal",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "pedestal"
+      },
+      "under": "."
+    },
+    "d": {
+      "color": "#daa520",
+      "solid": false,
+      "label": "door",
+      "tileRef": {
+        "tileset": "interior_props",
+        "tile": "door"
+      }
+    }
   },
   "objects": [
     {
@@ -78,7 +120,9 @@
             "Prove me right."
           ]
         },
-        { "kind": "show-starter-pick" }
+        {
+          "kind": "show-starter-pick"
+        }
       ],
       "interactAfterFlag": [
         {
@@ -143,7 +187,10 @@
                 "KAMON: ...It'll learn."
               ]
             },
-            { "kind": "set-flag", "flag": "kamon_took_siltskip" }
+            {
+              "kind": "set-flag",
+              "flag": "kamon_took_siltskip"
+            }
           ]
         },
         {
@@ -165,7 +212,10 @@
                 "KAMON: ...It'll learn."
               ]
             },
-            { "kind": "set-flag", "flag": "kamon_took_kindrake" }
+            {
+              "kind": "set-flag",
+              "flag": "kamon_took_kindrake"
+            }
           ]
         },
         {
@@ -187,7 +237,10 @@
                 "KAMON: ...It'll learn."
               ]
             },
-            { "kind": "set-flag", "flag": "kamon_took_grubleaf" }
+            {
+              "kind": "set-flag",
+              "flag": "kamon_took_grubleaf"
+            }
           ]
         },
         {
@@ -296,8 +349,15 @@
             "never on a guard you haven't broken."
           ]
         },
-        { "kind": "give-item", "itemId": "BALL", "qty": 5 },
-        { "kind": "set-flag", "flag": "catch_lesson_done" },
+        {
+          "kind": "give-item",
+          "itemId": "BALL",
+          "qty": 5
+        },
+        {
+          "kind": "set-flag",
+          "flag": "catch_lesson_done"
+        },
         {
           "kind": "dialog",
           "lines": [
@@ -308,14 +368,32 @@
             "Go on."
           ]
         },
-        { "kind": "set-flag", "flag": "kamon_took_starter" },
-        { "kind": "set-flag", "flag": "pushed_south" }
+        {
+          "kind": "set-flag",
+          "flag": "kamon_took_starter"
+        },
+        {
+          "kind": "set-flag",
+          "flag": "pushed_south"
+        }
       ]
     }
   ],
   "spawns": {
-    "default": { "x": 5, "y": 8, "facing": "up" },
-    "fromHearthwick": { "x": 5, "y": 9, "facing": "up" },
-    "fromRoute": { "x": 5, "y": 9, "facing": "up" }
+    "default": {
+      "x": 5,
+      "y": 8,
+      "facing": "up"
+    },
+    "fromHearthwick": {
+      "x": 5,
+      "y": 9,
+      "facing": "up"
+    },
+    "fromRoute": {
+      "x": 5,
+      "y": 9,
+      "facing": "up"
+    }
   }
 }

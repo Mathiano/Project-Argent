@@ -95,6 +95,7 @@ export const AT_TARGETS: Readonly<Record<string, AtTarget>> = {
   house: { map: 'HOUSE', spawn: 'fromBedroom' },
   hearthwick: { map: 'HEARTHWICK', spawn: 'fromHouse' },
   lab: { map: 'LAB', spawn: 'default' },
+  kamon: { map: 'KAMON_HOUSE', spawn: 'fromHearthwick' },
   center: { map: 'HEARTHWICK_CENTER', spawn: 'fromHearthwick' },
   mart: { map: 'HEARTHWICK_MART', spawn: 'fromHearthwick' },
   route31: { map: 'ROUTE31', spawn: 'default' },
