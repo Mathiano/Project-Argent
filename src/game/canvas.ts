@@ -1,4 +1,5 @@
 import { PALETTE } from './palette';
+import { integerScale, shouldRotate } from './viewport';
 
 // The BASE logical resolution — the size every scene draws at unless it declares
 // its own via Scene.logicalSize. The overworld + every menu are authored in these
@@ -15,10 +16,29 @@ export const LOGICAL_H = 180;
 export const BATTLE_LOGICAL_W = 640;
 export const BATTLE_LOGICAL_H = 360;
 
+// Coarse pointer (a phone/tablet) or the `?touch=1` override: the touch overlay
+// shows and the portrait rotation fallback (below) is armed.
+export function isTouchDevice(): boolean {
+  const coarse =
+    typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+  return coarse || window.location.search.includes('touch=1');
+}
+
+export interface Viewport {
+  // The viewport the game is laid out in. When `rotated`, w/h are the window's
+  // h/w — the host is turned 90° so the game runs along a portrait phone's long
+  // axis (viewport.ts shouldRotate).
+  readonly w: number;
+  readonly h: number;
+  readonly rotated: boolean;
+}
+
 export interface CanvasHost {
+  readonly host: HTMLElement;
   readonly canvas: HTMLCanvasElement;
   readonly ctx: CanvasRenderingContext2D;
   getScale(): number;
+  getViewport(): Viewport;
   // The canvas's CURRENT logical (backing) size — reflects the active scene's
   // declared size after setLogicalSize.
   getLogicalSize(): { readonly width: number; readonly height: number };
@@ -35,10 +55,12 @@ export function mountCanvas(host: HTMLElement): CanvasHost {
   host.style.alignItems = 'center';
   host.style.justifyContent = 'center';
   host.style.background = PALETTE.shellBlack;
-  host.style.width = '100vw';
-  host.style.height = '100vh';
   host.style.overflow = 'hidden';
   host.style.margin = '0';
+  // Sized in px from window.inner* by applyScale (not 100vw/100vh: iOS Safari's
+  // URL bar makes 100vh taller than the visible area), and rotated from the
+  // top-left corner for the portrait fallback.
+  host.style.transformOrigin = 'top left';
 
   // The live logical size — starts at the base, swapped by setLogicalSize when a
   // scene declares its own resolution.
@@ -59,6 +81,11 @@ export function mountCanvas(host: HTMLElement): CanvasHost {
   let scale = 1;
   const handlers: Array<(s: number) => void> = [];
 
+  const touch = isTouchDevice();
+  let viewW = 0;
+  let viewH = 0;
+  let rotated = false;
+
   // Size the canvas ELEMENT (CSS display size) to the on-screen footprint, updating
   // `scale`. The footprint is defined by the BASE logical resolution at an integer
   // scale — it is the physical space the game fills, and it is the SAME for every
@@ -72,10 +99,26 @@ export function mountCanvas(host: HTMLElement): CanvasHost {
   // into the 320-based footprint is a clean uniform 0.5×-per-pixel scale (no
   // distortion; on displays whose base scale is even, e.g. 1080p→6×, it is exactly
   // an integer 3× so it also stays pixel-crisp).
+  //
+  // Portrait fallback (touch devices only): when turning the window's w/h gives a
+  // strictly larger integer scale — every phone held upright — the host is
+  // rotated 90° and sized to the swapped dimensions, so the game runs along the
+  // long axis at ×2 instead of a ×1 strip. Still integer scale (pilot-exit §1);
+  // it just holds with rotation lock on. rotate(90deg) about the top-left corner
+  // then translateY(-100%) puts the (ih×iw) box exactly over the (iw×ih) window,
+  // with the game's top edge along the window's right edge — hold the phone
+  // turned counter-clockwise, notch to the left. A position:fixed overlay inside
+  // the host rotates with it (input.ts).
   function applyScale(): void {
-    const sw = window.innerWidth;
-    const sh = window.innerHeight;
-    scale = Math.max(1, Math.floor(Math.min(sw / LOGICAL_W, sh / LOGICAL_H)));
+    const iw = window.innerWidth;
+    const ih = window.innerHeight;
+    rotated = touch && shouldRotate(iw, ih, LOGICAL_W, LOGICAL_H);
+    viewW = rotated ? ih : iw;
+    viewH = rotated ? iw : ih;
+    host.style.width = `${viewW}px`;
+    host.style.height = `${viewH}px`;
+    host.style.transform = rotated ? 'rotate(90deg) translateY(-100%)' : '';
+    scale = integerScale(viewW, viewH, LOGICAL_W, LOGICAL_H);
     canvas.style.width = `${LOGICAL_W * scale}px`;
     canvas.style.height = `${LOGICAL_H * scale}px`;
   }
@@ -106,9 +149,11 @@ export function mountCanvas(host: HTMLElement): CanvasHost {
   window.addEventListener('resize', rescale);
 
   return {
+    host,
     canvas,
     ctx,
     getScale: () => scale,
+    getViewport: () => ({ w: viewW, h: viewH, rotated }),
     getLogicalSize: () => ({ width: logicalW, height: logicalH }),
     setLogicalSize,
     onResize(handler) {

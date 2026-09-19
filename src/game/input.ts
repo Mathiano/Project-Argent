@@ -1,4 +1,6 @@
 import type { InputKey } from './scene';
+import { overlayLayout } from './viewport';
+import type { OverlayKind } from './viewport';
 
 const KEY_MAP: { readonly [code: string]: InputKey } = {
   ArrowUp: 'up',
@@ -23,12 +25,25 @@ export interface InputDispatcher {
   dispose(): void;
 }
 
+export interface TouchOverlayOpts {
+  // Where the overlay lives. Must be the canvas host: when canvas.ts rotates the
+  // host for a portrait phone, a position:fixed overlay INSIDE it rotates along,
+  // so the controls sit beside the game instead of sideways across it.
+  readonly parent: HTMLElement;
+  readonly canvas: HTMLCanvasElement;
+  // The viewport the game is laid out in — post-rotation, so w ≥ h on a phone.
+  viewport(): { readonly w: number; readonly h: number };
+}
+
 export function createInputDispatcher(
   onKey: (key: InputKey) => void,
   // Raw typed key (KeyboardEvent.key). Return true when a text field consumed
   // it — the gamepad mapping below is then skipped for that keypress so typing
   // doesn't also fire button actions. Omitted → no text routing (unchanged).
   onText?: (key: string) => boolean,
+  // Touch overlay placement. Omitted → the overlay mounts on <body> and lays out
+  // against the window (the pre-rotation behaviour, kept for any bare caller).
+  touch?: TouchOverlayOpts,
 ): InputDispatcher {
   const held = new Set<InputKey>();
 
@@ -59,12 +74,13 @@ export function createInputDispatcher(
   window.addEventListener('keyup', keyUp);
   window.addEventListener('blur', blur);
 
-  const overlay = buildOverlay(onKey, held);
-  document.body.appendChild(overlay);
+  const overlay = buildOverlay(onKey, held, touch);
+  (touch?.parent ?? document.body).appendChild(overlay.el);
+  overlay.layout();
 
   const isCoarse =
     typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
-  if (!isCoarse && !window.location.search.includes('touch=1')) overlay.style.display = 'none';
+  if (!isCoarse && !window.location.search.includes('touch=1')) overlay.el.style.display = 'none';
 
   return {
     state: { pressed: (k) => held.has(k) },
@@ -72,12 +88,30 @@ export function createInputDispatcher(
       window.removeEventListener('keydown', keyDown);
       window.removeEventListener('keyup', keyUp);
       window.removeEventListener('blur', blur);
-      overlay.remove();
+      overlay.dispose();
     },
   };
 }
 
-function buildOverlay(onKey: (key: InputKey) => void, held: Set<InputKey>): HTMLDivElement {
+// Translucent at rest so the game reads through the buttons wherever the layout
+// still has to overlap it (a gutterless 16:9 viewport); solid while held, as the
+// press feedback a glass screen otherwise lacks.
+const IDLE_BG = 'rgba(20,20,30,.45)';
+const HELD_BG = 'rgba(20,20,30,.88)';
+
+interface TouchOverlay {
+  readonly el: HTMLDivElement;
+  // Re-place the buttons against the current viewport + canvas footprint. Runs
+  // on every window resize; call once after mounting.
+  layout(): void;
+  dispose(): void;
+}
+
+function buildOverlay(
+  onKey: (key: InputKey) => void,
+  held: Set<InputKey>,
+  opts?: TouchOverlayOpts,
+): TouchOverlay {
   const overlay = document.createElement('div');
   overlay.className = 'argent-touch';
   overlay.style.cssText = [
@@ -90,50 +124,74 @@ function buildOverlay(onKey: (key: InputKey) => void, held: Set<InputKey>): HTML
     'touch-action:manipulation',
   ].join(';');
 
-  const button = (key: InputKey, label: string, pos: string, kind: 'dpad' | 'ab' | 'meta'): void => {
+  const buttons = new Map<InputKey, HTMLButtonElement>();
+  const make = (key: InputKey, label: string, kind: OverlayKind): HTMLButtonElement => {
     const el = document.createElement('button');
     el.textContent = label;
-    const base =
+    const shape =
       kind === 'dpad'
-        ? 'width:54px;height:54px;border-radius:8px;font-size:20px;'
+        ? 'border-radius:8px;'
         : kind === 'ab'
-          ? 'width:64px;height:64px;border-radius:50%;font-size:18px;'
-          : 'padding:8px 12px;border-radius:18px;font-size:11px;letter-spacing:.1em;';
+          ? 'border-radius:50%;'
+          : 'border-radius:13px;letter-spacing:.1em;';
     el.style.cssText = [
       'position:absolute',
+      'box-sizing:border-box',
+      'padding:0',
       'pointer-events:auto',
-      'background:rgba(20,20,30,.72)',
+      `background:${IDLE_BG}`,
       'color:rgba(243,231,207,.92)',
-      'border:2px solid rgba(243,231,207,.4)',
+      'border:2px solid rgba(243,231,207,.35)',
       'font-family:monospace',
       'font-weight:700',
       'touch-action:manipulation',
-      base,
-      pos,
+      shape,
     ].join(';');
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       held.add(key);
+      el.style.background = HELD_BG;
       onKey(key);
     });
     const release = (e: Event): void => {
       e.preventDefault();
       held.delete(key);
+      el.style.background = IDLE_BG;
     };
     el.addEventListener('pointerup', release);
     el.addEventListener('pointercancel', release);
     el.addEventListener('pointerleave', release);
+    buttons.set(key, el);
     overlay.appendChild(el);
+    return el;
   };
 
-  button('up', '▲', 'left:74px;bottom:148px', 'dpad');
-  button('down', '▼', 'left:74px;bottom:40px', 'dpad');
-  button('left', '◀', 'left:14px;bottom:94px', 'dpad');
-  button('right', '▶', 'left:134px;bottom:94px', 'dpad');
-  button('b', 'B', 'right:96px;bottom:54px', 'ab');
-  button('a', 'A', 'right:18px;bottom:108px', 'ab');
-  button('select', 'SELECT', 'right:18px;top:14px', 'meta');
-  button('start', 'START', 'right:96px;top:14px', 'meta');
+  const layout = (): void => {
+    const v = opts ? opts.viewport() : { w: window.innerWidth, h: window.innerHeight };
+    const canvas = opts?.canvas ?? document.querySelector('canvas');
+    // No canvas yet → treat the footprint as the whole viewport (no gutters).
+    const cw = canvas?.clientWidth || v.w;
+    for (const b of overlayLayout(v.w, v.h, cw)) {
+      const el = buttons.get(b.key) ?? make(b.key, b.label, b.kind);
+      el.style.left = `${b.x}px`;
+      el.style.top = `${b.y}px`;
+      el.style.width = `${b.w}px`;
+      el.style.height = `${b.h}px`;
+      el.style.fontSize =
+        b.kind === 'meta' ? '11px' : `${Math.round(b.w * (b.kind === 'ab' ? 0.3 : 0.4))}px`;
+    }
+  };
 
-  return overlay;
+  // canvas.ts registers its own resize listener first (mountCanvas precedes the
+  // dispatcher in main.ts), so the canvas footprint is fresh by the time this runs.
+  window.addEventListener('resize', layout);
+
+  return {
+    el: overlay,
+    layout,
+    dispose() {
+      window.removeEventListener('resize', layout);
+      overlay.remove();
+    },
+  };
 }

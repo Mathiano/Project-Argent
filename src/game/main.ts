@@ -144,6 +144,9 @@ const dispatcher = createInputDispatcher(
     if (DEV_BUILD && raw === '`') { toggleDevMenu(); return true; }
     return scenes.textInput(raw); // raw typed keys → the active text field (nameEntry)
   },
+  // Touch overlay inside the canvas host, laid out against the (possibly
+  // rotated) viewport — see canvas.ts applyScale + viewport.ts overlayLayout.
+  { parent: host, canvas: canvasHost.canvas, viewport: () => canvasHost.getViewport() },
 );
 
 // First audio (docs/sfx-build-decisions.md): a synth engine + a subscriber on the
