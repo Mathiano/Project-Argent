@@ -19,11 +19,12 @@
 import type { GrayboxMapJson } from './mapLoader';
 import type { Facing, MapObject, Spawn, TileDef } from './types';
 
-// Shared skeleton: walls, a 4-wide counter at (2..5, y2), a south door at (4,7).
+// Shared skeleton: walls, a 4-wide counter at (2..5, y2) the player talks across
+// (TileDef.talkOver), the attendant behind it at y1, a south door at (4,7).
 const TILES = 'WWWWWWWWWW\nW........W\nW.CCCC...W\nW........W\nW........W\nW........W\nW........W\nWWWWdWWWWW';
 const DOOR = { x: 4, y: 7 };
 const ENTRY: Spawn = { x: 4, y: 6, facing: 'up' as Facing }; // stand just inside the door
-const DESK = { x: 2, y: 2 }; // the attendant, behind the counter
+const DESK = { x: 2, y: 1 }; // the attendant, BEHIND the counter (talked to across it)
 const SIGN = { x: 7, y: 2 }; // noticeboard / shelf
 const PC = { x: 8, y: 2 }; // Center only — the storage terminal
 
@@ -47,7 +48,7 @@ export function makeCenter(townId: string, opts: CenterOpts = {}): GrayboxMapJso
   const tileset: { readonly [k: string]: TileDef } = {
     W: { color: '#9c8a78', solid: true, label: 'wall', tileRef: { tileset: 'interior_props', tile: 'wall_wood' } },
     '.': { color: '#cec3a0', solid: false, label: 'floor', tileRef: { tileset: 'interior_props', tile: 'floor_plank' } },
-    C: { color: '#caa148', solid: true, label: 'counter', tileRef: { tileset: 'interior_props', tile: 'counter' }, under: '.' },
+    C: { color: '#caa148', solid: true, label: 'counter', tileRef: { tileset: 'interior_props', tile: 'counter' }, under: '.', talkOver: true },
     d: { color: '#daa520', solid: false, label: 'door', tileRef: { tileset: 'interior_props', tile: 'door' } },
   };
   const objects: MapObject[] = [
@@ -102,7 +103,7 @@ export function makeMart(townId: string, stock: readonly string[], opts: MartOpt
   const tileset: { readonly [k: string]: TileDef } = {
     W: { color: '#3a4a6a', solid: true, label: 'wall', tileRef: { tileset: 'interior_props', tile: 'wall_plaster' } },
     '.': { color: '#c3c8d6', solid: false, label: 'floor', tileRef: { tileset: 'interior_props', tile: 'floor_tile' } },
-    C: { color: '#5a78b0', solid: true, label: 'counter', tileRef: { tileset: 'interior_props', tile: 'counter' }, under: '.' },
+    C: { color: '#5a78b0', solid: true, label: 'counter', tileRef: { tileset: 'interior_props', tile: 'counter' }, under: '.', talkOver: true },
     d: { color: '#daa520', solid: false, label: 'door', tileRef: { tileset: 'interior_props', tile: 'door' } },
   };
   const objects: MapObject[] = [

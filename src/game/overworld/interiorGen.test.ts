@@ -70,3 +70,17 @@ describe('interior generator — the "new town = two lines" win', () => {
     expect(center.spawns.fromNewtown).toEqual(mart.spawns.fromNewtown);
   });
 });
+
+describe('attendants stand behind the counter', () => {
+  const cell = (m: ReturnType<typeof makeCenter>, x: number, y: number) => m.tileset[m.tiles.split('\n')[y]![x]!]!;
+  for (const m of [makeCenter('X'), makeMart('X', ['POTION'])]) {
+    test(`${m.name}: the attendant is at y=1 with a talkOver counter cell in front`, () => {
+      const attendant = m.objects!.find((o) => o.type === 'npc' && o.x === 2)!;
+      expect(attendant.y).toBe(1);
+      expect(cell(m, 2, 2).label).toBe('counter');
+      expect(cell(m, 2, 2).solid).toBe(true);
+      expect(cell(m, 2, 2).talkOver).toBe(true);
+      expect(cell(m, 2, 1).solid).toBe(false); // standing room behind the counter
+    });
+  }
+});

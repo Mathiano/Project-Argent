@@ -21,6 +21,10 @@ export interface TileDef {
   // One level only — an `under` on the under-def is ignored. Omitted → the
   // cell draws alone, exactly as before.
   readonly under?: string;
+  // A solid cell the player can TALK ACROSS (a shop counter): pressing A at it
+  // reaches the NPC on the far side. Collision is unchanged — only the A-button
+  // target lookup looks one cell further. Omitted → false.
+  readonly talkOver?: boolean;
 }
 
 export interface Spawn {

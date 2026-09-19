@@ -480,6 +480,12 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
     return true;
   }
 
+  // Graybox TileDef.talkOver at a cell (data-driven maps have no TileDefs → false).
+  function talkOverAt(x: number, y: number): boolean {
+    const ch = map.tiles.split('\n')[y]?.[x];
+    return ch !== undefined && (map.tileset[ch]?.talkOver ?? false);
+  }
+
   function npcAt(x: number, y: number): Extract<MapObject, { type: 'npc' }> | null {
     for (const obj of map.objects) {
       if (obj.type !== 'npc') continue;
@@ -830,7 +836,9 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         const { dx, dy } = facingDelta(facing);
         const fx = tx + dx;
         const fy = ty + dy;
-        const npc = npcAt(fx, fy);
+        // Talk across a counter: a `talkOver` cell in front reaches the NPC
+        // behind it (the nurse / clerk stand behind their counter).
+        const npc = npcAt(fx, fy) ?? (talkOverAt(fx, fy) ? npcAt(fx + dx, fy + dy) : null);
         if (npc) {
           const cmds =
             npc.blockedUntilFlag && opts.flags.has(npc.blockedUntilFlag) && npc.interactAfterFlag

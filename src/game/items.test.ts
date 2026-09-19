@@ -322,13 +322,14 @@ describe('Phase 5a GATE — Pokémon Center heal-party script verb wires through
       for (let i = 0; i < 12; i += 1) scene.update?.(0.02);
     }
 
-    // Spawn fromHearthwick is (4, 6) facing up. NURSE NPC is at (2, 2).
-    // The player can stand on (2, 3) facing up and press A to interact.
+    // Spawn fromHearthwick is (4, 6) facing up. NURSE NPC is at (2, 1), behind
+    // the counter at (2, 2). The player stands on (2, 3) facing up and presses A
+    // — the counter is talkOver, so A reaches across it.
     walkOne('left'); // (3, 6) facing left
     walkOne('left'); // (2, 6) facing left
     walkOne('up'); // (2, 5) facing up
     walkOne('up'); // (2, 4) facing up
-    walkOne('up'); // (2, 3) facing up — right in front of NURSE
+    walkOne('up'); // (2, 3) facing up — at the counter, NURSE behind it
 
     expect(scene.currentPosition()).toEqual({
       map: 'HEARTHWICK_CENTER',
@@ -379,7 +380,7 @@ describe('Phase 5b GATE — Poké Mart open-mart verb wires through the CLERK NP
       for (let i = 0; i < 12; i += 1) scene.update?.(0.02);
     }
 
-    // fromHearthwick spawn is (4, 6) facing up. CLERK is at (2, 2);
+    // fromHearthwick spawn is (4, 6) facing up. CLERK is at (2, 1), behind the counter at (2, 2);
     // stand at (2, 3) facing up and press A (same approach as the
     // Center NURSE).
     walkOne('left'); // (3, 6)
