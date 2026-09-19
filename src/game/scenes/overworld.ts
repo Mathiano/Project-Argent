@@ -4,6 +4,7 @@ import { getMap } from '../overworld/maps';
 import { emitGameEvent } from '../gameEvents';
 import type { Tile, Tileset } from '../overworld/tileset';
 import { getTileset, hasTileset } from '../overworld/tilesetCatalog';
+import { PLAYER_HAIR, npcHairColor } from '../overworld/npcLook';
 import type { Facing, MapData, MapObject, PlacedProp, ScriptCommand, TileDef } from '../overworld/types';
 import { findObjectAt, isWalkable } from '../overworld/types';
 import { ySortOrder } from '../overworld/ysort';
@@ -204,6 +205,9 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
   // it confronted the player from — through the dialogue, battle, and relent —
   // instead of snapping back to its map spawn tile.
   let confront: { npc: NpcObj; x: number; y: number; facing: Facing } | null = null;
+  // An NPC spoken to turns toward the player and stays turned (render-only —
+  // `facing` on the object, and so its sight line, is never mutated).
+  const npcFaces = new Map<NpcObj, Facing>();
 
   // The way a walking-up NPC faces: its direction of travel, else its authored
   // facing (the sight line), else toward the camera.
@@ -840,6 +844,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         // behind it (the nurse / clerk stand behind their counter).
         const npc = npcAt(fx, fy) ?? (talkOverAt(fx, fy) ? npcAt(fx + dx, fy + dy) : null);
         if (npc) {
+          npcFaces.set(npc, OPPOSITE[facing]);
           const cmds =
             npc.blockedUntilFlag && opts.flags.has(npc.blockedUntilFlag) && npc.interactAfterFlag
               ? npc.interactAfterFlag
@@ -884,7 +889,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
       // its walked-up tile), so skip its static marker to avoid a double-draw
       // back at its spawn tile.
       const confrontingNpc = approach?.npc ?? confront?.npc;
-      drawObjectMarkers(ctx, map, camX, camY, opts.flags, tick, confrontingNpc);
+      drawObjectMarkers(ctx, map, camX, camY, opts.flags, tick, (n) => npcFaces.get(n), confrontingNpc);
       // Phase-8 import: carried-through named markers (npc_*/warp_*), drawn as a
       // labelled placeholder until the wiring layer resolves each name to a real def.
       if (map.importedObjects !== undefined) drawImportedObjectMarkers(ctx, map, camX, camY);
@@ -895,7 +900,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         const ax = lerp(approach.px, approach.x, approach.t) * ts - camX;
         const ay = lerp(approach.py, approach.y, approach.t) * ts - camY;
         const stride: 0 | 1 | 2 = approach.t < 1 ? (Math.floor(tick * 8) % 2 === 0 ? 1 : 2) : 0;
-        drawCharacter(ctx, ax, ay, ts, approachFacing(approach), stride, approach.npc.color ?? '#d22f2f');
+        drawCharacter(ctx, ax, ay, ts, approachFacing(approach), stride, approach.npc.color ?? '#d22f2f', npcHairColor(map.name, approach.npc.x, approach.npc.y, approach.npc.hair));
         if (approach.alertT > 0) {
           drawText(ctx, '!', ax + ts / 2 - 1, ay - 7, PALETTE.hpCrit);
         }
@@ -904,7 +909,7 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
         // (+ relent), no snap-back to spawn.
         const cx = confront.x * ts - camX;
         const cy = confront.y * ts - camY;
-        drawCharacter(ctx, cx, cy, ts, confront.facing, 0, confront.npc.color ?? '#d22f2f');
+        drawCharacter(ctx, cx, cy, ts, confront.facing, 0, confront.npc.color ?? '#d22f2f', npcHairColor(map.name, confront.npc.x, confront.npc.y, confront.npc.hair));
       }
       // Walk phase: idle (0) when standing; otherwise the current stride
       // foot lifts for the middle 60% of the move and lands flat at the
@@ -975,6 +980,8 @@ export function createOverworldScene(opts: OverworldSceneOpts): OverworldScene {
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
+
+const OPPOSITE: { readonly [f in Facing]: Facing } = { up: 'down', down: 'up', left: 'right', right: 'left' };
 
 function drawDialog(
   ctx: CanvasRenderingContext2D,
@@ -1328,6 +1335,7 @@ function drawObjectMarkers(
   camY: number,
   flags: FlagStore,
   tick: number,
+  faceOf: (npc: Extract<MapObject, { type: 'npc' }>) => Facing | undefined,
   skipNpc?: MapObject,
 ): void {
   const ts = map.tilesize;
@@ -1362,7 +1370,11 @@ function drawObjectMarkers(
       // (grey once a trainer is beaten), standing still, facing its sight line.
       const beaten = obj.blockedUntilFlag ? flags.has(obj.blockedUntilFlag) : false;
       const color = beaten ? '#777' : obj.color ?? '#d22f2f';
-      drawCharacter(ctx, obj.x * ts - camX, obj.y * ts - camY, ts, obj.facing ?? 'down', 0, color);
+      drawCharacter(
+        ctx, obj.x * ts - camX, obj.y * ts - camY, ts,
+        faceOf(obj) ?? obj.facing ?? 'down', 0, color,
+        npcHairColor(map.name, obj.x, obj.y, obj.hair),
+      );
     }
   }
 }
@@ -1421,7 +1433,7 @@ function drawPlayer(
   facing: Facing,
   walkPhase: 0 | 1 | 2,
 ): void {
-  drawCharacter(ctx, px, py, ts, facing, walkPhase, '#d22f2f');
+  drawCharacter(ctx, px, py, ts, facing, walkPhase, '#d22f2f', PLAYER_HAIR);
 }
 
 // The one ¾ person placeholder — the player (red shirt) and every NPC (its own
@@ -1436,7 +1448,12 @@ function drawCharacter(
   facing: Facing,
   walkPhase: 0 | 1 | 2,
   shirt: string,
+  hair: string,
 ): void {
+  // Ground shadow under the feet — the ¾ contact cue (drawn first, under all).
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillRect(px + 3, py + ts - 1, ts - 6, 1);
+
   // Head
   const headInset = 3;
   const headH = 6;
@@ -1445,6 +1462,18 @@ function drawCharacter(
   ctx.strokeStyle = '#1d1d28';
   ctx.lineWidth = 1;
   ctx.strokeRect(px + headInset + 0.5, py + 1 + 0.5, ts - 2 * headInset - 1, headH - 1);
+
+  // Hair: a cap inside the head outline; the whole back of the head when facing
+  // away; the far side of the head when facing sideways; fringe tips head-on.
+  ctx.fillStyle = hair;
+  ctx.fillRect(px + 4, py + 2, ts - 8, 2);
+  if (facing === 'up') ctx.fillRect(px + 4, py + 4, ts - 8, 2);
+  else if (facing === 'left') ctx.fillRect(px + ts - 6, py + 4, 2, 2);
+  else if (facing === 'right') ctx.fillRect(px + 4, py + 4, 2, 2);
+  else {
+    ctx.fillRect(px + 4, py + 4, 1, 1);
+    ctx.fillRect(px + ts - 5, py + 4, 1, 1);
+  }
 
   // Body / shirt
   ctx.fillStyle = shirt;
@@ -1467,8 +1496,7 @@ function drawCharacter(
   ctx.fillStyle = '#1d1d28';
   const eye = 1;
   if (facing === 'up') {
-    // back of head — no eyes visible
-    ctx.fillRect(px + 6, py + 3, ts - 12, 1); // hair line
+    // back of head — no eyes visible (the hair covers it)
   } else if (facing === 'down') {
     ctx.fillRect(px + 6, py + 4, eye, 2);
     ctx.fillRect(px + ts - 6 - eye, py + 4, eye, 2);

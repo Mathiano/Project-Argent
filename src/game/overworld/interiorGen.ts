@@ -58,6 +58,7 @@ export function makeCenter(townId: string, opts: CenterOpts = {}): GrayboxMapJso
       x: DESK.x,
       y: DESK.y,
       color: '#e23a1e',
+      hair: '#d9b25a',
       interact: [
         { kind: 'dialog', lines: opts.nurseGreeting ?? ['NURSE: Welcome to the', 'Pokémon Center.', '', 'Shall I tend to your team?', 'It will only take a moment.'] },
         { kind: 'heal-party' },
@@ -113,6 +114,7 @@ export function makeMart(townId: string, stock: readonly string[], opts: MartOpt
       x: DESK.x,
       y: DESK.y,
       color: '#3a6ea5',
+      hair: '#2a2430',
       interact: [
         { kind: 'dialog', lines: opts.clerkGreeting ?? ['CLERK: Welcome to the', 'POKÉ MART!', '', 'Stocking up before the', 'routes? Smart.'] },
         { kind: 'open-mart', stock: [...stock] },

@@ -224,6 +224,7 @@
       "x": 6,
       "y": 2,
       "color": "#c2491a",
+      "hair": "#2f3c6e",
       "blockedUntilFlag": "falkner_beaten",
       "interact": [
         {

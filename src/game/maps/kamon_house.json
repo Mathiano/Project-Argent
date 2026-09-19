@@ -157,6 +157,7 @@
       "x": 6,
       "y": 5,
       "color": "#9a6a4a",
+      "hair": "#5a3a22",
       "interact": [
         {
           "kind": "dialog",

@@ -264,7 +264,64 @@
     "ffffffff00ffffff",
     "ffffffffffffffff",
     "ffffffffffffffff"
-   ]
+   ],
+   "frames": [
+    [
+     "ffffffffffffffff",
+     "f00fff0000ffffff",
+     "ffffffffffffffff",
+     "ffffffffffff000f",
+     "ffffffffffffffff",
+     "fffff00fffffffff",
+     "ffffffffffffffff",
+     "ffffffffffffffff",
+     "00ffffffffffff00",
+     "ffffffffffffffff",
+     "fffffff00fffffff",
+     "ffffffffffffffff",
+     "ffffffffffffffff",
+     "ffffffffffff00ff",
+     "ffffffffffffffff",
+     "ffffffffffffffff"
+    ],
+    [
+     "ffffffffffffffff",
+     "fffff00fff0000ff",
+     "ffffffffffffffff",
+     "000fffffffffffff",
+     "ffffffffffffffff",
+     "fffffffff00fffff",
+     "ffffffffffffffff",
+     "ffffffffffffffff",
+     "ff0000ffffffffff",
+     "ffffffffffffffff",
+     "fffffffffff00fff",
+     "ffffffffffffffff",
+     "ffffffffffffffff",
+     "00ffffffffffffff",
+     "ffffffffffffffff",
+     "ffffffffffffffff"
+    ],
+    [
+     "ffffffffffffffff",
+     "00fffffff00fff00",
+     "ffffffffffffffff",
+     "ffff000fffffffff",
+     "ffffffffffffffff",
+     "fffffffffffff00f",
+     "ffffffffffffffff",
+     "ffffffffffffffff",
+     "ffffff0000ffffff",
+     "ffffffffffffffff",
+     "0ffffffffffffff0",
+     "ffffffffffffffff",
+     "ffffffffffffffff",
+     "ffff00ffffffffff",
+     "ffffffffffffffff",
+     "ffffffffffffffff"
+    ]
+   ],
+   "fps": 6
   },
   "throne": {
    "label": "gym leader's perch",
@@ -660,7 +717,28 @@
     "1bkkkkkkkkkkkkb1",
     "1bbbbbbbbbbbbbb1",
     "1111111111111111"
-   ]
+   ],
+   "frames": [
+    [
+     "1111111111111111",
+     "1777777777777771",
+     "1bbbbbbbbbbbbbb1",
+     "1bk1111111111kb1",
+     "1bk1mmmmmmmm1kb1",
+     "1bk1mmmm5mmm1kb1",
+     "1bk1mmme55mm1kb1",
+     "1bk1m5ae5e5m1kb1",
+     "1bk1maeaaaem1kb1",
+     "1bk1madadaam1kb1",
+     "1bk1mddddddm1kb1",
+     "1bk1xxxxxxxx1kb1",
+     "1bk1zxzxzxzx1kb1",
+     "1bkkkkkkkkkkkkb1",
+     "1bbbbbbbbbbbbbb1",
+     "1111111111111111"
+    ]
+   ],
+   "fps": 3
   },
   "photos": {
    "label": "photos",

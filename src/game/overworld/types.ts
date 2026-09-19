@@ -192,6 +192,9 @@ export type MapObject =
       readonly x: number;
       readonly y: number;
       readonly color?: string;
+      // Placeholder-sprite hair colour. Omitted → a stable per-NPC pick from
+      // HAIR_PALETTE (npcLook.ts), so the cast varies with no data at all.
+      readonly hair?: string;
       readonly blockedUntilFlag?: string;
       readonly interact: readonly ScriptCommand[];
       readonly interactAfterFlag?: readonly ScriptCommand[];

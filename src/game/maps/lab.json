@@ -96,6 +96,7 @@
       "x": 3,
       "y": 4,
       "color": "#c5cfe2",
+      "hair": "#c9c9d2",
       "interact": [
         {
           "kind": "dialog",
