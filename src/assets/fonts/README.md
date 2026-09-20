@@ -10,6 +10,17 @@
   sub-pixel). ~6px caps, **~4.0px avg advance** (proportional) — narrower than the
   old monospace (4.8) and m5x7 (5.7), so it fits the 320×180 boxes. Lacks
   `★ ♥ ▼ ▶ ₽` (has `·`) → those render small via the symbol pass (ui.ts).
+- **Coverage (parsed cmap, 2026-09-20): 127 glyphs — full printable ASCII, and
+  very little else.** Pinned by `src/game/font.test.ts`, which fails if a font
+  swap ever costs us an ASCII character (canvas falls back per-glyph and
+  SILENTLY, so a gap draws from a system font instead of erroring).
+  Also absent, and NOT in the symbol pass — these draw from a system fallback:
+  - `é` (advance 7.1px vs 4px for `e`) — visibly off-style. Confined to the
+    `Pokémon` / `Poké Mart` naming-debt strings, so the rename pass removes the
+    only occurrences; not worth a glyph hack before then.
+  - `—` em dash (advance **16px** — 4× a lowercase letter) and `’`. The dash is
+    stylistically impure but reads fine at size; routing it through the
+    small-symbol pass would shrink it to a hyphen and look worse.
 - **Usage:** `UI_FONT` (ui.ts), loaded by font.ts at boot. m5x7's smaller sibling
   (same family/look); m5x7 was too big for the boxes at its 16px crisp size.
 
