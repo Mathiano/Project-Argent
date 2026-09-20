@@ -1,0 +1,116 @@
+{
+  "id": "battle.catchThrow",
+  "tracks": [
+    {
+      "target": "ball",
+      "property": "alpha",
+      "from": 0,
+      "to": 1,
+      "durationFrames": 2,
+      "easing": "easeOut",
+      "delayFrames": 0
+    },
+    {
+      "target": "ball",
+      "property": "x",
+      "from": 170,
+      "to": 528,
+      "durationFrames": 15,
+      "easing": "easeInOut",
+      "delayFrames": 0
+    },
+    {
+      "target": "ball",
+      "property": "y",
+      "from": 186,
+      "to": 52,
+      "durationFrames": 9,
+      "easing": "easeOut",
+      "delayFrames": 0
+    },
+    {
+      "target": "ball",
+      "property": "y",
+      "from": 52,
+      "to": 68,
+      "durationFrames": 6,
+      "easing": "easeIn",
+      "delayFrames": 9
+    },
+    {
+      "target": "ball",
+      "property": "spin",
+      "from": 0,
+      "to": 3.6,
+      "durationFrames": 15,
+      "easing": "linear",
+      "delayFrames": 0
+    },
+    {
+      "target": "sprite",
+      "property": "scale",
+      "side": "foe",
+      "from": 1,
+      "to": 1,
+      "durationFrames": 15,
+      "easing": "hold",
+      "delayFrames": 0
+    },
+    {
+      "target": "sprite",
+      "property": "scale",
+      "side": "foe",
+      "from": 1,
+      "to": 0,
+      "durationFrames": 7,
+      "easing": "easeIn",
+      "delayFrames": 15
+    },
+    {
+      "target": "sprite",
+      "property": "alpha",
+      "side": "foe",
+      "from": 1,
+      "to": 0,
+      "durationFrames": 7,
+      "easing": "easeIn",
+      "delayFrames": 15
+    },
+    {
+      "target": "ball",
+      "property": "spin",
+      "from": 3.6,
+      "to": 0,
+      "durationFrames": 6,
+      "easing": "easeOut",
+      "delayFrames": 15
+    },
+    {
+      "target": "ball",
+      "property": "y",
+      "from": 68,
+      "to": 112,
+      "durationFrames": 8,
+      "easing": "easeIn",
+      "delayFrames": 22
+    },
+    {
+      "target": "ball",
+      "property": "y",
+      "from": 112,
+      "to": 102,
+      "durationFrames": 4,
+      "easing": "easeOut",
+      "delayFrames": 30
+    },
+    {
+      "target": "ball",
+      "property": "y",
+      "from": 102,
+      "to": 112,
+      "durationFrames": 4,
+      "easing": "easeIn",
+      "delayFrames": 34
+    }
+  ]
+}

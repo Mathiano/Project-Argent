@@ -1,0 +1,59 @@
+{
+  "id": "battle.catchWiggle",
+  "tracks": [
+    {
+      "target": "ball",
+      "property": "tilt",
+      "from": 0,
+      "to": -0.38,
+      "durationFrames": 5,
+      "easing": "easeOut",
+      "delayFrames": 0
+    },
+    {
+      "target": "ball",
+      "property": "tilt",
+      "from": -0.38,
+      "to": 0.38,
+      "durationFrames": 8,
+      "easing": "easeInOut",
+      "delayFrames": 5
+    },
+    {
+      "target": "ball",
+      "property": "tilt",
+      "from": 0.38,
+      "to": 0,
+      "durationFrames": 6,
+      "easing": "easeOut",
+      "delayFrames": 13
+    },
+    {
+      "target": "ball",
+      "property": "x",
+      "from": 528,
+      "to": 525,
+      "durationFrames": 5,
+      "easing": "easeOut",
+      "delayFrames": 0
+    },
+    {
+      "target": "ball",
+      "property": "x",
+      "from": 525,
+      "to": 531,
+      "durationFrames": 8,
+      "easing": "easeInOut",
+      "delayFrames": 5
+    },
+    {
+      "target": "ball",
+      "property": "x",
+      "from": 531,
+      "to": 528,
+      "durationFrames": 6,
+      "easing": "easeOut",
+      "delayFrames": 13
+    }
+  ]
+}

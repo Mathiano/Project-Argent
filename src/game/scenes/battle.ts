@@ -1294,6 +1294,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let wipeAlpha = 0; // battle-enter wipe overlay
   let wipeOffX = 0; // the wipe overlay's x (slides off during the entrance)
   const spriteOffX: Record<Side, number> = { player: 0, foe: 0 }; // entrance/impact sprite x-slide (side-addressable)
+  // Catch-visual pass — the mon shrinks into the ball and fades (1/1 = untouched,
+  // so every non-catch battle draws exactly as before).
+  const spriteScale: Record<Side, number> = { player: 1, foe: 1 };
+  const spriteAlpha: Record<Side, number> = { player: 1, foe: 1 };
+  // The thrown ball. alpha 0 = absent, which is every frame outside a throw.
+  const ball = { x: 0, y: 0, alpha: 0, tilt: 0, spin: 0 };
+  const sparkle = { alpha: 0, scale: 1 }; // the click's star-burst confirm
   const panelOffY: Record<Side, number> = { player: 0, foe: 0 }; // panel drop-in y-offset (per side)
   const panelAlpha: Record<Side, number> = { player: 1, foe: 1 }; // panel fade-in (per side; rests at 1)
   anim.register('sprite.flashAlpha', { set: (v, s) => { spriteFlash[s ?? 'foe'] = v; } });
@@ -1305,6 +1312,15 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   anim.register('sprite.lungeToward', {
     set: (v, s) => { const side = s ?? 'player'; spriteOffX[side] = side === 'player' ? v : -v; },
   });
+  anim.register('sprite.scale', { set: (v, s) => { spriteScale[s ?? 'foe'] = v; } });
+  anim.register('sprite.alpha', { set: (v, s) => { spriteAlpha[s ?? 'foe'] = v; } });
+  anim.register('ball.x', { set: (v) => { ball.x = v; } });
+  anim.register('ball.y', { set: (v) => { ball.y = v; } });
+  anim.register('ball.alpha', { set: (v) => { ball.alpha = v; } });
+  anim.register('ball.tilt', { set: (v) => { ball.tilt = v; } });
+  anim.register('ball.spin', { set: (v) => { ball.spin = v; } });
+  anim.register('sparkle.alpha', { set: (v) => { sparkle.alpha = v; } });
+  anim.register('sparkle.scale', { set: (v) => { sparkle.scale = v; } });
   anim.register('stage.shakeX', { set: (v) => { stageShakeX = v; } });
   anim.register('bar.hpProgress', {
     onStart: (s) => { const side = s ?? 'foe'; drainFrom[side] = barHp[side]; drainTo[side] = display[side].hp; },
@@ -1367,6 +1383,52 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     textQueue = [...lines];
     textNext = then;
     textDismissable = options.dismissable ?? false;
+  }
+
+  // ── the catch sequence ────────────────────────────────────────────────────
+  // A throw is no longer one line of text. The result is already decided by
+  // onThrowBall; this plays it out — ball arc, the mon pulled in, the wiggle
+  // beat that IS the tension (visual-north-star §catch sequence), then the click
+  // or the breakout. Steps are (seconds, action) pairs ticked from update().
+  let catchSeq: { t: number; steps: { at: number; run: () => void }[]; done: () => void } | null = null;
+
+  function runCatchSequence(caught: boolean, wiggles: number, done: () => void): void {
+    const steps: { at: number; run: () => void }[] = [];
+    anim.play('battle.catchThrow');
+    // The throw + absorb + settle is 38 frames; wiggles start once the ball rests.
+    let t = 38 / 60;
+    for (let i = 0; i < wiggles; i += 1) {
+      const index = i;
+      steps.push({ at: t, run: () => emitGameEvent({ kind: 'catch-wiggle', index }) });
+      t += 22 / 60; // one wiggle (19 frames) + a beat of stillness between
+    }
+    t += 0.12; // the held breath before it resolves
+    steps.push({
+      at: t,
+      run: () => emitGameEvent({ kind: caught ? 'catch-success' : 'catch-break' }),
+    });
+    // Let the resolve animation read before the text box takes the screen.
+    steps.push({ at: t + (caught ? 26 : 20) / 60, run: () => { catchSeq = null; done(); } });
+    catchSeq = { t: 0, steps, done };
+  }
+
+  function tickCatchSequence(dt: number): void {
+    if (!catchSeq) return;
+    catchSeq.t += dt;
+    while (catchSeq && catchSeq.steps.length > 0 && catchSeq.steps[0]!.at <= catchSeq.t) {
+      catchSeq.steps.shift()!.run();
+    }
+  }
+
+  // Clear every catch-visual channel — the ball is gone and the foe is whole.
+  // Called when the sequence ends in a breakout (the mon stays) and on a switch.
+  function resetCatchVisuals(): void {
+    ball.alpha = 0;
+    ball.tilt = 0;
+    ball.spin = 0;
+    sparkle.alpha = 0;
+    spriteScale.foe = 1;
+    spriteAlpha.foe = 1;
   }
 
   function foeGone(): void {
@@ -2190,23 +2252,30 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     const hpFrac = foe.hp / Math.max(1, foe.maxHp);
     emitGameEvent({ kind: 'catch-attempt' });
     const result = opts.onThrowBall ? opts.onThrowBall(window, hpFrac) : { caught: false };
-    if (result.caught) {
-      emitGameEvent({ kind: 'catch-success' });
-      setText([`Gotcha! ${foe.species.name} was caught!`], () => opts.onCaught?.(state, 'read'));
-      return;
-    }
-    if (window === 'none') {
-      // Out-of-window throw — auto-fail. Wild: raise Wariness (→ flee spiral).
-      // Tutorial: a gentle correction, no Wariness (forgiving, scripted only).
-      if (opts.tutorial) {
-        setText([TUTORIAL_CORRECTION], () => commit({ kind: 'throwBall' }));
-      } else {
-        wariness += 1;
-        setText([`The ${foe.species.name} wasn't exposed — missed!`], () => commit({ kind: 'throwBall' }));
+    const missed = window === 'none';
+    // The wiggle count is the TENSION, and it stays honest about the read: a
+    // catch earns the full three; an in-window miss shakes twice before it goes;
+    // an out-of-window throw never had the mon, so there is nothing to shake.
+    const wiggles = result.caught ? 3 : missed ? 0 : 2;
+    runCatchSequence(result.caught, wiggles, () => {
+      if (result.caught) {
+        setText([`Gotcha! ${foe.species.name} was caught!`], () => opts.onCaught?.(state, 'read'));
+        return;
       }
-    } else {
-      setText([`Aww — the ${foe.species.name} broke free!`], () => commit({ kind: 'throwBall' }));
-    }
+      resetCatchVisuals(); // it broke out — the foe is whole again
+      if (missed) {
+        // Out-of-window throw — auto-fail. Wild: raise Wariness (→ flee spiral).
+        // Tutorial: a gentle correction, no Wariness (forgiving, scripted only).
+        if (opts.tutorial) {
+          setText([TUTORIAL_CORRECTION], () => commit({ kind: 'throwBall' }));
+        } else {
+          wariness += 1;
+          setText([`The ${foe.species.name} wasn't exposed — missed!`], () => commit({ kind: 'throwBall' }));
+        }
+      } else {
+        setText([`Aww — the ${foe.species.name} broke free!`], () => commit({ kind: 'throwBall' }));
+      }
+    });
   }
 
   function stepCursor(start: number, dir: 1 | -1): number {
@@ -2814,6 +2883,71 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // rising off the player's mon + a faint ring, the moment a read banks a ★.
   // Subtle and diegetic (NOT a score/grade popup) — it just says "the read
   // landed." Pure render; the testable signal is the 'read-win' game event.
+  // The ball: a placeholder two-tone sphere with a banded seam and a catch
+  // button, drawn procedurally at the battle's logical scale. `tilt` rocks it
+  // during a wiggle; `spin` rolls the seam while it flies. No-op at alpha 0.
+  // The bottom box during a throw: the empty frame with the one line that
+  // belongs to the beat, so the stage keeps the screen but the layout does not
+  // jump. Named separately from drawBottomDialog because it owns no queue and
+  // takes no input.
+  function drawBottomThrowBeat(ctx: CanvasRenderingContext2D): void {
+    drawBottomDialog(ctx, [`${monDisplayName(display.player)} hurls a ball!`]);
+  }
+
+  function drawCatchBall(ctx: CanvasRenderingContext2D): void {
+    if (ball.alpha <= 0.004) return;
+    const R = 9;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, ball.alpha);
+    ctx.translate(ball.x + stageShakeX, ball.y);
+    ctx.rotate(ball.tilt + ball.spin);
+    // body
+    ctx.fillStyle = PALETTE.paper;
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.fill();
+    // upper half — the warm shell
+    ctx.fillStyle = PALETTE.velvet;
+    ctx.beginPath();
+    ctx.arc(0, 0, R, Math.PI, 0);
+    ctx.fill();
+    // seam + catch
+    ctx.strokeStyle = PALETTE.frameInk;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-R, 0);
+    ctx.lineTo(R, 0);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = PALETTE.silver;
+    ctx.beginPath();
+    ctx.arc(0, 0, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = PALETTE.frameInk;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+
+    // the click's star-burst confirm (visual-north-star §particle touches)
+    if (sparkle.alpha > 0.004) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, sparkle.alpha);
+      ctx.strokeStyle = PALETTE.momentumGoldHi;
+      ctx.lineWidth = 2;
+      const r = 10 * sparkle.scale;
+      for (let i = 0; i < 6; i += 1) {
+        const a = (i / 6) * Math.PI * 2 + 0.3;
+        ctx.beginPath();
+        ctx.moveTo(ball.x + Math.cos(a) * r * 0.45, ball.y + Math.sin(a) * r * 0.45);
+        ctx.lineTo(ball.x + Math.cos(a) * r, ball.y + Math.sin(a) * r);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
   function drawReadReaction(ctx: CanvasRenderingContext2D): void {
     if (readReactT <= 0) return;
     const t = 1 - readReactT / READ_REACT_SEC; // 0→1 across the reaction
@@ -3317,6 +3451,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // hp bar to the truth on any side NOT mid-drain (so heals/settles don't lag;
       // a drain owns barHp for its ~16 frames, ending exactly on display.hp).
       anim.update(dt);
+      tickCatchSequence(dt);
       for (const s of ['player', 'foe'] as const) {
         if (!anim.isActive('battle.hpDrain', s)) barHp[s] = display[s].hp;
       }
@@ -3344,6 +3479,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     },
 
     input(key) {
+      // The catch sequence owns the screen while it plays — no input until the
+      // ball settles and the result text takes over.
+      if (catchSeq) return;
       if (phase === 'text') {
         handleTextInput(key);
         return;
@@ -3397,14 +3535,24 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       // that fits (2× → 112, pixel-crisp); placeholders already scale to the slot.
       const foeX = FOE_SLOT.x + spriteOffset('foe') + stageShakeX + spriteOffX.foe;
       const plX = PL_SLOT.x + spriteOffset('player') + stageShakeX + spriteOffX.player;
-      drawSpeciesInSlot(
-        ctx,
-        { name: display.foe.species.name, type: display.foe.species.types[0] ?? null },
-        foeX,
-        FOE_SLOT.y,
-        { facing: 'left', slotSize: BATTLE_SLOT, fillSlot: true, bottomAnchor: true },
-      );
-      drawSpriteFlash(ctx, 'foe', foeX, FOE_SLOT.y);
+      // Catch absorb: the slot shrinks about its bottom-centre so the mon is
+      // pulled DOWN into the ball rather than vanishing from its middle. At
+      // scale 1 / alpha 1 (every non-catch frame) this is the original call.
+      const foeScale = spriteScale.foe;
+      const foeSlot = BATTLE_SLOT * foeScale;
+      const foeAlpha = spriteAlpha.foe;
+      if (foeAlpha > 0.004) {
+        if (foeAlpha < 0.999) ctx.globalAlpha = foeAlpha;
+        drawSpeciesInSlot(
+          ctx,
+          { name: display.foe.species.name, type: display.foe.species.types[0] ?? null },
+          foeX + (BATTLE_SLOT - foeSlot) / 2,
+          FOE_SLOT.y + (BATTLE_SLOT - foeSlot),
+          { facing: 'left', slotSize: foeSlot, fillSlot: true, bottomAnchor: true },
+        );
+        if (foeAlpha < 0.999) ctx.globalAlpha = 1;
+        drawSpriteFlash(ctx, 'foe', foeX, FOE_SLOT.y);
+      }
       drawSpeciesInSlot(
         ctx,
         { name: monDisplayName(display.player), type: display.player.species.types[0] ?? null },
@@ -3414,6 +3562,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       );
       drawSpriteFlash(ctx, 'player', plX, PL_SLOT.y);
 
+      drawCatchBall(ctx); // the thrown ball — over the mon, under the HUD panels
       drawReadReaction(ctx); // surface ③ — over the mon, under the HUD panels
       // Battle-UI v2 (beat 1) — the panels now OWN their sub-elements: the foe
       // panel integrates the BREAK row (boss) + status tags; the player panel
@@ -3422,7 +3571,9 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       drawFoePanel(ctx);
       drawPlayerPanel(ctx);
 
-      if (phase === 'menu' || phase === 'move' || phase === 'call' || phase === 'release' || phase === 'throwoff') drawIntent(ctx);
+      // The catch sequence owns the screen — the menu the throw came from, and
+      // the foe-intent bar, both stand down until the ball resolves.
+      if (!catchSeq && (phase === 'menu' || phase === 'move' || phase === 'call' || phase === 'release' || phase === 'throwoff')) drawIntent(ctx);
       // S1 — the read-war callout occupies the intent slot during resolve. Drawn
       // whenever it's visible (situationAlpha > 0) so its fade-out completes even
       // a beat or two after resolve ends; drawCallout no-ops when faded out.
@@ -3434,7 +3585,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
         ctx.fillRect(0, 0, BATTLE_LOGICAL_W, BATTLE_LOGICAL_H);
       }
 
-      if (phase === 'text') drawBottomDialog(ctx, textQueue);
+      if (catchSeq) drawBottomThrowBeat(ctx);
+      else if (phase === 'text') drawBottomDialog(ctx, textQueue);
       else if (phase === 'menu') drawBottomMenu(ctx);
       else if (phase === 'move') drawBottomMoves(ctx);
       else if (phase === 'call') drawBottomCall(ctx);

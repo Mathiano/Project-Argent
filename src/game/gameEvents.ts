@@ -45,6 +45,10 @@ export type GameEvent =
   // text today). The emit site lands with the catch-sequence visual pass.
   | { readonly kind: 'catch-wiggle'; readonly index: number }
   | { readonly kind: 'catch-success' }
+  // The ball bursts and the mon comes back out. The counterpart to catch-success;
+  // fires at the END of the wiggle beat, not at the throw, so the visual and the
+  // audio land on the release rather than on the attempt.
+  | { readonly kind: 'catch-break' }
   // Reserved: the status system is Phase 8 (combat-depth-types-status.md).
   // No emit site exists yet; the type is here so audio reserves the cue.
   | { readonly kind: 'status-applied'; readonly side: Side; readonly status: string }

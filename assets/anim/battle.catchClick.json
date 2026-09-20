@@ -1,0 +1,50 @@
+{
+  "id": "battle.catchClick",
+  "tracks": [
+    {
+      "target": "ball",
+      "property": "tilt",
+      "from": 0,
+      "to": 0,
+      "durationFrames": 4,
+      "easing": "hold",
+      "delayFrames": 0
+    },
+    {
+      "target": "ball",
+      "property": "y",
+      "from": 112,
+      "to": 108,
+      "durationFrames": 3,
+      "easing": "easeOut",
+      "delayFrames": 0
+    },
+    {
+      "target": "ball",
+      "property": "y",
+      "from": 108,
+      "to": 112,
+      "durationFrames": 4,
+      "easing": "easeIn",
+      "delayFrames": 3
+    },
+    {
+      "target": "sparkle",
+      "property": "alpha",
+      "from": 1,
+      "to": 0,
+      "durationFrames": 22,
+      "easing": "easeIn",
+      "delayFrames": 2
+    },
+    {
+      "target": "sparkle",
+      "property": "scale",
+      "from": 0.3,
+      "to": 1.6,
+      "durationFrames": 22,
+      "easing": "easeOut",
+      "delayFrames": 2
+    }
+  ]
+}

@@ -125,10 +125,16 @@ function flush(scene: ReturnType<typeof createBattleScene>): void {
   for (let i = 0; i < 80; i += 1) scene.update?.(0.2);
 }
 
-// From the FIGHT menu, move down to the BALL row and throw.
+// From the FIGHT menu, move down to the BALL row and throw, then run the CATCH
+// SEQUENCE out. A throw is no longer instant: the ball arcs, the mon is pulled
+// in, it wiggles, and only then does the result text appear (the visual-pass
+// beat). The scene ignores input for the whole of it, so a test that presses
+// without ticking would press into a void. ~2.5s of ticks covers the longest
+// path (a catch: 3 wiggles + the click) with room to spare.
 function throwBall(scene: ReturnType<typeof createBattleScene>): void {
   scene.input?.('down'); // FIGHT → (skip greyed PKMN) → BALL
   scene.input?.('a'); // confirm BALL → throw
+  for (let i = 0; i < 150; i += 1) scene.update?.(1 / 60);
 }
 
 // One full out-of-window throw cycle from a menu, landing at the next

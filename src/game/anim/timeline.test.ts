@@ -80,6 +80,7 @@ describe('easing functions — endpoints + monotonicity', () => {
 describe('the SHIPPED battle animations — schema + duration pins', () => {
   test('every shipped animation loads + carries its id', () => {
     expect([...BATTLE_ANIM_DEFS.keys()].sort()).toEqual([
+      'battle.catchBreak', 'battle.catchClick', 'battle.catchThrow', 'battle.catchWiggle',
       'battle.enterWipe', 'battle.hitFlash', 'battle.hpDrain', 'battle.starPop', 'battle.strike',
     ]);
   });
@@ -116,6 +117,11 @@ describe('the SHIPPED battle animations — schema + duration pins', () => {
     expect(BATTLE_ANIM_EVENT_MAP['read-win']).toEqual(['battle.starPop']);
     expect(BATTLE_ANIM_EVENT_MAP['battle-start']).toEqual(['battle.enterWipe']);
     expect(BATTLE_ANIM_EVENT_MAP['move-resolved']).toBeUndefined(); // the lunge rides hit-landed
+    // The catch beat — catch-wiggle stops being a reserved-not-emitting event.
+    expect(BATTLE_ANIM_EVENT_MAP['catch-attempt']).toEqual(['battle.catchThrow']);
+    expect(BATTLE_ANIM_EVENT_MAP['catch-wiggle']).toEqual(['battle.catchWiggle']);
+    expect(BATTLE_ANIM_EVENT_MAP['catch-success']).toEqual(['battle.catchClick']);
+    expect(BATTLE_ANIM_EVENT_MAP['catch-break']).toEqual(['battle.catchBreak']);
   });
 });
 

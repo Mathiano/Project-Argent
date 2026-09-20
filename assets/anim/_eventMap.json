@@ -9,5 +9,17 @@
   ],
   "battle-start": [
     "battle.enterWipe"
+  ],
+  "catch-attempt": [
+    "battle.catchThrow"
+  ],
+  "catch-wiggle": [
+    "battle.catchWiggle"
+  ],
+  "catch-success": [
+    "battle.catchClick"
+  ],
+  "catch-break": [
+    "battle.catchBreak"
   ]
 }
