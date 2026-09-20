@@ -274,6 +274,9 @@ export interface TurnHistoryEntry {
   readonly foe: Stance | null;
 }
 
+// Layer 3 — declared in environment.ts; type-only, so no import cycle.
+export type EnvironmentId = 'open' | 'forest' | 'fog' | 'ice' | 'rocky' | 'cliff' | 'mud';
+
 export interface BattleState {
   readonly player: Team;
   readonly foe: Team;
@@ -283,6 +286,11 @@ export interface BattleState {
   // Trait modifier table for this battle. Defaults to LEGACY_TRAIT_TABLE
   // when caller omits it; bosses can override per-card.
   readonly traits: TraitTable;
+  // Combat Layer 3 — the GROUND this fight happens on. Tilts the stance
+  // triangle and the releases a little, and tells a local trainer how to play
+  // (environment.ts). ABSENT → 'open', whose every multiplier is 1, so every
+  // existing battle and ladder is bit-identical.
+  readonly environment?: EnvironmentId;
   // Boss-side card driving arena rhythm + future hooks. Null/absent for
   // wild and rival fights — neutral state, no modifiers.
   readonly bossCard?: BossCard;

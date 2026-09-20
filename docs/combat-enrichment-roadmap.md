@@ -91,6 +91,13 @@ So two-stepping is NOT a reliable momentum source — you only earn ★ from a t
 
 ## LAYER 3 — environments (the meta-read layer, build with/after two-steps)
 
+> **✅ BUILT (engine + sim gate) — read `docs/combat-environments-AS-BUILT.md` for code-truth.**
+> Three findings from the build change how this section should be read:
+> 1. **The table below taxes Fluid (rocky, mud) and was calibrated when Fluid was DOMINANT (~99.7% pre-Layer-1).** Post-Layer-1 Fluid is the WEAKEST pure stance (26%). A full re-derivation against current balance is a design call, deliberately NOT made during the build.
+> 2. **Raw damage is a weak lever here** — a 24% damage cut moved a stance's win rate 2pp. STAMINA is what bites, and it is what this section's own language ("slows mobility", "no room to wind up") describes.
+> 3. **In an A>F>G>A triangle you cannot tax one stance without paying another.** Hurting Fluid protects Guard in its only losing matchup; the first build handed PureGUARD 68–70% in rocky/mud — the dominant strategy the Monte Carlo TODO below warns about. Caught by the gate, fixed by cutting Guard's conversion on that ground.
+
+
 Each environment TILTS the triangle AND biases opponent behavior. Two effects:
 
 ### A) Mechanical tilt (helps/hurts specific stances)
@@ -105,7 +112,7 @@ Each environment TILTS the triangle AND biases opponent behavior. Two effects:
 | Sand / mud | Guard | Fluid, Charge | Slows mobility; favors the patient brace |
 
 ### B) The META-READ (the deep part)
-**A smart trainer plays to their terrain — so the environment tells you their likely policy.** In a frozen zone, local trainers know bracing is bad there, so they brace less — and YOU can anticipate that (prepare for their aggression). In fog/forest, home trainers MAIN evasion/ambush (their home turf) — read that and bait it. Opponents still VARY, but carry a terrain PREFERENCE you can exploit if you pay attention. This layers a slow, anticipatory read (their style, informed by where you fight) on top of the per-round read. Ties combat to "journeys not corridors" — *where* you fight matters, mechanically. (Monte Carlo TODO: model terrain-biased opponent policies to confirm no environment creates an in-biome dominant strategy.)
+**A smart trainer plays to their terrain — so the environment tells you their likely policy.** In a frozen zone, local trainers know bracing is bad there, so they brace less — and YOU can anticipate that (prepare for their aggression). In fog/forest, home trainers MAIN evasion/ambush (their home turf) — read that and bait it. Opponents still VARY, but carry a terrain PREFERENCE you can exploit if you pay attention. This layers a slow, anticipatory read (their style, informed by where you fight) on top of the per-round read. Ties combat to "journeys not corridors" — *where* you fight matters, mechanically. (Monte Carlo TODO: ✅ **DONE** — `src/sim/environmentBalance.test.ts` runs the Layer-1 round-robin in every biome and gates on no-dominant-strategy; it caught a real one during the build.)
 
 ---
 

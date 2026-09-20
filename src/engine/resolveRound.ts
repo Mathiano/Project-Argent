@@ -1,3 +1,5 @@
+import { envRelease, envStamina, envStanceDealt, envStanceTaken, environmentFor } from './environment';
+import type { Environment } from './environment';
 import { COMBAT, FOCUS, STATUS, TIERS } from './config';
 import { typeMult } from './data';
 import type { BattleEvent, CommitDescriptor, SideSnapshot } from './events';
@@ -404,6 +406,9 @@ function resolveStrike(
   events: BattleEvent[],
   typeChart: TypeChart,
   traits: TraitTable,
+  // Layer 3 — the ground this fight is on. Undefined → no tilt (every
+  // multiplier 1), which is what every pre-Layer-3 caller gets.
+  env: Environment | undefined,
   rhythm: boolean,
   defDazed: boolean,
   // FULL POWER (Lane B) — ×1.5 on a buffed attack, else 1. Applied to the raw
@@ -468,6 +473,7 @@ function resolveStrike(
     (tier.power * attacker.species.atk) / defender.species.dfn * COMBAT.dmgScale * variance;
   d *= eff;
   d *= stanceOutMult(attStance);
+  d *= envStanceDealt(env, attStance); // Layer 3 — the ground favours some stances
   // Trait damage modifier (e.g., GUSTBORNE x1.3 on rhythm rounds).
   d *= traitMods(attacker, rhythm, traits).dmgMult;
   d *= attMult;
@@ -527,6 +533,7 @@ function resolveStrike(
   const preMit = d;
   if (defStance === 'A') d *= COMBAT.aggrTaken;
   if (defStance === 'G') d *= COMBAT.guardTaken;
+  d *= envStanceTaken(env, defStance); // Layer 3 — bracing on ice protects less
   d *= defGuardMit; // SET STANCE: stronger Brace (1.0 unless Guard + the buff)
   if (defender.exhausted) d *= COMBAT.exhTaken;
   d *= dazeMult;
@@ -570,6 +577,8 @@ function paySide(
   action: Action,
   rhythm: boolean,
   arena: ArenaSchedule | undefined,
+  // Layer 3 — the ground taxes or rewards the stance you hold. Undefined → 0.
+  env: Environment | undefined,
 ): SideState {
   if (action.kind === 'rest') {
     return {
@@ -608,7 +617,12 @@ function paySide(
   if (action.stance === 'A') cost *= COMBAT.aggrCostMult;
   if (action.stance === 'F') cost += COMBAT.fluidCost;
   if (rhythm && arena && tier.name === 'heavy') cost += arena.heavyExtraCost;
-  let st = side.st - cost + COMBAT.regen + (action.stance === 'G' ? COMBAT.guardRegen : 0);
+  let st =
+    side.st -
+    cost +
+    COMBAT.regen +
+    (action.stance === 'G' ? COMBAT.guardRegen : 0) +
+    envStamina(env, action.stance); // Layer 3 — mud drains a dodger, rock feeds a brace
   const exhausted = st <= 0;
   st = exhausted ? 0 : Math.min(side.maxSt, st);
   return { ...side, st, exhausted };
@@ -643,6 +657,9 @@ export function resolveRound(
   if (activeMon(state.player).focus === undefined) validateActionTeam(state.player, playerAction);
   if (activeMon(state.foe).focus === undefined) validateActionTeam(state.foe, foeAction);
 
+  // Layer 3 — the ground, resolved once per round. Absent → OPEN, every
+  // multiplier 1, so an un-environmented battle stays bit-identical.
+  const env = environmentFor(state.environment);
   const events: BattleEvent[] = [];
 
   // Effect-move plumbing (Increment 1a): statuses a technique resolved THIS
@@ -854,14 +871,14 @@ export function resolveRound(
         if (pl.hp <= 0 || foe.hp <= 0) break;
         if (sk === 'player') {
           const { d, eff } = rawHit(pl, foe, plMv, rng, state.typeChart, state.traits, rhythm);
-          let dd = d * FOCUS.releaseBase * (winner === 'player' ? FOCUS.flipWin : winner === 'foe' ? FOCUS.flipLose : 1);
+          let dd = d * FOCUS.releaseBase * envRelease(env, a) * (winner === 'player' ? FOCUS.flipWin : winner === 'foe' ? FOCUS.flipLose : 1);
           if (foe.exhausted) dd *= COMBAT.exhTaken;
           const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
           events.push({ kind: 'release', side: 'player', release: a, outcome: winner === 'player' ? 'win' : winner === 'foe' ? 'lose' : 'neutral', damage: r.applied, effectiveness: eff });
           foe = koOrBondMoment(foe, 'foe', events);
         } else {
           const { d, eff } = rawHit(foe, pl, foeMv, rng, state.typeChart, state.traits, rhythm);
-          let dd = d * FOCUS.releaseBase * (winner === 'foe' ? FOCUS.flipWin : winner === 'player' ? FOCUS.flipLose : 1);
+          let dd = d * FOCUS.releaseBase * envRelease(env, b) * (winner === 'foe' ? FOCUS.flipWin : winner === 'player' ? FOCUS.flipLose : 1);
           if (pl.exhausted) dd *= COMBAT.exhTaken;
           const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
           events.push({ kind: 'release', side: 'foe', release: b, outcome: winner === 'foe' ? 'win' : winner === 'player' ? 'lose' : 'neutral', damage: r.applied, effectiveness: eff });
@@ -925,7 +942,7 @@ export function resolveRound(
         const att = relSide === 'player' ? pl : foe;
         const def = oppSide === 'player' ? pl : foe;
         const { d, eff } = rawHit(att, def, relMv, rng, state.typeChart, state.traits, rhythm);
-        let dd = d * FOCUS.releaseBase * relMult;
+        let dd = d * FOCUS.releaseBase * envRelease(env, rel) * relMult;
         if (def.exhausted) dd *= COMBAT.exhTaken;
         const r = dealt(def.hp, dd, oppCall);
         if (oppSide === 'player') pl = { ...pl, hp: r.hp };
@@ -944,7 +961,7 @@ export function resolveRound(
         // Full Power buffs the single-stepping opponent's strike (the buffed
         // attacker here is oppSide; the releaser is never a fullPower move).
         const oppStrikeMult = oppSide === 'player' ? plStrikeMult : foeStrikeMult;
-        let dd = d * stanceOutMult(oppStance!) * foeMult * oppStrikeMult;
+        let dd = d * stanceOutMult(oppStance!) * envStanceDealt(env, oppStance!) * foeMult * oppStrikeMult;
         if (def.exhausted) dd *= COMBAT.exhTaken;
         const r = dealt(def.hp, dd, relCall);
         if (relSide === 'player') pl = { ...pl, hp: r.hp };
@@ -978,7 +995,7 @@ export function resolveRound(
         if (pl.hp <= 0 || foe.hp <= 0) break;
         if (sk === 'player' && plStrikes) {
           const { d, eff } = rawHit(pl, foe, plMove!, rng, state.typeChart, state.traits, rhythm);
-          let dd = d * stanceOutMult(plStance) * plStrikeMult; // Full Power buffs this strike too
+          let dd = d * stanceOutMult(plStance) * envStanceDealt(env, plStance) * plStrikeMult; // Full Power buffs this strike too
           if (foeInitiating) dd *= FOCUS.focusCost; // hitting a focuser → the focus cost
           if (foe.exhausted) dd *= COMBAT.exhTaken;
           const r = dealt(foe.hp, dd, foeCall); foe = { ...foe, hp: r.hp };
@@ -987,7 +1004,7 @@ export function resolveRound(
           foe = koOrBondMoment(foe, 'foe', events);
         } else if (sk === 'foe' && foeStrikes) {
           const { d, eff } = rawHit(foe, pl, foeMove!, rng, state.typeChart, state.traits, rhythm);
-          let dd = d * stanceOutMult(foeStance) * foeStrikeMult; // Full Power buffs this strike too
+          let dd = d * stanceOutMult(foeStance) * envStanceDealt(env, foeStance) * foeStrikeMult; // Full Power buffs this strike too
           if (plInitiating) dd *= FOCUS.focusCost;
           if (pl.exhausted) dd *= COMBAT.exhTaken;
           const r = dealt(pl.hp, dd, plCall); pl = { ...pl, hp: r.hp };
@@ -1059,7 +1076,7 @@ export function resolveRound(
       if (plWins) {
         events.push({ kind: 'clash', winner: 'player' });
         pl = gainMomentum(pl, 'player', events);
-        const r = resolveStrike(pl, foe, plMove!, "A", "A", "player", rng, events, state.typeChart, state.traits, rhythm, foeDazed, plStrikeMult);
+        const r = resolveStrike(pl, foe, plMove!, "A", "A", "player", rng, events, state.typeChart, state.traits, env, rhythm, foeDazed, plStrikeMult);
         pl = r.attacker;
         foe = r.defender;
         if (r.effect !== undefined) pendingEffects.push(r.effect);
@@ -1071,7 +1088,7 @@ export function resolveRound(
       } else {
         events.push({ kind: 'clash', winner: 'foe' });
         foe = gainMomentum(foe, 'foe', events);
-        const r = resolveStrike(foe, pl, foeMove!, "A", "A", "foe", rng, events, state.typeChart, state.traits, rhythm, plDazed, foeStrikeMult);
+        const r = resolveStrike(foe, pl, foeMove!, "A", "A", "foe", rng, events, state.typeChart, state.traits, env, rhythm, plDazed, foeStrikeMult);
         foe = r.attacker;
         pl = r.defender;
         if (r.effect !== undefined) pendingEffects.push(r.effect);
@@ -1085,13 +1102,13 @@ export function resolveRound(
       for (const sideKey of order) {
         if (pl.hp <= 0 || foe.hp <= 0) break;
         if (sideKey === 'player' && plMove !== null) {
-          const r = resolveStrike(pl, foe, plMove, plStance, foeStance, "player", rng, events, state.typeChart, state.traits, rhythm, foeDazed, plStrikeMult);
+          const r = resolveStrike(pl, foe, plMove, plStance, foeStance, "player", rng, events, state.typeChart, state.traits, env, rhythm, foeDazed, plStrikeMult);
           pl = r.attacker;
           foe = r.defender;
           if (r.effect !== undefined) pendingEffects.push(r.effect);
           if (r.consumeCorrode) { pl = clearDebuff(pl); events.push({ kind: 'statusBreak', side: 'player', status: 'corrode' }); }
         } else if (sideKey === 'foe' && foeMove !== null) {
-          const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, "foe", rng, events, state.typeChart, state.traits, rhythm, plDazed, foeStrikeMult);
+          const r = resolveStrike(foe, pl, foeMove, foeStance, plStance, "foe", rng, events, state.typeChart, state.traits, env, rhythm, plDazed, foeStrikeMult);
           foe = r.attacker;
           pl = r.defender;
           if (r.effect !== undefined) pendingEffects.push(r.effect);
@@ -1132,7 +1149,7 @@ export function resolveRound(
     // pays its move cost via the normal paySide path.
     if (plReleasing) pl = { ...pl, st: Math.min(pl.maxSt, pl.st + COMBAT.regen) };
     else if (playerAction.kind === 'call') { /* ★ already spent; no stamina */ }
-    else pl = paySide(pl, playerAction, rhythm, arena);
+    else pl = paySide(pl, playerAction, rhythm, arena, env);
     if (pl.st !== plBefore.st) {
       events.push({
         kind: 'stamina',
@@ -1148,7 +1165,7 @@ export function resolveRound(
     const foeBefore = foe;
     if (foeReleasing) foe = { ...foe, st: Math.min(foe.maxSt, foe.st + COMBAT.regen) };
     else if (foeAction.kind === 'call') { /* ★ already spent; no stamina */ }
-    else foe = paySide(foe, foeAction, rhythm, arena);
+    else foe = paySide(foe, foeAction, rhythm, arena, env);
     if (foe.st !== foeBefore.st) {
       events.push({
         kind: 'stamina',
@@ -1238,6 +1255,11 @@ export function resolveRound(
       round: state.round + 1,
       typeChart: state.typeChart,
       traits: state.traits,
+      // Layer 3 — the ground does not change mid-fight. This state is built
+      // field-by-field rather than spread, so anything not listed here is
+      // DROPPED after round 1; environment was, and terrain silently stopped
+      // applying from round 2 on.
+      ...(state.environment !== undefined ? { environment: state.environment } : {}),
       ...(state.bossCard !== undefined ? { bossCard: state.bossCard } : {}),
       ...(breakThreshold > 0 ? { breakProgress, phase, rhythmAnchor } : {}),
       history: [

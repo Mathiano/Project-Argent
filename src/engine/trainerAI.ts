@@ -15,6 +15,7 @@
 // catalog's mid/elite tiers).
 
 import { COMBAT } from './config';
+import { environmentFor, terrainStanceMix } from './environment';
 import {
   affordableAttacks,
   affordableMoves,
@@ -420,7 +421,14 @@ export function trainerPolicy(profile: TrainerProfile): TrainerPolicy {
     // 5. BASE STANCE — weighted by tendency, REACTIVE counter-weighting (Stage 3;
     //    base mix untouched for non-reactive → bit-identical), avoiding the
     //    thrice-repeat self-daze. Single-step damage is an ATTACK.
-    const mix = adaptiveStanceMix(profile, STANCE_MIX[profile.stance], state, side);
+    // 5b. TERRAIN (Combat Layer 3 — the META-READ). A trainer who CLAIMS this
+    //     ground plays to it: leaning into what the terrain rewards, away from
+    //     what it punishes. This finally reads profile.terrain, which has been
+    //     carried as data since the Layer-4 build. A trainer whose terrain is
+    //     not this one fights the same everywhere — itself information, since
+    //     the local reads the ground and the stranger does not.
+    const base = adaptiveStanceMix(profile, STANCE_MIX[profile.stance], state, side);
+    const mix = terrainStanceMix(base, environmentFor(state.environment), profile.terrain);
     const stance = avoidSelfDaze(drawStance(mix, rng), state, side);
     return { kind: 'move', move: pickSustainableMove(atk), stance };
   };

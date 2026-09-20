@@ -18,7 +18,7 @@ import {
   mulberry32,
   resolveRound,
 } from '../engine';
-import type { Action, BattleState, RNG, Side, Stance } from '../engine';
+import type { Action, BattleState, EnvironmentId, RNG, Side, Stance } from '../engine';
 
 export type StancePolicy = (rng: RNG) => Stance;
 
@@ -55,10 +55,14 @@ export function battle(
   speciesName: string,
   rng: RNG,
   maxRounds = 80,
+  // Combat Layer 3 — fight this out on a given ground. Omitted → no
+  // environment on the state at all, so every existing caller is unchanged.
+  environment?: EnvironmentId,
 ): number {
   let state = createBattleState(
     createSide(SPECIES[speciesName]!),
     createSide(SPECIES[speciesName]!),
+    environment !== undefined ? { environment } : {},
   );
   for (let i = 0; i < maxRounds; i += 1) {
     const r = resolveRound(state, actionFor(state, 'player', polA(rng)), actionFor(state, 'foe', polB(rng)), rng);
@@ -81,7 +85,12 @@ export interface BalanceResult {
 }
 
 // Round-robin every ordered policy pairing, n battles each.
-export function runStanceBalance(speciesName = 'SPROUTLE', nPerPair = 600, seed = 1): BalanceResult {
+export function runStanceBalance(
+  speciesName = 'SPROUTLE',
+  nPerPair = 600,
+  seed = 1,
+  environment?: EnvironmentId,
+): BalanceResult {
   const names = Object.keys(POLICIES);
   const wins: { [k: string]: number } = {};
   const games: { [k: string]: number } = {};
@@ -94,7 +103,7 @@ export function runStanceBalance(speciesName = 'SPROUTLE', nPerPair = 600, seed 
     for (const nb of names) {
       if (na === nb) continue;
       for (let i = 0; i < nPerPair; i += 1) {
-        const score = battle(POLICIES[na]!, POLICIES[nb]!, speciesName, mulberry32(s));
+        const score = battle(POLICIES[na]!, POLICIES[nb]!, speciesName, mulberry32(s), 80, environment);
         s += 1;
         wins[na]! += score;
         games[na]! += 1;

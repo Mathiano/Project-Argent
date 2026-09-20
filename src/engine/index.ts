@@ -75,4 +75,9 @@ export type {
   CallUse,
 } from './trainerAI';
 export { resolveRound } from './resolveRound';
+
+// Combat Layer 3 — environments (the ground a fight happens on).
+export { ENVIRONMENTS, ENVIRONMENT_IDS, environmentFor, terrainStanceMix } from './environment';
+export type { Environment } from './environment';
+export type { EnvironmentId } from './types';
 export type { RoundResult } from './resolveRound';

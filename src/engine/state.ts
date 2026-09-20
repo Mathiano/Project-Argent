@@ -12,6 +12,7 @@ import type {
   Team,
   TraitTable,
   TypeChart,
+  EnvironmentId,
 } from './types';
 import { activeMon } from './types';
 
@@ -65,6 +66,8 @@ export interface BattleSetup {
   readonly typeChart?: TypeChart;
   readonly traits?: TraitTable;
   readonly bossCard?: BossCard;
+  // Layer 3 — the ground. Omitted → 'open' (all multipliers 1).
+  readonly environment?: EnvironmentId;
 }
 
 // Wrap one or more SideStates into a Team. The first member is active.
@@ -101,6 +104,7 @@ export function createBattleState(
     typeChart: setup.typeChart ?? LEGACY_TYPE_CHART,
     traits: setup.traits ?? LEGACY_TRAIT_TABLE,
     ...(setup.bossCard !== undefined ? { bossCard: setup.bossCard } : {}),
+    ...(setup.environment !== undefined ? { environment: setup.environment } : {}),
   };
 }
 
