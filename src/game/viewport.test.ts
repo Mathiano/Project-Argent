@@ -36,6 +36,20 @@ describe('overlayLayout', () => {
   const inside = (b: { x: number; y: number; w: number; h: number }, vw: number, vh: number): boolean =>
     b.x >= 0 && b.y >= 0 && b.x + b.w <= vw && b.y + b.h <= vh;
 
+  it('the stance chip sits above A in the right gutter — same thumb, not a corner', () => {
+    const vw = 844, vh = 390, cw = 640;
+    const b = overlayLayout(vw, vh, cw);
+    const at = (k: string) => b.find((x) => x.key === k)!;
+    const stance = at('select');
+    const a = at('a');
+    expect(stance.y + stance.h).toBeLessThanOrEqual(a.y); // above A, not overlapping
+    expect(stance.w).toBeGreaterThanOrEqual(62); // wide enough for "STANCE G"
+    expect(stance.x).toBeGreaterThanOrEqual(0);
+    expect(stance.x + stance.w).toBeLessThanOrEqual(vw);
+    // START keeps the top-right corner to itself.
+    expect(at('start').y).toBe(12);
+  });
+
   it('phone landscape (844×390, 640×360 footprint): A/B sit fully in the right gutter', () => {
     const vw = 844, vh = 390, cw = 640;
     const gutter = (vw - cw) / 2; // 102

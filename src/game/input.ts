@@ -25,6 +25,18 @@ export interface InputDispatcher {
   dispose(): void;
 }
 
+// The mounted overlay, so a scene can relabel a button to what it currently
+// does. Presentation only, and a no-op when no overlay is mounted (desktop,
+// tests) — a scene never needs to know whether touch controls exist.
+let liveOverlay: { setLabel(key: InputKey, label: string): void } | null = null;
+
+// Rename a touch button. Used for SELECT, which is bound to exactly one action
+// in the whole game — the battle stance cycle — so on a phone it reads
+// "STANCE G" instead of a key name the hardware does not have.
+export function setTouchKeyLabel(key: InputKey, label: string): void {
+  liveOverlay?.setLabel(key, label);
+}
+
 export interface TouchOverlayOpts {
   // Where the overlay lives. Must be the canvas host: when canvas.ts rotates the
   // host for a portrait phone, a position:fixed overlay INSIDE it rotates along,
@@ -77,6 +89,7 @@ export function createInputDispatcher(
   const overlay = buildOverlay(onKey, held, touch);
   (touch?.parent ?? document.body).appendChild(overlay.el);
   overlay.layout();
+  liveOverlay = overlay;
 
   const isCoarse =
     typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
@@ -88,6 +101,7 @@ export function createInputDispatcher(
       window.removeEventListener('keydown', keyDown);
       window.removeEventListener('keyup', keyUp);
       window.removeEventListener('blur', blur);
+      if (liveOverlay === overlay) liveOverlay = null;
       overlay.dispose();
     },
   };
@@ -104,6 +118,8 @@ interface TouchOverlay {
   // Re-place the buttons against the current viewport + canvas footprint. Runs
   // on every window resize; call once after mounting.
   layout(): void;
+  // Rename a button to the action it currently performs. Sticky across layouts.
+  setLabel(key: InputKey, label: string): void;
   dispose(): void;
 }
 
@@ -166,6 +182,10 @@ function buildOverlay(
     return el;
   };
 
+  // Labels a scene has overridden — re-applied after every layout so a resize
+  // does not silently restore the key name.
+  const labelOverride = new Map<InputKey, string>();
+
   const layout = (): void => {
     const v = opts ? opts.viewport() : { w: window.innerWidth, h: window.innerHeight };
     const canvas = opts?.canvas ?? document.querySelector('canvas');
@@ -179,6 +199,8 @@ function buildOverlay(
       el.style.height = `${b.h}px`;
       el.style.fontSize =
         b.kind === 'meta' ? '11px' : `${Math.round(b.w * (b.kind === 'ab' ? 0.3 : 0.4))}px`;
+      const override = labelOverride.get(b.key);
+      if (override !== undefined) el.textContent = override;
     }
   };
 
@@ -189,6 +211,11 @@ function buildOverlay(
   return {
     el: overlay,
     layout,
+    setLabel(key, label) {
+      labelOverride.set(key, label);
+      const el = buttons.get(key);
+      if (el) el.textContent = label;
+    },
     dispose() {
       window.removeEventListener('resize', layout);
       overlay.remove();

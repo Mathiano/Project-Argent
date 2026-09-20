@@ -81,15 +81,21 @@ export function overlayLayout(vw: number, vh: number, cw: number): readonly Over
 
   const pillW = 62;
   const pillH = 26;
-  const pill = (key: InputKey, label: string, x: number): OverlayButton => ({
-    key,
-    label,
+
+  // SELECT is the STANCE control — the only thing in the game bound to it, and
+  // the read-war's most-used decision. It does not belong in a corner: it sits
+  // in the right gutter ABOVE the A button, on the same thumb, wide enough to
+  // carry a live label ("STANCE G") rather than a key name.
+  const stanceW = Math.max(pillW, Math.round(ab * 1.45));
+  const stance: OverlayButton = {
+    key: 'select',
+    label: 'SELECT',
     kind: 'meta',
-    x,
-    y: 12,
-    w: pillW,
+    x: Math.round(clamp(aCx - stanceW / 2, edge, vw - edge - stanceW)),
+    y: Math.round(aCy - ab / 2 - 14 - pillH),
+    w: stanceW,
     h: pillH,
-  });
+  };
 
   return [
     cell('up', '▲', 0, -1),
@@ -98,7 +104,7 @@ export function overlayLayout(vw: number, vh: number, cw: number): readonly Over
     cell('right', '▶', 1, 0),
     round('b', 'B', bCx, bCy),
     round('a', 'A', aCx, aCy),
-    pill('start', 'START', vw - edge - pillW * 2 - 8),
-    pill('select', 'SELECT', vw - edge - pillW),
+    stance,
+    { key: 'start', label: 'START', kind: 'meta', x: vw - edge - pillW, y: 12, w: pillW, h: pillH },
   ];
 }

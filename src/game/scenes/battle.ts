@@ -33,6 +33,7 @@ import type {
 import { BATTLE_LOGICAL_H, BATTLE_LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
+import { setTouchKeyLabel } from '../input';
 import { monDisplayName } from '../monName';
 import { fleeTelegraphed, bondStage } from '../catching';
 import type { CatchWindow } from '../catching';
@@ -1374,6 +1375,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     }
   }
 
+  // The touch overlay's SELECT chip is the stance control (it is bound to
+  // nothing else in the game), so it carries the LIVE stance rather than a key
+  // name a phone does not have. No-op on desktop / in tests.
+  function syncStanceChip(): void {
+    setTouchKeyLabel('select', `STANCE ${STANCES[stanceIdx]!}`);
+  }
+
   function setText(
     lines: readonly string[],
     then: () => void,
@@ -2471,6 +2479,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       emitGameEvent({ kind: 'menu-move' });
     } else if (key === 'select') {
       stanceIdx = (stanceIdx + 1) % 3;
+      syncStanceChip();
       emitGameEvent({ kind: 'stance-selected', stance: STANCES[stanceIdx]! });
     } else if (key === 'left' || key === 'right') {
       // FULL POWER is a direct strike — the focus commit-modifier is disabled
@@ -3608,12 +3617,19 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
       drawDevLog(ctx); // DEV TOOL — over everything; no-op when off
     },
 
+    enter() {
+      syncStanceChip(); // name the touch chip for the stance this battle opens on
+    },
+
     exit() {
       // DEV TOOL — tear down the runtime-toggle listener so it never leaks
       // past this battle.
       if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
         window.removeEventListener('keydown', onDevLogKey);
       }
+      // Hand the chip back — outside a battle SELECT does nothing, and a stale
+      // "STANCE A" on the overworld would be a lie.
+      setTouchKeyLabel('select', 'SELECT');
       disposeAnim(); // drop the gameEvents subscription (the anim runtime)
     },
   };
