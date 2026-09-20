@@ -11,6 +11,7 @@ import hitFlash from '../../../assets/anim/battle.hitFlash.json';
 import hpDrain from '../../../assets/anim/battle.hpDrain.json';
 import starPop from '../../../assets/anim/battle.starPop.json';
 import enterWipe from '../../../assets/anim/battle.enterWipe.json';
+import strike from '../../../assets/anim/battle.strike.json';
 import eventMap from '../../../assets/anim/_eventMap.json';
 
 export const BATTLE_ANIM_DEFS: ReadonlyMap<string, AnimationDef> = buildDefs([
@@ -18,6 +19,7 @@ export const BATTLE_ANIM_DEFS: ReadonlyMap<string, AnimationDef> = buildDefs([
   hpDrain,
   starPop,
   enterWipe,
+  strike,
 ]);
 
 export const BATTLE_ANIM_EVENT_MAP: Readonly<Record<string, readonly string[]>> =

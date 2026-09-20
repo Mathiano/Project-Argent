@@ -78,21 +78,31 @@ describe('easing functions — endpoints + monotonicity', () => {
 });
 
 describe('the SHIPPED battle animations — schema + duration pins', () => {
-  test('all four proof animations load + carry their ids', () => {
+  test('every shipped animation loads + carries its id', () => {
     expect([...BATTLE_ANIM_DEFS.keys()].sort()).toEqual([
-      'battle.enterWipe', 'battle.hitFlash', 'battle.hpDrain', 'battle.starPop',
+      'battle.enterWipe', 'battle.hitFlash', 'battle.hpDrain', 'battle.starPop', 'battle.strike',
     ]);
   });
   test('durations are PINNED (a re-time is a deliberate, visible diff)', () => {
+    expect(BATTLE_ANIM_DEFS.get('battle.strike')!.totalFrames).toBe(18); // out, overshoot back, settle
     expect(BATTLE_ANIM_DEFS.get('battle.hitFlash')!.totalFrames).toBe(12);
     expect(BATTLE_ANIM_DEFS.get('battle.hpDrain')!.totalFrames).toBe(16);
     expect(BATTLE_ANIM_DEFS.get('battle.starPop')!.totalFrames).toBe(12);
     expect(BATTLE_ANIM_DEFS.get('battle.enterWipe')!.totalFrames).toBe(36); // v2 CD entrance choreography
   });
-  test('the three untouched proofs carry NO per-track side (backward-compatible)', () => {
-    for (const id of ['battle.hitFlash', 'battle.hpDrain', 'battle.starPop'] as const) {
+  test('the subject-driven proofs carry NO per-track side (they follow the event)', () => {
+    for (const id of ['battle.hpDrain', 'battle.starPop', 'battle.strike'] as const) {
       for (const t of BATTLE_ANIM_DEFS.get(id)!.tracks) expect(t.side).toBeUndefined();
     }
+  });
+
+  // hit-landed's subject is the ATTACKER (battle.ts emits ev.side = the striker),
+  // so the impact flash has to address the OPPOSITE side or it lights the wrong
+  // mon. The stage shake stays global — it is the room, not a combatant.
+  test('hitFlash puts the flash on the struck mon via side:opponent', () => {
+    const tracks = BATTLE_ANIM_DEFS.get('battle.hitFlash')!.tracks;
+    expect(tracks.filter((t) => t.target === 'sprite').every((t) => t.side === 'opponent')).toBe(true);
+    expect(tracks.filter((t) => t.target === 'stage').every((t) => t.side === undefined)).toBe(true);
   });
   test('the enterWipe v2 uses track-level side to choreograph BOTH panels/sprites', () => {
     const wipe = BATTLE_ANIM_DEFS.get('battle.enterWipe')!;
@@ -102,9 +112,10 @@ describe('the SHIPPED battle animations — schema + duration pins', () => {
     expect(wipe.tracks.filter((t) => t.target === 'wipe').every((t) => t.side === undefined)).toBe(true);
   });
   test('the event→id map is DATA (wires the real emitted events)', () => {
-    expect(BATTLE_ANIM_EVENT_MAP['hit-landed']).toEqual(['battle.hitFlash', 'battle.hpDrain']);
+    expect(BATTLE_ANIM_EVENT_MAP['hit-landed']).toEqual(['battle.hitFlash', 'battle.hpDrain', 'battle.strike']);
     expect(BATTLE_ANIM_EVENT_MAP['read-win']).toEqual(['battle.starPop']);
     expect(BATTLE_ANIM_EVENT_MAP['battle-start']).toEqual(['battle.enterWipe']);
+    expect(BATTLE_ANIM_EVENT_MAP['move-resolved']).toBeUndefined(); // the lunge rides hit-landed
   });
 });
 
@@ -172,5 +183,42 @@ describe('deterministic playback (no RNG — identical dt sequence → identical
       return trace.join(',');
     };
     expect(run()).toBe(run());
+  });
+});
+
+// ── side:'opponent' — the actor/target split ────────────────────────────────
+// An event's subject is the side it NAMES, which for hit-landed is the striker.
+// A visual that belongs on the mon that was HIT has to address the other side.
+describe("track side 'opponent'", () => {
+  const def = (side: 'player' | 'foe' | 'opponent' | undefined) =>
+    parseAnimationDef({
+      id: 'test.sideProbe',
+      tracks: [{ target: 'sprite', property: 'flashAlpha', from: 1, to: 1, durationFrames: 2, easing: 'hold', ...(side ? { side } : {}) }],
+    });
+
+  function run(side: 'player' | 'foe' | 'opponent' | undefined, subject: 'player' | 'foe' | null) {
+    const seen: Array<string | null> = [];
+    const rt = new AnimRuntime(new Map([['test.sideProbe', def(side)]]), { probe: ['test.sideProbe'] });
+    rt.register('sprite.flashAlpha', { set: (_v, s) => void seen.push(s) });
+    rt.trigger('probe', subject);
+    return seen[0];
+  }
+
+  test('mirrors the subject', () => {
+    expect(run('opponent', 'player')).toBe('foe');
+    expect(run('opponent', 'foe')).toBe('player');
+  });
+
+  test('stays null with no subject — a stage-global event has no opponent', () => {
+    expect(run('opponent', null)).toBe(null);
+  });
+
+  test('leaves the existing forms alone', () => {
+    expect(run(undefined, 'player')).toBe('player'); // absent → the subject
+    expect(run('foe', 'player')).toBe('foe'); // explicit → that side
+  });
+
+  test('rejects an unknown side at load', () => {
+    expect(() => def('nobody' as 'player')).toThrow(/side/);
   });
 });

@@ -1298,6 +1298,13 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   const panelAlpha: Record<Side, number> = { player: 1, foe: 1 }; // panel fade-in (per side; rests at 1)
   anim.register('sprite.flashAlpha', { set: (v, s) => { spriteFlash[s ?? 'foe'] = v; } });
   anim.register('sprite.offsetX', { set: (v, s) => { spriteOffX[s ?? 'foe'] = v; } });
+  // Semantic lunge: POSITIVE = toward the opponent, whichever side is acting.
+  // The player stands bottom-left and the foe top-right, so the sign flips per
+  // side — doing it here keeps the choreography JSON side-agnostic (one strike
+  // def animates either attacker) instead of shipping a mirrored pair.
+  anim.register('sprite.lungeToward', {
+    set: (v, s) => { const side = s ?? 'player'; spriteOffX[side] = side === 'player' ? v : -v; },
+  });
   anim.register('stage.shakeX', { set: (v) => { stageShakeX = v; } });
   anim.register('bar.hpProgress', {
     onStart: (s) => { const side = s ?? 'foe'; drainFrom[side] = barHp[side]; drainTo[side] = display[side].hp; },
@@ -2654,11 +2661,15 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     ctx.globalAlpha = 1;
   }
 
+  // The DODGE slip only. The strike/opening/clash lunge used to live here as a
+  // hard ±4 step for animT seconds — an instant jerk with no ease, and it would
+  // now DOUBLE with the data-driven battle.strike lunge that hit-landed plays
+  // (the draw adds both). Retired in favour of the animation, which is eased,
+  // overshoots, and is previewable in tools/anim_preview like every other
+  // choreography. Dodge has no emitted game event yet, so it stays a step until
+  // one exists; then it becomes battle.dodge.json and this function goes.
   function spriteOffset(side: Side): number {
     if (animSide !== side || animT <= 0) return 0;
-    if (animKind === 'strike' || animKind === 'opening' || animKind === 'clash') {
-      return side === 'player' ? 4 : -4;
-    }
     if (animKind === 'dodge') return side === 'player' ? -6 : 6;
     return 0;
   }

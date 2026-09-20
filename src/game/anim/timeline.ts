@@ -35,10 +35,13 @@ export interface Track {
   readonly durationFrames: number;
   readonly easing: EasingName;
   readonly delayFrames: number;
-  // Which side this track addresses ('player' | 'foe'). ABSENT → the triggering
-  // event's subject (today's behavior). Set it to drive a specific side from a
-  // SUBJECT-LESS event (e.g. battle-start's entrance choreographs both panels).
-  readonly side?: 'player' | 'foe';
+  // Which side this track addresses. ABSENT → the triggering event's subject.
+  // 'player' | 'foe' drive a SPECIFIC side from a subject-less event (e.g.
+  // battle-start's entrance choreographs both panels). 'opponent' drives the
+  // side OPPOSITE the subject — for an event whose subject is the ACTOR but
+  // whose visual belongs on the target (hit-landed carries the ATTACKER, while
+  // the impact flash belongs on the mon that was struck).
+  readonly side?: 'player' | 'foe' | 'opponent';
 }
 export interface AnimationDef {
   readonly id: string; // dot-namespaced ("battle.hitFlash")
@@ -74,7 +77,10 @@ export function parseAnimationDef(raw: unknown): AnimationDef {
     req(Number.isInteger(durationFrames) && durationFrames > 0, `${o.id}: track ${i} durationFrames must be a positive integer`);
     const delayFrames = t.delayFrames === undefined ? 0 : num(t.delayFrames, `${o.id}: track ${i} delayFrames`);
     req(Number.isInteger(delayFrames) && delayFrames >= 0, `${o.id}: track ${i} delayFrames must be a non-negative integer`);
-    req(t.side === undefined || t.side === 'player' || t.side === 'foe', `${o.id}: track ${i} side "${String(t.side)}" must be 'player' | 'foe' (or absent)`);
+    req(
+      t.side === undefined || t.side === 'player' || t.side === 'foe' || t.side === 'opponent',
+      `${o.id}: track ${i} side "${String(t.side)}" must be 'player' | 'foe' | 'opponent' (or absent)`,
+    );
     totalFrames = Math.max(totalFrames, delayFrames + durationFrames);
     return {
       target: t.target as string,
@@ -85,17 +91,27 @@ export function parseAnimationDef(raw: unknown): AnimationDef {
       durationFrames,
       easing: t.easing as EasingName,
       delayFrames,
-      ...(t.side !== undefined ? { side: t.side as 'player' | 'foe' } : {}),
+      ...(t.side !== undefined ? { side: t.side as 'player' | 'foe' | 'opponent' } : {}),
     };
   });
   return { id: o.id as string, tracks, totalFrames };
 }
 
 // ── Bindings — the host's named presentation handles ────────────────────────
-// `subject` is the side an event was about (hit-landed's defender, read-win's
-// player), or null for stage-global channels (wipe, shake). `onStart` lets a
+// `subject` is the side the event names — for hit-landed that is the ATTACKER
+// (battle.ts emits ev.side, the striker), for read-win the winner — or null for
+// stage-global channels (wipe, shake). A track that wants the other side asks
+// for it with side:'opponent'; do not assume the subject is the target. `onStart` lets a
 // binding CAPTURE runtime state at trigger time (e.g. the HP-drain start/target).
 export type Subject = 'player' | 'foe' | null;
+
+// A track's addressed side. 'opponent' mirrors the subject; with no subject
+// (a stage-global event) there is no opponent to mirror, so it stays null.
+function resolveSide(side: Track['side'], subject: Subject): Subject {
+  if (side === undefined) return subject;
+  if (side !== 'opponent') return side;
+  return subject === 'player' ? 'foe' : subject === 'foe' ? 'player' : null;
+}
 export interface AnimBinding {
   set(value: number, subject: Subject): void;
   onStart?(subject: Subject): void;
@@ -137,7 +153,7 @@ export class AnimRuntime {
     this.instances = this.instances.filter((i) => !(i.def.id === id && i.subject === subject));
     const captured = new Set<string>();
     for (const t of def.tracks) {
-      const sub = t.side ?? subject; // a track's explicit side overrides the event subject
+      const sub = resolveSide(t.side, subject); // explicit side (or its opponent) overrides the subject
       const key = `${t.channel}|${sub ?? ''}`;
       if (captured.has(key)) continue;
       captured.add(key);
@@ -163,7 +179,7 @@ export class AnimRuntime {
       if (local < 0) continue; // this track hasn't started
       const p = t.durationFrames > 0 ? Math.min(1, local / t.durationFrames) : 1;
       const v = t.from + (t.to - t.from) * EASINGS[t.easing](p);
-      this.bindings.get(t.channel)?.set(v, t.side ?? inst.subject); // per-track side overrides the subject
+      this.bindings.get(t.channel)?.set(v, resolveSide(t.side, inst.subject)); // per-track side overrides the subject
     }
   }
 

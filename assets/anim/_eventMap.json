@@ -1,5 +1,13 @@
 {
-  "hit-landed": ["battle.hitFlash", "battle.hpDrain"],
-  "read-win": ["battle.starPop"],
-  "battle-start": ["battle.enterWipe"]
+  "hit-landed": [
+    "battle.hitFlash",
+    "battle.hpDrain",
+    "battle.strike"
+  ],
+  "read-win": [
+    "battle.starPop"
+  ],
+  "battle-start": [
+    "battle.enterWipe"
+  ]
 }

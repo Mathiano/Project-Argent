@@ -1,0 +1,32 @@
+{
+  "id": "battle.strike",
+  "tracks": [
+    {
+      "target": "sprite",
+      "property": "lungeToward",
+      "from": 0,
+      "to": 7,
+      "durationFrames": 5,
+      "easing": "easeOut",
+      "delayFrames": 0
+    },
+    {
+      "target": "sprite",
+      "property": "lungeToward",
+      "from": 7,
+      "to": -2,
+      "durationFrames": 6,
+      "easing": "easeInOut",
+      "delayFrames": 5
+    },
+    {
+      "target": "sprite",
+      "property": "lungeToward",
+      "from": -2,
+      "to": 0,
+      "durationFrames": 7,
+      "easing": "easeOut",
+      "delayFrames": 11
+    }
+  ]
+}
