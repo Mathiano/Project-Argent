@@ -264,14 +264,23 @@ function drawTypeBadges(
 // (the shared drawMomentum/PALETTE.star used by ~15 other scenes stays untouched).
 // Returns the x just past the last star.
 const STAR_STEP = 9;
-function drawStars(ctx: CanvasRenderingContext2D, x: number, y: number, count: number, cap = 3): number {
+function drawStars(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  count: number,
+  cap = 3,
+  // Layer 3.5 bluff case: draw the sockets as dim '?' — the player sees that
+  // momentum EXISTS and what the cap is, never how much is banked.
+  hidden = false,
+): number {
   ctx.font = '11px monospace';
   ctx.textBaseline = 'top';
   ctx.textAlign = 'start';
   ctx.letterSpacing = '0px';
   for (let i = 0; i < cap; i += 1) {
-    ctx.fillStyle = i < count ? PALETTE.momentumGold : PALETTE.momentumOff;
-    ctx.fillText('★', x + i * STAR_STEP, y);
+    ctx.fillStyle = hidden || i >= count ? PALETTE.momentumOff : PALETTE.momentumGold;
+    ctx.fillText(hidden ? '?' : '★', x + i * STAR_STEP, y);
   }
   return x + cap * STAR_STEP;
 }
@@ -623,6 +632,13 @@ export interface BattleSceneOpts {
   // (the trainer's name) keeps the 'open' narrowing CONSISTENT per trainer so
   // tells are learnable. PRESENTATION only — no engine effect.
   readonly foeFocusInfo?: FocusIntentInfo;
+  // Layer 3.5 — whether the FOE's ★ meter reads out. Default 'open' (shown):
+  // the momentum differential drives the behind-penalty and the foe's tier
+  // access, so it is load-bearing state, not a spoiler (the playtest reversal,
+  // docs/combat-build-status.md). 'veiled'/'opaque' draw dim '?' sockets
+  // instead — the bluff case: you know the cap, not the count. PRESENTATION
+  // only; the engine's momentum is untouched either way.
+  readonly foeMomentumInfo?: InfoLevel;
   // Final BattleState is handed back so the caller can write party
   // hp/st/momentum forward (the Phase 2 writeback). 1v1 callers can
   // ignore `finalState`; team callers extract state.player.members.
@@ -1093,6 +1109,8 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   // scene-local RNG seeded independently of opts.rng, so degrading the
   // display cannot perturb the engine stream → ladders stay bit-identical.
   const reliability: IntentReliability = opts.intentReliability ?? 'honest';
+  // Shown unless the foe's profile explicitly hides it (see foeMomentumInfo).
+  const foeMomentumHidden = (opts.foeMomentumInfo ?? 'open') !== 'open';
   const intentRng: RNG = mulberry32(INTENT_DISPLAY_SEED);
   // ---- BOND-TELLS (Part 1) — your mon helps you read the foe -----------------
   // PRESENTATION ONLY: the intent display never feeds the engine (the feint roll
@@ -2669,7 +2687,7 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
     // MOMENTUM — a compact ★★☆ star row (the load-bearing ★ differential; display-
     // only — reads the foe's existing momentum, no logic change).
     drawText(ctx, 'MOMENTUM', px + 10, py + 40, PALETTE.stanceG);
-    drawStars(ctx, px + 10 + measureUiText(ctx, 'MOMENTUM') + 8, py + 40, display.foe.momentum);
+    drawStars(ctx, px + 10 + measureUiText(ctx, 'MOMENTUM') + 8, py + 40, display.foe.momentum, 3, foeMomentumHidden);
     // BOSS: the thin BREAK line + GYM LEADER / gust strip. Regular foes lack it.
     if (boss) drawBossBreak(ctx, px, pw, py, h);
     else drawBenchIndicators(ctx, px + 12, py + h + 3, state.foe);

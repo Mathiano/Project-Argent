@@ -114,8 +114,21 @@ Each environment TILTS the triangle AND biases opponent behavior. Two effects:
 A third axis of depth, alongside the base triangle and the two-steps: **what the player can SEE.** Difficulty scales not by adding mechanics but by progressively REMOVING information — forcing the player to read behavior/tells instead of explicit readouts. Leak-free difficulty: same system, less spoon-feeding.
 
 ### Momentum-★ is HIDDEN information (the foundational case)
+
+> **⚠️ REVERSED IN PLAYTEST, THEN NARROWED — read this first.** Hiding the foe's ★
+> BY DEFAULT was tried and **reversed** (`docs/combat-build-status.md` → "Playtest
+> banks"): the mechanics run on the momentum **differential** — the behind-penalty
+> (`behind = max(0, foe.momentum − self.momentum)`, config.ts) and the foe's phased
+> tier access (is the boss climbing toward its 2★ move?) — so a hidden foe meter hid
+> *load-bearing* state, not a spoiler. **Current model: the foe's ★ is SHOWN by
+> default, and hidden only where a trainer's profile opts in** (`InfoOverride.momentum`,
+> engine/trainerAI.ts) — the catalog gives that to **WARDEN**, the Elite Four base.
+> So this section's *principle* survives as a per-trainer elite dial and a progression
+> axis; its *default* does not. The rest of Layer 3.5 (foe bond, intent tells) is
+> unaffected. The original text is kept below as the design rationale.
+
 - **YOUR own ★/momentum:** visible + clearly LABELED (you know your own resources).
-- **The FOE's ★/momentum:** HIDDEN. You do NOT see how much momentum the opponent has banked.
+- **The FOE's ★/momentum:** HIDDEN. You do NOT see how much momentum the opponent has banked. *(→ now the WARDEN/elite dial, not the default — see the box above.)*
 - **Why:** this creates the emotional spike — "do they have ★? can they Call right now? are they about to unleash something?" Not knowing if the foe can escape-Call a committed Charge, or unleash a banked resource, makes every exchange a BLUFF read. The Call economy becomes a bluff layer, not just a resource meter.
 - **Consistency with the read-war:** foe INTENT stays visible (that's the core read — the skill is reacting to it). But resource-STATE (momentum) is hidden — you see what you READ, not what they HOARD. Intent = shown (the read); momentum = hidden (the bluff).
 
@@ -129,7 +142,7 @@ So the read-war DEEPENS by removing the training wheels — the same combat, pro
 ### Connections
 - **The Concord:** their augmented/manufactured-loyalty mons are the MASTERS of information denial — cold, unreadable, no tells. Makes them feel genuinely threatening (you can't read a machine-loyal mon the way you read a bonded one — thematic AND mechanical).
 - **Trainer variety (Layer 4):** WHAT information a trainer hides becomes part of their identity, alongside HOW they play. A leader who hides momentum is a different read than one who shows it.
-- **Build note:** the foundational piece (hide foe ★, label own ★) ships with the ★/Call economy. The PROGRESSION (opponents hiding more post-gym-1) is a per-trainer/per-chapter dial layered on as content builds — part of trainer-strategy authoring.
+- **Build note:** the foundational piece (label own ★; foe ★ shown by default, hidden per-profile via `InfoOverride.momentum`) ships with the ★/Call economy. The PROGRESSION (opponents hiding more post-gym-1) is a per-trainer/per-chapter dial layered on as content builds — part of trainer-strategy authoring.
 
 ---
 

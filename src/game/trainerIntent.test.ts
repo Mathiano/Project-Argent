@@ -52,3 +52,34 @@ describe('profileIntentInfo — the derivation generalizes (correct wiring for C
     expect(bluffer.foeFocusInfo.discipline).toBe('veiled'); // focus axis overridden
   });
 });
+
+describe('profileIntentInfo — the foe ★ meter (Layer 3.5 momentum axis)', () => {
+  // The DEFAULT is SHOWN, on purpose: the momentum differential drives the
+  // behind-penalty and the foe's phased tier access, so hiding it by default
+  // hides load-bearing state (docs/combat-build-status.md — the reversal).
+  const mk = (over: Partial<TrainerProfile>): TrainerProfile => ({
+    name: 'T', stance: 'balanced', twoStep: 'single-only', ...over,
+  } as TrainerProfile);
+
+  test('defaults to shown when no override is set', () => {
+    expect(profileIntentInfo(mk({})).foeMomentumInfo).toBe('open');
+  });
+
+  test('a veiled/opaque TELL does not hide the ★ meter — the axes are separate', () => {
+    expect(profileIntentInfo(mk({ infoLevel: 'veiled' })).foeMomentumInfo).toBe('open');
+    expect(profileIntentInfo(mk({ infoLevel: 'opaque' })).foeMomentumInfo).toBe('open');
+  });
+
+  test('only an explicit momentum override hides it', () => {
+    expect(profileIntentInfo(mk({ infoOverride: { momentum: 'opaque' } })).foeMomentumInfo).toBe('opaque');
+  });
+
+  test('every shipped CH1 trainer shows its ★; WARDEN (Elite Four base) hides it', () => {
+    for (const key of ['greenhorn', 'bruiser', 'skirmisher', 'jay', 'lass', 'kamon', 'youngster']) {
+      const p = TRAINER_PROFILES[key];
+      if (!p) continue;
+      expect(profileIntentInfo(p).foeMomentumInfo, key).toBe('open');
+    }
+    expect(profileIntentInfo(TRAINER_PROFILES.warden!).foeMomentumInfo).toBe('opaque');
+  });
+});

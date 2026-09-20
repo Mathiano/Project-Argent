@@ -54,6 +54,14 @@ export type InfoLevel = 'open' | 'veiled' | 'opaque';
 export interface InfoOverride {
   readonly stance?: InfoLevel;
   readonly focus?: InfoLevel;
+  // The foe's ★ METER. Default (omitted) is 'open' — SHOWN, and deliberately so:
+  // the mechanics run on the momentum DIFFERENTIAL (the behind-penalty, and the
+  // foe's phased tier access), so hiding it by default hid load-bearing state
+  // (docs/combat-build-status.md — the playtest reversal). It is NOT driven by
+  // the profile's blanket `infoLevel`; a veiled-tell trainer still shows its ★.
+  // 'veiled'/'opaque' opt a trainer INTO the Layer 3.5 bluff case — you can't
+  // see whether they can Call. The catalog gives this to WARDEN (Elite Four).
+  readonly momentum?: InfoLevel;
 }
 
 // Later-stage knob value types — declared as DATA now (forward-compatible);
@@ -486,6 +494,15 @@ export const TRAINER_PROFILES: { readonly [id: string]: TrainerProfile } = {
   duelist: {
     name: 'DUELIST', stance: 'evader', twoStep: 'frequent',
     release: { feintRate: 0.3, signature: 'heavy' }, infoLevel: 'veiled',
+    bond: 'high', callUse: 'clutch', adaptive: 'full', futureCalls: ['readThem', 'throwOff', 'comeBack'],
+  },
+  // WARDEN — the Elite Four base (catalog §WARDEN). The one archetype that HIDES
+  // its momentum: "you can't see whether he can Call (bluff tension on every
+  // commit)". Mastery stance, frequent two-steps, full Reactive.
+  warden: {
+    name: 'WARDEN', stance: 'balanced', twoStep: 'frequent',
+    release: { feintRate: 0.3, signature: 'heavy' }, infoLevel: 'veiled',
+    infoOverride: { momentum: 'opaque' },
     bond: 'high', callUse: 'clutch', adaptive: 'full', futureCalls: ['readThem', 'throwOff', 'comeBack'],
   },
 };

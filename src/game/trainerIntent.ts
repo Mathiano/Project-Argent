@@ -13,14 +13,19 @@ import { possibleReleases } from '../engine';
 import type { TrainerProfile } from '../engine';
 import { infoLevelToReliability } from './scenes/battle';
 import type { FocusIntentInfo, IntentReliability } from './scenes/battle';
+import type { InfoLevel } from '../engine';
 
 export function profileIntentInfo(profile: TrainerProfile): {
   readonly intentReliability: IntentReliability;
   readonly foeFocusInfo: FocusIntentInfo;
+  readonly foeMomentumInfo: InfoLevel;
 } {
   const level = profile.infoLevel ?? 'open';
   return {
     intentReliability: infoLevelToReliability(profile.infoOverride?.stance ?? level),
+    // NOT `level` — the ★ meter defaults to shown for EVERY trainer (the
+    // load-bearing differential); only an explicit override hides it.
+    foeMomentumInfo: profile.infoOverride?.momentum ?? 'open',
     foeFocusInfo: {
       discipline: profile.infoOverride?.focus ?? level,
       releases: possibleReleases(profile.release),

@@ -2462,7 +2462,7 @@ function pushTrainerFight(
       rng: run.rng,
       ...bondSceneProps(foeTeam, 'trainer'), // Lane A — bond meter + post-win advance
       chooseFoeAction: (s, r) => (foePolicy ? foePolicy(s, 'foe', r) : wildFoeAI(s, r)),
-      ...(intentInfo ? { intentReliability: intentInfo.intentReliability, foeFocusInfo: intentInfo.foeFocusInfo } : {}),
+      ...(intentInfo ? { intentReliability: intentInfo.intentReliability, foeFocusInfo: intentInfo.foeFocusInfo, foeMomentumInfo: intentInfo.foeMomentumInfo } : {}),
       intro: ['Gym trainer sent out', `${leadName}!`],
       catchBreathUnlocked: callsUnlocked(),
       canRun: false,

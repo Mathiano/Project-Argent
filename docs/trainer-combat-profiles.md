@@ -38,7 +38,7 @@ A trainer's bond WITH THEIR OWN mon gates their Call toolkit — the SAME bonds-
 ### 5. Information discipline (Layer 3.5 — what they HIDE)
 - **Open** — shows intent + (their own) momentum (early-game; teaches the read).
 - **Veiled intent** — their intent-tell is vague/absent (you read patterns, not readouts) — post-gym-1+.
-- **Hidden momentum** — you don't know if they can Call (bluff tension) — note: the PLAYER never sees foe momentum by default (Layer 3.5), but a "tell" trainer might LEAK it; a disciplined one never does.
+- **Hidden momentum** — you don't know if they can Call (bluff tension) — note: the player DOES see foe momentum by default (the differential is load-bearing — see combat-build-status.md); this dimension is the opt-IN that hides it, set via `InfoOverride.momentum`. WARDEN carries it.
 - **Bluffer** — actively fakes (telegraphs a Charge they won't throw; feigns low resources) — elite/Concord.
 
 ### 6. Terrain affinity (Layer 3 — home-turf bias)
