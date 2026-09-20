@@ -18,34 +18,54 @@ export interface AudioEngine {
   isMuted(): boolean;
 }
 
-// The real Web Audio backend. Returns a `tone` scheduler + a `setMuted` that drives
-// the MASTER GAIN (so in-flight tails are silenced too). No-op without Web Audio.
-function createWebAudioBackend(): { tone: ToneFn; setMuted: (m: boolean) => void } {
+// ── the shared audio bus ────────────────────────────────────────────────────
+// ONE AudioContext and ONE master gain for the whole game, so SFX and MUSIC mix
+// together, mute once, and never race each other to satisfy the autoplay policy
+// (two contexts would each need their own user gesture). Built lazily on first
+// sound — i.e. inside a gesture. Null forever without Web Audio (node/tests).
+const MASTER_LEVEL = 0.55; // master headroom (mute = 0)
+let busCtx: AudioContext | null = null;
+let busMaster: GainNode | null = null;
+let busMuted = false;
+
+export interface AudioBus {
+  readonly ctx: AudioContext;
+  readonly master: GainNode;
+}
+
+// The bus, building it if this is the first sound. Callers MUST handle null —
+// that is the headless path, and it is the normal case under vitest.
+export function getAudioBus(): AudioBus | null {
   const AC: typeof AudioContext | undefined =
     typeof AudioContext !== 'undefined'
       ? AudioContext
       : (globalThis as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AC) return { tone: () => {}, setMuted: () => {} }; // headless / unsupported
+  if (!AC) return null;
+  if (!busCtx) {
+    busCtx = new AC();
+    busMaster = busCtx.createGain();
+    busMaster.gain.value = busMuted ? 0 : MASTER_LEVEL;
+    busMaster.connect(busCtx.destination);
+  }
+  if (busCtx.state === 'suspended') void busCtx.resume(); // a user gesture is on the stack
+  return busMaster ? { ctx: busCtx, master: busMaster } : null;
+}
 
-  let ctx: AudioContext | null = null;
-  let master: GainNode | null = null;
-  let muted = false;
-  const LEVEL = 0.55; // master headroom (mute = 0)
+// Drive the ONE master gain. Silences in-flight tails and any looping music.
+export function setBusMuted(m: boolean): void {
+  busMuted = m;
+  if (busMaster) busMaster.gain.value = m ? 0 : MASTER_LEVEL;
+}
 
-  const ensure = (): AudioContext | null => {
-    if (!ctx) {
-      ctx = new AC();
-      master = ctx.createGain();
-      master.gain.value = muted ? 0 : LEVEL;
-      master.connect(ctx.destination);
-    }
-    if (ctx.state === 'suspended') void ctx.resume(); // a user gesture is on the stack
-    return ctx;
-  };
+// The real Web Audio backend. Returns a `tone` scheduler + a `setMuted` that drives
+// the shared MASTER GAIN (so in-flight tails and music are silenced too).
+function createWebAudioBackend(): { tone: ToneFn; setMuted: (m: boolean) => void } {
+  const ensure = (): AudioContext | null => getAudioBus()?.ctx ?? null;
 
   return {
     tone: (spec) => {
       const c = ensure();
+      const master = getAudioBus()?.master;
       if (!c || !master) return;
       const t0 = c.currentTime + (spec.delay ?? 0);
       const osc = c.createOscillator();
@@ -64,10 +84,7 @@ function createWebAudioBackend(): { tone: ToneFn; setMuted: (m: boolean) => void
       osc.start(t0);
       osc.stop(t0 + spec.dur + spec.release);
     },
-    setMuted: (m) => {
-      muted = m;
-      if (master) master.gain.value = m ? 0 : LEVEL;
-    },
+    setMuted: setBusMuted,
   };
 }
 

@@ -64,6 +64,8 @@ import { createDevMenuScene, type DevMenuItem } from './scenes/devMenu';
 import { createSfxSubscriber } from './sfx/sfx';
 import { createAudioEngine, loadMutedPref, saveMutedPref } from './audio/synth';
 import { installAudio } from './audio/audioSubscriber';
+import { createMusic } from './audio/tracks';
+import { installMusic } from './audio/musicSubscriber';
 import { createConfirmScene } from './scenes/confirmPrompt';
 import { createMessageScene } from './scenes/messageScene';
 import { createChapterCardScene } from './scenes/chapterCard';
@@ -155,6 +157,12 @@ const dispatcher = createInputDispatcher(
 // (autoplay policy). Mute is a persisted device preference; default ON (unmuted).
 const audioEngine = createAudioEngine({ muted: loadMutedPref() });
 installAudio(audioEngine);
+// Music rides the SAME bus as the SFX (one AudioContext, one master gain), so
+// the existing mute drives both and there is no second autoplay gesture to win.
+// battle-start / battle-end are wired through the event bus; the title theme is
+// started at the scene boundary main.ts owns.
+const music = createMusic();
+installMusic(music);
 
 const sessionFlags = new Set<string>();
 const flagStore = {
@@ -705,6 +713,10 @@ function autosaveNow(): void {
 
 function showTitle(): void {
   currentOverworldScene = null;
+  // The title theme. Web Audio will not start before a user gesture, so on a
+  // cold boot this arms the track and the first keypress brings it in; coming
+  // BACK to the title (after a black-out) it starts immediately.
+  music.play('music.title');
   // Continue is offered only when a save exists; selecting it restores
   // the run from localStorage. Phase 2 save/load. exactOptionalProps
   // wants us to omit the field rather than pass undefined.
@@ -808,7 +820,7 @@ function pushPauseMenu(): void {
       // OPTIONS → the audio mute toggle (the only live setting this slice). Persists
       // the device preference; the menu flash shows the new SOUND state.
       onOptions: () => {
-        audioEngine.setMuted(!audioEngine.isMuted());
+        audioEngine.setMuted(!audioEngine.isMuted()); // drives the shared master → music too
         saveMutedPref(audioEngine.isMuted());
       },
       audioOn: () => !audioEngine.isMuted(),

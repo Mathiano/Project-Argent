@@ -1,0 +1,21 @@
+{
+  "id": "music.victory",
+  "bpm": 132,
+  "stepsPerBeat": 4,
+  "loop": false,
+  "_note": "PLACEHOLDER MELODY \u2014 original, written in-repo, deliberately plain. audio-north-star.md ranks hero music (title/battle/set-pieces) as the place the homage's soul lives and the riskiest place for a machine draft: 'Original melodies, nothing Pokemon-adjacent', best sourced from a human composer or an AI draft behind a hard human originality pass. This is a system placeholder so the music LAYER can ship and be felt, exactly like the placeholder tilesets \u2014 not a proposed final theme. Replace the voices; the id and the event wiring stay.",
+  "voices": [
+    {
+      "name": "fanfare",
+      "wave": "square",
+      "gain": 0.1,
+      "steps": "C4 - E4 - G4 - C5 . . - G4 - C5 . . . . ."
+    },
+    {
+      "name": "bass",
+      "wave": "triangle",
+      "gain": 0.13,
+      "steps": "C3 . . . C3 . . . G2 . . . C3 . . . . ."
+    }
+  ]
+}
