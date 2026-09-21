@@ -103,12 +103,27 @@ this is the whole surface a playtest needs without replaying the gym. It is
 
 ---
 
+## The generic sheet (`prep.ts`) — same treatment
+
+Shipped in the same pass. `prep.ts` carried its own copy of the bug: a hardcoded
+`HABIT: ALL-OUT ATK` and a hardcoded `TYPE: edge vs you`, both of which happen to
+be true of KAMON — which is exactly why neither was noticed.
+
+- `habitStanceFor(tendency)` maps the Layer-4 profile's stance tendency to the one
+  stance a scout would write down; `'balanced'` returns **null**, and the sheet says
+  *"No single habit — he mixes"* rather than teaching a counter that loses to two
+  thirds of what that trainer plays.
+- `HABIT_LABEL` covers all four tendencies (a test fails on any profile without one).
+- `typeEdgeLine(player, foe, chart)` derives the TYPE row in **both** directions —
+  `edge vs you` / `the edge is yours` / `you both bite` / `no edge either way` — and
+  is coloured accordingly. With no chart passed, the row is **omitted**, not guessed.
+- `FOE_HABIT_STANCE` survives only as the documented fallback for an unprofiled foe.
+
+Call sites now pass the profile: both KAMON preps (`TRAINER_PROFILES.kamon`) and the
+dev forge (whichever profile was forged).
+
 ## Not built
 
-- **The generic prep scene (`prep.ts`) still hardcodes `FOE_HABIT_STANCE = 'A'`.**
-  Its own comment says it should come from the trainer profile's stance tendency.
-  KAMON is an `aggressor`, so today the literal happens to be right — which is
-  exactly how the break-bar lie survived. Deriving it is the obvious follow-on.
 - **Only Falkner has a report.** The def format is generic; a second boss is data.
 - **No phone contacts.** The scope doc's other named intel source (Phone 2.0, P1).
 - **No mirror rule** (Hard+ leaders scout *you*) — P1, unbuilt.

@@ -1,4 +1,4 @@
-import type { Species, Stance } from '../../engine';
+import type { Species, Stance, StanceTendency, TrainerProfile, TypeChart } from '../../engine';
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
@@ -9,13 +9,62 @@ export interface PrepSceneOpts {
   readonly playerSpecies: Species;
   readonly foeSpecies: Species;
   readonly foeTrainerName: string;
+  // The foe's Combat-Layer-4 profile. The HABIT line and the PLAN are derived from
+  // its stance tendency; omitted → the KAMON-class aggressor default (below).
+  readonly profile?: TrainerProfile;
+  // Derives the TYPE line. Omitted → the line is left off rather than guessed.
+  readonly typeChart?: TypeChart;
   readonly onContinue: () => void;
 }
 
-// The foe's scouted HABIT — its dominant stance. Fixed for now (KAMON-class
-// aggressors, "ALL-OUT ATK"); when trainer profiles feed prep this comes from the
-// profile's stance tendency.
+// The default scouted HABIT for a foe with no profile. It is 'A' because the only
+// unprofiled prep foe is KAMON-class. It is a FALLBACK, not a fact: a profiled foe
+// derives its habit below. (Prep once hardcoded this for every foe, and the sibling
+// Falkner sheet hardcoded its numbers the same way and shipped a false break bar for
+// months — hence the derivation.)
 export const FOE_HABIT_STANCE: Stance = 'A';
+
+// stance tendency → the single stance a scout would write down. A 'balanced'
+// trainer has no habit to report, which is itself the intel.
+export function habitStanceFor(tendency: StanceTendency): Stance | null {
+  return tendency === 'aggressor' ? 'A' : tendency === 'bulwark' ? 'G' : tendency === 'evader' ? 'F' : null;
+}
+
+export const HABIT_LABEL: { readonly [k in StanceTendency]: string } = {
+  aggressor: 'ALL-OUT ATK',
+  bulwark: 'DIGS IN',
+  evader: 'SLIPS AWAY',
+  balanced: 'MIXES IT UP',
+};
+
+// The strongest multiplier `attacker`'s types can land on `defender`'s.
+function bestMult(attacker: readonly string[], defender: readonly string[], chart: TypeChart): number {
+  let best = 0;
+  for (const a of attacker) {
+    let mult = 1;
+    for (const d of defender) {
+      const v = chart[a]?.[d];
+      if (v !== undefined) mult *= v;
+    }
+    best = Math.max(best, mult);
+  }
+  return best === 0 ? 1 : best;
+}
+
+// The TYPE line, DERIVED. It used to read 'TYPE: edge vs you' unconditionally —
+// true of KAMON (he takes the starter that beats yours) and a guess everywhere else.
+export function typeEdgeLine(
+  player: Species,
+  foe: Species,
+  chart: TypeChart,
+): { readonly text: string; readonly favors: 'foe' | 'player' | 'both' | 'neither' } {
+  const foeOnYou = bestMult(foe.types, player.types, chart);
+  const youOnFoe = bestMult(player.types, foe.types, chart);
+  if (foeOnYou > 1 && youOnFoe > 1) return { text: 'TYPE: you both bite', favors: 'both' };
+  if (foeOnYou > 1) return { text: 'TYPE: edge vs you', favors: 'foe' };
+  if (youOnFoe > 1) return { text: 'TYPE: the edge is yours', favors: 'player' };
+  return { text: 'TYPE: no edge either way', favors: 'neither' };
+}
 
 // The stance the PLAYER should adopt to beat a habitual stance — the CURRENT
 // triangle counter (AGGRESSIVE > FLUID > GUARD > AGGRESSIVE: GUARD turns Aggression,
@@ -39,6 +88,11 @@ export function prepPlanLines(habit: Stance): readonly [string, string] {
 
 export function createPrepScene(opts: PrepSceneOpts): Scene {
   const faster = opts.playerSpecies.spd > opts.foeSpecies.spd;
+  const tendency: StanceTendency = opts.profile?.stance ?? 'aggressor';
+  const habit = opts.profile ? habitStanceFor(tendency) : FOE_HABIT_STANCE;
+  const typeLine = opts.typeChart
+    ? typeEdgeLine(opts.playerSpecies, opts.foeSpecies, opts.typeChart)
+    : null;
   let tick = 0;
 
   return {
@@ -75,14 +129,22 @@ export function createPrepScene(opts: PrepSceneOpts): Scene {
 
       // Trainer + species
       drawText(ctx, `${opts.foeTrainerName}'s ${opts.foeSpecies.name}`, 18, 28);
-      drawText(ctx, 'TYPE: edge vs you', 18, 42, PALETTE.hpCrit);
+      if (typeLine) {
+        drawText(
+          ctx,
+          typeLine.text,
+          18,
+          42,
+          typeLine.favors === 'player' ? PALETTE.hpOk : typeLine.favors === 'neither' ? PALETTE.paperShadow : PALETTE.hpCrit,
+        );
+      }
       drawText(
         ctx,
         `SPD ${opts.foeSpecies.spd} (${faster ? 'SLOWER' : 'FASTER'})`,
         18,
         56,
       );
-      drawText(ctx, 'HABIT: ALL-OUT ATK', 18, 70);
+      drawText(ctx, `HABIT: ${HABIT_LABEL[tendency]}`, 18, 70);
 
       // Divider
       ctx.fillStyle = PALETTE.barEmpty;
@@ -93,9 +155,16 @@ export function createPrepScene(opts: PrepSceneOpts): Scene {
       // The counter is DERIVED from the foe's habit + the current triangle — not the
       // speed. (Speed decides initiative, not the win-edge: post-flip, dodging an
       // Aggressive foe with FLUID is a PUNISH, so GUARD is the read regardless.)
-      const plan = prepPlanLines(FOE_HABIT_STANCE);
-      drawText(ctx, plan[0], 18, 106);
-      drawText(ctx, plan[1], 18, 118);
+      if (habit === null) {
+        // No habit to counter — say so rather than teaching a line that loses to
+        // two thirds of what this foe actually plays.
+        drawText(ctx, 'No single habit — he mixes.', 18, 106);
+        drawText(ctx, 'Read him round by round.', 18, 118);
+      } else {
+        const plan = prepPlanLines(habit);
+        drawText(ctx, plan[0], 18, 106);
+        drawText(ctx, plan[1], 18, 118);
+      }
       drawText(ctx, faster ? 'You strike first.' : 'He outspeeds you.', 18, 134, PALETTE.paperShadow);
 
       drawText(ctx, '★ CALL: catch breath', 18, 156, PALETTE.paperShadow);

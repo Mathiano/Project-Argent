@@ -7,7 +7,8 @@ import {
   resolveRound,
 } from '../../engine';
 import type { BattleState, Stance } from '../../engine';
-import { FOE_HABIT_STANCE, counterStanceFor, prepPlanLines } from './prep';
+import { TRAINER_PROFILES } from '../../engine';
+import { FOE_HABIT_STANCE, HABIT_LABEL, counterStanceFor, createPrepScene, habitStanceFor, prepPlanLines, typeEdgeLine } from './prep';
 
 // ── The SCOUT REPORT teaches the CURRENT triangle — never a stale line ───────
 // The prep-scene bug: it taught "FLUID dodges his Aggressive" — a LOSING line
@@ -50,6 +51,113 @@ describe('prep scout report — the taught counter matches the engine triangle',
     expect(plan).toContain('GUARD');
     expect(plan).toContain('counter and charge ★');
     expect(plan).not.toContain('FLUID'); // the pre-flip, now-losing advice is gone
+  });
+});
+
+// ── The generic sheet reads the PROFILE, not a literal ───────────────────────
+// prep.ts carried its own version of the bug that made the Falkner sheet lie: a
+// hardcoded HABIT and a hardcoded 'TYPE: edge vs you'. Both happened to be true of
+// KAMON, which is exactly why nobody noticed. Now they are derived.
+
+describe('generic scout report — habit + type edge are derived', () => {
+  test('each stance tendency maps to the stance a scout would write down', () => {
+    expect(habitStanceFor('aggressor')).toBe('A');
+    expect(habitStanceFor('bulwark')).toBe('G');
+    expect(habitStanceFor('evader')).toBe('F');
+    // A balanced trainer has NO habit — reporting one would teach a line that
+    // loses to two thirds of what they actually play.
+    expect(habitStanceFor('balanced')).toBeNull();
+  });
+
+  test("KAMON's profile reproduces the old literal — which is why it went unnoticed", () => {
+    expect(TRAINER_PROFILES.kamon!.stance).toBe('aggressor');
+    expect(habitStanceFor(TRAINER_PROFILES.kamon!.stance)).toBe(FOE_HABIT_STANCE);
+    expect(HABIT_LABEL[TRAINER_PROFILES.kamon!.stance]).toBe('ALL-OUT ATK');
+  });
+
+  test('every profile in the catalog has a habit label (no blank HABIT row)', () => {
+    for (const p of Object.values(TRAINER_PROFILES)) {
+      expect(HABIT_LABEL[p!.stance], p!.name).toBeTruthy();
+    }
+  });
+
+  test('the TYPE line follows the chart in BOTH directions', () => {
+    const chart: TypeChart = { HOT: { GREEN: 1.3, WET: 0.7 }, GREEN: { WET: 1.3, HOT: 0.7 }, WET: { HOT: 1.3, GREEN: 0.7 } };
+    const mon = (name: string, t: string): Species => ({ ...SPECIES.EMBERCUB!, name, types: [t] });
+    expect(typeEdgeLine(mon('P', 'GREEN'), mon('F', 'HOT'), chart).favors).toBe('foe');
+    expect(typeEdgeLine(mon('P', 'HOT'), mon('F', 'GREEN'), chart).favors).toBe('player');
+    expect(typeEdgeLine(mon('P', 'HOT'), mon('F', 'HOT'), chart).favors).toBe('neither');
+  });
+
+  test('the SCENE draws the derived habit + type line, not the old literals', () => {
+    // The pure functions above are only half the guard — the scene has to actually
+    // print them. A bulwark foe must not be advertised as ALL-OUT ATK.
+    const drawn: string[] = [];
+    const ctx = new Proxy({}, {
+      get(_t, prop) {
+        if (prop === 'fillText') return (t: string) => drawn.push(String(t));
+        if (prop === 'measureText') return (t: string) => ({ width: String(t).length * 4 });
+        if (prop === 'canvas') return { width: LOGICAL_W, height: LOGICAL_H };
+        return () => {};
+      },
+      set: () => true,
+    }) as unknown as CanvasRenderingContext2D;
+    const scene = createPrepScene({
+      playerSpecies: SPECIES.EMBERCUB!,
+      foeSpecies: SPECIES.AQUAFIN!,
+      foeTrainerName: 'TEST',
+      profile: TRAINER_PROFILES.stonewall!, // bulwark
+      // Mixed-case: the permanent fixture trio speaks the LEGACY vocabulary
+      // (data.ts LEGACY_TYPE_CHART), never the CH1 UPPERCASE one. Mixing them
+      // silently no-ops the lookup (CLAUDE.md).
+      typeChart: { Flame: { Splash: 0.67 }, Splash: { Flame: 1.5 } },
+      onContinue: () => {},
+    });
+    scene.update?.(0);
+    scene.draw(ctx);
+    const all = drawn.join(' | ');
+    expect(all).toContain('HABIT: DIGS IN');
+    expect(all).not.toContain('ALL-OUT ATK');
+    // AQUAFIN(SPLASH) hits EMBERCUB(FLAME) for 1.3 and takes 0.7 → the foe's edge.
+    expect(all).toContain('TYPE: edge vs you');
+    // A bulwark's counter is FLUID, not the aggressor's GUARD.
+    expect(all).toContain('FLUID');
+    expect(all).not.toContain('GUARD turns');
+  });
+
+  test('a BALANCED foe is reported as having no habit to counter', () => {
+    const drawn: string[] = [];
+    const ctx = new Proxy({}, {
+      get(_t, prop) {
+        if (prop === 'fillText') return (t: string) => drawn.push(String(t));
+        if (prop === 'measureText') return (t: string) => ({ width: String(t).length * 4 });
+        if (prop === 'canvas') return { width: LOGICAL_W, height: LOGICAL_H };
+        return () => {};
+      },
+      set: () => true,
+    }) as unknown as CanvasRenderingContext2D;
+    const scene = createPrepScene({
+      playerSpecies: SPECIES.EMBERCUB!,
+      foeSpecies: SPECIES.AQUAFIN!,
+      foeTrainerName: 'TEST',
+      profile: TRAINER_PROFILES.youngster!, // balanced
+      onContinue: () => {},
+    });
+    scene.update?.(0);
+    scene.draw(ctx);
+    const all = drawn.join(' | ');
+    expect(all).toContain('HABIT: MIXES IT UP');
+    expect(all).toContain('No single habit');
+    // No typeChart passed → the TYPE row is omitted rather than guessed.
+    expect(all).not.toContain('TYPE:');
+  });
+
+  test("it no longer claims an edge that isn't there", () => {
+    const chart: TypeChart = { A: { A: 1 } };
+    const mon = (name: string): Species => ({ ...SPECIES.EMBERCUB!, name, types: ['A'] });
+    const line = typeEdgeLine(mon('P'), mon('F'), chart);
+    expect(line.text).not.toContain('edge vs you');
+    expect(line.favors).toBe('neither');
   });
 });
 

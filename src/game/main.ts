@@ -1142,6 +1142,9 @@ function showPrep(): void {
       playerSpecies: player,
       foeSpecies: kamonStolenSpecies(player),
       foeTrainerName: 'KAMON',
+      // Layer 4: the HABIT + PLAN come off KAMON's profile, not a literal.
+      profile: TRAINER_PROFILES.kamon!,
+      typeChart: TYPECHART_CH1,
       onContinue: showRivalBattle,
     }),
   );
@@ -1389,6 +1392,8 @@ function showKamonGate(): void {
       playerSpecies: player,
       foeSpecies: stolen,
       foeTrainerName: 'KAMON',
+      profile: TRAINER_PROFILES.kamon!,
+      typeChart: TYPECHART_CH1,
       onContinue: () => {
         const state = createBattleState(playerTeam, foeTeam, isCh1 ? { typeChart: TYPECHART_CH1 } : {});
         scenes.replace(
@@ -1800,6 +1805,8 @@ function showForgeFight(foeName: string, profileKey: string | null): void {
       playerSpecies: partyLead(),
       foeSpecies: activeMon(foeTeam).species,
       foeTrainerName: profile.name,
+      profile,
+      ...(foeIsCh1 ? { typeChart: TYPECHART_CH1 } : {}),
       onContinue: () => {
         const state = createBattleState(buildPlayerTeam(), foeTeam, foeIsCh1 ? { typeChart: TYPECHART_CH1 } : {});
         scenes.replace(
