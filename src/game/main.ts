@@ -27,6 +27,7 @@ import type {
   BattleState,
   BossCard,
   DexEntryJson,
+  EnvironmentId,
   MoveJson,
   RNG,
   SideState,
@@ -35,6 +36,7 @@ import type {
   TraitTable,
   TypeChart,
 } from '../engine';
+import { getMap } from './overworld/maps';
 import ch1BatchData from '../../docs/ch1-batch.json';
 import movesData from '../../docs/moves.json';
 import typechartData from '../../docs/typechart.json';
@@ -241,6 +243,11 @@ const scenes = new SceneStack();
 // snapshots position from this reference; if null, position isn't
 // persisted (no overworld = nothing to remember).
 let currentOverworldScene: import('./scenes/overworld').OverworldScene | null = null;
+// Combat Layer 3 — the ground the player is standing on. Captured once per map
+// transition (not per battle: getMap rebuilds from JSON each call). Fights that
+// START here inherit it; dev/test battles have no map and stay neutral, which
+// is also what keeps every ladder bit-identical.
+let hereEnvironment: EnvironmentId | undefined;
 // Stable seed for the current run. Persisted as part of the save.
 let currentRngSeed: number = 0;
 // Black-out respawn: the last Pokémon Center the player healed at. A
@@ -713,6 +720,7 @@ function autosaveNow(): void {
 
 function showTitle(): void {
   currentOverworldScene = null;
+  hereEnvironment = undefined;
   // The title theme. Web Audio will not start before a user gesture, so on a
   // cold boot this arms the track and the first keypress brings it in; coming
   // BACK to the title (after a black-out) it starts immediately.
@@ -738,6 +746,7 @@ function showTitle(): void {
 // loop is testable from the first wild encounter, before shops exist.
 function startNewGame(): void {
   currentOverworldScene = null;
+  hereEnvironment = undefined;
   wipeStorage();
   run.party = [];
   run.bag = [];
@@ -1246,11 +1255,12 @@ function pushRivalGateFight(): void {
   const chaff = kamonChaffFor(player);
   const foeTeam = buildKamonTeam(stolen, chaff);
   const isCh1 = CH1_DEX[player.name] !== undefined;
-  const state = createBattleState(
-    buildPlayerTeam(),
-    foeTeam,
-    isCh1 ? { typeChart: TYPECHART_CH1 } : {},
-  );
+  const state = createBattleState(buildPlayerTeam(), foeTeam, {
+    ...(isCh1 ? { typeChart: TYPECHART_CH1 } : {}),
+    // Layer 3 — the rival gate is fought on Violet's ground, like any other
+    // fight that starts from a live map.
+    ...(hereEnvironment !== undefined ? { environment: hereEnvironment } : {}),
+  });
   scenes.push(
     createBattleScene({
       state,
@@ -2211,6 +2221,7 @@ function showOverworld(
   };
   const scene = createOverworldScene(sceneOpts);
   currentOverworldScene = scene;
+  hereEnvironment = getMap(map).environment;
   scenes.replace(scene);
   // Autosave on the new map landing — the player just transitioned;
   // the snapshot captures their fresh position (or the restored spawn
@@ -2236,6 +2247,7 @@ function pushWildEncounter(foeSpeciesName: string): void {
   markSeen(run.dex, foe.name); // Phase 6.5 — a wild encounter marks SEEN
   const state = createBattleState(buildPlayerTeam(), createSide(foe), {
     typeChart: TYPECHART_CH1,
+    ...(hereEnvironment !== undefined ? { environment: hereEnvironment } : {}),
   });
   scenes.push(
     createBattleScene({
@@ -2354,6 +2366,7 @@ function pushTutorialCatch(): void {
   markSeen(run.dex, foe.name);
   const state = createBattleState(buildPlayerTeam(), createSide(foe), {
     typeChart: TYPECHART_CH1,
+    ...(hereEnvironment !== undefined ? { environment: hereEnvironment } : {}),
   });
   const popBack = () => {
     scenes.pop();
@@ -2462,6 +2475,7 @@ function pushTrainerFight(
   const leadName = activeMon(foeTeam).species.name;
   const state = createBattleState(buildPlayerTeam(), foeTeam, {
     typeChart: TYPECHART_CH1,
+    ...(hereEnvironment !== undefined ? { environment: hereEnvironment } : {}),
   });
   // Combat Layer 4: a profiled trainer fights with its distinct policy; an
   // unprofiled one keeps the generic wildFoeAI (bit-identical).

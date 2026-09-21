@@ -72,6 +72,53 @@ Two fixes were tried and **rejected by measurement** before the third worked:
 - the mechanism directly (stamina taxed every round, damage tilted in the stated direction, unnamed stances untouched).
 - the meta-read (a local leans; a visitor does not).
 
+## Wiring (shipped)
+
+`MapData.environment` (both map JSON shapes carry it). `main.ts` captures the
+current map's ground once per transition — not per battle, since `getMap`
+rebuilds from JSON on every call — and the **five fights that originate on a
+live map** inherit it: wild encounters, the tutorial catch, trainer fights, the
+rival gate, and the gym. The dev/test hooks (`?skip=…`, the forge) have no map
+and stay neutral, which is also what keeps every ladder bit-identical.
+
+The battle **announces the ground before the foe**: a tilted environment's
+`blurb` is the first line in the intro queue. OPEN and an absent environment
+say nothing — a neutral field has no rules to announce. The tilt is never
+hidden; Layer 3.5 conceals *resources*, never the rules of the fight.
+
+| Map | Ground | Why |
+|---|---|---|
+| ROUTE 31 | `forest` | the first road is close country — tall grass, trees, a pond |
+| ROUTE 32 | `open` | the chapter's closing road |
+| GYM | *(neutral)* | **see below** |
+| towns, interiors | *(neutral)* | an indoor fight has no weather |
+
+### The gym is deliberately NOT `cliff`
+Falkner's rooftop is thematically a cliff, and the tilt is real. Measured against
+the published bands (n=600):
+
+| cell | neutral | on cliff |
+|---|---|---|
+| naive-triangle · GRUBLEAF | 34.8% | **15.3%** (−19.5pp) |
+| stamina-reader · GRUBLEAF | 34.8% | **15.2%** (−19.7pp) |
+| naive-triangle · KINDRAKE | 85.7% | 74.8% (−10.8pp) |
+| brute · SILTSKIP | 51.0% | **62.5%** (+11.5pp) |
+
+Cliff gives heavy releases ×1.10 and Aggressive +3 ST — which is precisely
+Falkner's gust kit — while costing the reader archetypes their hide line.
+GRUBLEAF was already the hardest cell (README open thread #2). CLAUDE.md: *a
+boss ships only when its archetype win rates land on its boss card's targets*,
+so putting the gym on cliff is a **boss-card re-baseline — a design call**, not
+a wiring change. `runFalknerLadder` now takes an `environment`, so re-running
+this is one argument away when that call is made.
+
 ## Not built yet
-- **Game wiring.** No map or encounter sets `environment` — the engine supports it and nothing uses it. Wiring routes/arenas to biomes is the next increment.
-- **Player-facing tell.** Every environment carries a `blurb` for the battle open; nothing renders it yet. The tilt must never be hidden — Layer 3.5 hides *resources*, not the rules of the ground.
+- **Per-encounter-zone ground.** Environment is per-MAP. A route whose pond,
+  forest and open grass differ would want `encounter_zone.environment`; the
+  zone that triggered an encounter is not currently passed to the battle push.
+- **Content that claims terrain.** The meta-read fires only when a trainer's
+  `profile.terrain` matches the ground. The archetype catalog assigns terrain to
+  the BULWARK (rocky) and EVADER (water/open) floors, but no shipped CH1 profile
+  sets it, and CH1's only tilted ground is Route 31's forest — so the meta-read
+  is wired and unit-tested but **inert in CH1 play**. Which trainers are locals
+  is a content decision.

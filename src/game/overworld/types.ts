@@ -2,6 +2,7 @@
 // Graybox format — flat-color tileset and a 1-char-per-tile grid for now.
 // A future Tiled JSON loader can target the same MapData type.
 
+import type { EnvironmentId } from '../../engine';
 export type Facing = 'up' | 'down' | 'left' | 'right';
 
 export interface TileDef {
@@ -245,6 +246,12 @@ export interface MapData {
   readonly width: number;
   readonly height: number;
   readonly tilesize: number;
+  // Combat Layer 3 — the GROUND fights on this map happen on
+  // (src/engine/environment.ts). Absent → 'open', i.e. no tilt, which is what
+  // every interior and every dev hook wants. Read at battle creation for the
+  // fights that ORIGINATE here (wild, trainer, rival gate); dev/test battles
+  // have no map and stay neutral.
+  readonly environment?: EnvironmentId;
   // Legacy graybox: single char per tile + inline tileset (flat colors).
   readonly tiles: string;
   readonly tileset: { readonly [key: string]: TileDef };

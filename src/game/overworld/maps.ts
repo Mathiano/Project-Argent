@@ -183,7 +183,10 @@ function buildRoute31(): MapData {
       ],
     },
   ];
-  return { ...map, objects: [...map.objects, ...scripts] };
+  // Combat Layer 3 — the first road is close country: tall grass, trees, a
+  // pond. Forest ground favours the slipping line and leaves no room to wind
+  // up (docs/combat-environments-AS-BUILT.md).
+  return { ...map, environment: 'forest', objects: [...map.objects, ...scripts] };
 }
 
 // THE LIVE Hearthwick (Mathias's authored 40×36 Tiled town): import+wire the .tmj

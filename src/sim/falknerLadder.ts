@@ -29,6 +29,7 @@ import type {
   Species,
   TraitTable,
   TypeChart,
+  EnvironmentId,
 } from '../engine';
 import type { BotArchetype } from './archetypes';
 import { FALKNER_LADDER_ARCHETYPES } from './archetypes';
@@ -107,11 +108,19 @@ function runMatch(
   archetype: BotArchetype,
   rng: RNG,
   maxRounds = 50,
+  // Combat Layer 3 — the ground the gym is fought on. Omitted → neutral, which
+  // is the baseline every published Falkner band was measured against.
+  environment?: EnvironmentId,
 ): MatchOutcome {
   let state: BattleState = createBattleState(
     createSide(playerSpecies),
     createSide(card.species, card.statScale, { openingMomentum: FALKNER_OPENING_MOMENTUM }),
-    { bossCard: card, typeChart: TYPECHART, traits },
+    {
+      bossCard: card,
+      typeChart: TYPECHART,
+      traits,
+      ...(environment !== undefined ? { environment } : {}),
+    },
   );
   for (let i = 0; i < maxRounds; i += 1) {
     const fAction: Action = falknerBossAI(state, 'foe', rng);
@@ -134,6 +143,7 @@ export function runFalknerLadder(opts: {
   gustBorneDmgMult?: number;
   n: number;
   seed: number;
+  environment?: EnvironmentId;
 }): FalknerCellResult[] {
   ensureRegistered();
   const { card, traits } = buildFalknerAce(opts);
@@ -149,7 +159,7 @@ export function runFalknerLadder(opts: {
       let totalRounds = 0;
       for (let i = 0; i < opts.n; i += 1) {
         const rng = mulberry32(opts.seed + i + player.name.length * 7919);
-        const r = runMatch(player, card, traits, archetype, rng);
+        const r = runMatch(player, card, traits, archetype, rng, 50, opts.environment);
         if (r.winner === 'player') wins += 1;
         totalRounds += r.rounds;
       }

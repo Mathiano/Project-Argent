@@ -16,6 +16,7 @@
 // returns a unified MapData. Existing scenes read the same shape either
 // way; the renderer branches on `cells` to pick its draw path.
 
+import type { EnvironmentId } from '../../engine';
 import type { MapData, MapObject, PlacedProp, Spawn, TileDef } from './types';
 import type { PrefabPlacement } from './types';
 import { getPrefab, getTileset } from './tilesetCatalog';
@@ -24,6 +25,8 @@ import { autotileTerrain } from './autotile';
 
 export interface GrayboxMapJson {
   readonly name: string;
+  // Layer 3 — the ground (see MapData.environment).
+  readonly environment?: EnvironmentId;
   readonly width: number;
   readonly height: number;
   readonly tilesize: number;
@@ -35,6 +38,7 @@ export interface GrayboxMapJson {
 
 export interface DataDrivenMapJson {
   readonly name: string;
+  readonly environment?: EnvironmentId;
   readonly width: number;
   readonly height: number;
   readonly tilesize: number;
@@ -83,6 +87,7 @@ export function loadMap(json: MapJson): MapData {
 function loadGrayboxMap(j: GrayboxMapJson): MapData {
   return {
     name: j.name,
+    ...(j.environment !== undefined ? { environment: j.environment } : {}),
     width: j.width,
     height: j.height,
     tilesize: j.tilesize,
@@ -210,6 +215,7 @@ function loadDataDrivenMap(j: DataDrivenMapJson): MapData {
 
   return {
     name: j.name,
+    ...(j.environment !== undefined ? { environment: j.environment } : {}),
     width: j.width,
     height: j.height,
     tilesize: j.tilesize,

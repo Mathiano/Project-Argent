@@ -30,6 +30,7 @@ import type {
   Team,
   TierName,
 } from '../../engine';
+import { environmentFor } from '../../engine';
 import { BATTLE_LOGICAL_H, BATTLE_LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
@@ -1191,7 +1192,15 @@ export function createBattleScene(opts: BattleSceneOpts): Scene {
   let pendingReadWindow = false;
   let fleeWarned = false;
   let spareCursor: 0 | 1 = 0;
-  let textQueue: string[] = [...opts.intro];
+  // Combat Layer 3 — the ground announces itself FIRST, before the foe. The
+  // tilt is never hidden: Layer 3.5 conceals resources (the foe's bond, its
+  // tells), never the rules of the fight. A neutral field has nothing to say,
+  // so OPEN adds no line at all.
+  const groundLine =
+    state.environment !== undefined && state.environment !== 'open'
+      ? [environmentFor(state.environment).blurb]
+      : [];
+  let textQueue: string[] = [...groundLine, ...opts.intro];
   let textNext: (() => void) | null = beginTurn;
   // Party-picker mode. 'voluntary' = opened from FIGHT menu's PKMN row
   // (switch is a turn action; B cancels back to menu). 'forced' = opened
