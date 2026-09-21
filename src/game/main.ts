@@ -47,6 +47,7 @@ import { createInputDispatcher } from './input';
 import { SceneStack } from './scene';
 import { createBattleScene, infoLevelToReliability } from './scenes/battle';
 import { profileIntentInfo } from './trainerIntent';
+import { FALKNER_REPORT, intelFlagsOf } from './scout';
 import { createEndScene } from './scenes/end';
 import { createBagMenuScene } from './scenes/bagMenu';
 import { createMartMenuScene } from './scenes/martMenu';
@@ -1430,15 +1431,22 @@ function showKamonGate(): void {
   );
 }
 
-function buildFalknerTeam(): { team: ReturnType<typeof createTeam>; card: BossCard } {
-  const flitpeck: Species = FALKNER_LEAD_DEX.FLITPECK!;
-  const galehawk: Species = { ...FALKNER_ACE_DEX.GALEHAWK!, trait: 'GUSTBORNE' };
-  // The arena schedule + ace-only HP scale ride on the card; the engine
-  // applies statScale to whatever mon's data the card carries (its species
-  // pointer), but the player-facing team data is what's in the Team.
-  // Falkner's 2-mon team uses the ace mult on the GALEHAWK member only.
-  const card: BossCard = {
-    species: galehawk,
+// FALKNER's ace species and his CARD, split out of buildFalknerTeam so the SCOUT
+// REPORT can quote the very card the fight will use. The report derives every
+// number from this (break bar, rhythm, roster, opening ★) instead of restating
+// them as prose — which is how the prep screen came to advertise "Break bar 2"
+// four re-baselines after the card moved to 4.
+export function falknerAceSpecies(): Species {
+  return { ...FALKNER_ACE_DEX.GALEHAWK!, trait: 'GUSTBORNE' };
+}
+
+export function falknerBossCard(): BossCard {
+  return {
+    species: falknerAceSpecies(),
+    // The arena schedule + ace-only HP scale ride on the card; the engine
+    // applies statScale to whatever mon's data the card carries (its species
+    // pointer), but the player-facing team data is what's in the Team.
+    // Falkner's 2-mon team uses the ace mult on the GALEHAWK member only.
     statScale: { hp: 1.15 },
     arenaSchedule: FALKNER_ARENA,
     // Spine-1 re-baseline 2→4: phased-unlock let good readers Break-spam Falkner,
@@ -1448,6 +1456,12 @@ function buildFalknerTeam(): { team: ReturnType<typeof createTeam>; card: BossCa
     teamSize: 2,
     openingMomentum: FALKNER_OPENING_MOMENTUM,
   };
+}
+
+function buildFalknerTeam(): { team: ReturnType<typeof createTeam>; card: BossCard } {
+  const flitpeck: Species = FALKNER_LEAD_DEX.FLITPECK!;
+  const card = falknerBossCard();
+  const galehawk: Species = card.species;
   const team = createTeam([
     // The boss "comes prepared" — both of Falkner's mons bank the opening ★ so
     // their signature heavy (DIVE BOMB = 2★ under phased-unlock) reaches the field.
@@ -2132,6 +2146,20 @@ else if (skip === 'falkner') {
   applyPartyFromUrl();
   recomputeSignpostFlags();
   showFalknerFight();
+}
+// Dev hook for the SCOUT-REPORT economy: jump straight to Falkner's sheet with a
+// chosen slice of intel, e.g. ?skip=scout&intel=gym_trainer_beaten,gym_trainer_4_beaten
+// (omit &intel for an empty report, &intel=all for a full one). The report is a
+// pure function of the flags, so this is the whole surface a playtest needs to see
+// every state of it without replaying the gym. NOT `?skip=prep` — that name is
+// already taken by the generic KAMON-style prep scene above.
+else if (skip === 'scout') {
+  applyPartyFromUrl();
+  const intel = url.get('intel') ?? '';
+  if (intel === 'all') for (const f of intelFlagsOf(FALKNER_REPORT)) flagStore.set(f);
+  else for (const f of intel.split(',').map((x) => x.trim()).filter(Boolean)) flagStore.set(f);
+  recomputeSignpostFlags();
+  showFalknerFightFromOverworld();
 } else if (skip === 'gym') {
   applyPartyFromUrl();
   recomputeSignpostFlags();
@@ -2534,7 +2562,11 @@ function showFalknerFightFromOverworld(): void {
   scenes.push(
     createFalknerPrepScene({
       playerSpecies: partyLead(),
-      foeSpecies: FALKNER_ACE_DEX.GALEHAWK!,
+      foeSpecies: falknerAceSpecies(),
+      card: falknerBossCard(),
+      typeChart: TYPECHART_CH1,
+      // The intel economy: each report line is bought with a trainer's win-flag.
+      hasFlag: (f) => flagStore.has(f),
       onContinue: () => {
         scenes.pop();
         pushFalknerBattle();

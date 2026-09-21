@@ -300,12 +300,25 @@ function createHarness(
     );
   }
 
+  // One card, shared by the prep sheet and the fight — the walk asserts the sheet
+  // can be built from the same card the battle uses (the scout-report economy).
+  const falknerAce: Species = { ...CH1.GALEHAWK!, trait: 'GUSTBORNE' };
+  const falknerCard: BossCard = {
+    species: falknerAce,
+    statScale: { hp: 1.15 },
+    arenaSchedule: FALKNER_ARENA,
+    breakBar: 4,
+    teamSize: 2,
+  };
   function pushFalknerPrep(): void {
     topKind = 'prep';
     scenes.push(
       createFalknerPrepScene({
         playerSpecies: run.party[0]!.species,
-        foeSpecies: CH1.GALEHAWK!,
+        foeSpecies: falknerAce,
+        card: falknerCard,
+        typeChart: TYPECHART,
+        hasFlag: (f) => flags.has(f),
         onContinue: () => {
           scenes.pop();
           pushFalknerBattle();
@@ -314,14 +327,8 @@ function createHarness(
     );
   }
   function pushFalknerBattle(): void {
-    const galehawk: Species = { ...CH1.GALEHAWK!, trait: 'GUSTBORNE' };
-    const card: BossCard = {
-      species: galehawk,
-      statScale: { hp: 1.15 },
-      arenaSchedule: FALKNER_ARENA,
-      breakBar: 2,
-      teamSize: 2,
-    };
+    const galehawk = falknerAce;
+    const card = falknerCard;
     const foeTeam = createTeam([makeFoe(CH1.FLITPECK!), makeFoe(galehawk)]);
     const state = createBattleState(buildPlayerTeam(), foeTeam, {
       typeChart: TYPECHART,

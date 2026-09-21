@@ -135,7 +135,11 @@ export const DEFAULT_DEFS: WiringDefs = {
         { kind: 'dialog', lines: ['WREN: Shh — watch the canopy, not me.', 'My FLITPECK never sits still;', 'I learned to read it by going still', 'myself. Now — try and catch it.'] },
         { kind: 'start-trainer-battle', foeSpecies: 'FLITPECK', winFlag: 'route31_birdkeeper_beaten', reward: 350 },
       ],
-      interactAfterFlag: [{ kind: 'dialog', lines: ['WREN: You read its feints.', 'Sharp eyes. The woods taught you fast.'] }],
+      // Off-site SCOUT INTEL (src/game/scout.ts): a bird keeper knows the bird, so
+      // WREN is where Falkner's GUSTBORNE trait comes from. She is optional and
+      // sits a route away from the gym — the scope doc's "and phone contacts" half
+      // of "intel is a currency": the world knows things the gym never hands out.
+      interactAfterFlag: [{ kind: 'dialog', lines: ['WREN: You read its feints.', 'Sharp eyes. One more thing:', 'the big one up at the gym,', "GALEHAWK — it's GUSTBORNE.", 'The wind lends it force.', 'Put that on your report.'] }],
     },
     npc_youngster_pax: {
       color: '#caa148', blockedUntilFlag: 'route31_youngster2_beaten',

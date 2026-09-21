@@ -163,7 +163,9 @@
             "anything. No running this time."
           ]
         },
-        { "kind": "start-rival-battle" }
+        {
+          "kind": "start-rival-battle"
+        }
       ]
     },
     {
@@ -276,7 +278,7 @@
       ]
     },
     {
-      "_note": "Gym guide (kept) — points the way + foreshadows the gym's wind.",
+      "_note": "Gym guide (kept) — points the way + names the SCOUT-REPORT economy (src/game/scout.ts). It also signposts the OFF-SITE source (WREN on Route 31), or the one intel line the gym never sells would be undiscoverable.",
       "type": "npc",
       "x": 12,
       "y": 11,
@@ -288,8 +290,12 @@
             "GYM GUIDE: Down the lane is",
             "FALKNER's gym. The wind is the",
             "third fighter up there.",
-            "Beat his trainers first —",
-            "they hand out a scout report."
+            "Beat his trainers first — each",
+            "one adds a line to your SCOUT",
+            "REPORT before you climb.",
+            "The gym keeps one thing back,",
+            "mind. Ask the bird keeper back",
+            "on ROUTE 31 about his ace."
           ]
         }
       ]

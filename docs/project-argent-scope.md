@@ -50,7 +50,7 @@ Core stays: turn-based, 6v6, types/STAB intact.
 
 | Element | Detail | Tier |
 |---|---|---|
-| **Scout report** | Leader's roster, ace, known patterns — earned via gym trainers and phone contacts; intel is a currency | P0 |
+| **Scout report** ✅ | Leader's roster, ace, known patterns — earned via gym trainers and phone contacts; intel is a currency. **BUILT for Falkner 2026-09-21** (`src/game/scout.ts`; code-truth `docs/scout-report-AS-BUILT.md`) — gym-trainer half shipped, **phone contacts not built** (see Phone 2.0, P1) | P0 |
 | **Order screen** | Drag team order; slot-1 matchup preview against their lead | P0 |
 | **Loadout** | Held items + stamina plan locked before entry | P0 |
 | **Mirror rule** | On Hard+, leaders scout *you* — they've watched your last 3 badges and adapt their team | P1 |

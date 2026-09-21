@@ -287,7 +287,17 @@ The renderer reads the next round's rhythm status to draw the "the wind is risin
 
 ## Break bar (BossCard.breakBar)
 
-Bosses optionally declare a Break threshold (Falkner: 2). The engine tracks `breakProgress` on `BattleState`; each player **read-win** (counter landed, opening landed, dodge succeeded, clash won) increments it. When `breakProgress >= breakBar`:
+> **⚠️ STALE NUMBER (flagged 2026-09-21, not silently changed):** the "Falkner: 2"
+> below predates the Spine-1 re-baseline. Falkner's live card is **`breakBar: 4`**
+> (`src/game/main.ts` + `src/sim/falknerLadder.ts`); `docs/combat-build-status.md`
+> records the 2→4 change with its sim evidence (at 2, a good reader Break-spammed
+> him every ~2 rounds and each Break reset `rhythmAnchor`, starving his gust cadence
+> and DIVE BOMB). Per CLAUDE.md this line is a doc-vs-doc conflict, not a design
+> number to edit in place — resolve it deliberately or delete the parenthetical.
+> The prep screen used to restate "Break bar 2" as prose and shipped that falsehood
+> for months; it now derives the number from the card (`src/game/scout.ts`).
+
+Bosses optionally declare a Break threshold (Falkner: 2 — see the note above). The engine tracks `breakProgress` on `BattleState`; each player **read-win** (counter landed, opening landed, dodge succeeded, clash won) increments it. When `breakProgress >= breakBar`:
 
 - Engine emits `breakProgress` event (with `progress`/`threshold`) per round when progress changes
 - Engine emits `break` event with `newPhase`

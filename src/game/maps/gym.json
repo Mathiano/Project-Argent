@@ -100,9 +100,11 @@
           "kind": "dialog",
           "lines": [
             "GYM TRAINER: Good show.",
-            "Falkner doubles when",
-            "the wind rises — count",
-            "to three."
+            "Now what I owe you: the roof",
+            "gusts on a COUNT of three.",
+            "Falkner rides every one.",
+            "Your scout report knows it",
+            "now — his RHYTHM."
           ]
         }
       ]
@@ -139,8 +141,11 @@
           "kind": "dialog",
           "lines": [
             "BIRDKEEPER: Sharp reads.",
-            "Falkner will test them",
-            "harder."
+            "Birds are simple, mind.",
+            "Stone, frost, spark, forge,",
+            "a jolt of earth — any of it",
+            "grounds them. Write that on",
+            "your report."
           ]
         }
       ]
@@ -176,8 +181,11 @@
           "kind": "dialog",
           "lines": [
             "FLEDGLING: One bird, one",
-            "lesson. The rooftop's",
-            "yours to climb."
+            "lesson. Falkner brings TWO,",
+            "so don't spend everything",
+            "on the first one.",
+            "That's his ROSTER — on your",
+            "report now."
           ]
         }
       ]
@@ -213,8 +221,15 @@
         {
           "kind": "dialog",
           "lines": [
-            "ACE: You're ready.",
-            "Falkner is just ahead."
+            "ACE: You're ready. Two things",
+            "nobody tells you up front.",
+            "He walks in with ★ banked.",
+            "And he only cracks after a",
+            "run of clean reads — count",
+            "them, don't rush them.",
+            "His OPENING and his BREAK.",
+            "Both on your report.",
+            "Go on up."
           ]
         }
       ]
