@@ -105,6 +105,30 @@ describe('the instrument itself', () => {
     expect(c.totals.avoidableFights).toBe(c.fights.filter((f) => f.avoidable).length);
   });
 
+  it('reports the trainer move pool, because that is what a level band controls', () => {
+    // loadSpeciesAt reads stats ABSOLUTELY and uses level only as a learnset
+    // cursor, so a "lv6-10 band" is a move-pool band. This pins the distinction —
+    // and pins the conflict the census found: the gym chaff carries Falkner's
+    // signature heavy. See docs/ch1-census-findings.md.
+    const byFlag = new Map(FIGHTS.map((f) => [f.flag, f]));
+    const gymWithDiveBomb = ['gym_trainer_2_beaten', 'gym_trainer_3_beaten', 'gym_trainer_4_beaten'];
+    for (const flag of gymWithDiveBomb) {
+      expect(byFlag.get(flag)!.foeMoves, flag).toContain('DIVE BOMB');
+    }
+    // If the spec's FLITPECK-only chaff is ever adopted, this flips and the doc
+    // annotation in trainer-sets-ch1.md comes out in the same commit.
+    expect(byFlag.get('gym_trainer_beaten')!.foeMoves).not.toContain('DIVE BOMB');
+  });
+
+  it('confirms level is a LEARNSET cursor, not a stat scale', () => {
+    const solo = FIGHTS.find((f) => f.foeSpecies.length === 1)!;
+    const low = simulateFight(solo, DEX.GRUBLEAF!, 20, 11, 13)!;
+    const same = simulateFight(solo, DEX.GRUBLEAF!, 20, 11, 15)!;
+    // 13 and 15 sit in the same learnset band for every CH1 mon, so the fight is
+    // bit-identical — stats did not move with the level.
+    expect(low).toEqual(same);
+  });
+
   it('rejects an unknown starter rather than measuring nothing', () => {
     expect(() => ch1Census({ n: 2, seed: 1, starter: 'NOT_A_MON' })).toThrow(/unknown starter/);
   });

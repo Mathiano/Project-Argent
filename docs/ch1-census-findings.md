@@ -17,7 +17,8 @@ than the win rates — pinning those would turn a content edit into a false regr
 
 ## Reading the table
 
-`n=300/fight, seed 1, starter GRUBLEAF`. **`vN` is the team size on BOTH sides**: the
+`n=300/fight, seed 1, starter GRUBLEAF`. Overrides: `N=`, `SEED=`, `STARTER=`,
+`PLAYER_LEVEL=`, `FOE_LEVEL=`. **`vN` is the team size on BOTH sides**: the
 player mirrors the trainer's count.
 
 That control matters more than it sounds. Without it the player fights solo against
@@ -66,10 +67,12 @@ where the profile has no stance for the player to read, which is the opposite of
 what a teaching chapter wants — a teaching fight should be easy *because you made
 the read*, not easy because there was none to make.
 
-**3. The gym teaches one read, four times.** All four gym trainers are `SKIRMISHER`.
-That is the documented "gym chaff" decision in `trainerAI.ts`, not an accident, but
-it means the four fights guarding Falkner exercise a single profile. Falkner's kit is
-rhythm + heavy releases; nothing on the way up rehearses it.
+**3. The gym teaches one read, four times — by design, but at four times the
+specified count.** All four gym trainers are `SKIRMISHER`. That profile choice is
+*correct*: `docs/trainer-sets-ch1.md` §VIOLET GYM specifies `SKIRMISHER` chaff, and
+the floor-tier rule ("every generic CH1 trainer is a floor stamp… variable release
+starts Gym 2") forbids anything richer. **The count and the roster are the
+divergence** — see the conflict table below.
 
 **4. The ★ economy is exercised, lightly.** 1.3–3.2 ★ earned per fight (5.1 in the
 long 2v2) against a cap of 3. The short fights (5–6 rounds, 1.3–1.6 ★) barely reach
@@ -78,6 +81,46 @@ the Calls economy at all.
 **5. GALEHAWK — Falkner's ace — is catchable on Route 31** at 18% across four zones.
 Noted, not judged: it may well be intended (you can bring the gym's own bird to the
 gym), but it is the kind of thing worth being deliberate about.
+
+---
+
+## Doc-vs-code conflicts the census surfaced
+
+Per CLAUDE.md these are **flagged, not silently resolved** — the design numbers are
+Mathias's to move. `docs/trainer-sets-ch1.md` is the spec; the right-hand column is
+what the maps actually ship.
+
+**First, what a "level" is in Argent.** `loadSpeciesAt` reads stats **absolutely**
+off the dex entry and uses the level only as a **learnset cursor** — consistent with
+CLAUDE.md's "Argent has no player-facing levels". Two mons at lv6 and lv13 have
+*identical stats* and *different move pools*: lv6 → 4 moves, lv8–11 → 5, lv13 → the
+full 6 including the tier-3 heavy. So the doc's "lv ~6–10" bands are **move-pool
+bands**, and shipping one flat level is a move-access decision, not a stat one.
+(I first wrote this up as a missing stat ramp. That was wrong; `FOE_LEVEL=8` and
+`FOE_LEVEL=13` produce byte-identical win rates, which is what exposed it.)
+
+| | spec (`trainer-sets-ch1.md`) | shipped |
+|---|---|---|
+| **Gym chaff count** | **2** Bird Keepers (⟨Skye⟩, ⟨Gust⟩) | **4** trainers |
+| **Gym chaff roster** | **FLITPECK only**, lv11 | 3 of 4 field **GALEHAWK** |
+| **Gym chaff moves** | at lv11: no `DIVE BOMB` (GALEHAWK learns it at 13) | **`DIVE BOMB` in 3 of 4 fights** |
+| Trainer level band | Route 31 lv6–9 · Violet lv10 · gym lv11 | flat **lv13** everywhere |
+| "existing youngster" | L027·1 = MARSHMASH | **FLITPECK** |
+| "existing lass" | L023·1 = GRITHOAX | **MARSHMASH** |
+| ⟨Rourke⟩ / ⟨Wren⟩ / ⟨Pax⟩ / ⟨Dell⟩ | as specced | ✅ match |
+
+**The one worth a decision: the gym spends the boss before the boss.** GALEHAWK is
+Falkner's ace, `DIVE BOMB` is his signature heavy, and at the shipped flat level the
+chaff on the stairs fields both — in three fights out of four. By the time the
+player reaches the rooftop, the ace species and its signature have each been seen
+three times. The spec's FLITPECK-at-lv11 chaff would hold both back.
+
+This is also why the census reports a **MOVES** column and takes `FOE_LEVEL=`: the
+cost of adopting the spec's bands is one run away, and it costs nothing in stats.
+
+Two smaller ones — the youngster and the lass field each other's specced species —
+look like a straight transposition, cheap to correct either way, and worth a ruling
+rather than a guess about which side is current.
 
 ---
 

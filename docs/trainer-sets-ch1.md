@@ -25,6 +25,18 @@
 |---|---|---|---|---|
 | ⟨Dell⟩ | Schoolkid | GREENHORN | L023·1 (lv10) | new (optional) |
 
+> **⚠️ SHIPPED CONTENT DIVERGES FROM THIS TABLE (flagged 2026-09-23 by `npm run census`; not silently resolved — CLAUDE.md).**
+> `gym.json` ships **4** chaff trainers, not 2, and **3 of the 4 field GALEHAWK**
+> (L008·2 — Falkner's ace) rather than FLITPECK. Because every generic CH1 trainer
+> is stamped at a flat **lv13** (main.ts `CH1_LEVEL`) instead of this table's bands,
+> and level is a **learnset cursor** in Argent (stats are absolute), those GALEHAWKs
+> carry **DIVE BOMB — Falkner's signature heavy**. The player therefore meets the
+> boss's ace and its signature three times on the stairs before meeting the boss.
+> Route 31 also transposes two rosters: the "existing youngster" fields FLITPECK
+> where this table says L027·1 (MARSHMASH), and the "existing lass" fields MARSHMASH
+> where it says L023·1 (GRITHOAX). ⟨Rourke⟩ / ⟨Wren⟩ / ⟨Pax⟩ / ⟨Dell⟩ match.
+> Full table + the measured cost: `docs/ch1-census-findings.md`.
+
 ## VIOLET GYM — ZEPHYR badge, Gale — lv ~10–13
 | Trainer | Class | Profile | Mons (line·stage, ~lv) | Status |
 |---|---|---|---|---|

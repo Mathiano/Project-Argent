@@ -59,9 +59,26 @@ export const CH1_MAPS: readonly string[] = [
   'ROUTE32',
 ];
 
-const CH1_LEVEL = 13;
+// Every generic CH1 trainer mon ships at this ONE level (main.ts CH1_LEVEL), which
+// is also the player's starter level. `docs/trainer-sets-ch1.md` specifies a band
+// per area instead (lv ~6-10 on Route 31, ~10-13 in the gym) — a doc-vs-code
+// conflict, flagged in docs/ch1-census-findings.md, not silently resolved here.
+//
+// NOTE what a level IS here: `loadSpeciesAt` reads stats ABSOLUTELY off the dex
+// entry and uses the level only as a LEARNSET CURSOR (consistent with CLAUDE.md —
+// Argent has no player-facing levels). So the doc's bands are move-pool bands, not
+// stat bands: lv6 = 4 moves, lv8-11 = 5, lv13 = the full 6 including the heavy.
+// The census takes a level so the cost of adopting the doc's bands is one run away.
+export const SHIPPED_CH1_LEVEL = 13;
 const TYPECHART = typeChartData as TypeChart;
-const CH1_DEX = loadDex(ch1BatchData as DexEntryJson[], CH1_LEVEL);
+const dexCache = new Map<number, { readonly [k: string]: Species }>();
+function dexAt(level: number): { readonly [k: string]: Species } {
+  const hit = dexCache.get(level);
+  if (hit) return hit;
+  const built = loadDex(ch1BatchData as DexEntryJson[], level);
+  dexCache.set(level, built);
+  return built;
+}
 
 export interface Ch1Fight {
   readonly flag: string;
@@ -74,6 +91,9 @@ export interface Ch1Fight {
   readonly environment: EnvironmentId | undefined;
   // Does the trainer drag you in on sight, or can you walk past?
   readonly avoidable: boolean;
+  // The union of the trainer team's move pool at the SHIPPED level. Level is a
+  // learnset cursor, so this is what a level band actually controls.
+  readonly foeMoves: readonly string[];
 }
 
 export interface Ch1Zone {
@@ -109,10 +129,13 @@ export function ch1Fights(): readonly Ch1Fight[] {
         obj.type === 'npc' ? obj.interact : obj.type === 'script' ? obj.commands : [];
       for (const b of battleCommands(cmds)) {
         const species = typeof b.foeSpecies === 'string' ? [b.foeSpecies] : b.foeSpecies;
+        const shipped = dexAt(SHIPPED_CH1_LEVEL);
+        const moves = [...new Set(species.flatMap((n) => shipped[n]?.moves ?? []))];
         out.push({
           flag: b.winFlag,
           map: map.name,
           foeSpecies: species,
+          foeMoves: moves,
           reward: b.reward ?? 0,
           profileName: foeProfileForFlag(b.winFlag)?.name ?? null,
           environment: map.environment,
@@ -163,9 +186,10 @@ export interface FightMetrics {
   readonly draws: number;
 }
 
-function teamOf(names: readonly string[]): ReturnType<typeof createTeam> {
+function teamOf(names: readonly string[], level: number): ReturnType<typeof createTeam> {
+  const dex = dexAt(level);
   const sides = names.flatMap((n) => {
-    const sp = CH1_DEX[n];
+    const sp = dex[n];
     return sp ? [createSide(sp)] : [];
   });
   if (sides.length === 0) throw new Error(`ch1Census: no known species in [${names.join(', ')}]`);
@@ -195,6 +219,8 @@ export function simulateFight(
   playerSpecies: Species,
   n: number,
   seed: number,
+  // The level to field the TRAINER's mons at. Defaults to what the game ships.
+  foeLevel: number = SHIPPED_CH1_LEVEL,
   maxRounds = 60,
 ): FightMetrics | null {
   const profile = foeProfileForFlag(fight.flag);
@@ -213,7 +239,7 @@ export function simulateFight(
 
   for (let i = 0; i < n; i += 1) {
     const rng: RNG = mulberry32(seed + i * 7919);
-    const foeTeam = teamOf(fight.foeSpecies);
+    const foeTeam = teamOf(fight.foeSpecies, foeLevel);
     let state: BattleState = createBattleState(
       createTeam(foeTeam.members.map(() => createSide(playerSpecies))),
       foeTeam,
@@ -291,12 +317,22 @@ export interface Ch1Census {
   };
 }
 
-export function ch1Census(opts: { n: number; seed: number; starter: string }): Ch1Census {
+export function ch1Census(opts: {
+  n: number;
+  seed: number;
+  starter: string;
+  /** Player level; defaults to the shipped CH1 level. */
+  playerLevel?: number;
+  /** Trainer level; defaults to the shipped CH1 level. Lower it to price the ramp. */
+  foeLevel?: number;
+}): Ch1Census {
   const fights = ch1Fights();
   const zones = ch1Zones();
-  const player = CH1_DEX[opts.starter];
+  const playerLevel = opts.playerLevel ?? SHIPPED_CH1_LEVEL;
+  const foeLevel = opts.foeLevel ?? SHIPPED_CH1_LEVEL;
+  const player = dexAt(playerLevel)[opts.starter];
   if (!player) throw new Error(`ch1Census: unknown starter ${opts.starter}`);
-  const measured = fights.map((f) => ({ f, m: simulateFight(f, player, opts.n, opts.seed) }));
+  const measured = fights.map((f) => ({ f, m: simulateFight(f, player, opts.n, opts.seed, foeLevel) }));
   const metrics = measured.flatMap(({ m }) => (m ? [m] : []));
   const unmeasured = measured.flatMap(({ f, m }) => (m ? [] : [f.flag]));
   const wildSpecies = new Set(zones.flatMap((z) => z.species));
