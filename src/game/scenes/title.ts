@@ -2,7 +2,7 @@ import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
 import type { InputKey, Scene } from '../scene';
 import { drawSpeciesInSlot } from '../sprites';
-import { drawText } from '../ui';
+import { drawText, drawTextCenter } from '../ui';
 
 export interface TitleSceneOpts {
   readonly onStart: () => void;
@@ -10,6 +10,10 @@ export interface TitleSceneOpts {
   // Title renders a 2-row menu (Continue / New Game); when undefined,
   // the legacy single-button "Press Start" UX is preserved.
   readonly onContinue?: () => void;
+  // Shown under the menu when the previous save could not be loaded. It is the
+  // ONLY place the player is told, so it also says where the bytes went — the
+  // save is quarantined, not deleted (save.ts QUARANTINE_KEY).
+  readonly notice?: string;
 }
 
 export function createTitleScene(opts: TitleSceneOpts): Scene {
@@ -71,6 +75,10 @@ export function createTitleScene(opts: TitleSceneOpts): Scene {
         row('NEW GAME', 1, 166);
       } else if (Math.floor(tick * 1.6) % 2 === 0) {
         drawText(ctx, 'PRESS START', 126, 158, PALETTE.paper);
+      }
+
+      if (opts.notice !== undefined) {
+        drawTextCenter(ctx, opts.notice, LOGICAL_W / 2, 140, PALETTE.hpWarn);
       }
     },
   };

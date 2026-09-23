@@ -604,3 +604,144 @@ describe('Phase 2 — New Game wipes the save; Continue restores it', () => {
     expect(loaded.catchBreathUnlocked).toBe(true);
   });
 });
+
+// ── Migration + quarantine ───────────────────────────────────────────────────
+// The shape has grown additively since Phase 5a (every new field optional with a
+// default), which is why it is still version 1. The chain has to exist BEFORE it is
+// needed, because the alternative at bump time is discarding saves — and until now
+// a rejected save was treated as NO save, after which the autosave that fires on the
+// first overworld transition wrote straight over it.
+
+import {
+  CURRENT_SAVE_VERSION,
+  QUARANTINE_KEY,
+  loadFromStorageResult,
+  migrateSave,
+  readQuarantine,
+} from './save';
+import type { SaveMigration } from './save';
+
+function memStorage(seed: { [k: string]: string } = {}) {
+  const map = new Map(Object.entries(seed));
+  return {
+    getItem: (k: string) => map.get(k) ?? null,
+    setItem: (k: string, v: string) => void map.set(k, v),
+    removeItem: (k: string) => void map.delete(k),
+    keys: () => [...map.keys()],
+  };
+}
+
+const MIN_V1 = {
+  version: 1,
+  party: [{ speciesName: 'GRUBLEAF', hp: 10, st: 50, momentum: 0 }],
+  position: { map: 'ROUTE31', x: 3, y: 4, facing: 'down' },
+  flags: ['player_has_starter'],
+  catchBreathUnlocked: false,
+  rngSeed: 42,
+};
+
+describe('migrateSave — the chain exists before it is needed', () => {
+  test('a current-version save passes through untouched', () => {
+    const r = migrateSave(MIN_V1);
+    expect('value' in r && r.value.version).toBe(CURRENT_SAVE_VERSION);
+  });
+
+  test('walks an older save up one step at a time, stamping each version', () => {
+    const seen: number[] = [];
+    const steps: { [from: number]: SaveMigration } = {
+      1: (raw) => { seen.push(raw.version as number); return { ...raw, addedInV2: true }; },
+      2: (raw) => { seen.push(raw.version as number); return { ...raw, addedInV3: true }; },
+    };
+    const r = migrateSave(MIN_V1, steps, 3);
+    expect('value' in r).toBe(true);
+    if (!('value' in r)) return;
+    expect(seen).toEqual([1, 2]); // each step sees the version it upgrades FROM
+    expect(r.value.version).toBe(3);
+    expect(r.value.addedInV2).toBe(true);
+    expect(r.value.addedInV3).toBe(true);
+    expect(r.value.rngSeed).toBe(42); // untouched fields survive
+  });
+
+  test('refuses a NEWER save rather than mangling it — a chain cannot downgrade', () => {
+    const r = migrateSave({ ...MIN_V1, version: 99 });
+    expect('failure' in r && r.failure).toBe('future');
+  });
+
+  test('a GAP in the chain fails instead of half-migrating', () => {
+    // Target 3 with only the 1→2 step registered: stopping at 2 and handing that to
+    // the validator would be worse than refusing.
+    const r = migrateSave(MIN_V1, { 1: (raw) => raw }, 3);
+    expect('failure' in r && r.failure).toBe('corrupt');
+  });
+
+  test('a missing or non-numeric version is corrupt, not version 0', () => {
+    expect('failure' in migrateSave({ party: [] })).toBe(true);
+    expect('failure' in migrateSave({ version: 'one' })).toBe(true);
+    expect('failure' in migrateSave(null)).toBe(true);
+  });
+});
+
+describe('quarantine — a bad byte must not cost a run', () => {
+  test('no save at all is not a failure and quarantines nothing', () => {
+    const s = memStorage();
+    const r = loadFromStorageResult(s);
+    expect(r).toEqual({ save: null, failure: null });
+    expect(s.getItem(QUARANTINE_KEY)).toBeNull();
+  });
+
+  test('a good save loads and leaves the quarantine empty', () => {
+    const s = memStorage({ [SAVE_KEY]: JSON.stringify(MIN_V1) });
+    const r = loadFromStorageResult(s);
+    expect(r.failure).toBeNull();
+    expect(r.save?.rngSeed).toBe(42);
+    expect(s.getItem(QUARANTINE_KEY)).toBeNull();
+  });
+
+  test('unparseable JSON is set aside, not silently dropped', () => {
+    const s = memStorage({ [SAVE_KEY]: '{not json' });
+    expect(loadFromStorageResult(s).failure).toBe('unparseable');
+    const q = readQuarantine(s)!;
+    expect(q.reason).toBe('unparseable');
+    expect(q.raw).toBe('{not json');
+  });
+
+  test('a corrupt save is set aside with its bytes intact', () => {
+    const bad = JSON.stringify({ ...MIN_V1, position: 'nowhere' });
+    const s = memStorage({ [SAVE_KEY]: bad });
+    expect(loadFromStorageResult(s).failure).toBe('corrupt');
+    expect(readQuarantine(s)!.raw).toBe(bad);
+  });
+
+  test('a FUTURE save is preserved verbatim — an older build must not eat it', () => {
+    const future = JSON.stringify({ ...MIN_V1, version: 99, somethingNew: [1, 2] });
+    const s = memStorage({ [SAVE_KEY]: future });
+    expect(loadFromStorageResult(s).failure).toBe('future');
+    expect(readQuarantine(s)!.raw).toBe(future);
+  });
+
+  test('the live slot is CLEARED, so the next autosave cannot land on top of it', () => {
+    // This is the whole point. Before: reject → Continue hidden → New Game →
+    // autosaveNow() on the first overworld transition → the run is gone.
+    const s = memStorage({ [SAVE_KEY]: '{not json' });
+    loadFromStorageResult(s);
+    expect(s.getItem(SAVE_KEY)).toBeNull();
+    expect(s.getItem(QUARANTINE_KEY)).not.toBeNull();
+  });
+
+  test('a storage that refuses writes still lets the game start', () => {
+    const s = {
+      getItem: () => '{not json',
+      setItem: () => { throw new Error('quota'); },
+      removeItem: () => { throw new Error('locked'); },
+    };
+    expect(() => loadFromStorageResult(s)).not.toThrow();
+    expect(loadFromStorageResult(s).failure).toBe('unparseable');
+  });
+
+  test('?wipe clears the quarantine too, so the next failure reports itself', () => {
+    const s = memStorage({ [SAVE_KEY]: '{bad', [QUARANTINE_KEY]: '{"reason":"corrupt","raw":"x"}' });
+    wipeStorage(s);
+    expect(s.getItem(SAVE_KEY)).toBeNull();
+    expect(s.getItem(QUARANTINE_KEY)).toBeNull();
+  });
+});

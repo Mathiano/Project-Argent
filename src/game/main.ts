@@ -123,12 +123,13 @@ import { createDexMenuScene } from './scenes/dexMenu';
 import type { DexUiEntry } from './scenes/dexMenu';
 import {
   fromSavedSide,
-  hasSave,
   loadFromStorage,
+  loadFromStorageResult,
   saveToStorage,
   toSavedSide,
   wipeStorage,
 } from './save';
+import type { LoadFailure, LoadResult } from './save';
 import type { SaveState } from './save';
 
 const host = document.getElementById('app');
@@ -729,13 +730,37 @@ function showTitle(): void {
   // Continue is offered only when a save exists; selecting it restores
   // the run from localStorage. Phase 2 save/load. exactOptionalProps
   // wants us to omit the field rather than pass undefined.
+  // Load ONCE, here, rather than probing with hasSave(): hasSave only checks that
+  // the key exists, so a corrupt save used to offer CONTINUE, fail on selection,
+  // and drop into a new game that then autosaved over it. Loading up front also
+  // runs the quarantine (save.ts) BEFORE any autosave can fire.
+  pendingLoad = loadFromStorageResult();
+  const notice = saveFailureNotice(pendingLoad.failure);
   scenes.replace(
-    createTitleScene(
-      hasSave()
-        ? { onStart: startNewGame, onContinue: continueFromSave }
-        : { onStart: startNewGame },
-    ),
+    createTitleScene({
+      onStart: startNewGame,
+      ...(pendingLoad.save ? { onContinue: continueFromSave } : {}),
+      ...(notice ? { notice } : {}),
+    }),
   );
+}
+
+// The load attempted at title time, reused by CONTINUE so the save is not parsed
+// twice (and so the quarantine cannot fire twice on the same blob).
+let pendingLoad: LoadResult | null = null;
+
+// What the player is told when a save could not be read. It has to say the data
+// was kept, or "COULD NOT READ SAVE" reads as "your run is gone".
+export function saveFailureNotice(failure: LoadFailure | null): string | null {
+  switch (failure) {
+    case 'future':
+      return 'SAVE IS FROM A NEWER BUILD — KEPT, NOT LOADED';
+    case 'unparseable':
+    case 'corrupt':
+      return 'SAVE COULD NOT BE READ — KEPT ASIDE, NOT DELETED';
+    default:
+      return null;
+  }
 }
 
 // Phase 3 — New Game starts in the bedroom with an EMPTY party. The
@@ -1076,7 +1101,7 @@ function applySave(saved: SaveState): void {
 }
 
 function continueFromSave(): void {
-  const saved = loadFromStorage();
+  const saved = pendingLoad?.save ?? loadFromStorage();
   if (!saved) {
     // Save vanished between title render and click — fall back to
     // the new-game flow.
