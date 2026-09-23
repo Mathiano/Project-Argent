@@ -15,6 +15,7 @@ import {
 import type { DexEntryJson, MoveJson, SideState } from '../engine';
 import { createPauseMenuScene } from './scenes/pauseMenu';
 import { createPartyMenuScene } from './scenes/partyMenu';
+import type { CatchOrigin } from './catching';
 
 registerMoves(loadMoves(movesData as MoveJson[]));
 const CH1 = loadDex(ch1BatchData as DexEntryJson[], 13);
@@ -262,6 +263,28 @@ describe('Phase 4 — party menu', () => {
     expect(party[0]!.species.name).toBe('SILTSKIP');
     expect(party[1]!.species.name).toBe('GRUBLEAF');
     expect(reorderCalls).toBe(1);
+  });
+
+  test('reorder carries bond AND catch origin with the mon, not the slot', () => {
+    // Regression: origin was not passed to the menu, so a reorder left it on the
+    // old index. starterDisplayName() reads partyOrigin to find "your partner",
+    // so after moving the starter the CH1 ending named the wrong mon — and the
+    // desync was autosaved.
+    const party = [createSide(CH1.GRUBLEAF!), createSide(CH1.SILTSKIP!), createSide(CH1.KINDRAKE!)];
+    const bond = [40, 3, 7];
+    const origin: CatchOrigin[] = ['starter', 'read', 'mercy'];
+    const scene = createPartyMenuScene({ party, bond, origin, onReorder: () => {}, onClose: () => {} });
+    scene.input?.('a'); // action on GRUBLEAF (idx 0)
+    scene.input?.('down'); // MOVE
+    scene.input?.('a'); // lift
+    scene.input?.('down'); // → idx 1
+    scene.input?.('down'); // → idx 2
+    scene.input?.('a'); // place
+    expect(party.map((m) => m.species.name)).toEqual(['SILTSKIP', 'KINDRAKE', 'GRUBLEAF']);
+    expect(bond).toEqual([3, 7, 40]);
+    expect(origin).toEqual(['read', 'mercy', 'starter']);
+    // The starter is still findable by origin, and it is still GRUBLEAF.
+    expect(party[origin.indexOf('starter')]!.species.name).toBe('GRUBLEAF');
   });
 
   test('B in list mode closes back to pause', () => {

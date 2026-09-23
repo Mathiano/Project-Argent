@@ -23,6 +23,7 @@
 import { TIERS, lookupMove } from '../../engine';
 import type { SideState } from '../../engine';
 import { BOND_STAGES, bondStage, bondStageName } from '../catching';
+import type { CatchOrigin } from '../catching';
 import { stageProgress } from '../bond';
 import { LOGICAL_H, LOGICAL_W } from '../canvas';
 import { PALETTE } from '../palette';
@@ -38,6 +39,12 @@ export interface PartyMenuOpts {
   // lockstep on reorder so bond follows its mon. Optional (legacy/test
   // callers omit it).
   readonly bond?: number[];
+  // Feature 3 — HOW each mon was caught (index-aligned with party). Kept in
+  // lockstep on reorder for the same reason as bond: it is a per-MON fact
+  // stored per-INDEX. Before this was passed, a reorder left origin behind —
+  // starterDisplayName() then named whichever mon now sat in the starter's old
+  // slot (the CH1 ending calls it "your partner"), and the desync was saved.
+  readonly origin?: CatchOrigin[];
   // Phase 6b — "ask your mon" (a flavored bond/readiness response) + the
   // summary's evolution readiness line. Optional.
   readonly ask?: (index: number) => string;
@@ -85,6 +92,11 @@ export function createPartyMenuScene(opts: PartyMenuOpts): Scene {
         const ba = opts.bond[reorderIdx]!;
         opts.bond[reorderIdx] = opts.bond[next]!;
         opts.bond[next] = ba;
+      }
+      if (opts.origin) {
+        const oa = opts.origin[reorderIdx]!;
+        opts.origin[reorderIdx] = opts.origin[next]!;
+        opts.origin[next] = oa;
       }
       reorderIdx = next;
       cursor = next;

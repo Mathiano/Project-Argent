@@ -1019,6 +1019,7 @@ function pushPartyMenu(): void {
     createPartyMenuScene({
       party: run.party,
       bond: run.partyBond,
+      origin: run.partyOrigin, // follows its mon on reorder (starterDisplayName reads it)
       // 6b — "ask your mon" + the summary readiness line read the interim
       // bond value + badges through the evolution module.
       ask: (i) =>

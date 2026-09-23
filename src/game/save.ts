@@ -53,7 +53,9 @@ export interface SaveState {
   readonly dex?: SavedDex;
   // living-world.md Feature 3 — HOW each mon was caught, index-aligned
   // with `party` / `box`. Additive; impossible to backfill (set at catch
-  // time). Missing → best-effort default on load. Nothing reads it yet.
+  // time). Missing → best-effort default on load. Read by main.ts
+  // starterDisplayName() (which mon is "your partner"); the party menu keeps it
+  // index-aligned on reorder.
   readonly partyOrigin?: readonly CatchOrigin[];
   readonly boxOrigin?: readonly CatchOrigin[];
   // Player character name (the [player] token source). Additive — pre-naming
