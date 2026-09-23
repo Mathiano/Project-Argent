@@ -10,7 +10,8 @@
     "typecheck": "tsc --build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "sim": "tsx src/sim/runLadder.ts"
+    "sim": "tsx src/sim/runLadder.ts",
+    "census": "tsx src/game/runCh1Census.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

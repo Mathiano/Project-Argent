@@ -39,6 +39,7 @@ URL: `http://localhost:5173/?skip=<value>[&starter=<species>]`
 | **`test-battle-2v2`** | **2-mon player party (GRUBLEAF lead + SILTSKIP bench) vs wild KILNDRAKE** | **Phase 1 hook — switching-as-a-read.** Lead is at type disadvantage (FLAME→NATURE 1.3 punish); SILTSKIP (AQUA) is the bench answer (AQUA→FLAME 1.3). Exercises voluntary switch + forced-switch + bench indicators. Restarts on resolve. Override the party with `?party=A,B`. |
 | `prep`          | Rival prep scene (legacy EMBERCUB vs KAMON-counter)                   | Legacy demo flow.                                                     |
 | `rival`         | Rival battle (legacy)                                                  | Legacy demo flow.                                                     |
+| **`scout`**     | **Falkner's SCOUT REPORT sheet at any intel state**                    | **`&intel=<flag,flag>` buys those lines; `&intel=all` fills the sheet; omit for an empty 0/6 report.** The report is a pure function of the flags, so every state is reachable without replaying the gym. See `docs/scout-report-AS-BUILT.md`. NOT `?skip=prep` — that is the generic KAMON-style prep scene. |
 | `falkner`       | Falkner boss fight (2-mon FLITPECK→GALEHAWK)                          | Sets the active starter via `?starter` (default GRUBLEAF). On a win it now awards the **ZEPHYR badge** + fanfare beat (same as the real gym), then the demo-end → title. |
 | `pct-tiles`     | PCT sample tiles at 320×180 — NATIVE drawImage vs INDEXED side-by-side | Pipeline EYE-CHECK scene (debug bypass; not the production renderer). A/B exits. |
 | **`pct-prod`**  | **Walk the `__PCT_VERIFY__` fixture — pct_* tiles through the REAL overworld renderer** | **Production-path confidence check before Tiled (tileRef → registry → indexed decode → draw). Verified headless by `pctProdRender.test.ts`; see `docs/pct-pipeline-verify.md`.** |
@@ -46,6 +47,14 @@ URL: `http://localhost:5173/?skip=<value>[&starter=<species>]`
 | **`tiled-kitchen`** | **The KITCHEN-SINK map — EVERY feature at once, walked in-engine** | **Phase-8 full-pipeline proof: collision walls + 3 NPCs (incl. a trainer, `?party=`/`?starter=` for a team) + 2 warps + 2 spawns + 4 encounter zones. Arrives at `spawn_player`. Walk into a wall, talk/fight, step both zone types, use a warp. See `docs/tiled-importer.md`.** |
 | **`route31-big`** | **Route 31 Phase 1+2 — the full 22×74 canvas imported+wired, walked in-engine** | **Terrain (incl. WATER, fences, buildings) + collision + warps (N→Hearthwick, S→Violet) + 7 encounter zones + tree-top walk-behind. Phase 2: JAY (approachOnEnter robber whose win UNLOCKS Calls) + flavor NPCs (birdwatcher, afraid-of-stones, healer) + the lost-kid/PIP quest. Enters `fromHearthwick`. `?party=`/`?starter=` to fight Jay. See `docs/route31-migration-scope.md`.** |
 | `end`           | End scene (won = true)                                                | Used to verify the end → onRestart loop.                              |
+
+### Headless report (not a `?skip=` hook)
+
+`npm run census` prints the **CH1 census** — every fight and encounter zone read off
+the shipped maps, each fight simulated against the canonical `reader` yardstick
+(win%, rounds, ★ earned, HP left, skippable), plus chapter totals. Env overrides:
+`N=` (default 300), `SEED=` (1), `STARTER=` (GRUBLEAF). It gates nothing; findings
+live in `docs/ch1-census-findings.md`.
 
 ### Modifiers
 
