@@ -1,5 +1,10 @@
 import { runFalknerLadder } from './falknerLadder';
 import type { FalknerCellResult } from './falknerLadder';
+import { FALKNER_LADDER_ARCHETYPES, reader } from './archetypes';
+
+// `--reader` appends the Layer-4 fair-fight yardstick as an extra row — printed,
+// never asserted (no band on the card) and outside the in-band summary.
+const WITH_READER = process.argv.includes('--reader');
 
 interface Lever {
   readonly gustBorneDmgMult: number;
@@ -41,6 +46,7 @@ function summary(cells: readonly FalknerCellResult[]): { inBand: number; totalDi
   let band = 0;
   let dist = 0;
   for (const cell of cells) {
+    if (!TARGETS[cell.archetype]) continue; // the unasserted reader column
     if (inBand(cell)) band += 1;
     dist += distance(cell);
   }
@@ -60,6 +66,13 @@ function printTable(label: string, cells: readonly FalknerCellResult[]): void {
     };
     const row = STARTER_ORDER.map((s) => fmt(cellOf(cells, archetype, s))).join(' | ');
     console.log(`  ${archetype.padEnd(15)} | ${row} | ${target[0]}-${target[1]}%`);
+  }
+  if (WITH_READER) {
+    const row = STARTER_ORDER.map((s) => {
+      const c = cellOf(cells, reader.name, s);
+      return c ? `${c.winPct.toFixed(1).padStart(5)}% ` : '   N/A  ';
+    }).join(' | ');
+    console.log(`  ${reader.name.padEnd(15)} | ${row} | (not asserted)`);
   }
   const s = summary(cells);
   console.log(`  → ${s.inBand}/15 in band, total miss-distance ${s.totalDistance.toFixed(1)}pp`);
@@ -83,6 +96,7 @@ for (const lever of SWEEP) {
     aceHpMult: lever.aceHpMult,
     n: N,
     seed: SEED,
+    ...(WITH_READER ? { archetypes: [...FALKNER_LADDER_ARCHETYPES, reader] } : {}),
   });
   const s = summary(cells);
   printTable(`gust=${lever.gustBorneDmgMult} hp=${lever.aceHpMult}`, cells);

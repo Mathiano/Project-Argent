@@ -8,8 +8,9 @@ import {
   createTeam,
   FALKNER_OPENING_MOMENTUM,
   falknerBossAI,
+  FALKNER_CARD,
+  loadBossCard,
   forcedAction,
-  loadDex,
   loadSpeciesAt,
   loadMoves,
   mulberry32,
@@ -23,7 +24,6 @@ import {
 } from '../engine';
 import type {
   Action,
-  ArenaSchedule,
   BattleState,
   BossCard,
   DexEntryJson,
@@ -181,11 +181,7 @@ const flagStore = {
 // Load moves at startup; the chapter dexes (CH1 at CH1_LEVEL) come from the
 // registry (dexRegistry.ts) — the one species resolver + type-chart rule.
 registerMoves(loadMoves(movesData as MoveJson[]));
-const FALKNER_LEAD_LEVEL = 13;
-const FALKNER_ACE_LEVEL = 15;
 const CH1_DEX = DEX_REGISTRY.dex('CH1');
-const FALKNER_LEAD_DEX = loadDex(ch1BatchData as DexEntryJson[], FALKNER_LEAD_LEVEL);
-const FALKNER_ACE_DEX = loadDex(ch1BatchData as DexEntryJson[], FALKNER_ACE_LEVEL);
 const TYPECHART_CH1 = TYPECHART_CANON;
 
 const STARTERS: readonly Species[] = ['KINDRAKE', 'GRUBLEAF', 'SILTSKIP'].map(
@@ -219,19 +215,10 @@ function dexStatusOf(name: string): ReturnType<typeof dexStatus> {
   return dexStatus(run.dex, name);
 }
 
-const FALKNER_ARENA: ArenaSchedule = {
-  rhythmEveryN: 3,
-  heavyExtraCost: 8,
-  heavyExtraInitWeight: 1.3,
-  telegraphAheadBy: 1,
-};
-
-// Locked B1 trait table: GUSTBORNE dmgMult 1.4 (gust lever from the
-// boss-card sweep). Passed into createBattleState at Falkner setup time;
-// the global LEGACY_TRAIT_TABLE stays at 1.3/1.25 untouched.
-const FALKNER_TRAITS: TraitTable = {
-  GUSTBORNE: { dmgMult: 1.4, initMult: 1.25 },
-};
+// Locked B1 trait table (GUSTBORNE dmgMult 1.4) — rides on the engine's
+// FALKNER_CARD, the one source the sim ladder also builds from. Passed into
+// createBattleState at Falkner setup time; LEGACY_TRAIT_TABLE stays untouched.
+const FALKNER_TRAITS: TraitTable = FALKNER_CARD.traits;
 
 void SPECIES;
 void COUNTER_MAP;
@@ -1463,31 +1450,27 @@ function showKamonGate(): void {
 // number from this (break bar, rhythm, roster, opening ★) instead of restating
 // them as prose — which is how the prep screen came to advertise "Break bar 2"
 // four re-baselines after the card moved to 4.
+// The card itself (levels, arena, break bar, ace HP scale, opening ★) is DATA —
+// engine FALKNER_CARD (bossCards.ts), the one source the sim ladder also loads.
+// The arena schedule + ace-only HP scale ride on the card; the engine applies
+// statScale to whatever mon's data the card carries (its species pointer), but
+// the player-facing team data is what's in the Team. Falkner's 2-mon team uses
+// the ace mult on the GALEHAWK member only.
+function loadFalkner(): ReturnType<typeof loadBossCard> {
+  return loadBossCard(FALKNER_CARD, ch1BatchData as DexEntryJson[]);
+}
+
 export function falknerAceSpecies(): Species {
-  return { ...FALKNER_ACE_DEX.GALEHAWK!, trait: 'GUSTBORNE' };
+  return loadFalkner().card.species;
 }
 
 export function falknerBossCard(): BossCard {
-  return {
-    species: falknerAceSpecies(),
-    // The arena schedule + ace-only HP scale ride on the card; the engine
-    // applies statScale to whatever mon's data the card carries (its species
-    // pointer), but the player-facing team data is what's in the Team.
-    // Falkner's 2-mon team uses the ace mult on the GALEHAWK member only.
-    statScale: { hp: 1.15 },
-    arenaSchedule: FALKNER_ARENA,
-    // Spine-1 re-baseline 2→4: phased-unlock let good readers Break-spam Falkner,
-    // resetting his gust cadence and starving DIVE BOMB. 4 holds the cadence so his
-    // signature fires (see src/sim/falknerLadder.ts).
-    breakBar: 4,
-    teamSize: 2,
-    openingMomentum: FALKNER_OPENING_MOMENTUM,
-  };
+  return loadFalkner().card;
 }
 
 function buildFalknerTeam(): { team: ReturnType<typeof createTeam>; card: BossCard } {
-  const flitpeck: Species = FALKNER_LEAD_DEX.FLITPECK!;
-  const card = falknerBossCard();
+  const { card, roster } = loadFalkner();
+  const flitpeck: Species = roster[0]!;
   const galehawk: Species = card.species;
   const team = createTeam([
     // The boss "comes prepared" — both of Falkner's mons bank the opening ★ so

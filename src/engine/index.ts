@@ -55,6 +55,8 @@ export {
 } from './rivalCard';
 export { falknerBossAI, FALKNER_OPENING_MOMENTUM } from './bossAI';
 export type { BossPolicy } from './bossAI';
+export { FALKNER_CARD, loadBossCard } from './bossCards';
+export type { BossCardData, BossRosterSlot, LoadedBossCard } from './bossCards';
 export {
   trainerPolicy,
   TRAINER_PROFILES,
