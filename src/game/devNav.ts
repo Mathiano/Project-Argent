@@ -1,6 +1,6 @@
 // Dev playtest navigation — PURE parsing of dev URL params into a normalized plan
 // that main.ts applies via the existing map-warp / flag / party-construction paths.
-// No DOM, no engine imports: the dev gate (import.meta.env.DEV) lives in main.ts and
+// No DOM, no direct engine imports: the dev gate (import.meta.env.DEV) lives in main.ts and
 // is passed in as `dev`, so this module is unit-testable and inert-by-contract.
 //
 // This is a dev ENTRY layer over existing systems, not a new game system. The same
@@ -16,10 +16,10 @@
 // e.g. ?at=academy&state=postfalkner   ?at=violet&party=grubleaf:12,kindrake:8
 //      ?fight=galehawk:duelist&bond=6&seed=a9c0
 
-// A JSON data import (the CH1 manifest) — the SAME source main.ts loads the dex
-// from, so the forge foe list can't drift from shipping content. Not an engine
-// import; keeps this module DOM-free + unit-testable.
-import ch1BatchData from '../../docs/ch1-batch.json';
+// The chapter-dex registry — the SAME source main.ts resolves species from, so the
+// forge foe list can't drift from shipping content. Pure (JSON + the engine's
+// loader); keeps this module DOM-free + unit-testable.
+import { DEX_REGISTRY } from './dexRegistry';
 
 export interface AtTarget {
   readonly map: string;
@@ -51,13 +51,13 @@ export interface DevPlan {
 }
 
 // The permanent sim-fixture species (docs/data.ts — the forever trio). Stable
-// names, safe to list; the CH1 roster is enumerated from the manifest below.
+// names, safe to list; the chapter rosters are enumerated from the registry below.
 const FIXTURE_FOES = ['EMBERCUB', 'SPROUTLE', 'AQUAFIN'] as const;
-// The Battle Forge's selectable foes: every registered CH1 species (from the
-// manifest — no hardcoded copy that could drift) + the fixtures.
+// The Battle Forge's selectable foes: every registered chapter species (from the
+// registry — no hardcoded copy that could drift) + the fixtures.
 export const FORGE_FOES: readonly string[] = [
   ...new Set([
-    ...(ch1BatchData as ReadonlyArray<{ readonly name: string }>).map((e) => e.name.toUpperCase()),
+    ...DEX_REGISTRY.names.map((n) => n.toUpperCase()),
     ...FIXTURE_FOES,
   ]),
 ];

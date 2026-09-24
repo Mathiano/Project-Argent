@@ -34,12 +34,11 @@ import type {
   Species,
   Stance,
   TraitTable,
-  TypeChart,
 } from '../engine';
 import { getMap } from './overworld/maps';
+import { DEX_REGISTRY, TYPECHART_CANON } from './dexRegistry';
 import ch1BatchData from '../../docs/ch1-batch.json';
 import movesData from '../../docs/moves.json';
-import typechartData from '../../docs/typechart.json';
 import { LOGICAL_H, LOGICAL_W, mountCanvas } from './canvas';
 import { loadUiFont } from './font';
 import { createPctTileTestScene } from './scenes/pctTileTest';
@@ -179,15 +178,15 @@ const flagStore = {
   },
 };
 
-// Load CH1 dex + moves at startup.
+// Load moves at startup; the chapter dexes (CH1 at CH1_LEVEL) come from the
+// registry (dexRegistry.ts) — the one species resolver + type-chart rule.
 registerMoves(loadMoves(movesData as MoveJson[]));
-const CH1_LEVEL = 13;
 const FALKNER_LEAD_LEVEL = 13;
 const FALKNER_ACE_LEVEL = 15;
-const CH1_DEX = loadDex(ch1BatchData as DexEntryJson[], CH1_LEVEL);
+const CH1_DEX = DEX_REGISTRY.dex('CH1');
 const FALKNER_LEAD_DEX = loadDex(ch1BatchData as DexEntryJson[], FALKNER_LEAD_LEVEL);
 const FALKNER_ACE_DEX = loadDex(ch1BatchData as DexEntryJson[], FALKNER_ACE_LEVEL);
-const TYPECHART_CH1 = typechartData as TypeChart;
+const TYPECHART_CH1 = TYPECHART_CANON;
 
 const STARTERS: readonly Species[] = ['KINDRAKE', 'GRUBLEAF', 'SILTSKIP'].map(
   (n) => CH1_DEX[n]!,
@@ -394,10 +393,10 @@ function buildPlayerTeam(): ReturnType<typeof createTeam> {
   return createTeam(fresh);
 }
 
-// Resolve a species name across the CH1 dex + LEGACY fixture (skip-
+// Resolve a species name across the chapter dexes + LEGACY fixture (skip-
 // flag paths use legacy species). Throws if a saved name is unknown.
 function resolveSpecies(name: string): Species {
-  const sp = CH1_DEX[name] ?? SPECIES[name];
+  const sp = DEX_REGISTRY.resolveSpecies(name);
   if (!sp) throw new Error(`Argent: unknown species "${name}" — dex drift?`);
   return sp;
 }
@@ -1155,10 +1154,10 @@ function kamonStolenSpecies(player: Species): Species {
   return resolveSpecies(stolenName!);
 }
 
-// KAMON's leading CHAFF (the 2-mon card) — only for a CH1 lead. The fixture/demo
-// path (EMBERCUB / ?skip, no CH1 dex entry) has no chaff → KAMON fights solo.
+// KAMON's leading CHAFF (the 2-mon card) — only for a chapter-dex lead. The fixture/demo
+// path (EMBERCUB / ?skip, no chapter-dex entry) has no chaff → KAMON fights solo.
 function kamonChaffFor(player: Species): Species | undefined {
-  return CH1_DEX[player.name] !== undefined ? CH1_DEX[KAMON_CHAFF_SPECIES] : undefined;
+  return DEX_REGISTRY.usesCanonChart(player.name) ? DEX_REGISTRY.chapterSpecies(KAMON_CHAFF_SPECIES) : undefined;
 }
 
 function showPrep(): void {
@@ -1184,11 +1183,10 @@ function showRivalBattle(): void {
   // keeps the legacy chart and fights solo (no CH1 chaff).
   const chaff = kamonChaffFor(player);
   const foeTeam = buildKamonTeam(stolen, chaff);
-  const isCh1 = CH1_DEX[player.name] !== undefined;
   const state = createBattleState(
     buildPlayerTeam(),
     foeTeam,
-    isCh1 ? { typeChart: TYPECHART_CH1 } : {},
+    DEX_REGISTRY.chartOptsFor(player.name),
   );
   scenes.replace(
     createBattleScene({
@@ -1284,9 +1282,8 @@ function pushRivalGateFight(): void {
   // still stage-1 here even though this is post-ZEPHYR.
   const chaff = kamonChaffFor(player);
   const foeTeam = buildKamonTeam(stolen, chaff);
-  const isCh1 = CH1_DEX[player.name] !== undefined;
   const state = createBattleState(buildPlayerTeam(), foeTeam, {
-    ...(isCh1 ? { typeChart: TYPECHART_CH1 } : {}),
+    ...DEX_REGISTRY.chartOptsFor(player.name),
     // Layer 3 — the rival gate is fought on Violet's ground, like any other
     // fight that starts from a live map.
     ...(hereEnvironment !== undefined ? { environment: hereEnvironment } : {}),
@@ -1411,7 +1408,6 @@ function showKamonGate(): void {
   const chaff = kamonChaffFor(player); // CH1 → a leading chaff; the ACE finishes
   const foeTeam = buildKamonTeam(stolen, chaff); // the built v2 card (0.85 ace) — UNCHANGED
   const aceIndex = chaff ? 1 : 0; // the stolen-starter ace's index in KAMON's team
-  const isCh1 = CH1_DEX[player.name] !== undefined;
   const playerTeam = buildPlayerTeamPrefix(2); // the FIRST TWO party mons
   scenes.push(
     createPrepScene({
@@ -1421,7 +1417,7 @@ function showKamonGate(): void {
       profile: TRAINER_PROFILES.kamon!,
       typeChart: TYPECHART_CH1,
       onContinue: () => {
-        const state = createBattleState(playerTeam, foeTeam, isCh1 ? { typeChart: TYPECHART_CH1 } : {});
+        const state = createBattleState(playerTeam, foeTeam, DEX_REGISTRY.chartOptsFor(player.name));
         scenes.replace(
           createBattleScene({
             state,
@@ -1735,7 +1731,7 @@ function applyPartyFromUrl(): void {
     const names = partyParam.split(',').map((n) => n.trim()).filter(Boolean);
     const sides: SideState[] = [];
     for (const name of names) {
-      const sp = STARTERS.find((s) => s.name === name) ?? CH1_DEX[name];
+      const sp = STARTERS.find((s) => s.name === name) ?? DEX_REGISTRY.chapterSpecies(name);
       if (!sp) {
         console.warn(`Argent ?party=${name}: not in dex; skipped`);
         continue;
@@ -1758,9 +1754,9 @@ function applyPartyFromUrl(): void {
 // widens the learnset band via loadSpeciesAt (Argent has no stat-leveling — level
 // only gates moves). Falls back to the default-band species, then to the starter list.
 function resolveDevSpecies(name: string, level: number | null): Species | null {
-  const entry = (ch1BatchData as DexEntryJson[]).find((e) => e.name === name);
-  if (entry) return loadSpeciesAt(entry, level ?? CH1_LEVEL);
-  return STARTERS.find((s) => s.name === name) ?? CH1_DEX[name] ?? null;
+  const found = DEX_REGISTRY.chapterEntry(name);
+  if (found) return loadSpeciesAt(found.entry, level ?? found.level);
+  return STARTERS.find((s) => s.name === name) ?? DEX_REGISTRY.chapterSpecies(name) ?? null;
 }
 
 function applyDevParty(members: readonly DevPartyMember[]): void {
@@ -1825,16 +1821,16 @@ function showForgeFight(foeName: string, profileKey: string | null): void {
   const profile = forgeProfile(profileKey);
   const foeTeam = buildTrainerTeam(foeName.toUpperCase());
   if (!foeTeam) { console.warn(`Argent dev forge: unknown foe "${foeName}"; skipped`); return; }
-  const foeIsCh1 = CH1_DEX[foeName.toUpperCase()] !== undefined; // CH1 mon → the CH1 (UPPERCASE) type chart
+  const foeChart = DEX_REGISTRY.chartOptsFor(foeName.toUpperCase()); // chapter mon → the canon (UPPERCASE) chart
   scenes.push(
     createPrepScene({
       playerSpecies: partyLead(),
       foeSpecies: activeMon(foeTeam).species,
       foeTrainerName: profile.name,
       profile,
-      ...(foeIsCh1 ? { typeChart: TYPECHART_CH1 } : {}),
+      ...foeChart,
       onContinue: () => {
-        const state = createBattleState(buildPlayerTeam(), foeTeam, foeIsCh1 ? { typeChart: TYPECHART_CH1 } : {});
+        const state = createBattleState(buildPlayerTeam(), foeTeam, foeChart);
         scenes.replace(
           createBattleScene({
             state,
@@ -2300,7 +2296,7 @@ function showOverworld(
 }
 
 function pushWildEncounter(foeSpeciesName: string): void {
-  const foe = CH1_DEX[foeSpeciesName] ?? SPECIES[foeSpeciesName];
+  const foe = DEX_REGISTRY.resolveSpecies(foeSpeciesName);
   if (!foe) {
     console.warn(`Argent: encounter species not found: ${foeSpeciesName}`);
     return;
@@ -2419,7 +2415,7 @@ function pushWildEncounter(foeSpeciesName: string): void {
 // MATH is unchanged (same callbacks as pushWildEncounter). The trigger's
 // once-flag is already set when this fires, so normal encounters resume after.
 function pushTutorialCatch(): void {
-  const foe = CH1_DEX[TUTORIAL_CATCH_SPECIES] ?? SPECIES[TUTORIAL_CATCH_SPECIES];
+  const foe = DEX_REGISTRY.resolveSpecies(TUTORIAL_CATCH_SPECIES);
   if (!foe) {
     console.warn(`Argent: tutorial-catch species not found: ${TUTORIAL_CATCH_SPECIES}`);
     return;
@@ -2512,7 +2508,7 @@ function buildTrainerTeam(spec: string | readonly string[]): ReturnType<typeof c
   const names = typeof spec === 'string' ? [spec] : spec;
   const sides: SideState[] = [];
   for (const n of names) {
-    const sp = CH1_DEX[n] ?? SPECIES[n];
+    const sp = DEX_REGISTRY.resolveSpecies(n);
     if (!sp) {
       console.warn(`Argent: trainer roster species not found: ${n}`);
       continue;
