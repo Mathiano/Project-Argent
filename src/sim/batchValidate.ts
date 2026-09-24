@@ -23,7 +23,7 @@
 
 import movesData from '../../docs/moves.json';
 import { loadMoves, loadSpeciesAt, lookupMove, movePoolIssues, registerMoves } from '../engine';
-import type { DexEntryJson, MoveJson, TypeChart } from '../engine';
+import type { DexEntryJson, ManifestRow, MoveJson, TypeChart } from '../engine';
 
 // The reserved stage-3 signature slot (authored later on boss cards / batch
 // finalization — ch1-batch-sheet.md). Exempt from the registry + nuke checks.
@@ -38,80 +38,11 @@ function ensureRegistered(): void {
 
 // ── Manifest ────────────────────────────────────────────────────────────────
 
-export interface ManifestRow {
-  readonly line_id: string;
-  readonly stage: number;
-  readonly name: string; // '' = unnamed slot
-  readonly stages_total: number;
-  readonly bucket: string;
-  readonly type1: string;
-  readonly type2: string; // '' = single-type
-  readonly archetype: string;
-  readonly rarity: string;
-  readonly evolve_at: number | null;
-}
-
-// Minimal RFC-4180 split: quoted fields may hold commas and "" escapes.
-function splitCsvLine(line: string): string[] {
-  const out: string[] = [];
-  let cur = '';
-  let quoted = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i]!;
-    if (quoted) {
-      if (ch === '"' && line[i + 1] === '"') {
-        cur += '"';
-        i += 1;
-      } else if (ch === '"') quoted = false;
-      else cur += ch;
-    } else if (ch === '"') quoted = true;
-    else if (ch === ',') {
-      out.push(cur);
-      cur = '';
-    } else cur += ch;
-  }
-  out.push(cur);
-  return out;
-}
-
-// Parse docs/mon-manifest.csv text (the caller reads the file).
-export function parseManifest(csv: string): ManifestRow[] {
-  const lines = csv.split(/\r?\n/).filter((l) => l.trim() !== '');
-  const header = splitCsvLine(lines[0] ?? '');
-  const col = (name: string): number => {
-    const i = header.indexOf(name);
-    if (i < 0) throw new Error(`parseManifest: missing column "${name}"`);
-    return i;
-  };
-  const c = {
-    line_id: col('line_id'),
-    stage: col('stage'),
-    name: col('name'),
-    stages_total: col('stages_total'),
-    bucket: col('bucket'),
-    type1: col('type1'),
-    type2: col('type2'),
-    archetype: col('archetype'),
-    rarity: col('rarity'),
-    evolve_at: col('evolve_at'),
-  };
-  return lines.slice(1).map((line) => {
-    const f = splitCsvLine(line);
-    const at = (i: number): string => (f[i] ?? '').trim();
-    return {
-      line_id: at(c.line_id),
-      stage: Number(at(c.stage)),
-      name: at(c.name),
-      stages_total: Number(at(c.stages_total)),
-      bucket: at(c.bucket),
-      type1: at(c.type1),
-      type2: at(c.type2),
-      archetype: at(c.archetype),
-      rarity: at(c.rarity),
-      evolve_at: at(c.evolve_at) === '' ? null : Number(at(c.evolve_at)),
-    };
-  });
-}
+// The manifest row + its parser live in the engine (src/engine/manifest.ts) —
+// ONE parser shared with the game's placeholder silhouettes. Re-exported here so
+// this module's public surface is unchanged.
+export { parseManifest } from '../engine';
+export type { ManifestRow } from '../engine';
 
 // ── Issues ──────────────────────────────────────────────────────────────────
 

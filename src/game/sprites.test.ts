@@ -5,7 +5,7 @@
 
 import { describe, expect, test } from 'vitest';
 import { drawPlaceholder, drawSprite, drawSpriteInSlot, drawSpeciesInSlot, getSprite, placeholderSpec } from './sprites';
-import { parseManifest } from './monManifest';
+import { parseManifest } from '../engine';
 import monManifestCsv from '../../docs/mon-manifest.csv?raw';
 import ch1Batch from '../../docs/ch1-batch.json';
 import { validateSprite } from './sprite';
@@ -139,7 +139,7 @@ describe('manifest-backed placeholders', () => {
     for (const e of ch1Batch) {
       const row = byName.get(e.name);
       expect(row, `${e.name} missing from the manifest`).toBeDefined();
-      expect(row!.lineId, e.name).toBe(e.line_id);
+      expect(row!.line_id, e.name).toBe(e.line_id);
       expect(row!.stage, e.name).toBe(e.stage);
       expect(row!.archetype, e.name).toBe(e.archetype);
       expect([row!.type1, row!.type2].filter(Boolean), e.name).toEqual(e.types);

@@ -42,6 +42,8 @@ export {
   loadMoves,
 } from './dexLoader';
 export type { DexEntryJson, MoveJson } from './dexLoader';
+export { parseCsv, parseManifest } from './manifest';
+export type { ManifestRow } from './manifest';
 export {
   KAMON_BOND_FACTOR,
   KAMON_STEAL,

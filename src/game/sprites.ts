@@ -15,8 +15,8 @@ import siltskipBackData from '../../assets/sprites/SILTSKIP_BACK.sprite.json';
 import grithoaxData from '../../assets/sprites/GRITHOAX.sprite.json';
 import grithoaxBackData from '../../assets/sprites/GRITHOAX_BACK.sprite.json';
 import monManifestCsv from '../../docs/mon-manifest.csv?raw';
+import { parseManifest } from '../engine';
 import type { ElementType } from '../engine';
-import { parseManifest } from './monManifest';
 import type { Facing, Sprite } from './sprite';
 import { drawSprite, drawSpriteInSlot, validateSprite } from './sprite';
 
