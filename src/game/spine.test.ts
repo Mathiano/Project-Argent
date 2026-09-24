@@ -69,6 +69,13 @@ const CH1 = loadDex(ch1BatchData as DexEntryJson[], 13);
 const TYPECHART = typechartData as TypeChart;
 const ZEPHYR_BADGE = 'ZEPHYR';
 
+// FROZEN MIRROR — not the shipped card. This fixture restates Falkner's arena,
+// trait lever and card (below) instead of loading FALKNER_CARD / FALKNER_LEADER
+// (src/engine/bossCards.ts, src/game/leaders.ts), and it has drifted from them:
+// no openingMomentum, GALEHAWK at the CH1 level 13 (the card's ace is 15), and a
+// foe team built without statScale. It walks the scenes, not main.ts's leader
+// fight, so it does not guard the shipped card. Migrating it to
+// loadBossCard(FALKNER_LEADER.card, FALKNER_LEADER.dexRows) is a follow-up.
 const FALKNER_ARENA: ArenaSchedule = {
   rhythmEveryN: 3,
   heavyExtraCost: 8,

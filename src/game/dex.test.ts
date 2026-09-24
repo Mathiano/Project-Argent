@@ -73,7 +73,7 @@ describe('dex registry', () => {
   test('a trainer/boss roster marks every foe mon SEEN (not wild-only)', () => {
     const dex = createDex();
     // Falkner's two-mon team — the wiring (buildTrainerTeam /
-    // buildFalknerTeam) calls markSeenAll with the foe species names.
+    // buildLeaderTeam) calls markSeenAll with the foe species names.
     markSeenAll(dex, ['FLITPECK', 'GALEHAWK']);
     expect(dexStatus(dex, 'FLITPECK')).toBe('seen');
     expect(dexStatus(dex, 'GALEHAWK')).toBe('seen');

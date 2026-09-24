@@ -181,7 +181,6 @@ const flagStore = {
 // registry (dexRegistry.ts) — the one species resolver + type-chart rule.
 registerMoves(loadMoves(movesData as MoveJson[]));
 const CH1_DEX = DEX_REGISTRY.dex('CH1');
-const TYPECHART_CH1 = TYPECHART_CANON;
 
 const STARTERS: readonly Species[] = ['KINDRAKE', 'GRUBLEAF', 'SILTSKIP'].map(
   (n) => CH1_DEX[n]!,
@@ -1142,7 +1141,7 @@ function showPrep(): void {
       foeTrainerName: 'KAMON',
       // Layer 4: the HABIT + PLAN come off KAMON's profile, not a literal.
       profile: TRAINER_PROFILES.kamon!,
-      typeChart: TYPECHART_CH1,
+      typeChart: TYPECHART_CANON,
       onContinue: showRivalBattle,
     }),
   );
@@ -1388,7 +1387,7 @@ function showKamonGate(): void {
       foeSpecies: stolen,
       foeTrainerName: 'KAMON',
       profile: TRAINER_PROFILES.kamon!,
-      typeChart: TYPECHART_CH1,
+      typeChart: TYPECHART_CANON,
       onContinue: () => {
         const state = createBattleState(playerTeam, foeTeam, DEX_REGISTRY.chartOptsFor(player.name));
         scenes.replace(
@@ -1479,7 +1478,7 @@ function createLeaderBattle(
     buildPlayerTeam(),
     team,
     {
-      typeChart: TYPECHART_CH1,
+      typeChart: TYPECHART_CANON,
       traits: leader.card.traits,
       bossCard: card,
     },
@@ -1543,7 +1542,7 @@ function showTestBattle(): void {
   const state = createBattleState(
     buildPlayerTeam(),
     createSide(foe),
-    { typeChart: TYPECHART_CH1 },
+    { typeChart: TYPECHART_CANON },
   );
   scenes.replace(
     createBattleScene({
@@ -1582,7 +1581,7 @@ function showTestBattle2v2(): void {
   const state = createBattleState(
     buildPlayerTeam(),
     foeTeam,
-    { typeChart: TYPECHART_CH1 },
+    { typeChart: TYPECHART_CANON },
   );
   scenes.replace(
     createBattleScene({
@@ -2269,7 +2268,7 @@ function pushWildEncounter(foeSpeciesName: string): void {
   }
   markSeen(run.dex, foe.name); // Phase 6.5 — a wild encounter marks SEEN
   const state = createBattleState(buildPlayerTeam(), createSide(foe), {
-    typeChart: TYPECHART_CH1,
+    typeChart: TYPECHART_CANON,
     ...(hereEnvironment !== undefined ? { environment: hereEnvironment } : {}),
   });
   scenes.push(
@@ -2388,7 +2387,7 @@ function pushTutorialCatch(): void {
   }
   markSeen(run.dex, foe.name);
   const state = createBattleState(buildPlayerTeam(), createSide(foe), {
-    typeChart: TYPECHART_CH1,
+    typeChart: TYPECHART_CANON,
     ...(hereEnvironment !== undefined ? { environment: hereEnvironment } : {}),
   });
   const popBack = () => {
@@ -2497,7 +2496,7 @@ function pushTrainerFight(
   if (!foeTeam) return;
   const leadName = activeMon(foeTeam).species.name;
   const state = createBattleState(buildPlayerTeam(), foeTeam, {
-    typeChart: TYPECHART_CH1,
+    typeChart: TYPECHART_CANON,
     ...(hereEnvironment !== undefined ? { environment: hereEnvironment } : {}),
   });
   // Combat Layer 4: a profiled trainer fights with its distinct policy; an
@@ -2566,7 +2565,7 @@ function showLeaderFight(bossId: string): void {
       playerSpecies: partyLead(),
       foeSpecies: card.species,
       card,
-      typeChart: TYPECHART_CH1,
+      typeChart: TYPECHART_CANON,
       // The intel economy: each report line is bought with a trainer's win-flag.
       hasFlag: (f) => flagStore.has(f),
       onContinue: () => {

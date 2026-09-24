@@ -1,7 +1,9 @@
 // Falkner's prep screen — now the generic leader prep scene (leaderPrep.ts) with
 // FALKNER's registry id and name filled in from his LeaderSpec (gym2-plan Step 6).
-// Kept so existing callers keep their call shape; main.ts stages every leader
-// through createLeaderPrepScene directly.
+// TEST-ONLY: no production code calls it — main.ts stages every leader through
+// createLeaderPrepScene directly. It keeps the call shape the tests use
+// (spine.test.ts, prep.test.ts, leaderPrep.test.ts); retire it when those move
+// to createLeaderPrepScene.
 
 import { FALKNER_LEADER } from '../leaders';
 import type { Scene } from '../scene';
