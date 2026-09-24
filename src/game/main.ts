@@ -6,9 +6,6 @@ import {
   createBattleState,
   createSide,
   createTeam,
-  FALKNER_OPENING_MOMENTUM,
-  falknerBossAI,
-  FALKNER_CARD,
   loadBossCard,
   forcedAction,
   loadSpeciesAt,
@@ -33,7 +30,6 @@ import type {
   SideState,
   Species,
   Stance,
-  TraitTable,
 } from '../engine';
 import { getMap } from './overworld/maps';
 import { DEX_REGISTRY, TYPECHART_CANON } from './dexRegistry';
@@ -44,14 +40,15 @@ import { loadUiFont } from './font';
 import { createPctTileTestScene } from './scenes/pctTileTest';
 import { createInputDispatcher } from './input';
 import { SceneStack } from './scene';
+import type { Scene } from './scene';
 import { createBattleScene, infoLevelToReliability } from './scenes/battle';
 import { profileIntentInfo } from './trainerIntent';
-import { FALKNER_REPORT, intelFlagsOf } from './scout';
+import { intelFlagsOf, scoutReportFor } from './scout';
 import { createEndScene } from './scenes/end';
 import { createBagMenuScene } from './scenes/bagMenu';
 import { createMartMenuScene } from './scenes/martMenu';
 import { createBadgeAwardScene } from './scenes/badgeAward';
-import { createFalknerPrepScene } from './scenes/falknerPrep';
+import { createLeaderPrepScene } from './scenes/leaderPrep';
 import { createOverworldScene } from './scenes/overworld';
 import { CALLS_UNLOCK_ON_WIN } from './overworld/tiledWiring';
 import { createPartyMenuScene } from './scenes/partyMenu';
@@ -73,7 +70,9 @@ import { createMessageScene } from './scenes/messageScene';
 import { createChapterCardScene } from './scenes/chapterCard';
 import { monDisplayName } from './monName';
 import { kamonGateLines, quietResolveLines, CHAPTER_CARD, CH1_CLOSED_FLAG, shouldFireChapterEnd } from './ch1Ending';
-import { ACADEMY_PROMOTED_FLAG, falknerMentorLines } from './violetAcademy';
+import { BADGE_FLAGS } from './badges';
+import { FALKNER_LEADER, leaderFor, leaderIntro } from './leaders';
+import type { LeaderSpec } from './leaders';
 import { freshBattleSide } from './battlePrep';
 import { bagAdd, bagByPocket, bagConsume, ITEMS, seedStartingBag } from './items';
 import type { BagEntry } from './items';
@@ -215,11 +214,6 @@ function dexStatusOf(name: string): ReturnType<typeof dexStatus> {
   return dexStatus(run.dex, name);
 }
 
-// Locked B1 trait table (GUSTBORNE dmgMult 1.4) — rides on the engine's
-// FALKNER_CARD, the one source the sim ladder also builds from. Passed into
-// createBattleState at Falkner setup time; LEGACY_TRAIT_TABLE stays untouched.
-const FALKNER_TRAITS: TraitTable = FALKNER_CARD.traits;
-
 void SPECIES;
 void COUNTER_MAP;
 const RNG_SEED = 0xa9c0;
@@ -309,10 +303,6 @@ let devSession = false;
 // bondSceneProps. The SHIPPING default is bond-gated (false) — never ship on.
 let devUnlockAllCalls = false;
 
-// Demo-complete: the one badge the demo ships. Falkner's ZEPHYR BADGE.
-// A registry can come later when gyms 2–8 land; one constant suffices now.
-const ZEPHYR_BADGE = 'ZEPHYR';
-
 function partyTypes(): Set<string> {
   const out = new Set<string>();
   for (const side of run.party) {
@@ -332,11 +322,12 @@ function recomputeSignpostFlags(): void {
   const hasTerra = types.has('TERRA');
   if (hasSprout && !hasTerra) flagStore.set('need_terra_nudge');
   else flagStore.unset('need_terra_nudge');
-  // The canonical "ZEPHYR badge earned" flag — derived from run.badges so it's
-  // always consistent (and recomputed on load). Gates the Violet→Route 32
-  // obstacle (gone once earned) and KAMON's spawn (present once earned).
-  if (run.badges.includes(ZEPHYR_BADGE)) flagStore.set('zephyr_earned');
-  else flagStore.unset('zephyr_earned');
+  // Each badge's world flag (badges.ts BADGE_FLAGS — "ZEPHYR earned" today) is
+  // derived from run.badges so it's always consistent (and recomputed on load).
+  for (const { badge, flag } of BADGE_FLAGS) {
+    if (run.badges.includes(badge)) flagStore.set(flag);
+    else flagStore.unset(flag);
+  }
 }
 
 // Stable RNG seed from the party composition. Same party → same seed
@@ -980,21 +971,16 @@ function awardBadge(id: string): boolean {
   return true;
 }
 
-// Demo-complete — push the badge fanfare beat. onContinue is the
+// Demo-complete — the leader's badge fanfare beat. onContinue is the
 // caller's "where to go after the player dismisses it" (back to the gym
 // in the real path; to the title on the ?skip=falkner standalone).
-function pushBadgeAward(onContinue: () => void): void {
-  scenes.push(
-    createBadgeAwardScene({
-      badgeName: ZEPHYR_BADGE,
-      leaderName: 'FALKNER',
-      lines: [
-        'Proof of the rooftop wind.',
-        'You read the gale and held.',
-      ],
-      onContinue,
-    }),
-  );
+function badgeAwardScene(leader: LeaderSpec, onContinue: () => void): Scene {
+  return createBadgeAwardScene({
+    badgeName: leader.badge,
+    leaderName: leader.trainerName,
+    lines: leader.badgeLines,
+    onContinue,
+  });
 }
 
 // Phase 4 — party menu pushed from the pause menu's POKEMON row. The
@@ -1445,105 +1431,102 @@ function showKamonGate(): void {
   );
 }
 
-// FALKNER's ace species and his CARD, split out of buildFalknerTeam so the SCOUT
-// REPORT can quote the very card the fight will use. The report derives every
-// number from this (break bar, rhythm, roster, opening ★) instead of restating
-// them as prose — which is how the prep screen came to advertise "Break bar 2"
-// four re-baselines after the card moved to 4.
-// The card itself (levels, arena, break bar, ace HP scale, opening ★) is DATA —
-// engine FALKNER_CARD (bossCards.ts), the one source the sim ladder also loads.
-// The arena schedule + ace-only HP scale ride on the card; the engine applies
-// statScale to whatever mon's data the card carries (its species pointer), but
-// the player-facing team data is what's in the Team. Falkner's 2-mon team uses
-// the ace mult on the GALEHAWK member only.
-function loadFalkner(): ReturnType<typeof loadBossCard> {
-  return loadBossCard(FALKNER_CARD, ch1BatchData as DexEntryJson[]);
-}
-
-export function falknerAceSpecies(): Species {
-  return loadFalkner().card.species;
-}
-
-export function falknerBossCard(): BossCard {
-  return loadFalkner().card;
-}
-
-function buildFalknerTeam(): { team: ReturnType<typeof createTeam>; card: BossCard } {
-  const { card, roster } = loadFalkner();
-  const flitpeck: Species = roster[0]!;
-  const galehawk: Species = card.species;
-  const team = createTeam([
-    // The boss "comes prepared" — both of Falkner's mons bank the opening ★ so
-    // their signature heavy (DIVE BOMB = 2★ under phased-unlock) reaches the field.
-    createSide(flitpeck, undefined, { openingMomentum: FALKNER_OPENING_MOMENTUM }),
-    createSide(galehawk, card.statScale, { openingMomentum: FALKNER_OPENING_MOMENTUM }),
-  ]);
+// A gym LEADER's fight, staged from its LeaderSpec (leaders.ts; gym2-plan Step 6).
+// The card itself (roster + levels, arena, break bar, ace HP scale, opening ★,
+// traits) is DATA — engine bossCards.ts, the one source the sim ladder also loads —
+// and the scout report quotes the very card the fight will use, deriving every
+// number from it (break bar, rhythm, roster, opening ★) instead of restating them
+// as prose, which is how the prep screen came to advertise "Break bar 2" four
+// re-baselines after the card moved to 4. The arena schedule + ace-only HP scale
+// ride on the card; the engine applies statScale to whatever mon's data the card
+// carries (its species pointer), but the player-facing team data is what's in the
+// Team, so the ace mult goes on the ACE member (the roster's last) only.
+function buildLeaderTeam(leader: LeaderSpec): {
+  team: ReturnType<typeof createTeam>;
+  card: BossCard;
+  roster: readonly Species[];
+} {
+  const { card, roster } = loadBossCard(leader.card, leader.dexRows);
+  const ace = roster.length - 1;
+  // The boss "comes prepared" — every lineup mon banks the card's opening ★ so
+  // the signature heavy (Falkner's DIVE BOMB = 2★ under phased-unlock) reaches
+  // the field.
+  const opening = card.openingMomentum !== undefined ? { openingMomentum: card.openingMomentum } : undefined;
+  const team = createTeam(
+    roster.map((mon, i) => createSide(mon, i === ace ? card.statScale : undefined, opening)),
+  );
   // Phase 6.5 — facing the boss's mons registers them as SEEN too.
-  markSeenAll(run.dex, [flitpeck.name, galehawk.name]);
-  return { team, card };
+  markSeenAll(run.dex, roster.map((mon) => mon.name));
+  return { team, card, roster };
 }
 
-function showFalknerFight(): void {
-  const { team, card } = buildFalknerTeam();
+// The battle scene both leader paths share: the card-driven state, the leader's
+// policy + tells + intro. `bond` is the path's bond props (the ?skip standalone
+// shows a static meter and awards nothing); `onResolve` gets the foe team too, for
+// the bond award.
+function createLeaderBattle(
+  leader: LeaderSpec,
+  bond: (team: ReturnType<typeof createTeam>) => ReturnType<typeof bondSceneProps>,
+  onResolve: (
+    winner: 'player' | 'foe',
+    finalState: BattleState,
+    participants: readonly number[],
+    team: ReturnType<typeof createTeam>,
+  ) => void,
+): Scene {
+  const { team, card, roster } = buildLeaderTeam(leader);
   const state = createBattleState(
     buildPlayerTeam(),
     team,
     {
       typeChart: TYPECHART_CH1,
-      traits: FALKNER_TRAITS,
+      traits: leader.card.traits,
       bossCard: card,
     },
   );
+  return createBattleScene({
+    state,
+    rng: run.rng,
+    ...bond(team),
+    chooseFoeAction: (s, r) => leader.policy(s, 'foe', r),
+    intentReliability: leader.intentReliability,
+    foeFocusInfo: leader.foeFocusInfo,
+    intro: leaderIntro(leader, roster[0]!.name),
+    catchBreathUnlocked: true,
+    canRun: false,
+    onResolve: (winner, finalState, participants) => onResolve(winner, finalState, participants, team),
+  });
+}
+
+// The ?skip=falkner standalone: the fight alone, no prep, no bond award.
+function showLeaderFightStandalone(leader: LeaderSpec): void {
   scenes.replace(
-    createBattleScene({
-      state,
-      rng: run.rng,
-      ...bondSceneProps(), // Lane A — static bond meter (?skip path awards no bond)
-      chooseFoeAction: (s, r) => falknerBossAI(s, 'foe', r),
-      // Phase 6.7-A — a gym leader reads AMBIGUOUS: his stance intent can't
-      // be blind-countered. Engine still commits the true stance.
-      intentReliability: 'ambiguous',
-      // Layer 4 Stage 1 — Falkner's gust-Focus tell is VAGUE (a gym leader
-      // hints but doesn't narrow to two): "is focusing intently".
-      foeFocusInfo: { discipline: 'veiled', releases: ['heavy'] },
-      intro: [
-        'FALKNER: Welcome to my',
-        'rooftop. Read the wind!',
-        '— sent out FLITPECK!',
-      ],
-      catchBreathUnlocked: true,
-      canRun: false,
-      onResolve: (winner, finalState) => {
+    createLeaderBattle(
+      leader,
+      () => bondSceneProps(), // Lane A — static bond meter (?skip path awards no bond)
+      (winner, finalState) => {
         writebackParty(finalState);
-        if (winner === 'player') showBadgeAwarded();
+        if (winner === 'player') showBadgeAwarded(leader);
         else {
-          // ?skip=falkner standalone retry — heal first so the refight
+          // ?skip standalone retry — heal first so the refight
           // isn't with a fainted party (BUG 2, the skip-path mirror of
           // the real instant-retry).
           healPartyInPlace();
-          showFalknerFight();
+          showLeaderFightStandalone(leader);
         }
       },
-    }),
+    ),
   );
 }
 
-function showBadgeAwarded(): void {
-  // ?skip=falkner standalone: award the badge, show the same fanfare
+function showBadgeAwarded(leader: LeaderSpec): void {
+  // ?skip standalone: award the badge, show the same fanfare
   // beat the real gym path uses, then fall through to the demo-end
   // screen → title.
-  awardBadge(ZEPHYR_BADGE);
-  flagStore.set('falkner_beaten');
+  awardBadge(leader.badge);
+  flagStore.set(leader.beatenFlag);
   scenes.replace(
-    createBadgeAwardScene({
-      badgeName: ZEPHYR_BADGE,
-      leaderName: 'FALKNER',
-      lines: [
-        'Proof of the rooftop wind.',
-        'You read the gale and held.',
-      ],
-      onContinue: () => scenes.replace(createEndScene({ won: true, onRestart: showTitle })),
-    }),
+    badgeAwardScene(leader, () => scenes.replace(createEndScene({ won: true, onRestart: showTitle }))),
   );
 }
 
@@ -2157,7 +2140,7 @@ else if (skip === 'house') showOverworld('HOUSE', 'fromBedroom', false);
 else if (skip === 'falkner') {
   applyPartyFromUrl();
   recomputeSignpostFlags();
-  showFalknerFight();
+  showLeaderFightStandalone(FALKNER_LEADER);
 }
 // Dev hook for the SCOUT-REPORT economy: jump straight to Falkner's sheet with a
 // chosen slice of intel, e.g. ?skip=scout&intel=gym_trainer_beaten,gym_trainer_4_beaten
@@ -2168,10 +2151,10 @@ else if (skip === 'falkner') {
 else if (skip === 'scout') {
   applyPartyFromUrl();
   const intel = url.get('intel') ?? '';
-  if (intel === 'all') for (const f of intelFlagsOf(FALKNER_REPORT)) flagStore.set(f);
+  if (intel === 'all') for (const f of intelFlagsOf(scoutReportFor(FALKNER_LEADER.bossId))) flagStore.set(f);
   else for (const f of intel.split(',').map((x) => x.trim()).filter(Boolean)) flagStore.set(f);
   recomputeSignpostFlags();
-  showFalknerFightFromOverworld();
+  showLeaderFight(FALKNER_LEADER.bossId);
 } else if (skip === 'gym') {
   applyPartyFromUrl();
   recomputeSignpostFlags();
@@ -2223,7 +2206,7 @@ function showOverworld(
       pushTrainerFight(foeSpecies, winFlag, reward);
     },
     onBossBattle(bossId: string) {
-      if (bossId === 'falkner') showFalknerFightFromOverworld();
+      showLeaderFight(bossId);
     },
     onOpenMart(stock: readonly string[]) {
       pushMartMenu(stock);
@@ -2568,92 +2551,84 @@ function pushTrainerFight(
   );
 }
 
-function showFalknerFightFromOverworld(): void {
-  // Push prep, then on continue push Falkner fight. On resolve, pop both
-  // back to the gym overworld + (on win) set the badge flag.
+// A leader fight from the overworld: push the leader's prep sheet, then on
+// continue push the fight. On resolve, pop back to the gym overworld + (on a win)
+// set the beaten flag and award the badge. `bossId` is the gym map's
+// start-boss-battle id; an unregistered id is a no-op (as it always was).
+function showLeaderFight(bossId: string): void {
+  const leader = leaderFor(bossId);
+  if (!leader) return;
+  const { card } = loadBossCard(leader.card, leader.dexRows);
   scenes.push(
-    createFalknerPrepScene({
+    createLeaderPrepScene({
+      bossId: leader.bossId,
+      trainerName: leader.trainerName,
       playerSpecies: partyLead(),
-      foeSpecies: falknerAceSpecies(),
-      card: falknerBossCard(),
+      foeSpecies: card.species,
+      card,
       typeChart: TYPECHART_CH1,
       // The intel economy: each report line is bought with a trainer's win-flag.
       hasFlag: (f) => flagStore.has(f),
       onContinue: () => {
         scenes.pop();
-        pushFalknerBattle();
+        pushLeaderBattle(leader);
       },
     }),
   );
 }
 
-function pushFalknerBattle(): void {
-  const { team, card } = buildFalknerTeam();
-  const state = createBattleState(
-    buildPlayerTeam(),
-    team,
-    {
-      typeChart: TYPECHART_CH1,
-      traits: FALKNER_TRAITS,
-      bossCard: card,
-    },
-  );
+// BUG 2 — the "instant boss retry" pillar (project-argent-scope.md: a boss loss
+// drops you straight back into Prep, no walk of shame), shared by every leader: a
+// loss heals in place, persists, and re-opens that leader's prep → fight — not a
+// fainted party stuck on the gym floor and not a long walk back from a Center.
+function retryIntoPrep(leader: LeaderSpec): void {
+  healPartyInPlace();
+  autosaveNow();
+  showLeaderFight(leader.bossId);
+}
+
+function pushLeaderBattle(leader: LeaderSpec): void {
   scenes.push(
-    createBattleScene({
-      state,
-      rng: run.rng,
-      ...bondSceneProps(team, 'boss'), // Lane A — bond meter + post-win advance
-      chooseFoeAction: (s, r) => falknerBossAI(s, 'foe', r),
-      // Phase 6.7-A — gym leader reads AMBIGUOUS (the ?skip=falkner path).
-      intentReliability: 'ambiguous',
-      // Layer 4 Stage 1 — Falkner's gust-Focus tell is VAGUE.
-      foeFocusInfo: { discipline: 'veiled', releases: ['heavy'] },
-      intro: [
-        'FALKNER: Welcome to my',
-        'rooftop. Read the wind!',
-        '— sent out FLITPECK!',
-      ],
-      catchBreathUnlocked: true,
-      canRun: false,
-      onResolve: (winner, finalState, participants) => {
+    createLeaderBattle(
+      leader,
+      (team) => bondSceneProps(team, 'boss'), // Lane A — bond meter + post-win advance
+      (winner, finalState, participants, team) => {
         writebackParty(finalState);
         scenes.pop(); // drop the battle scene first
         if (winner === 'player') {
-          flagStore.set('falkner_beaten');
+          flagStore.set(leader.beatenFlag);
           run.catchBreathUnlocked = true;
           const bondCrossings = awardBondForFight(team, 'boss', finalState, participants); // boss clear = the big bonus
-          // Demo-complete S1: award the ZEPHYR badge + a real payoff
+          // Demo-complete S1: award the badge + a real payoff
           // beat, then return to the gym. awardBadge autosaves; the
-          // pop after the fanfare lands the player back on the rooftop.
-          awardBadge(ZEPHYR_BADGE);
-          pushBadgeAward(() => {
-            scenes.pop(); // drop the badge scene → back to the gym
-            autosaveNow();
-            // After the badge fanfare: the bond beat (a boss clear is the
-            // biggest bond gain), then the evo gate check (ZEPHYR may also
-            // complete a bonded mon's badge gate), then FALKNER's mentor line
-            // — the game's thesis, delivered in-gym on the win. It promotes the
-            // Academy as the next prompt (a Violet NPC appears on the flag).
-            // One-shot: this win onResolve fires once; the flag persists it.
-            showBondBeats(bondCrossings, () =>
-              maybeEvolve(() => {
-                flagStore.set(ACADEMY_PROMOTED_FLAG);
-                autosaveNow(); // persist the promote-marker before the line plays
-                pushMessage(falknerMentorLines());
-              }),
-            );
-          });
+          // pop after the fanfare lands the player back in the gym.
+          awardBadge(leader.badge);
+          scenes.push(
+            badgeAwardScene(leader, () => {
+              scenes.pop(); // drop the badge scene → back to the gym
+              autosaveNow();
+              // After the badge fanfare: the bond beat (a boss clear is the
+              // biggest bond gain), then the evo gate check (the badge may also
+              // complete a bonded mon's badge gate), then the leader's after-win
+              // beat (FALKNER's mentor line — the game's thesis, delivered
+              // in-gym on the win; it promotes the Academy as the next prompt).
+              // One-shot: this win onResolve fires once; the flag persists it.
+              showBondBeats(bondCrossings, () =>
+                maybeEvolve(() => {
+                  const after = leader.afterWin;
+                  if (!after) return;
+                  flagStore.set(after.flag);
+                  autosaveNow(); // persist the promote-marker before the line plays
+                  pushMessage(after.lines());
+                }),
+              );
+            }),
+          );
         } else {
-          // BUG 2 — a boss loss heals + offers INSTANT RETRY (the
-          // "instant boss retry" pillar), not a fainted party stuck on
-          // the rooftop and not a long walk back from a Center. Re-open
-          // the prep → fight in place with a fresh party.
-          healPartyInPlace();
-          autosaveNow();
-          showFalknerFightFromOverworld();
+          retryIntoPrep(leader);
         }
       },
-    }),
+    ),
   );
 }
 

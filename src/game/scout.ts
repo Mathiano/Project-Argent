@@ -272,3 +272,19 @@ export const FALKNER_REPORT: ScoutReportDef = {
     },
   ],
 };
+
+// ── The registry — one report per leader, keyed by boss id ────────────────────
+// gym2-plan Step 6. The key is the def's own `id`, which is the id the gym map's
+// `start-boss-battle` names — so the prep sheet (and the ?skip=scout hook) find a
+// leader's report from the same id that launched the fight, and a second gym's
+// report is one def plus one row here.
+export const SCOUT_REPORTS: Readonly<Record<string, ScoutReportDef>> = {
+  [FALKNER_REPORT.id]: FALKNER_REPORT,
+};
+
+// Throws on an unregistered id: a leader fight with no report would open a blank
+// prep sheet, which is a content bug to fail loudly on, not to render.
+export function scoutReportFor(bossId: string): ScoutReportDef {
+  if (!Object.hasOwn(SCOUT_REPORTS, bossId)) throw new Error(`Argent: no scout report for boss "${bossId}"`);
+  return SCOUT_REPORTS[bossId]!;
+}
