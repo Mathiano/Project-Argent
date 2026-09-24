@@ -16,3 +16,8 @@ declare module '*.png' {
   const url: string;
   export default url;
 }
+// `?raw` imports resolve to the file's text (e.g. docs/mon-manifest.csv).
+declare module '*?raw' {
+  const text: string;
+  export default text;
+}

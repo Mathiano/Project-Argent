@@ -4,7 +4,10 @@
 // can tell the mons apart at a glance (not an identical "?").
 
 import { describe, expect, test } from 'vitest';
-import { drawPlaceholder, drawSprite, drawSpriteInSlot, drawSpeciesInSlot, getSprite } from './sprites';
+import { drawPlaceholder, drawSprite, drawSpriteInSlot, drawSpeciesInSlot, getSprite, placeholderSpec } from './sprites';
+import { parseManifest } from './monManifest';
+import monManifestCsv from '../../docs/mon-manifest.csv?raw';
+import ch1Batch from '../../docs/ch1-batch.json';
 import { validateSprite } from './sprite';
 import type { Sprite } from './sprite';
 import flitpeck from '../../assets/sprites/FLITPECK.sprite.json';
@@ -116,6 +119,66 @@ describe('distinct placeholders', () => {
     ] as const) {
       expect(render(name, type).count, name).toBeGreaterThan(60);
     }
+  });
+});
+
+// ── Gym-2 plan step 2 — placeholders read the MANIFEST, not the batch JSON ──
+// A mon the manifest names gets its archetype silhouette before any batch
+// JSON carries it (CH2 lines render as shapes, not the "?" blob), and every
+// CH1 mon resolves exactly as it did when the lookup read ch1-batch.json.
+describe('manifest-backed placeholders', () => {
+  const manifest = parseManifest(monManifestCsv);
+  const byName = new Map(manifest.filter((r) => r.name).map((r) => [r.name, r] as const));
+  const blob = (): Set<string> => {
+    const ctx = recCtx();
+    drawPlaceholder(ctx, null, 0, 0, { slotSize: SIZE }); // no name → the "?" blob
+    return new Set(ctx.px.keys());
+  };
+
+  test('ch1-batch.json agrees with the manifest wherever both carry a mon', () => {
+    for (const e of ch1Batch) {
+      const row = byName.get(e.name);
+      expect(row, `${e.name} missing from the manifest`).toBeDefined();
+      expect(row!.lineId, e.name).toBe(e.line_id);
+      expect(row!.stage, e.name).toBe(e.stage);
+      expect(row!.archetype, e.name).toBe(e.archetype);
+      expect([row!.type1, row!.type2].filter(Boolean), e.name).toEqual(e.types);
+    }
+  });
+
+  test('every CH1 name resolves exactly as before (the batch archetype + stage)', () => {
+    for (const e of ch1Batch) {
+      expect(placeholderSpec(e.name), e.name).toEqual({ archetype: e.archetype, stage: e.stage });
+    }
+  });
+
+  test('manifest-only (CH2) names resolve to their archetype shapes', () => {
+    expect(ch1Batch.some((e) => ['MURKIN', 'FAWNDLE', 'BUZZGRUB'].includes(e.name))).toBe(false);
+    expect(placeholderSpec('MURKIN')).toEqual({ archetype: 'Drainer', stage: 1 });
+    expect(placeholderSpec('FAWNDLE')).toEqual({ archetype: 'Pacer', stage: 1 });
+    expect(placeholderSpec('BUZZGRUB')).toEqual({ archetype: 'Glass nuke', stage: 1 });
+    const q = blob();
+    for (const [name, type] of [['MURKIN', 'VENOM'], ['FAWNDLE', 'NATURE'], ['BUZZGRUB', 'INSECT']] as const) {
+      const sig = render(name, type);
+      expect(sig.count, name).toBeGreaterThan(60);
+      expect(maskDiffers(sig.mask, q), name).toBeGreaterThan(40); // a silhouette, not the "?" blob
+    }
+    // BUZZGRUB shares FLITPECK's archetype + stage → the same bird mask.
+    expect(render('BUZZGRUB', 'INSECT').mask).toEqual(render('FLITPECK', 'GALE').mask);
+  });
+
+  test('the HIVE-unlocked evolutions still resolve to shapes', () => {
+    for (const name of ['KILNDRAKE', 'FORTDRAKE', 'VINESNAP', 'WYRMFERN', 'BRACKSLAP', 'CRASHMAW', 'CHASMTRAP']) {
+      expect(placeholderSpec(name), name).not.toBeNull();
+      expect(render(name, null).count, name).toBeGreaterThan(60);
+    }
+  });
+
+  test('unnamed manifest slots and unknown names stay on the "?" blob', () => {
+    expect(manifest.some((r) => r.name === '')).toBe(true); // the sheet does carry unnamed slots
+    expect(placeholderSpec('')).toBeNull();
+    expect(placeholderSpec('NOTAMON')).toBeNull();
+    expect(render('NOTAMON', null).mask).toEqual(blob());
   });
 });
 

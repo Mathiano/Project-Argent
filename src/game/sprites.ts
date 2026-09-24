@@ -14,8 +14,9 @@ import siltskipData from '../../assets/sprites/SILTSKIP.sprite.json';
 import siltskipBackData from '../../assets/sprites/SILTSKIP_BACK.sprite.json';
 import grithoaxData from '../../assets/sprites/GRITHOAX.sprite.json';
 import grithoaxBackData from '../../assets/sprites/GRITHOAX_BACK.sprite.json';
-import ch1BatchData from '../../docs/ch1-batch.json';
+import monManifestCsv from '../../docs/mon-manifest.csv?raw';
 import type { ElementType } from '../engine';
+import { parseManifest } from './monManifest';
 import type { Facing, Sprite } from './sprite';
 import { drawSprite, drawSpriteInSlot, validateSprite } from './sprite';
 
@@ -169,11 +170,24 @@ const PLACEHOLDER_EYE = '#f6efda';
 // Manifest-backed archetype/stage lookup. Placeholders read the LOCKED
 // manifest so they're VISUALLY DISTINCT — shape by archetype, colour by
 // type, size by evo stage — instead of an identical "?" for every mon.
+// Keyed by the NAMED rows only (unnamed slots have nothing to look up), so a
+// mon renders its silhouette the moment the manifest names it — no batch
+// JSON needed. Where ch1-batch.json also carries the mon it must agree
+// (pinned in sprites.test.ts).
 const ARCHETYPE_BY_NAME: { [name: string]: string } = {};
 const STAGE_BY_NAME: { [name: string]: number } = {};
-for (const e of ch1BatchData as ReadonlyArray<{ name: string; archetype?: string; stage?: number }>) {
+for (const e of parseManifest(monManifestCsv)) {
+  if (!e.name) continue;
   if (e.archetype) ARCHETYPE_BY_NAME[e.name] = e.archetype;
-  if (typeof e.stage === 'number') STAGE_BY_NAME[e.name] = e.stage;
+  if (Number.isInteger(e.stage)) STAGE_BY_NAME[e.name] = e.stage;
+}
+
+// The archetype + stage a named placeholder draws with, or null when the
+// name has no silhouette (→ the neutral "?" blob). Mirrors drawPlaceholder.
+export function placeholderSpec(name: string): { readonly archetype: string; readonly stage: number } | null {
+  const archetype = ARCHETYPE_BY_NAME[name];
+  if (!archetype || !SHAPES[archetype]) return null;
+  return { archetype, stage: STAGE_BY_NAME[name] ?? 1 };
 }
 
 // Silhouette primitives over NORMALISED slot coords (0..1). A shape is the
