@@ -289,7 +289,9 @@ The renderer reads the next round's rhythm status to draw the "the wind is risin
 
 > **⚠️ STALE NUMBER (flagged 2026-09-21, not silently changed):** the "Falkner: 2"
 > below predates the Spine-1 re-baseline. Falkner's live card is **`breakBar: 4`**
-> (`src/game/main.ts` + `src/sim/falknerLadder.ts`); `docs/combat-build-status.md`
+> (`src/engine/bossCards.ts` `FALKNER_CARD`, which the game (via `src/game/leaders.ts`)
+> and `src/sim/falknerLadder.ts` both load — pointer updated 2026-09-24; it read
+> `src/game/main.ts` + `src/sim/falknerLadder.ts` before `138cfd2`); `docs/combat-build-status.md`
 > records the 2→4 change with its sim evidence (at 2, a good reader Break-spammed
 > him every ~2 rounds and each Break reset `rhythmAnchor`, starving his gust cadence
 > and DIVE BOMB). Per CLAUDE.md this line is a doc-vs-doc conflict, not a design

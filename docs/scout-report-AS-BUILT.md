@@ -37,6 +37,14 @@ Both prep screens printed authored strings unconditionally. Two consequences:
 | `buildScoutReport(def, facts, hasFlag)` | Resolves a def against the player's flags → entries + `known`/`total` |
 | `intelFlagsOf(def)` | Every flag that buys a line |
 | `FALKNER_REPORT` | The Violet Gym sheet (below) |
+| `SCOUT_REPORTS` | *(added `8315ec3`, gym2-plan Step 6)* The registry: one `ScoutReportDef` per leader, keyed by the def's own `id` — the same boss id the gym map's `start-boss-battle` names |
+| `scoutReportFor(bossId)` | *(added `8315ec3`)* Looks a report up in `SCOUT_REPORTS`; **throws** on an unregistered id (a leader fight with no report is a content bug, not a blank sheet) |
+
+**The sheet** *(since `8315ec3`)* is the generic `src/game/scenes/leaderPrep.ts`
+(`createLeaderPrepScene`, opts carry `bossId` + `trainerName`); `main.ts` stages every
+leader fight through it. `scenes/falknerPrep.ts` is now a thin test-only wrapper that
+fills in FALKNER's id and name. A new gym's report is one `ScoutReportDef` plus one
+`SCOUT_REPORTS` row.
 
 A line with no `intelFlag` is **free** (you will see it the moment the fight opens,
 so redacting it would be theatre). A line with `requires` is **derived**: it is not

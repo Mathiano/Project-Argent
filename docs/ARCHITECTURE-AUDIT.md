@@ -250,6 +250,9 @@ Drift-by-file. **Pinned-by-design** items are intentional and called out separat
 2. Extend `dexLoader.ts` with `loadBossCard(entry, dex)` that constructs a `BossCard` from JSON + the loaded dex.
 3. `main.ts` and `falknerLadder.ts` both call `loadBossCard('falkner', ...)` instead of building inline.
 
+> **Resolved 2026-09-24 by `138cfd2` (+ `8315ec3` for the game side) — done differently from the proposal above; the snapshot is kept as history.**
+> The card is TS data, not JSON: `FALKNER_CARD` (`BossCardData`: roster with levels + ace trait, statScale, arenaSchedule, breakBar, openingMomentum, the GUSTBORNE trait table) in `src/engine/bossCards.ts`, and `loadBossCard(data, dexRows)` lives there too, not in `dexLoader.ts`. `src/sim/falknerLadder.ts` and the game (via `FALKNER_LEADER` in `src/game/leaders.ts`, loaded in `main.ts`) both build from it, so the `FALKNER_ARENA` literal and the `TRAITS.GUSTBORNE` mutation noted above (§3 "Notable absences", §4 `main.ts` / `falknerLadder.ts`) are gone from production code; the trait lever now travels as the card's `traits` table. **Not moved:** `phases[]` — the per-phase read rates, move table, stance distribution and Catch Breath trigger stay as code in `src/engine/bossAI.ts`. `src/game/spine.test.ts` still carries its own frozen Falkner mirror.
+
 ---
 
 ## 5. Team-battle gap

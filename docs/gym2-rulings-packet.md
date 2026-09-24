@@ -2,7 +2,7 @@
 
 **Status:** OPEN — nothing in this packet is decided. It collects every ruling the Gym 2 vertical slice (`ROAD-post-ui.md:7`) waits on, in the order that unblocks the most work, plus two skeletons (the Gym-2 boss card and `trainer-sets-ch2`) whose cells stay `TODO(ruling X)` until the matching ruling lands. CC wrote this from the gym2 build plan (step 13); CC has **not** resolved any ruling, edited any other doc, or chosen any number.
 
-**How to use it:** tick an option (or write your own) and fill the **Ruling:** line. Every settled value quoted here carries the `path:line` it came from; those lines were read at commit `8315ec3`. Anything without a citation is an open question, not canon.
+**How to use it:** tick an option (or write your own) and fill the **Ruling:** line. Every settled value quoted here carries the `path:line` it came from; those lines were read at commit `8315ec3` (re-verified at `c24808d`, 2026-09-24: only `src/game/sprites.ts` had moved, fixed below). Anything without a citation is an open question, not canon.
 
 **[BLOCKER]** = gates the most downstream work. Until the six blockers in §1 land, CC can only build plumbing (the dex registry, boss-ladder harness, leader-fight plumbing, placeholders, batch validator — all combat-neutral and bit-identical).
 
@@ -64,7 +64,7 @@ Also: is the old well in the slice? (L009's habitat is "old well", `mon-manifest
 **Ruling:** ____
 
 ### F1 [BLOCKER] — how the stamina lesson ships while combat is CLOSED
-Gym 2 teaches **stamina management** (`content-progression-scope.md:60`). The designed arena — web lines that tax Fluid, which Fire burns away (`content-progression-scope.md:60`, `combat-2-0-spec.md:143`) — and the Drained arena are unbuilt, and combat is closed (`ROAD-post-ui.md:2`, `combat-build-status.md:5`).
+Gym 2 teaches **stamina management** (`content-progression-scope.md:60`). The designed arena — web lines that tax Fluid, which Fire burns away (`content-progression-scope.md:60`, `combat-2-0-spec.md:143`) — and the Drained arena are unbuilt, and combat is closed (`combat-build-status.md:5`; `ROAD-post-ui.md:2` says so too, but that line also carries the stale "Reactive remains" — H9).
 - [ ] (a) Neutral ground; the lesson comes through the room plus the overlay/AI (TOXIC SAP casts — built, `src/engine/data.ts:128`).
 - [ ] (b) Existing mud or rocky ground (`src/engine/types.ts:278`) plus a card re-baseline.
 - [ ] (c) Reopen combat for a Fluid-tax field.
@@ -197,7 +197,7 @@ Then pin a badge → info-level table.
 **Ruling:** ____
 
 **E3 — profile fixes surfaced by measurement.**
-- STONEWALL and DUELIST sit at 92–96% vs `reader` (accepted-provisional, dormant — `src/sim/trainerCalls.test.ts:124-135`): [ ] accept · [ ] drop to mid-bond · [ ] shrink the heal · [ ] exclude from CH2.
+- STONEWALL and DUELIST sit at 92–96% vs `reader` (measured in commit bodies `2973b05`, "walls the reader 93-96%", and `2d2fc50`, "93.5→92.1% vs the reader"; the test records only the accepted-provisional ruling and a <97% bound — `src/sim/trainerCalls.test.ts:124-135`): [ ] accept · [ ] drop to mid-bond · [ ] shrink the heal · [ ] exclude from CH2.
 - TRICKSTER is fixed to FEINT in code (`src/engine/trainerAI.ts:486`, `{feintRate: 0.35, signature: 'feint'}`) vs the catalog's "Variable" (`trainer-archetype-catalog.md:72`): [ ] amend the catalog · [ ] extend ReleaseModel and re-gate.
 - DRIFTER's reactive level and bond (`trainer-archetype-catalog.md:93`).
 - AMBUSHER (`trainer-archetype-catalog.md:76-81`): [ ] author values now · [ ] defer.
@@ -233,7 +233,8 @@ Then pin a badge → info-level table.
 
 **Ruling:** ____
 
-**G2 — the INSECT placeholder hex** (the "bug-olive" family). `TYPE_COLOR` (`src/game/sprites.ts:145`) has no INSECT or STONE entry.
+**G2 — the INSECT placeholder hex** (the "bug-olive" family). `TYPE_COLOR` (`src/game/sprites.ts:146`; the packet first cited `:145`, its line at `8315ec3`) has no INSECT or STONE entry.
+- *Placeholder reach (added 2026-09-24, review of `6c7ca36`):* since that commit every NAMED `mon-manifest.csv` row outside `ch1-batch.json` draws its archetype silhouette instead of the "?" blob — 157 names, including 14 CH1-bucket rows not in the batch (NIPVOLE, BURROWDROVE, DRISKIT, DRISKADE, CHITTERLING, MITESWARM, HIVEMAW, THISTLEKIT, GLIMMERFLY, DUSKMOTH, GROTTLE, STALAGNAW, DRILLNOUT, BORESCARAB), not only CH2+. None is reachable in live play yet (no map, encounter table or roster names them). The Pacer shape (`src/game/sprites.ts:256`) is a small plain ellipse-over-a-bar with no eyes: [ ] keep it · [ ] give Pacer a distinct placeholder before a CH2 Pacer (FAWNDLE, STRIDEHART) ships.
 
 **Ruling:** ____
 
@@ -278,7 +279,7 @@ Listed, not resolved. For each: [ ] the doc stands (CC fixes the code) · [ ] th
 The lesson: **stamina management** (`content-progression-scope.md:60`). Framing line: `TODO(ruling A1)`.
 
 ### Arena
-- Designed: web lines tax Fluid; chip/poison war drains your bar (`content-progression-scope.md:60`); Fire moves burn webs away (`combat-2-0-spec.md:143`). **Unbuilt; combat is closed** (`ROAD-post-ui.md:2`).
+- Designed: web lines tax Fluid; chip/poison war drains your bar (`content-progression-scope.md:60`); Fire moves burn webs away (`combat-2-0-spec.md:143`). **Unbuilt; combat is closed** (`combat-build-status.md:5`).
 - What ships: `TODO(ruling F1)` · ground id: `TODO(ruling B5)`.
 - Reusable engine shape (if a rhythm is used): `ArenaSchedule` on the card (`src/engine/bossCards.ts:25`; Falkner's values at `:43-48`).
 
@@ -324,7 +325,7 @@ Format: Falkner's per-starter table (`falkner-boss-card.md:39-49`); yardstick `r
 `TODO(ruling F3)` — none frozen yet.
 
 ### Engine hooks
-Reuse only (no new hooks while combat is closed, `ROAD-post-ui.md:2`): arena rhythm, the trait slot, the Break bar and the card loader already exist (`src/engine/bossCards.ts:20-31`, `:69-89`). Anything new (web lines, a Drained arena) = F1(c) / B5(c).
+Reuse only (no new hooks while combat is closed, `combat-build-status.md:5`): arena rhythm, the trait slot, the Break bar and the card loader already exist (`src/engine/bossCards.ts:20-31`, `:69-89`). Anything new (web lines, a Drained arena) = F1(c) / B5(c).
 
 ### Gym room (P0 rule: the room teaches the leader, `falkner-boss-card.md:62`)
 `TODO(ruling F5)`.
